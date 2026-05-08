@@ -1,0 +1,800 @@
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { FileStack, Home, Library } from "lucide-react"
+import { toast } from "sonner"
+
+import { PromptArea, type Attachment } from "@/components/core/prompt-area"
+import {
+  WorkflowFlowCanvas,
+  type WorkflowFlowCanvasHandle,
+} from "@/features/workflow/components/workflow-flow-canvas"
+import { WorkflowFlowSkeleton } from "@/features/workflow/components/workflow-flow-skeleton"
+import { WorkflowGenerationProgress } from "@/features/workflow/components/workflow-generation-progress"
+import { WorkflowPalette } from "@/features/workflow/components/workflow-palette"
+import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-content-drawer"
+import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
+import { rfNodesToApiPayload } from "@/features/workflow/data/workflow-model"
+import {
+  useContentPageQuery,
+} from "@/shared/queries/content.query"
+import {
+  useGenerateWorkflow,
+  useGetWorkflowByRuleIdQuery,
+  useRegenerateWorkflowByRuleMutation,
+  useSaveWorkflowNodesMutation,
+} from "@/shared/queries/workflow.query"
+import {
+  useGetPipelineQuery,
+  useRetryNodeMutation,
+  useStartPipelineMutation,
+} from "@/shared/queries/pipeline.query"
+import {
+  joinPipelineRoom,
+  leavePipelineRoom,
+  onNodeCompleted,
+  onNodeFailedFinal,
+  onNodeProcessing,
+  onNodeRetrying,
+  onNodeStarted,
+  onNodeStreaming,
+  onPipelineCompleted,
+  onPipelineFailed,
+  onPipelinePaused,
+  onPipelineStarted,
+} from "@/shared/socket/pipeline-events"
+import {
+  joinWorkflowRoom,
+  leaveWorkflowRoom,
+  onWorkflowCompleted,
+  onWorkflowFailed,
+  onWorkflowGenerating,
+  onWorkflowStarted,
+} from "@/shared/socket/workflow-events"
+import type { WorkflowNode } from "@/shared/types/workflow.type"
+import type { ContentPageItem } from "@/shared/types/content.type"
+import { T } from "@/lib/tokens"
+
+type GenerationStep = "started" | "generating" | "failed"
+type RouteState = {
+  generating?: boolean
+  ruleName?: string
+}
+type ProcessingMode = "edit" | "processing" | "failed"
+const STORAGE_KEY = "neutral-tex-last-workflow"
+
+export default function WorkflowPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { ruleId } = useParams<{ ruleId: string }>()
+  const routeState = (location.state ?? {}) as RouteState
+
+  const [wfName, setWfName] = useState("Untitled Workflow")
+  const [ruleName, setRuleName] = useState<string | undefined>(
+    routeState.ruleName
+  )
+  const [activeWorkflowId, setActiveWorkflowId] = useState<string | undefined>(
+    undefined
+  )
+  const [workflowPrompt, setWorkflowPrompt] = useState("")
+  const [hovPalette, setHovPalette] = useState<number | null>(null)
+  const [apiNodes, setApiNodes] = useState<WorkflowNode[] | undefined>(
+    undefined
+  )
+  const [failureMessage, setFailureMessage] = useState("")
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>("edit")
+  const [pipelineId, setPipelineId] = useState<string | undefined>(
+    searchParams.get("pipelineId") ?? undefined
+  )
+  const [pipelineFailedMessage, setPipelineFailedMessage] = useState("")
+  const [pipelinePaused, setPipelinePaused] = useState(false)
+  const [totalNodes, setTotalNodes] = useState<number | null>(null)
+  const [completedNodes, setCompletedNodes] = useState(0)
+  const [nodeRuntimeById, setNodeRuntimeById] = useState<
+    Record<string, Record<string, unknown>>
+  >({})
+  const [contentDrawerOpen, setContentDrawerOpen] = useState(false)
+  const [contentPage, setContentPage] = useState(1)
+  const [contentItems, setContentItems] = useState<ContentPageItem[]>([])
+  const [contentTotalPages, setContentTotalPages] = useState(0)
+  const completedNodeIdsRef = useRef<Set<string>>(new Set())
+
+  const [generationStep, setGenerationStep] = useState<GenerationStep | null>(
+    routeState.generating ? "started" : null
+  )
+
+  const canvasRef = useRef<WorkflowFlowCanvasHandle>(null)
+  /** True after submit until completed/failed or nodes arrive (matches rule page processingRuleId pattern). */
+  const generationInFlightRef = useRef(false)
+  /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
+  const workflowEventTargetRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    workflowEventTargetRef.current = activeWorkflowId
+  }, [activeWorkflowId])
+
+  const generateWorkflow = useGenerateWorkflow()
+  const regenerateWorkflowByRule = useRegenerateWorkflowByRuleMutation()
+  const saveNodesMutation = useSaveWorkflowNodesMutation()
+  const startPipelineMutation = useStartPipelineMutation()
+  const retryNodeMutation = useRetryNodeMutation()
+  const pipelineQuery = useGetPipelineQuery(pipelineId)
+  const contentPageQuery = useContentPageQuery(
+    {
+      page: contentPage,
+      limit: 5,
+      filter: activeWorkflowId ? { workflowRef: activeWorkflowId } : undefined,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+    },
+    contentDrawerOpen && !!activeWorkflowId
+  )
+
+  const workflowByRuleQuery = useGetWorkflowByRuleIdQuery(ruleId, {
+    refetchInterval:
+      generationStep && generationStep !== "failed" ? 2000 : false,
+  })
+
+  useEffect(() => {
+    if (routeState.ruleName) setRuleName(routeState.ruleName)
+  }, [routeState.ruleName])
+
+  useEffect(() => {
+    if (!ruleId || !workflowByRuleQuery.isFetched) return
+
+    const data = workflowByRuleQuery.data
+
+    if (data == null) {
+      setActiveWorkflowId(undefined)
+      setApiNodes([])
+      setWfName("Untitled Workflow")
+      return
+    }
+
+    const wf = data.workflow
+    if (!wf?.workflowId) {
+      setActiveWorkflowId(undefined)
+      setApiNodes([])
+      setWfName("Untitled Workflow")
+      return
+    }
+
+    setActiveWorkflowId(wf.workflowId)
+    if (wf.name) setWfName(wf.name)
+
+    // During generation/regeneration, prioritize live workflow status over any
+    // stale nodes from the previous snapshot so progress state is not cleared early.
+    if (generationInFlightRef.current && wf.status === "generating") {
+      setApiNodes([])
+      setGenerationStep("generating")
+      return
+    }
+
+    if (wf.status === "failed") {
+      generationInFlightRef.current = false
+      setGenerationStep("failed")
+      setFailureMessage("Could not generate workflow. Please try again.")
+      return
+    }
+
+    const nodes = data.nodes ?? []
+    if (nodes.length > 0) {
+      setApiNodes(nodes)
+      setGenerationStep(null)
+      generationInFlightRef.current = false
+      try {
+        const lastWorkflow = localStorage.getItem(STORAGE_KEY)
+        if (lastWorkflow) {
+          const parsed = JSON.parse(lastWorkflow) as {
+            workflowId?: string
+            contentPrompt?: string
+            ruleId?: string
+          }
+          if (parsed.workflowId === wf.workflowId && parsed.ruleId === ruleId) {
+            setWorkflowPrompt(parsed.contentPrompt ?? "")
+          }
+        }
+      } catch {
+        // Ignore invalid local storage data.
+      }
+      return
+    }
+
+    setApiNodes([])
+    if (wf.status === "generating") {
+      setGenerationStep("generating")
+    } else {
+      setGenerationStep(null)
+    }
+  }, [ruleId, workflowByRuleQuery.data, workflowByRuleQuery.isFetched])
+
+  useEffect(() => {
+    setContentPage(1)
+    setContentItems([])
+    setContentTotalPages(0)
+  }, [activeWorkflowId])
+
+  useEffect(() => {
+    const payload = contentPageQuery.data
+    if (!payload) return
+    setContentTotalPages(payload.meta.totalPages)
+    setContentItems((prev) => {
+      if (contentPage === 1) return payload.data
+      const seen = new Set(prev.map((item) => item.contentId))
+      const appended = payload.data.filter((item) => !seen.has(item.contentId))
+      return [...prev, ...appended]
+    })
+  }, [contentPage, contentPageQuery.data])
+
+  useEffect(() => {
+    if (!pipelineQuery.data || !pipelineId) return
+    const snap = pipelineQuery.data
+    const runtime: Record<string, Record<string, unknown>> = {}
+    const completed = new Set<string>()
+    for (const node of snap.nodes) {
+      const normalizedStatus =
+        node.status === "failed"
+          ? "failed_final"
+          : node.status === "completed"
+            ? "completed"
+            : node.status
+      const merged = outputToRuntime(node.type, node.output)
+      runtime[node.nodeId] = {
+        status: normalizedStatus,
+        ...merged,
+      }
+      if (node.status === "completed") completed.add(node.nodeId)
+    }
+    completedNodeIdsRef.current = completed
+    setNodeRuntimeById(runtime)
+    setTotalNodes(snap.nodes.length)
+    setCompletedNodes(completed.size)
+    if (snap.pipeline.status === "paused") {
+      setPipelinePaused(true)
+      setProcessingMode("processing")
+    } else if (snap.pipeline.status === "running") {
+      setPipelinePaused(false)
+      setProcessingMode("processing")
+    } else if (snap.pipeline.status === "failed") {
+      setPipelineFailedMessage("Something went wrong. Please try again.")
+      setProcessingMode("failed")
+    } else if (snap.pipeline.status === "completed") {
+      setProcessingMode("processing")
+    }
+  }, [pipelineId, pipelineQuery.data])
+
+  // Stay in the workflow socket room while this workflow id is active (incl. after complete) so regeneration events are received.
+  useEffect(() => {
+    if (!activeWorkflowId) return
+    joinWorkflowRoom(activeWorkflowId)
+    return () => leaveWorkflowRoom(activeWorkflowId)
+  }, [activeWorkflowId])
+
+  useEffect(() => {
+    if (!pipelineId) return
+    joinPipelineRoom(pipelineId)
+    return () => leavePipelineRoom(pipelineId)
+  }, [pipelineId])
+
+  // Subscribe once; adopt workflow id from first event when HTTP has not set state yet (fixes race before onSuccess).
+  useEffect(() => {
+    function allowsWorkflowSocket(id: string): boolean {
+      const known = workflowEventTargetRef.current
+      if (known !== undefined) return id === known
+      if (!generationInFlightRef.current) return false
+      workflowEventTargetRef.current = id
+      setActiveWorkflowId(id)
+      joinWorkflowRoom(id)
+      return true
+    }
+
+    const cleanups = [
+      onWorkflowStarted(({ workflowId: id }) => {
+        if (!allowsWorkflowSocket(id)) return
+        setGenerationStep("started")
+      }),
+      onWorkflowGenerating(({ workflowId: id }) => {
+        if (!allowsWorkflowSocket(id)) return
+        setGenerationStep("generating")
+      }),
+      onWorkflowCompleted(({ workflowId: id, nodes }) => {
+        if (!allowsWorkflowSocket(id)) return
+        generationInFlightRef.current = false
+        setApiNodes(nodes)
+        setGenerationStep(null)
+      }),
+      onWorkflowFailed(({ workflowId: id, message }) => {
+        if (!allowsWorkflowSocket(id)) return
+        generationInFlightRef.current = false
+        setFailureMessage(
+          message ?? "Could not generate workflow. Please try again."
+        )
+        setGenerationStep("failed")
+      }),
+    ]
+
+    return () => cleanups.forEach((fn) => fn())
+  }, [])
+
+  useEffect(() => {
+    if (!pipelineId) return
+    const cleanups = [
+      onPipelineStarted(({ pipelineId: id, totalNodes: total }) => {
+        if (id !== pipelineId) return
+        setTotalNodes(total)
+        setCompletedNodes(0)
+        completedNodeIdsRef.current.clear()
+      }),
+      onNodeStarted(({ pipelineId: id, nodeId }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "running",
+            processingMessage: "Generating...",
+            errorMessage: undefined,
+          },
+        }))
+      }),
+      onNodeStreaming(({ pipelineId: id, nodeId, chunk }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "streaming",
+            previewText: `${String(prev[nodeId]?.previewText ?? "")}${chunk}`,
+          },
+        }))
+      }),
+      onNodeProcessing(({ pipelineId: id, nodeId, message }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "processing",
+            processingMessage: message,
+          },
+        }))
+      }),
+      onNodeRetrying(({ pipelineId: id, nodeId, attempt, maxAttempts }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "retrying",
+            retryAttempt: attempt,
+            retryMaxAttempts: maxAttempts,
+            processingMessage: `Retrying... attempt ${attempt}/${maxAttempts}`,
+          },
+        }))
+      }),
+      onNodeCompleted(({ pipelineId: id, nodeId, nodeType, output }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "completed",
+            ...outputToRuntime(nodeType, output),
+            processingMessage: undefined,
+            errorMessage: undefined,
+          },
+        }))
+        if (!completedNodeIdsRef.current.has(nodeId)) {
+          completedNodeIdsRef.current.add(nodeId)
+          setCompletedNodes(completedNodeIdsRef.current.size)
+        }
+      }),
+      onNodeFailedFinal(({ pipelineId: id, nodeId, message }) => {
+        if (id !== pipelineId) return
+        setNodeRuntimeById((prev) => ({
+          ...prev,
+          [nodeId]: {
+            ...(prev[nodeId] ?? {}),
+            status: "failed_final",
+            errorMessage: message,
+            processingMessage: undefined,
+          },
+        }))
+      }),
+      onPipelinePaused(({ pipelineId: id }) => {
+        if (id !== pipelineId) return
+        setPipelinePaused(true)
+      }),
+      onPipelineCompleted(({ pipelineId: id, contentId }) => {
+        if (id !== pipelineId) return
+        setPipelinePaused(false)
+        setTimeout(() => {
+          leavePipelineRoom(id)
+          setSearchParams((params) => {
+            params.delete("pipelineId")
+            return params
+          })
+          navigate(`/content/${contentId}`)
+        }, 1000)
+      }),
+      onPipelineFailed(({ pipelineId: id, message }) => {
+        if (id !== pipelineId) return
+        setPipelinePaused(false)
+        setPipelineFailedMessage(message ?? "Something went wrong. Please try again.")
+        setProcessingMode("failed")
+      }),
+    ]
+    return () => cleanups.forEach((fn) => fn())
+  }, [navigate, pipelineId, setSearchParams])
+
+  function handleSave() {
+    if (!activeWorkflowId || !ruleId) return
+    const rfNodes = canvasRef.current?.getRfNodes() ?? []
+    const rfEdges = canvasRef.current?.getRfEdges() ?? []
+    saveNodesMutation.mutate({
+      workflowId: activeWorkflowId,
+      ruleId,
+      nodes: rfNodesToApiPayload(rfNodes, rfEdges),
+    })
+  }
+
+  function handleStartPipeline() {
+    if (!activeWorkflowId || !ruleId) return
+    const contentPrompt = workflowPrompt.trim()
+    if (!contentPrompt) {
+      toast.error("Please enter a content prompt first.")
+      return
+    }
+    startPipelineMutation.mutate(
+      { workflowId: activeWorkflowId, ruleId, contentPrompt },
+      {
+        onSuccess: ({ pipelineId: id }) => {
+          setPipelineId(id)
+          setSearchParams((params) => {
+            params.set("pipelineId", id)
+            return params
+          })
+          setProcessingMode("processing")
+          setPipelinePaused(false)
+          setTotalNodes(apiNodes?.length ?? null)
+          setCompletedNodes(0)
+          completedNodeIdsRef.current.clear()
+          setNodeRuntimeById(() =>
+            Object.fromEntries(
+              (apiNodes ?? []).map((n) => [n.nodeId, { status: "pending" }])
+            )
+          )
+          joinPipelineRoom(id)
+        },
+        onError: () => {
+          toast.error("Could not start pipeline. Please try again.")
+        },
+      }
+    )
+  }
+
+  function handleRetryNode(nodeId: string) {
+    if (!pipelineId) return
+    retryNodeMutation.mutate(
+      { pipelineId, payload: { nodeId } },
+      {
+        onSuccess: () => {
+          setPipelinePaused(false)
+          setNodeRuntimeById((prev) => ({
+            ...prev,
+            [nodeId]: {
+              ...(prev[nodeId] ?? {}),
+              status: "running",
+              errorMessage: undefined,
+              processingMessage: "Generating...",
+            },
+          }))
+        },
+        onError: () => {
+          toast.error("Could not retry. Please try again.")
+        },
+      }
+    )
+  }
+
+  function handleGenerate(text: string, _attachments: Attachment[]) {
+    const contentPrompt = text.trim()
+    if (!contentPrompt || !ruleId) return
+    generationInFlightRef.current = true
+    setGenerationStep("started")
+    // Re-enter room before HTTP returns so we do not miss fast `workflow:started` / `workflow:generating` emissions.
+    if (activeWorkflowId) joinWorkflowRoom(activeWorkflowId)
+    const onSuccess = (data: { workflowId: string }) => {
+      workflowEventTargetRef.current = data.workflowId
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ workflowId: data.workflowId, contentPrompt, ruleId })
+      )
+      setWorkflowPrompt(contentPrompt)
+      setActiveWorkflowId(data.workflowId)
+      setApiNodes([])
+      joinWorkflowRoom(data.workflowId)
+      navigate(`/workflow/${ruleId}`, {
+        replace: true,
+        state: { ruleName, generating: true },
+      })
+      void workflowByRuleQuery.refetch()
+    }
+    if (activeWorkflowId) {
+      regenerateWorkflowByRule.mutate({ contentPrompt, ruleId }, { onSuccess })
+      return
+    }
+    generateWorkflow.mutate({ contentPrompt, ruleId }, { onSuccess })
+  }
+
+  const canvasMode = useMemo(() => {
+    if (
+      generationStep &&
+      generationStep !== "failed" &&
+      (!apiNodes || apiNodes.length === 0)
+    )
+      return "loading"
+    if (workflowByRuleQuery.isLoading && (!apiNodes || apiNodes.length === 0))
+      return "loading"
+    if (workflowByRuleQuery.isFetched && workflowByRuleQuery.data == null)
+      return "empty"
+    if (!apiNodes || apiNodes.length === 0) return "empty"
+    return "ready"
+  }, [
+    apiNodes,
+    generationStep,
+    ruleId,
+    workflowByRuleQuery.data,
+    workflowByRuleQuery.isFetched,
+    workflowByRuleQuery.isLoading,
+  ])
+
+  const progressPercent = useMemo(() => {
+    if (!totalNodes || totalNodes <= 0) return null
+    return Math.round((completedNodes / totalNodes) * 100)
+  }, [completedNodes, totalNodes])
+
+  if (!ruleId) {
+    return (
+      <div
+        className="flex min-h-0 flex-1 flex-col items-center justify-center p-6"
+        style={{ background: T.canvasBg }}
+      >
+        <p className="text-sm" style={{ color: T.textSecondary }}>
+          Invalid workflow URL. Open a workflow from Rules.
+        </p>
+        <button
+          type="button"
+          className="mt-4 text-sm font-medium underline"
+          style={{ color: T.accent }}
+          onClick={() => navigate("/rules")}
+        >
+          Go to Rules
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      style={{ background: T.canvasBg }}
+    >
+      <WorkflowToolbar
+        wfName={wfName}
+        onWfNameChange={setWfName}
+        ruleName={ruleName}
+        onRuleClick={() =>
+          navigate("/rules", { state: { selectedRuleId: ruleId } })
+        }
+        onRun={handleStartPipeline}
+        runLabel="Start Generation"
+        onSave={activeWorkflowId && processingMode === "edit" ? handleSave : undefined}
+        isSaving={saveNodesMutation.isPending}
+        readOnly={processingMode === "processing"}
+        showCancel={processingMode === "processing"}
+      />
+
+      {processingMode === "processing" ? (
+        <div className="border-b bg-white px-4 py-2">
+          {pipelinePaused ? (
+            <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Pipeline paused - please retry the failed node to continue.
+            </div>
+          ) : null}
+          <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+            <span>
+              {progressPercent == null
+                ? "Running..."
+                : `${completedNodes} of ${totalNodes ?? 0} nodes completed`}
+            </span>
+            <span>{progressPercent == null ? "..." : `${progressPercent}%`}</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
+            <div
+              className="h-full rounded bg-emerald-500 transition-all"
+              style={{ width: progressPercent == null ? "35%" : `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {processingMode === "failed" ? (
+        <div className="m-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div>{pipelineFailedMessage || "Something went wrong. Please try again."}</div>
+          <button
+            type="button"
+            className="mt-2 rounded border border-red-400 px-3 py-1 text-xs"
+            onClick={() => {
+              setProcessingMode("edit")
+              setPipelineFailedMessage("")
+              if (pipelineId) leavePipelineRoom(pipelineId)
+              setPipelineId(undefined)
+              setSearchParams((params) => {
+                params.delete("pipelineId")
+                return params
+              })
+            }}
+          >
+            Start Over
+          </button>
+        </div>
+      ) : null}
+
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        {processingMode === "edit" ? (
+          <WorkflowPalette hovPalette={hovPalette} onHover={setHovPalette} />
+        ) : null}
+        {canvasMode === "loading" ? (
+          <WorkflowFlowSkeleton />
+        ) : canvasMode === "empty" ? (
+          <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+            <div className="max-w-md text-center">
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: T.textPrimary }}
+              >
+                Start your workflow
+              </h2>
+              <p className="mt-2 text-sm" style={{ color: T.textSecondary }}>
+                Use the prompt box to generate nodes for this workflow. You can
+                then reorder, connect, and update each node.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <WorkflowFlowCanvas
+            ref={canvasRef}
+            apiNodes={apiNodes}
+            readOnly={processingMode === "processing"}
+            runtimeById={nodeRuntimeById}
+            onRetryNode={handleRetryNode}
+          />
+        )}
+        {processingMode === "edit" ? (
+          <div className="pointer-events-none absolute bottom-0 left-1/2 z-20 flex w-full -translate-x-1/2 justify-center px-4 pb-4">
+          <div className="pointer-events-auto w-full max-w-[760px] rounded-2xl border border-canvas-200 bg-white/95 p-2 shadow-lg backdrop-blur">
+            <p className="px-2 pb-1 text-xs font-medium text-canvas-500">
+              Workflow Prompt {workflowPrompt ? `- ${workflowPrompt}` : ""}
+            </p>
+            <PromptArea
+              value={workflowPrompt}
+              onChange={setWorkflowPrompt}
+              onSubmit={handleGenerate}
+              placeholder="Describe the content you want this workflow to generate..."
+              className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+            />
+          </div>
+          </div>
+        ) : null}
+      </div>
+
+      {generationStep ? (
+        <WorkflowGenerationProgress
+          step={generationStep}
+          failureMessage={failureMessage}
+          onRetry={
+            generationStep === "failed"
+              ? () => navigate("/rules", { state: { selectedRuleId: ruleId } })
+              : undefined
+          }
+        />
+      ) : null}
+
+      <div className="pointer-events-none fixed right-6 bottom-6 z-30 flex flex-col gap-2">
+        <button
+          type="button"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
+          onClick={() => setContentDrawerOpen(true)}
+          title="Workflow Contents"
+        >
+          <Library className="size-4" />
+        </button>
+        <button
+          type="button"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
+          onClick={() => navigate("/")}
+          title="Go to Home"
+        >
+          <Home className="size-4" />
+        </button>
+        <button
+          type="button"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
+          onClick={() =>
+            navigate("/rules", { state: { selectedRuleId: ruleId } })
+          }
+          title="Go to Rules"
+        >
+          <FileStack className="size-4" />
+        </button>
+      </div>
+
+      <WorkflowContentDrawer
+        open={contentDrawerOpen}
+        onOpenChange={(open) => {
+          setContentDrawerOpen(open)
+          if (open) {
+            setContentPage(1)
+            setContentItems([])
+          }
+        }}
+        items={contentItems}
+        isLoading={contentPageQuery.isLoading}
+        canViewMore={contentPage < contentTotalPages}
+        isLoadingMore={contentPageQuery.isFetching && contentPage > 1}
+        onViewMore={() => {
+          if (contentPageQuery.isFetching) return
+          setContentPage((p) => p + 1)
+        }}
+      />
+    </div>
+  )
+}
+
+function outputToRuntime(
+  nodeType: string,
+  output: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  if (!output) return {}
+  const textLike =
+    typeof output.text === "string"
+      ? output.text
+      : typeof output.translatedText === "string"
+        ? output.translatedText
+        : typeof output.transcription === "string"
+          ? output.transcription
+          : typeof output.summary === "string"
+            ? output.summary
+            : undefined
+  const truncated = textLike && textLike.length > 100 ? `${textLike.slice(0, 100)}...` : textLike
+  switch (nodeType) {
+    case "text_generation":
+    case "translation":
+    case "transcription":
+    case "summarization":
+      return { previewText: truncated }
+    case "image_generation":
+      return {
+        previewImage:
+          typeof output.image === "string"
+            ? output.image
+            : typeof output.output === "string"
+              ? output.output
+              : undefined,
+      }
+    case "video_generation":
+      return {
+        previewVideo:
+          typeof output.video === "string"
+            ? output.video
+            : typeof output.output === "string"
+              ? output.output
+              : undefined,
+      }
+    default:
+      return { previewText: truncated }
+  }
+}
