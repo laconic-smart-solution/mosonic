@@ -71,7 +71,7 @@ export class RuleController {
     new ValidationPipe({
       transform: true,
       whitelist: true,
-      forbidNonWhitelisted: false,
+      forbidNonWhitelisted: true,
       transformOptions: { enableImplicitConversion: true },
     }),
   )

@@ -13,7 +13,7 @@ import {
 import type { RuleFlowNodeData } from "@/features/rules/data/rules-mock"
 
 export type BubbleNodeData = RuleFlowNodeData & {
-  onSaveNode: (fieldKey: string, nextValue: string) => void
+  onSaveNode: (fieldPath: string, nextValue: string) => void
   savePending?: boolean
 }
 
@@ -34,7 +34,7 @@ export function BubbleNode({ data }: NodeProps<Node<BubbleNodeData>>) {
   }
   const level = (data.level ?? 0) as RuleFlowNodeData["level"]
   const theme = levelTheme[level]
-  const isEditable = data.editable && typeof data.fieldKey === "string"
+  const isEditable = data.editable && typeof data.fieldPath === "string"
 
   return (
     <>
@@ -69,7 +69,7 @@ export function BubbleNode({ data }: NodeProps<Node<BubbleNodeData>>) {
               <Button
                 className="w-full"
                 disabled={data.savePending}
-                onClick={() => data.onSaveNode(data.fieldKey as string, value)}
+                onClick={() => data.onSaveNode(data.fieldPath as string, value)}
               >
                 {data.savePending ? (
                   <span className="inline-flex items-center justify-center gap-2">

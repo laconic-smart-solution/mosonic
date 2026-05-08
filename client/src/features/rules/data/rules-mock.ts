@@ -81,7 +81,7 @@ export type RuleFlowNodeData = {
   label: string
   level: 0 | 1 | 2 | 3
   editable: boolean
-  fieldKey?: string
+  fieldPath?: string
   editValue?: string
 }
 
@@ -382,7 +382,7 @@ export function buildRuleFlow(rule: RuleEntity): { nodes: Node[]; edges: Edge[] 
             label: fieldValueLabel,
             level: 3,
             editable: true,
-            fieldKey: section.key,
+            fieldPath: `${section.key}.${field.key}`,
             editValue: fieldValueLabel,
           },
         })
@@ -427,7 +427,10 @@ export function buildRuleFlow(rule: RuleEntity): { nodes: Node[]; edges: Edge[] 
             label: item,
             level: 3,
             editable: true,
-            fieldKey: section.key,
+            fieldPath:
+              section.key === "channels"
+                ? `channels[${itemIndex}].channel`
+                : `${section.key}.${field.key}[${itemIndex}]`,
             editValue: item,
           },
         })
@@ -446,62 +449,105 @@ export function buildRuleFlow(rule: RuleEntity): { nodes: Node[]; edges: Edge[] 
 
 export function updateRuleFromNode(
   rule: RuleEntity,
-  nodeId: string,
+  fieldPath: string,
   nextValue: string,
 ): RuleEntity {
-  if (nodeId === "brand") {
-    const [brandName = rule.brand.brandName, tonesRaw = "", ctaRaw = ""] = nextValue.split("\n")
-    return {
-      ...rule,
-      brand: {
-        ...rule.brand,
-        brandName: brandName.trim() || rule.brand.brandName,
-        brandTone: tonesRaw
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        callToAction: ctaRaw.replace("CTA:", "").trim() || rule.brand.callToAction,
-      },
+  const value = nextValue.trim()
+  if (!value) return rule
+
+  const updateArrayItem = (items: string[], index: number, itemValue: string) => {
+    if (index < 0 || index >= items.length) return items
+    const nextItems = [...items]
+    nextItems[index] = itemValue
+    return nextItems
+  }
+
+  const listItemMatch = fieldPath.match(/^([^.[\]]+)\.([^.[\]]+)\[(\d+)\]$/)
+  if (listItemMatch) {
+    const [, section, field, indexRaw] = listItemMatch
+    const index = Number(indexRaw)
+    if (!Number.isInteger(index)) return rule
+    if (section === "brand" && field === "brandTone") {
+      return {
+        ...rule,
+        brand: { ...rule.brand, brandTone: updateArrayItem(rule.brand.brandTone, index, value) },
+      }
+    }
+    if (section === "audience" && field === "location") {
+      return {
+        ...rule,
+        audience: { ...rule.audience, location: updateArrayItem(rule.audience.location, index, value) },
+      }
+    }
+    if (section === "audience" && field === "interests") {
+      return {
+        ...rule,
+        audience: { ...rule.audience, interests: updateArrayItem(rule.audience.interests, index, value) },
+      }
+    }
+    if (section === "campaign" && field === "goals") {
+      return {
+        ...rule,
+        campaign: { ...rule.campaign, goals: updateArrayItem(rule.campaign.goals, index, value) },
+      }
+    }
+    if (section === "campaign" && field === "keywords") {
+      return {
+        ...rule,
+        campaign: { ...rule.campaign, keywords: updateArrayItem(rule.campaign.keywords, index, value) },
+      }
+    }
+    if (section === "campaign" && field === "contentFormats") {
+      return {
+        ...rule,
+        campaign: {
+          ...rule.campaign,
+          contentFormats: updateArrayItem(rule.campaign.contentFormats, index, value),
+        },
+      }
+    }
+    if (section === "contentGuidelines" && field === "dos") {
+      return {
+        ...rule,
+        contentGuidelines: {
+          ...rule.contentGuidelines,
+          dos: updateArrayItem(rule.contentGuidelines.dos, index, value),
+        },
+      }
+    }
+    if (section === "contentGuidelines" && field === "donts") {
+      return {
+        ...rule,
+        contentGuidelines: {
+          ...rule.contentGuidelines,
+          donts: updateArrayItem(rule.contentGuidelines.donts, index, value),
+        },
+      }
     }
   }
-  if (nodeId === "audience") {
-    const [description = "", locationsRaw = ""] = nextValue.split("\n")
+
+  const channelFieldMatch = fieldPath.match(/^channels\[(\d+)\]\.channel$/)
+  if (channelFieldMatch) {
+    const index = Number(channelFieldMatch[1])
+    if (!Number.isInteger(index) || index < 0 || index >= rule.channels.length) return rule
     return {
       ...rule,
-      audience: {
-        ...rule.audience,
-        description: description.trim() || rule.audience.description,
-        location: locationsRaw
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      },
+      channels: rule.channels.map((channel, i) =>
+        i === index ? { ...channel, channel: value } : channel,
+      ),
     }
   }
-  if (nodeId === "campaign") {
-    return { ...rule, campaign: { ...rule.campaign, goals: nextValue.split(",").map((s) => s.trim()) } }
+
+  if (fieldPath === "brand.brandName") {
+    return { ...rule, brand: { ...rule.brand, brandName: value } }
   }
-  if (nodeId === "channels") {
-    return {
-      ...rule,
-      channels: nextValue
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((channel) => ({ channel, priority: "medium", contentStyle: "custom style" })),
-    }
+  if (fieldPath === "brand.callToAction") {
+    return { ...rule, brand: { ...rule.brand, callToAction: value } }
   }
-  if (nodeId === "contentGuidelines") {
-    const [dosRaw = "", dontsRaw = ""] = nextValue.split("\nDonts:")
-    return {
-      ...rule,
-      contentGuidelines: {
-        ...rule.contentGuidelines,
-        dos: dosRaw.replace("Dos:", "").split(",").map((s) => s.trim()).filter(Boolean),
-        donts: dontsRaw.split(",").map((s) => s.trim()).filter(Boolean),
-      },
-    }
+  if (fieldPath === "audience.description") {
+    return { ...rule, audience: { ...rule.audience, description: value } }
   }
+
   return rule
 }
 

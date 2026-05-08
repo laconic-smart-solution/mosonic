@@ -303,7 +303,7 @@ export class RuleService {
     };
 
     const updated = await this.ruleModel
-      .findOneAndUpdate({ ruleId }, { $set }, { new: true })
+      .findOneAndUpdate({ ruleId }, { $set }, { new: true, runValidators: true })
       .exec();
     if (!updated) {
       throw new NotFoundException(`Rule ${ruleId} not found`);

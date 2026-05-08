@@ -95,23 +95,16 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 function treeSectionPatch(
-  fieldKey: string,
+  fieldPath: string,
   merged: RuleEntity
 ): RulePatchPayload {
-  switch (fieldKey) {
-    case "brand":
-      return { brand: merged.brand }
-    case "audience":
-      return { audience: merged.audience }
-    case "campaign":
-      return { campaign: merged.campaign }
-    case "channels":
-      return { channels: merged.channels }
-    case "contentGuidelines":
-      return { contentGuidelines: merged.contentGuidelines }
-    default:
-      return {}
-  }
+  if (fieldPath.startsWith("brand.")) return { brand: merged.brand }
+  if (fieldPath.startsWith("audience.")) return { audience: merged.audience }
+  if (fieldPath.startsWith("campaign.")) return { campaign: merged.campaign }
+  if (fieldPath.startsWith("channels[")) return { channels: merged.channels }
+  if (fieldPath.startsWith("contentGuidelines."))
+    return { contentGuidelines: merged.contentGuidelines }
+  return {}
 }
 
 function toReplacePayload(rule: RuleEntity): RuleReplacePayload {
@@ -353,16 +346,16 @@ export default function RulesPage() {
   }, [selectedRule])
 
   const onSaveNode = useCallback(
-    (fieldKey: string, nextValue: string) => {
+    (fieldPath: string, nextValue: string) => {
       if (!selectedRuleId) return
       const old = queryClient.getQueryData<RuleEntity>(["rule", selectedRuleId])
       if (!old) return
       if (old.status === "processing") return
-      const next = updateRuleFromNode(old, fieldKey, nextValue)
-      const patch = treeSectionPatch(fieldKey, next)
+      const next = updateRuleFromNode(old, fieldPath, nextValue)
+      const patch = treeSectionPatch(fieldPath, next)
       if (Object.keys(patch).length === 0) return
       queryClient.setQueryData<RuleEntity>(["rule", selectedRuleId], next)
-      setTreeSavePendingKey(fieldKey)
+      setTreeSavePendingKey(fieldPath)
       patchRuleMutation.mutate(
         { ruleId: selectedRuleId, patch },
         {
@@ -372,7 +365,7 @@ export default function RulesPage() {
             queryClient.setQueryData<RuleEntity>(["rule", selectedRuleId], old)
           },
           onSettled: () => {
-            setTreeSavePendingKey((prev) => (prev === fieldKey ? null : prev))
+            setTreeSavePendingKey((prev) => (prev === fieldPath ? null : prev))
           },
         }
       )
@@ -391,15 +384,15 @@ export default function RulesPage() {
   const enhancedNodes = useMemo(() => {
     return flow.nodes.map((node) => {
       const base = node.data as RuleFlowNodeData
-      const fieldKey = base.fieldKey
+      const fieldPath = base.fieldPath
       return {
         ...node,
         data: {
           ...base,
           savePending:
-            typeof fieldKey === "string" && treeSavePendingKey === fieldKey,
-          onSaveNode: (fk: string, nextValue: string) =>
-            onSaveNodeRef.current(fk, nextValue),
+            typeof fieldPath === "string" && treeSavePendingKey === fieldPath,
+          onSaveNode: (fp: string, nextValue: string) =>
+            onSaveNodeRef.current(fp, nextValue),
         },
       }
     }) as Node<BubbleNodeData>[]

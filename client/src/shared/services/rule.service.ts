@@ -46,7 +46,7 @@ export type RulesPageableResponse<T = unknown> = {
 
 export const ruleService = {
   extract: async (payload: ExtractRulePayload): Promise<ExtractRuleResponse> => {
-    const response = await apiClient.post("/rule/extract", payload)
+    const response = await apiClient.post("/rules/extract", payload)
     return response.data
   },
   getById: async <T = unknown>(ruleId: string): Promise<T> => {
