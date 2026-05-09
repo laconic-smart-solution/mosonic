@@ -23,7 +23,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # file-type@22+ and other deps require Node >= 22
+          node-version: "22"
           cache: yarn
           cache-dependency-path: server/yarn.lock
 
@@ -47,7 +48,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: yarn
           cache-dependency-path: client/yarn.lock
 
