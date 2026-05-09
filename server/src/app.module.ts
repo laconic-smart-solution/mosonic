@@ -16,9 +16,15 @@ import { PipelineModule } from './pipeline/pipeline.module';
 import { RuleModule } from './rule/rule.module';
 import { UploadModule } from './upload/upload.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
+    AuthModule,
+    UsersModule,
+    AdminModule,
     LlmModule,
     PreprocessingModule,
     EventsModule,
