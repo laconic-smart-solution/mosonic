@@ -100,13 +100,24 @@ export class Content {
   @Prop({ required: true, index: true })
   ruleRef: string;
 
-  /** Active version row in `versions` (must exist when versions is non-empty). */
-  @Prop({ type: Number, required: true, default: 1, min: 1 })
-  currentVersion: number;
+  /** Single-state AI outputs used by content detail/edit flows. */
+  @Prop({ type: ContentOutputsSchema, default: {} })
+  outputs: ContentOutputs;
 
-  /** Full version history; append-only for audit. */
+  /** Single-state user edits layered on top of `outputs`. */
+  @Prop({ type: ContentUserEditsSchema, default: {} })
+  userEdits: ContentUserEdits;
+
+  /** Node-type key -> prompt override used by re-run flows. */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  nodePromptOverrides: Record<string, string>;
+
+  /** Legacy version fields kept for backward DB compatibility (unused by new flows). */
+  @Prop({ type: Number, min: 1 })
+  currentVersion?: number;
+
   @Prop({ type: [ContentVersionEntrySchema], default: [] })
-  versions: ContentVersionEntry[];
+  versions?: ContentVersionEntry[];
 
   @Prop({
     type: String,

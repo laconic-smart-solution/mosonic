@@ -63,7 +63,6 @@ export class ContentPageItemDto {
   workflowRef!: string;
   ruleRef!: string;
   status!: ContentStatus;
-  currentVersion!: number;
   updatedAt!: string;
   createdAt!: string;
 }

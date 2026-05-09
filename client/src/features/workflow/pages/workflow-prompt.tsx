@@ -12,8 +12,6 @@ import { HomeBackdrop } from "@/features/home/components/home-backdrop"
 import WorkflowExistingBanner from "../components/workflow-existing-banner"
 import WorkflowFloatingNavigation from "../components/workflow-floating-navigation"
 
-const STORAGE_KEY = "neutral-tex-last-workflow"
-
 type RouteState = {
   ruleId?: string
   ruleName?: string
@@ -50,10 +48,6 @@ export default function WorkflowPromptPage() {
       {
         onSuccess: (data) => {
           const { workflowId } = data
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({ workflowId, contentPrompt, ruleId })
-          )
           joinWorkflowRoom(workflowId)
           navigate(ruleId ? `/workflow/${ruleId}` : "/rules", { state: { generating: true, ruleName } })
         },

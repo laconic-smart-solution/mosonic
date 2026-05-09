@@ -26,7 +26,10 @@ import {
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
-import { Workflow, type WorkflowDocument } from '../workflow/schemas/workflow.schema';
+import {
+  Workflow,
+  type WorkflowDocument,
+} from '../workflow/schemas/workflow.schema';
 import { NodeExecutor } from './node-executor.service';
 
 @Injectable()
@@ -91,6 +94,7 @@ export class OrchestrationService {
         order: node.order,
         isLocked: node.isLocked,
         userPrompt: node.userPrompt ?? '',
+        config: (node.config ?? {}) as Record<string, unknown>,
         status: PipelineNodeExecutionStatus.Pending,
         input: '',
         output: null,
@@ -143,13 +147,19 @@ export class OrchestrationService {
       nodeId: string;
       type: string;
       order: number;
+      isLocked: boolean;
+      userPrompt: string;
+      config: Record<string, unknown>;
       status: string;
       output: Record<string, unknown> | null;
       retryCount: number;
       executedAt: Date | null;
     }>;
   }> {
-    const pipeline = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
+    const pipeline = await this.pipelineModel
+      .findOne({ pipelineId })
+      .lean()
+      .exec();
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -167,6 +177,9 @@ export class OrchestrationService {
         nodeId: node.nodeId,
         type: node.type,
         order: node.order,
+        isLocked: node.isLocked,
+        userPrompt: node.userPrompt ?? '',
+        config: node.config ?? {},
         status: node.status,
         output: parseNodeOutput(node.output),
         retryCount: node.retryCount,
@@ -206,7 +219,11 @@ export class OrchestrationService {
       });
     }
 
-    await this.updatePipelineStatus(pipelineId, PipelineStatus.Completed, new Date());
+    await this.updatePipelineStatus(
+      pipelineId,
+      PipelineStatus.Completed,
+      new Date(),
+    );
     const contentId = await this.createContent({
       pipelineId,
       workflowId,
@@ -336,30 +353,25 @@ export class OrchestrationService {
       pipelineRef: args.pipelineId,
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
-      currentVersion: 1,
-      versions: [
-        {
-          versionNumber: 1,
-          outputs: {
-            text: args.context.previousOutputs.text,
-            image: args.context.previousOutputs.image,
-            translatedText: args.context.previousOutputs.translatedText,
-            video: args.context.previousOutputs.video,
-            transcription: args.context.previousOutputs.transcription,
-            summary: args.context.previousOutputs.summary,
-          },
-          userEdits: {},
-          nodePromptOverrides: {},
-          createdAt: new Date(),
-        },
-      ],
+      outputs: {
+        text: args.context.previousOutputs.text,
+        image: args.context.previousOutputs.image,
+        translatedText: args.context.previousOutputs.translatedText,
+        video: args.context.previousOutputs.video,
+        transcription: args.context.previousOutputs.transcription,
+        summary: args.context.previousOutputs.summary,
+      },
+      userEdits: {},
+      nodePromptOverrides: {},
       status: ContentStatus.Draft,
     });
     return content.contentId;
   }
 }
 
-function parseNodeOutput(output: string | null): Record<string, unknown> | null {
+function parseNodeOutput(
+  output: string | null,
+): Record<string, unknown> | null {
   if (!output) return null;
   try {
     const parsed = JSON.parse(output) as unknown;

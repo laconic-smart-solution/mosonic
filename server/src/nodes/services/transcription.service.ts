@@ -47,7 +47,10 @@ function normalizeTranscriptionConfig(
   };
 }
 
-function inferMimeType(sourceType: NodeMediaSourceType, fileName: string): string {
+function inferMimeType(
+  sourceType: NodeMediaSourceType,
+  fileName: string,
+): string {
   const lower = fileName.toLowerCase();
   if (sourceType === NodeMediaSourceType.Audio) {
     if (lower.endsWith('.wav')) return 'audio/wav';
@@ -60,7 +63,10 @@ function inferMimeType(sourceType: NodeMediaSourceType, fileName: string): strin
   return 'video/mp4';
 }
 
-function fileNameFromUrl(urlString: string, sourceType: NodeMediaSourceType): string {
+function fileNameFromUrl(
+  urlString: string,
+  sourceType: NodeMediaSourceType,
+): string {
   try {
     const url = new URL(urlString);
     const candidate = decodeURIComponent(url.pathname.split('/').pop() || '');
@@ -106,7 +112,9 @@ export class TranscriptionService {
       );
     }
     const contentLengthHeader = response.headers.get('content-length');
-    const contentLength = contentLengthHeader ? Number(contentLengthHeader) : undefined;
+    const contentLength = contentLengthHeader
+      ? Number(contentLengthHeader)
+      : undefined;
     if (
       typeof contentLength === 'number' &&
       Number.isFinite(contentLength) &&
@@ -141,7 +149,10 @@ export class TranscriptionService {
     }
 
     const { buffer } = await this.downloadSource(normalized.sourceUrl);
-    const fileName = fileNameFromUrl(normalized.sourceUrl, normalized.sourceType);
+    const fileName = fileNameFromUrl(
+      normalized.sourceUrl,
+      normalized.sourceType,
+    );
     const mimeType = inferMimeType(normalized.sourceType, fileName);
 
     const transcription = await this.llm.transcribeMedia({

@@ -35,7 +35,9 @@ export class UploadMediaController {
       );
     }
     const endpoint = `${base.replace(/\/+$/, '')}/upload`;
-    const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype });
+    const blob = new Blob([new Uint8Array(file.buffer)], {
+      type: file.mimetype,
+    });
     const form = new FormData();
     form.append('file', blob, file.originalname);
 
@@ -55,7 +57,9 @@ export class UploadMediaController {
     };
     const data = payload?.data;
     if (!payload?.success || !data) {
-      throw new BadRequestException('File service returned an invalid response');
+      throw new BadRequestException(
+        'File service returned an invalid response',
+      );
     }
     const url = data.fileUrl?.trim() || data.relativePath?.trim();
     if (!url) {

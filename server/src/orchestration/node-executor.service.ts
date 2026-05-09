@@ -78,7 +78,9 @@ export class NodeExecutor {
       : new Error('Node execution failed');
   }
 
-  private async executeNode(input: NodeExecutorInput): Promise<NodeExecutorOutput> {
+  private async executeNode(
+    input: NodeExecutorInput,
+  ): Promise<NodeExecutorOutput> {
     this.emitDual(input, 'node:started', {
       pipelineId: input.pipelineId,
       nodeId: input.node.nodeId,

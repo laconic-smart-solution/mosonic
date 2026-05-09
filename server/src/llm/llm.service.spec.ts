@@ -1,6 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { LlmService } from './llm.service';
-import { LlmProvider, WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import {
+  LlmProvider,
+  WorkflowNodeType,
+} from '../nodes/schemas/workflow-node.schema';
 
 describe('LlmService', () => {
   const config = {

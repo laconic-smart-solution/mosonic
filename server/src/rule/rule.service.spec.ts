@@ -29,7 +29,10 @@ describe('RuleService updates', () => {
       keywords: ['old'],
       hashtagStrategy: [],
       contentFormats: [],
-      duration: { startDate: new Date('2026-01-01'), endDate: new Date('2026-01-31') },
+      duration: {
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-01-31'),
+      },
       postingFrequency: 'weekly',
       customSchedule: [],
     },
@@ -39,13 +42,13 @@ describe('RuleService updates', () => {
 
   const createService = () => {
     const findOneExec = jest.fn().mockResolvedValue(existingRule);
-    const findOneAndUpdateExec = jest.fn().mockResolvedValue({ ...existingRule });
+    const findOneAndUpdateExec = jest
+      .fn()
+      .mockResolvedValue({ ...existingRule });
 
     const ruleModel = {
-      findOne: jest.fn(() => ({ exec: findOneExec }) as MockChain<typeof existingRule>),
-      findOneAndUpdate: jest.fn(
-        () => ({ exec: findOneAndUpdateExec }) as MockChain<typeof existingRule>,
-      ),
+      findOne: jest.fn(() => ({ exec: findOneExec })),
+      findOneAndUpdate: jest.fn(() => ({ exec: findOneAndUpdateExec })),
     };
 
     const service = new RuleService(

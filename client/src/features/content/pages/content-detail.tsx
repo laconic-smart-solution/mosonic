@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   FileText,
   ImageIcon,
@@ -39,7 +39,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -179,11 +178,9 @@ export default function ContentDetailPage() {
   const [editedOutputs, setEditedOutputs] = useState<Partial<Record<OutputKey, string | undefined>>>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approveEnabled, setApproveEnabled] = useState(false)
-  const [displayVersion, setDisplayVersion] = useState(1)
   const [showRejectedBanner, setShowRejectedBanner] = useState(false)
   const [retainedSlots, setRetainedSlots] = useState<Set<OutputKey>>(new Set())
 
-  const [versionSheetOpen, setVersionSheetOpen] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const [rerunPanelKey, setRerunPanelKey] = useState<OutputKey | null>(null)
@@ -196,7 +193,6 @@ export default function ContentDetailPage() {
 
   const [confirmApproveOpen, setConfirmApproveOpen] = useState(false)
   const [confirmRejectOpen, setConfirmRejectOpen] = useState(false)
-  const [restoreTarget, setRestoreTarget] = useState<number | null>(null)
 
   const lastNavContentIdRef = useRef<string | null>(null)
 
@@ -210,7 +206,6 @@ export default function ContentDetailPage() {
     setEditedOutputs(o)
     setHasUnsavedChanges(false)
     setApproveEnabled(false)
-    setDisplayVersion(doc.currentVersion)
     setShowRejectedBanner(doc.status === "rejected")
   }, [])
 
@@ -220,12 +215,6 @@ export default function ContentDetailPage() {
     lastNavContentIdRef.current = contentId
     applyServerContent(data)
   }, [contentId, data, applyServerContent])
-
-  const versionsQuery = useQuery({
-    queryKey: ["content", contentId, "versions"],
-    queryFn: () => contentService.getVersions(contentId!),
-    enabled: !!contentId && versionSheetOpen,
-  })
 
   const visibleKeys = useMemo(() => {
     const keys = new Set<OutputKey>(retainedSlots)
@@ -358,14 +347,10 @@ export default function ContentDetailPage() {
           video: editedOutputs.video,
         },
       }),
-    onSuccess: ({ versionNumber }) => {
-      toast.success(`Changes saved (version ${versionNumber})`)
+    onSuccess: () => {
+      toast.success("Changes saved")
       setHasUnsavedChanges(false)
       setApproveEnabled(true)
-      setDisplayVersion(versionNumber)
-      queryClient.setQueryData<ContentDetail | undefined>(["content", contentId], (old) =>
-        old ? { ...old, currentVersion: versionNumber } : old
-      )
     },
     onError: () => {
       toast.error("Failed to save. Please try again.")
@@ -393,27 +378,6 @@ export default function ContentDetailPage() {
     },
     onError: () => {
       toast.error("Could not reject. Please try again.")
-    },
-  })
-
-  const restoreMutation = useMutation({
-    mutationFn: (versionNumber: number) =>
-      contentService.restoreVersion(contentId!, { versionNumber }),
-    onSuccess: async (_data, versionNumber) => {
-      await queryClient.invalidateQueries({ queryKey: ["content", contentId] })
-      const fresh = await queryClient.fetchQuery({
-        queryKey: ["content", contentId],
-        queryFn: () => contentService.getById(contentId!),
-      })
-      if (fresh) {
-        applyServerContent(fresh)
-      }
-      setVersionSheetOpen(false)
-      setRestoreTarget(null)
-      toast.success(`Restored to version ${versionNumber}`)
-    },
-    onError: () => {
-      toast.error("Could not restore version.")
     },
   })
 
@@ -457,6 +421,14 @@ export default function ContentDetailPage() {
       await contentService.rerunNode(contentId, {
         nodeId,
         updatedPrompt: rerunPromptDraft.trim() || undefined,
+        previousOutputs: {
+          text: editedOutputs.text,
+          translatedText: editedOutputs.translatedText,
+          transcription: editedOutputs.transcription,
+          summary: editedOutputs.summary,
+          image: editedOutputs.image,
+          video: editedOutputs.video,
+        },
       })
     } catch {
       toast.error("Could not start re-run.")
@@ -523,8 +495,7 @@ export default function ContentDetailPage() {
               <div>
                 <h1 className="text-lg font-semibold">Content review</h1>
                 <p className="text-xs text-muted-foreground">
-                  Content {data.contentId.slice(0, 8)}… · Version {displayVersion} ·{" "}
-                  <span className="capitalize">{data.status}</span>
+                  Content {data.contentId.slice(0, 8)}… · <span className="capitalize">{data.status}</span>
                 </p>
               </div>
             </div>
@@ -739,14 +710,7 @@ export default function ContentDetailPage() {
 
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setVersionSheetOpen(true)}
-            >
-              Version History
-            </Button>
+            <div />
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -794,51 +758,6 @@ export default function ContentDetailPage() {
             </div>
           </div>
         </div>
-
-        <Sheet open={versionSheetOpen} onOpenChange={setVersionSheetOpen}>
-          <SheetContent side="right" className="w-[380px]">
-            <SheetHeader>
-              <SheetTitle>Version history</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-2">
-              {versionsQuery.isLoading ? (
-                <p className="text-xs text-muted-foreground">Loading…</p>
-              ) : (
-                (versionsQuery.data ?? []).map((v) => {
-                  const isCurrent = v.versionNumber === displayVersion
-                  return (
-                    <div
-                      key={v.versionNumber}
-                      className={`rounded-lg border p-3 ${isCurrent ? "border-primary/50 bg-primary/5" : ""}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-semibold">Version {v.versionNumber}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {new Date(v.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                        {isCurrent ? (
-                          <span className="text-[10px] font-medium text-emerald-600">Current</span>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setRestoreTarget(v.versionNumber)}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
 
         <Dialog open={!!lightboxUrl} onOpenChange={(o) => !o && setLightboxUrl(null)}>
           <DialogContent className="max-w-4xl">
@@ -888,26 +807,6 @@ export default function ContentDetailPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={restoreTarget != null} onOpenChange={(o) => !o && setRestoreTarget(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Restore version {restoreTarget}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your current unsaved changes will be lost.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (restoreTarget != null) void restoreMutation.mutateAsync(restoreTarget)
-                }}
-              >
-                Restore
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </TooltipProvider>
   )

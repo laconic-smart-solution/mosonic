@@ -32,7 +32,8 @@ export class FileProxyController {
   ): Promise<void> {
     const proxied = await this.fileProxyService.fetchFile(query.relativePath);
     if (proxied.status >= 200 && proxied.status < 300 && proxied.stream) {
-      if (proxied.contentType) res.setHeader('Content-Type', proxied.contentType);
+      if (proxied.contentType)
+        res.setHeader('Content-Type', proxied.contentType);
       if (proxied.contentLength) {
         res.setHeader('Content-Length', proxied.contentLength);
       }

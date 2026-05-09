@@ -7,6 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { NodeExecutor } from '../orchestration/node-executor.service';
+import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
   WorkflowNode,
   type WorkflowNodeDocument,
@@ -22,12 +23,12 @@ import type {
   ContentPageQueryDto,
 } from './dto/content-page-query.dto';
 import type { RerunNodeDto } from './dto/rerun-node.dto';
-import type { RestoreVersionDto } from './dto/restore-version.dto';
 import type { SaveContentDto } from './dto/save-content.dto';
 import {
   ContentStatus,
   type ContentDocument,
-  type ContentVersionEntry,
+  type ContentOutputs,
+  type ContentUserEdits,
 } from './schemas/content.schema';
 
 export type ContentDetailResponse = {
@@ -36,15 +37,7 @@ export type ContentDetailResponse = {
   workflowRef: string;
   ruleRef: string;
   status: ContentStatus;
-  currentVersion: number;
   outputs: ReturnType<typeof mergeResolvedOutputs>;
-  versions: Array<{
-    versionNumber: number;
-    outputs?: Record<string, unknown>;
-    userEdits?: Record<string, unknown>;
-    nodePromptOverrides?: Record<string, string>;
-    createdAt: string;
-  }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -77,21 +70,8 @@ export class ContentService {
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      doc.versions ?? [],
-      doc.currentVersion,
-    );
-    const versions = normalized.versions;
-    if (versions.length === 0) {
-      throw new BadRequestException('Content has no versions');
-    }
-    const current = versions.find(
-      (v) => v.versionNumber === normalized.currentVersion,
-    );
-    if (!current) {
-      throw new BadRequestException('Current version row is missing');
-    }
-    const outputs = mergeResolvedOutputs(current);
+    const snapshot = this.resolveEditableState(doc);
+    const outputs = mergeResolvedOutputs(snapshot);
 
     const createdAtRaw = (doc as { createdAt?: Date }).createdAt;
     const updatedAtRaw = (doc as { updatedAt?: Date }).updatedAt;
@@ -101,16 +81,8 @@ export class ContentService {
       pipelineRef: doc.pipelineRef,
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
-      status: doc.status as ContentStatus,
-      currentVersion: normalized.currentVersion,
+      status: doc.status,
       outputs,
-      versions: versions.map((v) => ({
-        versionNumber: v.versionNumber,
-        outputs: v.outputs as Record<string, unknown>,
-        userEdits: v.userEdits as Record<string, unknown>,
-        nodePromptOverrides: v.nodePromptOverrides,
-        createdAt: this.versionDateToIso(v.createdAt),
-      })),
       createdAt: this.versionDateToIso(createdAtRaw ?? new Date()),
       updatedAt: this.versionDateToIso(updatedAtRaw ?? new Date()),
     };
@@ -119,63 +91,23 @@ export class ContentService {
   async saveContent(
     contentId: string,
     dto: SaveContentDto,
-  ): Promise<{ versionNumber: number }> {
+  ): Promise<{ success: boolean }> {
     const doc = await this.contentRepository.findById(contentId);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      doc.versions ?? [],
-      doc.currentVersion,
-    );
-    const current = normalized.versions.find(
-      (v) => v.versionNumber === normalized.currentVersion,
-    );
-    if (!current) {
-      throw new BadRequestException('Current version row is missing');
-    }
-
-    const ue = dto.userEdits;
-    const resolvedCurrent = mergeResolvedOutputs(current);
-    const previousVersion: ContentVersionEntry = {
-      versionNumber: 1,
-      outputs: {
-        text: resolvedCurrent.text,
-        image: resolvedCurrent.image,
-        translatedText: resolvedCurrent.translatedText,
-        video: resolvedCurrent.video,
-        transcription: resolvedCurrent.transcription,
-        summary: resolvedCurrent.summary,
-      },
-      userEdits: {},
-      nodePromptOverrides: { ...(current.nodePromptOverrides ?? {}) },
-      createdAt: this.ensureDate(current.createdAt),
-    };
-    const nextCurrentVersion: ContentVersionEntry = {
-      versionNumber: 2,
-      outputs: { ...previousVersion.outputs },
-      userEdits: {
-        ...(ue.text !== undefined ? { text: ue.text } : {}),
-        ...(ue.translatedText !== undefined
-          ? { translatedText: ue.translatedText }
-          : {}),
-        ...(ue.transcription !== undefined
-          ? { transcription: ue.transcription }
-          : {}),
-        ...(ue.summary !== undefined ? { summary: ue.summary } : {}),
-        ...(ue.image !== undefined ? { image: ue.image } : {}),
-        ...(ue.video !== undefined ? { video: ue.video } : {}),
-      },
-      nodePromptOverrides: { ...(current.nodePromptOverrides ?? {}) },
-      createdAt: new Date(),
+    const snapshot = this.resolveEditableState(doc);
+    const nextUserEdits: ContentUserEdits = {
+      ...snapshot.userEdits,
+      ...dto.userEdits,
     };
 
-    await this.contentRepository.replaceVersionsAndSetCurrent(
-      contentId,
-      [previousVersion, nextCurrentVersion],
-      2,
-    );
-    return { versionNumber: 2 };
+    await this.contentRepository.updateEditableState(contentId, {
+      outputs: snapshot.outputs,
+      userEdits: nextUserEdits,
+      nodePromptOverrides: snapshot.nodePromptOverrides,
+    });
+    return { success: true };
   }
 
   /**
@@ -185,17 +117,6 @@ export class ContentService {
     const content = await this.contentRepository.findById(contentId);
     if (!content) {
       throw new NotFoundException(`Content ${contentId} not found`);
-    }
-
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      content.versions ?? [],
-      content.currentVersion,
-    );
-    const current = normalized.versions.find(
-      (v) => v.versionNumber === normalized.currentVersion,
-    );
-    if (!current) {
-      throw new BadRequestException('Current version row is missing');
     }
 
     const pipeline = await this.pipelineModel
@@ -217,14 +138,16 @@ export class ContentService {
       );
     }
 
-    const rule = await this.ruleModel.findOne({ ruleId: content.ruleRef }).exec();
+    const rule = await this.ruleModel
+      .findOne({ ruleId: content.ruleRef })
+      .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
     }
 
     /** Resolved outputs match what the user sees (edits over AI). */
-    const resolved = mergeResolvedOutputs(current);
-    const previousOutputs = {
+    const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
+    const previousOutputsFromDb: PreviousOutputs = {
       text: resolved.text,
       image: resolved.image,
       translatedText: resolved.translatedText,
@@ -232,6 +155,10 @@ export class ContentService {
       transcription: resolved.transcription,
       summary: resolved.summary,
     };
+    const previousOutputs = this.mergeRerunPreviousOutputs(
+      previousOutputsFromDb,
+      dto.previousOutputs,
+    );
 
     void this.runRerunExecution({
       content,
@@ -242,7 +169,9 @@ export class ContentService {
       previousOutputs,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Content node re-run execution failed (${contentId}): ${msg}`);
+      this.logger.error(
+        `Content node re-run execution failed (${contentId}): ${msg}`,
+      );
     });
   }
 
@@ -273,7 +202,7 @@ export class ContentService {
           workflowRef: content.workflowRef,
         },
         context: {
-          rule: rule.toObject() as Rule,
+          rule: rule.toObject(),
           contentPrompt: pipeline.contentPrompt,
           previousOutputs,
         },
@@ -295,25 +224,19 @@ export class ContentService {
       throw new BadRequestException('Only draft content can be approved');
     }
 
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      doc.versions ?? [],
-      doc.currentVersion,
-    );
-    const current = normalized.versions.find(
-      (v) => v.versionNumber === normalized.currentVersion,
-    );
-    if (!current) {
-      throw new BadRequestException('Current version row is missing');
-    }
-
     const rule = await this.ruleModel.findOne({ ruleId: doc.ruleRef }).exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
     }
 
-    const resolvedOutputs = mergeResolvedOutputs(current);
+    const resolvedOutputs = mergeResolvedOutputs(
+      this.resolveEditableState(doc),
+    );
 
-    await this.contentRepository.updateStatus(contentId, ContentStatus.Approved);
+    await this.contentRepository.updateStatus(
+      contentId,
+      ContentStatus.Approved,
+    );
 
     const { uploadId } = await this.uploadService.createUpload({
       contentRef: doc.contentId,
@@ -331,53 +254,10 @@ export class ContentService {
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    await this.contentRepository.updateStatus(contentId, ContentStatus.Rejected);
-    return { success: true };
-  }
-
-  async getVersionSummaries(contentId: string): Promise<
-    Array<{ versionNumber: number; createdAt: string }>
-  > {
-    const doc = await this.contentRepository.findById(contentId);
-    if (!doc) {
-      throw new NotFoundException(`Content ${contentId} not found`);
-    }
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      doc.versions ?? [],
-      doc.currentVersion,
-    );
-    return normalized.versions.map((v) => ({
-      versionNumber: v.versionNumber,
-      createdAt: this.versionDateToIso(v.createdAt),
-    }));
-  }
-
-  async restoreVersion(
-    contentId: string,
-    dto: RestoreVersionDto,
-  ): Promise<{ success: boolean }> {
-    const doc = await this.contentRepository.findById(contentId);
-    if (!doc) {
-      throw new NotFoundException(`Content ${contentId} not found`);
-    }
-    const normalized = this.normalizeVersionsForTwoSlotModel(
-      doc.versions ?? [],
-      doc.currentVersion,
-    );
-    const exists = normalized.versions.some(
-      (v) => v.versionNumber === dto.versionNumber,
-    );
-    if (!exists) {
-      throw new BadRequestException('Version not found');
-    }
-    await this.contentRepository.replaceVersionsAndSetCurrent(
+    await this.contentRepository.updateStatus(
       contentId,
-      normalized.versions,
-      dto.versionNumber,
+      ContentStatus.Rejected,
     );
-    if (doc.status === ContentStatus.Rejected) {
-      await this.contentRepository.updateStatus(contentId, ContentStatus.Draft);
-    }
     return { success: true };
   }
 
@@ -386,45 +266,67 @@ export class ContentService {
     return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
   }
 
-  private ensureDate(input: Date | string | undefined): Date {
-    if (!input) return new Date();
-    return input instanceof Date ? input : new Date(input);
+  private mergeRerunPreviousOutputs(
+    fallback: PreviousOutputs,
+    incoming?: PreviousOutputs,
+  ): PreviousOutputs {
+    const merged: PreviousOutputs = { ...fallback };
+    const keys: Array<keyof PreviousOutputs> = [
+      'text',
+      'image',
+      'translatedText',
+      'video',
+      'transcription',
+      'summary',
+    ];
+    for (const key of keys) {
+      const normalized = this.trimToUndefined(incoming?.[key]);
+      if (normalized !== undefined) {
+        merged[key] = normalized;
+      }
+    }
+    return merged;
   }
 
-  private normalizeVersionsForTwoSlotModel(
-    versions: ContentVersionEntry[],
-    currentVersion: number,
-  ): { versions: ContentVersionEntry[]; currentVersion: number } {
-    if (versions.length === 0) {
-      return { versions: [], currentVersion: 1 };
-    }
+  private trimToUndefined(value: string | undefined): string | undefined {
+    if (value == null) return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
 
-    const sorted = [...versions].sort(
-      (a, b) => this.ensureDate(a.createdAt).getTime() - this.ensureDate(b.createdAt).getTime(),
-    );
-    const currentCandidates = sorted.filter((v) => v.versionNumber === currentVersion);
-    const currentRaw = currentCandidates.at(-1) ?? sorted.at(-1);
-    if (!currentRaw) {
-      return { versions: [], currentVersion: 1 };
-    }
-
-    const previousRaw = [...sorted]
-      .reverse()
-      .find((v) => this.ensureDate(v.createdAt).getTime() < this.ensureDate(currentRaw.createdAt).getTime());
-
-    if (!previousRaw) {
+  private resolveEditableState(content: {
+    outputs?: ContentOutputs;
+    userEdits?: ContentUserEdits;
+    nodePromptOverrides?: Record<string, string>;
+    versions?: Array<{
+      versionNumber: number;
+      outputs?: ContentOutputs;
+      userEdits?: ContentUserEdits;
+      nodePromptOverrides?: Record<string, string>;
+      createdAt?: Date | string;
+    }>;
+    currentVersion?: number;
+  }): {
+    outputs: ContentOutputs;
+    userEdits: ContentUserEdits;
+    nodePromptOverrides: Record<string, string>;
+  } {
+    if (content.outputs || content.userEdits || content.nodePromptOverrides) {
       return {
-        versions: [{ ...currentRaw, versionNumber: 1 }],
-        currentVersion: 1,
+        outputs: content.outputs ?? {},
+        userEdits: content.userEdits ?? {},
+        nodePromptOverrides: content.nodePromptOverrides ?? {},
       };
     }
 
+    const versions = content.versions ?? [];
+    const preferred =
+      versions.find((v) => v.versionNumber === content.currentVersion) ??
+      versions.at(-1);
     return {
-      versions: [
-        { ...previousRaw, versionNumber: 1 },
-        { ...currentRaw, versionNumber: 2 },
-      ],
-      currentVersion: 2,
+      outputs: preferred?.outputs ?? {},
+      userEdits: preferred?.userEdits ?? {},
+      nodePromptOverrides: preferred?.nodePromptOverrides ?? {},
     };
   }
 }

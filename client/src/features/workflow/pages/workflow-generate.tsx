@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { Plus, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,8 +18,6 @@ import { T } from "@/lib/tokens"
 
 type Phase = "loading" | "ready" | "failed"
 
-const STORAGE_KEY = "neutral-tex-last-workflow"
-
 function generateNodeId() {
   return `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
@@ -33,8 +31,6 @@ export default function WorkflowGeneratePage() {
   const [nodes, setNodes] = useState<WorkflowNode[]>([])
   const [addNodeOpen, setAddNodeOpen] = useState(false)
   const [failureMessage, setFailureMessage] = useState("")
-
-  const savedPayloadRef = useRef<{ contentPrompt: string; ruleId?: string } | null>(null)
 
   const workflowQuery = useGetWorkflowQuery(workflowId)
   const saveNodesMutation = useSaveWorkflowNodesMutation()
@@ -50,14 +46,6 @@ export default function WorkflowGeneratePage() {
   // Socket events
   useEffect(() => {
     if (!workflowId) return
-
-    // Load saved payload for retry
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) savedPayloadRef.current = JSON.parse(raw)
-    } catch {
-      // ignore
-    }
 
     joinWorkflowRoom(workflowId)
 

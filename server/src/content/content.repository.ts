@@ -9,7 +9,8 @@ import {
   Content,
   ContentStatus,
   type ContentDocument,
-  type ContentVersionEntry,
+  type ContentOutputs,
+  type ContentUserEdits,
 } from './schemas/content.schema';
 
 @Injectable()
@@ -37,7 +38,8 @@ export class ContentRepository {
     const sortBy = query.sortBy ?? 'updatedAt';
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
     const filter: Record<string, unknown> = {};
-    if (query.filter?.workflowRef) filter.workflowRef = query.filter.workflowRef;
+    if (query.filter?.workflowRef)
+      filter.workflowRef = query.filter.workflowRef;
     if (query.filter?.ruleRef) filter.ruleRef = query.filter.ruleRef;
     if (query.filter?.pipelineRef)
       filter.pipelineRef = query.filter.pipelineRef;
@@ -50,7 +52,7 @@ export class ContentRepository {
         .skip(skip)
         .limit(limit)
         .select(
-          'contentId pipelineRef workflowRef ruleRef status currentVersion createdAt updatedAt',
+          'contentId pipelineRef workflowRef ruleRef status createdAt updatedAt',
         )
         .lean()
         .exec(),
@@ -69,7 +71,6 @@ export class ContentRepository {
           workflowRef: doc.workflowRef,
           ruleRef: doc.ruleRef,
           status: doc.status,
-          currentVersion: doc.currentVersion,
           createdAt: new Date(withDates.createdAt ?? new Date()).toISOString(),
           updatedAt: new Date(withDates.updatedAt ?? new Date()).toISOString(),
         };
@@ -78,34 +79,20 @@ export class ContentRepository {
     };
   }
 
-  async replaceVersionsAndSetCurrent(
+  async updateEditableState(
     contentId: string,
-    entries: ContentVersionEntry[],
-    newCurrentVersion: number,
+    payload: {
+      outputs?: ContentOutputs;
+      userEdits?: ContentUserEdits;
+      nodePromptOverrides?: Record<string, string>;
+    },
   ): Promise<void> {
-    await this.contentModel
-      .updateOne(
-        { contentId },
-        {
-          $set: {
-            versions: entries,
-            currentVersion: newCurrentVersion,
-          },
-        },
-      )
-      .exec();
-  }
-
-  async updateCurrentVersion(
-    contentId: string,
-    versionNumber: number,
-  ): Promise<void> {
-    await this.contentModel
-      .updateOne({ contentId }, { $set: { currentVersion: versionNumber } })
-      .exec();
+    await this.contentModel.updateOne({ contentId }, { $set: payload }).exec();
   }
 
   async updateStatus(contentId: string, status: ContentStatus): Promise<void> {
-    await this.contentModel.updateOne({ contentId }, { $set: { status } }).exec();
+    await this.contentModel
+      .updateOne({ contentId }, { $set: { status } })
+      .exec();
   }
 }

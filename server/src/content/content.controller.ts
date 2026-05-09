@@ -12,7 +12,6 @@ import {
   ContentPageResponseDto,
 } from './dto/content-page-query.dto';
 import { RerunNodeDto } from './dto/rerun-node.dto';
-import { RestoreVersionDto } from './dto/restore-version.dto';
 import { SaveContentDto } from './dto/save-content.dto';
 import { ContentService } from './content.service';
 
@@ -36,20 +35,6 @@ export class ContentController {
     const limit = body.limit ?? 10;
     const totalPages = Math.ceil(total / limit) || 0;
     return { data, meta: { total, page, limit, totalPages } };
-  }
-
-  @Get(':contentId/versions')
-  async getVersions(@Param('contentId') contentId: string) {
-    return this.contentService.getVersionSummaries(contentId);
-  }
-
-  @Post(':contentId/restore')
-  @UsePipes(bodyPipe)
-  async restoreVersion(
-    @Param('contentId') contentId: string,
-    @Body() body: RestoreVersionDto,
-  ) {
-    return this.contentService.restoreVersion(contentId, body);
   }
 
   @Post(':contentId/save')

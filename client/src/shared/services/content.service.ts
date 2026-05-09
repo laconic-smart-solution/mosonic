@@ -13,15 +13,7 @@ export type SaveContentBody = {
 export type RerunNodeBody = {
   nodeId: string
   updatedPrompt?: string
-}
-
-export type RestoreVersionBody = {
-  versionNumber: number
-}
-
-export type ContentVersionSummary = {
-  versionNumber: number
-  createdAt: string
+  previousOutputs?: Partial<ContentOutputs>
 }
 
 export const contentService = {
@@ -38,7 +30,7 @@ export const contentService = {
   save: async (
     contentId: string,
     body: SaveContentBody
-  ): Promise<{ versionNumber: number }> => {
+  ): Promise<{ success: boolean }> => {
     const response = await apiClient.post(`/contents/${contentId}/save`, body)
     return response.data
   },
@@ -58,19 +50,6 @@ export const contentService = {
 
   reject: async (contentId: string): Promise<{ success: boolean }> => {
     const response = await apiClient.post(`/contents/${contentId}/reject`)
-    return response.data
-  },
-
-  getVersions: async (contentId: string): Promise<ContentVersionSummary[]> => {
-    const response = await apiClient.get(`/contents/${contentId}/versions`)
-    return response.data
-  },
-
-  restoreVersion: async (
-    contentId: string,
-    body: RestoreVersionBody
-  ): Promise<{ success: boolean }> => {
-    const response = await apiClient.post(`/contents/${contentId}/restore`, body)
     return response.data
   },
 }

@@ -1,6 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { pipelineService } from "../services/pipeline.service"
-import type { RetryNodePayload, StartPipelinePayload } from "../types/pipeline.type"
+import type {
+  PipelinePageQueryPayload,
+  RetryNodePayload,
+  StartPipelinePayload,
+} from "../types/pipeline.type"
 
 export const useStartPipelineMutation = () => {
   return useMutation({
@@ -25,6 +29,18 @@ export const useGetPipelineQuery = (pipelineId: string | undefined) => {
     queryKey: ["pipeline", pipelineId],
     queryFn: () => pipelineService.getById(pipelineId!),
     enabled: !!pipelineId,
+    retry: false,
+  })
+}
+
+export const usePipelinePageQuery = (
+  payload: PipelinePageQueryPayload,
+  enabled = true
+) => {
+  return useQuery({
+    queryKey: ["pipeline", "pageable", payload],
+    queryFn: () => pipelineService.pageable(payload),
+    enabled,
     retry: false,
   })
 }
