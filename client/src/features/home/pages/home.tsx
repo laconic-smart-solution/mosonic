@@ -16,8 +16,6 @@ import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { T } from "@/lib/tokens"
 
-const STORAGE_KEY = "neutral-tex-last-workflow"
-
 export default function HomePage() {
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState("")
@@ -86,10 +84,6 @@ export default function HomePage() {
     generateWorkflow.mutate(payload, {
       onSuccess: (data) => {
         const { workflowId, ruleId } = data
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ workflowId, contentPrompt: combined, ruleId })
-        )
         // Join the socket room NOW — before React re-renders for navigation —
         // so no events are missed while WorkflowPage is mounting.
         joinWorkflowRoom(workflowId)

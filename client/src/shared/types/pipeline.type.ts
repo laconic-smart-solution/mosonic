@@ -6,6 +6,37 @@ export type StartPipelinePayload = {
   contentPrompt: string
 }
 
+export type PipelinePageQueryPayload = {
+  page?: number
+  limit?: number
+  filter?: {
+    workflowRef?: string
+  }
+  sortBy?: "startedAt" | "completedAt"
+  sortOrder?: "asc" | "desc"
+}
+
+export type PipelinePageItem = {
+  pipelineId: string
+  workflowRef: string
+  ruleRef: string
+  status: PipelineStatus
+  contentPrompt: string
+  nodeCount: number
+  startedAt: string
+  completedAt: string | null
+}
+
+export type PipelinePageResponse = {
+  data: PipelinePageItem[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
 export type StartPipelineResponse = {
   pipelineId: string
 }
@@ -25,6 +56,9 @@ export type PipelineNodeSnapshot = {
   nodeId: string
   type: WorkflowNodeType
   order: number
+  isLocked: boolean
+  userPrompt: string
+  config: Record<string, unknown>
   status: PipelineNodeRuntimeStatus
   output: Record<string, unknown> | null
   retryCount: number

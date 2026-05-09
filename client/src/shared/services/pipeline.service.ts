@@ -1,6 +1,8 @@
 import apiClient from "../api/api-client"
 import type {
   GetPipelineResponse,
+  PipelinePageQueryPayload,
+  PipelinePageResponse,
   RetryNodePayload,
   RetryNodeResponse,
   StartPipelinePayload,
@@ -25,6 +27,13 @@ export const pipelineService = {
 
   getById: async (pipelineId: string): Promise<GetPipelineResponse> => {
     const response = await apiClient.get(`/pipeline/${pipelineId}`)
+    return response.data
+  },
+
+  pageable: async (
+    payload: PipelinePageQueryPayload
+  ): Promise<PipelinePageResponse> => {
+    const response = await apiClient.post("/pipeline/pageable", payload)
     return response.data
   },
 }

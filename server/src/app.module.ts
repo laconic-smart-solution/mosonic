@@ -9,6 +9,7 @@ import { ContentModule } from './content/content.module';
 import { EventsModule } from './events/events.module';
 import { LlmModule } from './llm/llm.module';
 import { LoggingModule } from './logging/logging.module';
+import { McpModule } from './mcp/mcp.module';
 import { NodesModule } from './nodes/nodes.module';
 import { OrchestrationModule } from './orchestration/orchestration.module';
 import { PipelineModule } from './pipeline/pipeline.module';
@@ -36,6 +37,7 @@ import { AdminModule } from './admin/admin.module';
     ContentModule,
     UploadModule,
     AnalyticsModule,
+    McpModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

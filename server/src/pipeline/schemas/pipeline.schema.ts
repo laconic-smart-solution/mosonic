@@ -44,6 +44,9 @@ export class PipelineNodeExecution {
   @Prop({ type: String, default: '' })
   userPrompt: string;
 
+  @Prop({ type: Object, default: {} })
+  config: Record<string, unknown>;
+
   @Prop({
     type: String,
     enum: Object.values(PipelineNodeExecutionStatus),

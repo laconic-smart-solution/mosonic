@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import { Button } from "@/components/ui/button"
@@ -14,7 +13,8 @@ import type { RuleFlowNodeData } from "@/features/rules/data/rules-mock"
 
 export type BubbleNodeData = RuleFlowNodeData & {
   onSaveNode: (fieldPath: string, nextValue: string) => void
-  savePending?: boolean
+  onAddNodeItem?: (fieldPath: string) => void
+  onRemoveNodeItem?: (fieldPath: string) => void
 }
 
 type LevelTheme = Record<RuleFlowNodeData["level"], { bg: string; border: string; text: string }>
@@ -35,6 +35,7 @@ export function BubbleNode({ data }: NodeProps<Node<BubbleNodeData>>) {
   const level = (data.level ?? 0) as RuleFlowNodeData["level"]
   const theme = levelTheme[level]
   const isEditable = data.editable && typeof data.fieldPath === "string"
+  const isListItem = Boolean(data.fieldPath?.match(/\[\d+\](?:\.channel)?$/))
 
   return (
     <>
@@ -68,18 +69,26 @@ export function BubbleNode({ data }: NodeProps<Node<BubbleNodeData>>) {
               />
               <Button
                 className="w-full"
-                disabled={data.savePending}
                 onClick={() => data.onSaveNode(data.fieldPath as string, value)}
               >
-                {data.savePending ? (
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                    Saving…
-                  </span>
-                ) : (
-                  "Save node"
-                )}
+                Save node
               </Button>
+              {isListItem ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => data.onAddNodeItem?.(data.fieldPath as string)}
+                  >
+                    Add item
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => data.onRemoveNodeItem?.(data.fieldPath as string)}
+                  >
+                    Remove item
+                  </Button>
+                </div>
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-muted-foreground whitespace-pre-line">{data.label}</p>

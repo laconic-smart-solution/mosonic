@@ -1,4 +1,36 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+
+export class RerunPreviousOutputsDto {
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsOptional()
+  @IsString()
+  image?: string;
+
+  @IsOptional()
+  @IsString()
+  translatedText?: string;
+
+  @IsOptional()
+  @IsString()
+  video?: string;
+
+  @IsOptional()
+  @IsString()
+  transcription?: string;
+
+  @IsOptional()
+  @IsString()
+  summary?: string;
+}
 
 export class RerunNodeDto {
   @IsString()
@@ -8,4 +40,9 @@ export class RerunNodeDto {
   @IsOptional()
   @IsString()
   updatedPrompt?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RerunPreviousOutputsDto)
+  previousOutputs?: RerunPreviousOutputsDto;
 }

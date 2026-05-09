@@ -19,7 +19,6 @@ export type ContentPageItem = {
   workflowRef: string
   ruleRef: string
   status: ContentStatus
-  currentVersion: number
   createdAt: string
   updatedAt: string
 }
@@ -45,18 +44,11 @@ export type ContentOutputs = {
 
 export type ContentDetail = {
   contentId: string
-  /** Merged userEdits over outputs for current version (when backend provides). */
+  /** Merged userEdits over outputs. */
   outputs?: ContentOutputs
   pipelineRef: string
   workflowRef: string
   ruleRef: string
-  currentVersion: number
-  versions: Array<{
-    versionNumber: number
-    outputs?: Record<string, unknown>
-    userEdits?: Record<string, unknown>
-    createdAt: string
-  }>
   status: ContentStatus
   createdAt: string
   updatedAt: string

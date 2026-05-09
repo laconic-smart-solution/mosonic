@@ -94,6 +94,7 @@ export class OrchestrationService {
         order: node.order,
         isLocked: node.isLocked,
         userPrompt: node.userPrompt ?? '',
+        config: (node.config ?? {}) as Record<string, unknown>,
         status: PipelineNodeExecutionStatus.Pending,
         input: '',
         output: null,
@@ -146,6 +147,9 @@ export class OrchestrationService {
       nodeId: string;
       type: string;
       order: number;
+      isLocked: boolean;
+      userPrompt: string;
+      config: Record<string, unknown>;
       status: string;
       output: Record<string, unknown> | null;
       retryCount: number;
@@ -173,6 +177,9 @@ export class OrchestrationService {
         nodeId: node.nodeId,
         type: node.type,
         order: node.order,
+        isLocked: node.isLocked,
+        userPrompt: node.userPrompt ?? '',
+        config: node.config ?? {},
         status: node.status,
         output: parseNodeOutput(node.output),
         retryCount: node.retryCount,
@@ -346,23 +353,16 @@ export class OrchestrationService {
       pipelineRef: args.pipelineId,
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
-      currentVersion: 1,
-      versions: [
-        {
-          versionNumber: 1,
-          outputs: {
-            text: args.context.previousOutputs.text,
-            image: args.context.previousOutputs.image,
-            translatedText: args.context.previousOutputs.translatedText,
-            video: args.context.previousOutputs.video,
-            transcription: args.context.previousOutputs.transcription,
-            summary: args.context.previousOutputs.summary,
-          },
-          userEdits: {},
-          nodePromptOverrides: {},
-          createdAt: new Date(),
-        },
-      ],
+      outputs: {
+        text: args.context.previousOutputs.text,
+        image: args.context.previousOutputs.image,
+        translatedText: args.context.previousOutputs.translatedText,
+        video: args.context.previousOutputs.video,
+        transcription: args.context.previousOutputs.transcription,
+        summary: args.context.previousOutputs.summary,
+      },
+      userEdits: {},
+      nodePromptOverrides: {},
       status: ContentStatus.Draft,
     });
     return content.contentId;

@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import {
+  PipelinePageQueryDto,
+  PipelinePageResponseDto,
+} from './dto/pipeline-page-query.dto';
 import { RetryNodeDto } from './dto/retry-node.dto';
 import { StartPipelineDto } from './dto/start-pipeline.dto';
 import { PipelineService } from './pipeline.service';
@@ -6,6 +18,32 @@ import { PipelineService } from './pipeline.service';
 @Controller('pipeline')
 export class PipelineController {
   constructor(private readonly pipelineService: PipelineService) {}
+
+  @Post('pageable')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  async pageable(
+    @Body() body: PipelinePageQueryDto,
+  ): Promise<PipelinePageResponseDto> {
+    const { data, total } = await this.pipelineService.findPage(body);
+    const page = body.page ?? 1;
+    const limit = body.limit ?? 10;
+    const totalPages = Math.ceil(total / limit) || 0;
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
+  }
 
   @Post('start')
   startPipeline(

@@ -11,7 +11,6 @@ import {
   useState,
 } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   Background,
@@ -31,7 +30,7 @@ import {
   type BubbleNodeData,
 } from "@/features/rules/components/bubble-node"
 import { CreateRuleDialog } from "@/features/rules/components/create-rule-dialog"
-import { RuleDetailView } from "@/features/rules/components/rule-detail-view"
+import { RuleDetailForm } from "@/features/rules/components/rule-detail-form"
 import { RuleDetailViewSkeleton } from "@/features/rules/components/rule-detail-view-skeleton"
 import { RuleExtractionProgress } from "@/features/rules/components/rule-extraction-progress"
 import { RuleFlowSkeleton } from "@/features/rules/components/rule-flow-skeleton"
@@ -42,22 +41,20 @@ import {
 import { RulesListDrawer } from "@/features/rules/components/rules-list-drawer"
 import {
   type RuleFlowNodeData,
+  addListItemFromNode,
   buildRuleFlow,
   createRuleFromPrompt,
+  removeListItemFromNode,
   updateRuleFromNode,
   type RuleEntity,
 } from "@/features/rules/data/rules-mock"
 import {
   useExtractRuleMutation,
-  usePatchRuleMutation,
   usePutRuleMutation,
   useRuleByIdQuery,
   useRulesPageQuery,
 } from "@/shared/queries/rule.query"
-import type {
-  RulePatchPayload,
-  RuleReplacePayload,
-} from "@/shared/services/rule.service"
+import type { RuleReplacePayload } from "@/shared/services/rule.service"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import {
   formatMaxFileSizeMb,
@@ -92,19 +89,6 @@ function apiErrorMessage(error: unknown, fallback: string): string {
   }
   if (error instanceof Error && error.message) return error.message
   return fallback
-}
-
-function treeSectionPatch(
-  fieldPath: string,
-  merged: RuleEntity
-): RulePatchPayload {
-  if (fieldPath.startsWith("brand.")) return { brand: merged.brand }
-  if (fieldPath.startsWith("audience.")) return { audience: merged.audience }
-  if (fieldPath.startsWith("campaign.")) return { campaign: merged.campaign }
-  if (fieldPath.startsWith("channels[")) return { channels: merged.channels }
-  if (fieldPath.startsWith("contentGuidelines."))
-    return { contentGuidelines: merged.contentGuidelines }
-  return {}
 }
 
 function toReplacePayload(rule: RuleEntity): RuleReplacePayload {
@@ -185,17 +169,10 @@ export default function RulesPage() {
   const [streamedContent, setStreamedContent] = useState("")
   const [failureMessage, setFailureMessage] = useState("")
   const [viewMode, setViewMode] = useState<RuleViewMode>("tree")
-  const [treeSavePendingKey, setTreeSavePendingKey] = useState<string | null>(
-    null
-  )
-  const [detailDraft, setDetailDraft] = useState<RuleEntity | null>(null)
+  const [treeDraft, setTreeDraft] = useState<RuleEntity | null>(null)
 
   const extractRuleMutation = useExtractRuleMutation()
-  const patchRuleMutation = usePatchRuleMutation()
   const putRuleMutation = usePutRuleMutation()
-
-  const prevViewModeRef = useRef<RuleViewMode>(viewMode)
-  const detailSyncedRuleIdRef = useRef<string | null>(null)
 
   const pageList = rulesPageQuery.data?.data
   const drawerRulesPageQuery = useRulesPageQuery(
@@ -291,112 +268,146 @@ export default function RulesPage() {
     !ruleDetailQuery.isError &&
     ruleDetailQuery.isLoading
 
-  const flow = useMemo(() => {
-    if (!selectedRule) return { nodes: [] as Node[], edges: [] as Edge[] }
-    return buildRuleFlow(selectedRule)
-  }, [selectedRule])
-
   useEffect(() => {
-    const enteredDetail =
-      prevViewModeRef.current !== "detail" && viewMode === "detail"
-    prevViewModeRef.current = viewMode
-
-    if (viewMode !== "detail" || !selectedRule) return
-
-    const ruleId = selectedRule.ruleId
-    const shouldReset =
-      enteredDetail || detailSyncedRuleIdRef.current !== ruleId
-
-    if (shouldReset) {
-      detailSyncedRuleIdRef.current = ruleId
-      setDetailDraft(selectedRule)
-    }
-  }, [viewMode, selectedRule])
-
-  const detailWorking = detailDraft ?? selectedRule
-  const isDetailDirty = useMemo(() => {
-    if (!selectedRule || !detailWorking) return false
-    return (
-      JSON.stringify(toReplacePayload(detailWorking)) !==
-      JSON.stringify(toReplacePayload(selectedRule))
+    if (!selectedRule) return
+    setTreeDraft((prev) =>
+      prev && prev.ruleId === selectedRule.ruleId ? prev : selectedRule
     )
-  }, [detailWorking, selectedRule])
-
-  const handleDetailSave = useCallback(() => {
-    if (!selectedRuleId || !detailWorking) return
-    if (detailWorking.status === "processing") return
-    putRuleMutation.mutate(
-      {
-        ruleId: selectedRuleId,
-        body: toReplacePayload(detailWorking),
-      },
-      {
-        onSuccess: (data) => {
-          toast.success("Rule saved", { id: "rule-detail-save" })
-          setDetailDraft({ ...data })
-        },
-        onError: (err) =>
-          toast.error(apiErrorMessage(err, "Could not save rule")),
-      }
-    )
-  }, [detailWorking, putRuleMutation.mutate, selectedRuleId])
-
-  const handleDetailCancel = useCallback(() => {
-    if (selectedRule) setDetailDraft(selectedRule)
   }, [selectedRule])
+
+  const treeWorkingRule = treeDraft?.ruleId === selectedRule?.ruleId ? treeDraft : selectedRule
+
+  const flow = useMemo(() => {
+    if (!treeWorkingRule) return { nodes: [] as Node[], edges: [] as Edge[] }
+    return buildRuleFlow(treeWorkingRule)
+  }, [treeWorkingRule])
+
+  const handleDetailSave = useCallback(
+    async (values: RuleEntity) => {
+      if (!selectedRuleId) return values
+      if (values.status === "processing") return values
+      try {
+        const data = await putRuleMutation.mutateAsync({
+          ruleId: selectedRuleId,
+          body: toReplacePayload(values),
+        })
+        toast.success("Rule saved", { id: "rule-detail-save" })
+        return data
+      } catch (err) {
+        toast.error(apiErrorMessage(err, "Could not save rule"))
+        return values
+      }
+    },
+    [putRuleMutation, selectedRuleId]
+  )
 
   const onSaveNode = useCallback(
     (fieldPath: string, nextValue: string) => {
-      if (!selectedRuleId) return
-      const old = queryClient.getQueryData<RuleEntity>(["rule", selectedRuleId])
-      if (!old) return
-      if (old.status === "processing") return
-      const next = updateRuleFromNode(old, fieldPath, nextValue)
-      const patch = treeSectionPatch(fieldPath, next)
-      if (Object.keys(patch).length === 0) return
-      queryClient.setQueryData<RuleEntity>(["rule", selectedRuleId], next)
-      setTreeSavePendingKey(fieldPath)
-      patchRuleMutation.mutate(
-        { ruleId: selectedRuleId, patch },
-        {
-          onSuccess: () => toast.success("Changes saved"),
-          onError: (err) => {
-            toast.error(apiErrorMessage(err, "Could not save changes"))
-            queryClient.setQueryData<RuleEntity>(["rule", selectedRuleId], old)
-          },
-          onSettled: () => {
-            setTreeSavePendingKey((prev) => (prev === fieldPath ? null : prev))
-          },
-        }
-      )
+      setTreeDraft((prev) => {
+        if (!prev || prev.status === "processing") return prev
+        return updateRuleFromNode(prev, fieldPath, nextValue)
+      })
     },
-    // `useMutation()`'s return object identity can change every render; depend on `mutate` only.
-    [patchRuleMutation.mutate, queryClient, selectedRuleId]
+    []
   )
+
+  const onAddNodeItem = useCallback((fieldPath: string) => {
+    setTreeDraft((prev) => {
+      if (!prev || prev.status === "processing") return prev
+      return addListItemFromNode(prev, fieldPath)
+    })
+  }, [])
+
+  const onRemoveNodeItem = useCallback((fieldPath: string) => {
+    setTreeDraft((prev) => {
+      if (!prev || prev.status === "processing") return prev
+      return removeListItemFromNode(prev, fieldPath)
+    })
+  }, [])
 
   const onSaveNodeRef = useRef(onSaveNode)
   onSaveNodeRef.current = onSaveNode
-
-  const onDetailDraftChange = useCallback((next: RuleEntity) => {
-    setDetailDraft(next)
-  }, [])
+  const onAddNodeItemRef = useRef(onAddNodeItem)
+  onAddNodeItemRef.current = onAddNodeItem
+  const onRemoveNodeItemRef = useRef(onRemoveNodeItem)
+  onRemoveNodeItemRef.current = onRemoveNodeItem
 
   const enhancedNodes = useMemo(() => {
     return flow.nodes.map((node) => {
       const base = node.data as RuleFlowNodeData
-      const fieldPath = base.fieldPath
       return {
         ...node,
         data: {
           ...base,
-          savePending:
-            typeof fieldPath === "string" && treeSavePendingKey === fieldPath,
           onSaveNode: (fp: string, nextValue: string) =>
             onSaveNodeRef.current(fp, nextValue),
+          onAddNodeItem: (fp: string) => onAddNodeItemRef.current(fp),
+          onRemoveNodeItem: (fp: string) => onRemoveNodeItemRef.current(fp),
         },
       }
     }) as Node<BubbleNodeData>[]
-  }, [flow.nodes, treeSavePendingKey])
+  }, [flow.nodes])
+
+  const treeDraftDirty = useMemo(() => {
+    if (!selectedRule || !treeWorkingRule) return false
+    return (
+      JSON.stringify(toReplacePayload(treeWorkingRule)) !==
+      JSON.stringify(toReplacePayload(selectedRule))
+    )
+  }, [selectedRule, treeWorkingRule])
+
+  const treeListChangeCount = useMemo(() => {
+    if (!selectedRule || !treeWorkingRule) return 0
+
+    const countListDiff = (a: string[], b: string[]) => {
+      const length = Math.max(a.length, b.length)
+      let changed = 0
+      for (let i = 0; i < length; i += 1) {
+        if ((a[i] ?? "") !== (b[i] ?? "")) changed += 1
+      }
+      return changed
+    }
+
+    return (
+      countListDiff(selectedRule.brand.brandTone, treeWorkingRule.brand.brandTone) +
+      countListDiff(selectedRule.audience.location, treeWorkingRule.audience.location) +
+      countListDiff(selectedRule.audience.interests, treeWorkingRule.audience.interests) +
+      countListDiff(selectedRule.campaign.goals, treeWorkingRule.campaign.goals) +
+      countListDiff(selectedRule.campaign.keywords, treeWorkingRule.campaign.keywords) +
+      countListDiff(selectedRule.campaign.contentFormats, treeWorkingRule.campaign.contentFormats) +
+      countListDiff(
+        selectedRule.contentGuidelines.dos,
+        treeWorkingRule.contentGuidelines.dos
+      ) +
+      countListDiff(
+        selectedRule.contentGuidelines.donts,
+        treeWorkingRule.contentGuidelines.donts
+      ) +
+      countListDiff(
+        selectedRule.channels.map((c) => c.channel),
+        treeWorkingRule.channels.map((c) => c.channel)
+      )
+    )
+  }, [selectedRule, treeWorkingRule])
+
+  const handleDiscardTreeDraft = useCallback(() => {
+    if (selectedRule) setTreeDraft(selectedRule)
+  }, [selectedRule])
+
+  const handleSaveTreeDraft = useCallback(async () => {
+    if (!selectedRuleId || !treeWorkingRule || !treeDraftDirty) return
+    if (treeWorkingRule.status === "processing") return
+    try {
+      const data = await putRuleMutation.mutateAsync({
+        ruleId: selectedRuleId,
+        body: toReplacePayload(treeWorkingRule),
+      })
+      setTreeDraft(data)
+      toast.success("Tree changes saved")
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Could not save tree changes"))
+    }
+  }, [putRuleMutation, selectedRuleId, treeWorkingRule, treeDraftDirty])
 
   const enhancedEdges = useMemo(() => {
     return flow.edges.map((edge) => ({
@@ -653,72 +664,62 @@ export default function RulesPage() {
               <RuleDetailViewSkeleton />
             </div>
           ) : selectedRule && viewMode === "tree" ? (
-            <ReactFlow
-              nodes={canvasNodes}
-              edges={canvasEdges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              nodeTypes={ruleFlowNodeTypes}
-              edgeTypes={ruleFlowEdgeTypes}
-              connectionLineComponent={FloatingConnectionLine}
-              fitView
-              nodesConnectable={false}
-              nodesDraggable
-              edgesFocusable={false}
-              elementsSelectable
-              panOnDrag
-              zoomOnScroll
-              className="h-full min-h-0 w-full flex-1"
-            >
-              <Background gap={18} size={1} />
-              <Controls showInteractive={false} />
-            </ReactFlow>
-          ) : selectedRule && viewMode === "detail" && detailWorking ? (
             <div className="relative min-h-0 flex-1">
-              <div className="h-full min-h-0 overflow-y-auto scroll-smooth px-4 pt-1 pb-28">
-                <RuleDetailView
-                  rule={detailWorking}
-                  onRuleChange={onDetailDraftChange}
-                />
-              </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pt-3 pb-5">
-                <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/80 bg-background/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full px-5"
-                    onClick={handleDetailCancel}
-                    disabled={putRuleMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="rounded-full px-5"
-                    onClick={handleDetailSave}
-                    disabled={
-                      putRuleMutation.isPending ||
-                      !isDetailDirty ||
-                      detailWorking.status === "processing"
-                    }
-                  >
-                    {putRuleMutation.isPending ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2
-                          className="size-4 shrink-0 animate-spin"
-                          aria-hidden
-                        />
-                        Saving…
-                      </span>
-                    ) : (
-                      "Save"
-                    )}
-                  </Button>
+              <ReactFlow
+                nodes={canvasNodes}
+                edges={canvasEdges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                nodeTypes={ruleFlowNodeTypes}
+                edgeTypes={ruleFlowEdgeTypes}
+                connectionLineComponent={FloatingConnectionLine}
+                fitView
+                nodesConnectable={false}
+                nodesDraggable
+                edgesFocusable={false}
+                elementsSelectable
+                panOnDrag
+                zoomOnScroll
+                className="h-full min-h-0 w-full flex-1"
+              >
+                <Background gap={18} size={1} />
+                <Controls showInteractive={false} />
+              </ReactFlow>
+              {treeDraftDirty ? (
+                <div className="pointer-events-none absolute right-4 bottom-4 z-20 flex justify-end">
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/80 bg-background/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+                    <span className="px-2 text-xs text-muted-foreground">
+                      {treeListChangeCount} pending
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full px-4"
+                      onClick={handleDiscardTreeDraft}
+                      disabled={putRuleMutation.isPending}
+                    >
+                      Discard all
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full px-4"
+                      onClick={() => void handleSaveTreeDraft()}
+                      disabled={putRuleMutation.isPending || !treeDraftDirty}
+                    >
+                      Save changes
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
+          ) : selectedRule && viewMode === "detail" ? (
+            <RuleDetailForm
+              rule={selectedRule}
+              isSaving={putRuleMutation.isPending}
+              onSubmit={handleDetailSave}
+            />
           ) : null}
         </div>
       </section>
