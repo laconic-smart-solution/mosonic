@@ -8,7 +8,9 @@ export class PipelineController {
   constructor(private readonly pipelineService: PipelineService) {}
 
   @Post('start')
-  startPipeline(@Body() dto: StartPipelineDto): Promise<{ pipelineId: string }> {
+  startPipeline(
+    @Body() dto: StartPipelineDto,
+  ): Promise<{ pipelineId: string }> {
     return this.pipelineService.startPipeline({
       workflowId: dto.workflowId,
       ruleId: dto.ruleId,

@@ -101,7 +101,7 @@ export class ContentService {
       pipelineRef: doc.pipelineRef,
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
-      status: doc.status as ContentStatus,
+      status: doc.status,
       currentVersion: normalized.currentVersion,
       outputs,
       versions: versions.map((v) => ({
@@ -217,7 +217,9 @@ export class ContentService {
       );
     }
 
-    const rule = await this.ruleModel.findOne({ ruleId: content.ruleRef }).exec();
+    const rule = await this.ruleModel
+      .findOne({ ruleId: content.ruleRef })
+      .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
     }
@@ -242,7 +244,9 @@ export class ContentService {
       previousOutputs,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Content node re-run execution failed (${contentId}): ${msg}`);
+      this.logger.error(
+        `Content node re-run execution failed (${contentId}): ${msg}`,
+      );
     });
   }
 
@@ -273,7 +277,7 @@ export class ContentService {
           workflowRef: content.workflowRef,
         },
         context: {
-          rule: rule.toObject() as Rule,
+          rule: rule.toObject(),
           contentPrompt: pipeline.contentPrompt,
           previousOutputs,
         },
@@ -313,7 +317,10 @@ export class ContentService {
 
     const resolvedOutputs = mergeResolvedOutputs(current);
 
-    await this.contentRepository.updateStatus(contentId, ContentStatus.Approved);
+    await this.contentRepository.updateStatus(
+      contentId,
+      ContentStatus.Approved,
+    );
 
     const { uploadId } = await this.uploadService.createUpload({
       contentRef: doc.contentId,
@@ -331,13 +338,16 @@ export class ContentService {
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    await this.contentRepository.updateStatus(contentId, ContentStatus.Rejected);
+    await this.contentRepository.updateStatus(
+      contentId,
+      ContentStatus.Rejected,
+    );
     return { success: true };
   }
 
-  async getVersionSummaries(contentId: string): Promise<
-    Array<{ versionNumber: number; createdAt: string }>
-  > {
+  async getVersionSummaries(
+    contentId: string,
+  ): Promise<Array<{ versionNumber: number; createdAt: string }>> {
     const doc = await this.contentRepository.findById(contentId);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
@@ -400,9 +410,13 @@ export class ContentService {
     }
 
     const sorted = [...versions].sort(
-      (a, b) => this.ensureDate(a.createdAt).getTime() - this.ensureDate(b.createdAt).getTime(),
+      (a, b) =>
+        this.ensureDate(a.createdAt).getTime() -
+        this.ensureDate(b.createdAt).getTime(),
     );
-    const currentCandidates = sorted.filter((v) => v.versionNumber === currentVersion);
+    const currentCandidates = sorted.filter(
+      (v) => v.versionNumber === currentVersion,
+    );
     const currentRaw = currentCandidates.at(-1) ?? sorted.at(-1);
     if (!currentRaw) {
       return { versions: [], currentVersion: 1 };
@@ -410,7 +424,11 @@ export class ContentService {
 
     const previousRaw = [...sorted]
       .reverse()
-      .find((v) => this.ensureDate(v.createdAt).getTime() < this.ensureDate(currentRaw.createdAt).getTime());
+      .find(
+        (v) =>
+          this.ensureDate(v.createdAt).getTime() <
+          this.ensureDate(currentRaw.createdAt).getTime(),
+      );
 
     if (!previousRaw) {
       return {

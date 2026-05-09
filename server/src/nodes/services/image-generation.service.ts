@@ -41,13 +41,9 @@ function normalizeImageGenerationConfig(
 
   let size: NormalizedImageConfig['size'];
   if (model === 'dall-e-2') {
-    size = dalle2Sizes.has(sizeRaw)
-      ? (sizeRaw as NormalizedImageConfig['size'])
-      : '1024x1024';
+    size = dalle2Sizes.has(sizeRaw) ? sizeRaw : '1024x1024';
   } else {
-    size = dalle3Sizes.has(sizeRaw)
-      ? (sizeRaw as NormalizedImageConfig['size'])
-      : '1024x1024';
+    size = dalle3Sizes.has(sizeRaw) ? sizeRaw : '1024x1024';
   }
 
   const quality =

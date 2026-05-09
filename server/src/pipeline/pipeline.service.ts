@@ -16,7 +16,10 @@ export class PipelineService {
     });
   }
 
-  async retryNode(pipelineId: string, _nodeId: string): Promise<{ success: boolean }> {
+  async retryNode(
+    pipelineId: string,
+    _nodeId: string,
+  ): Promise<{ success: boolean }> {
     await this.orchestration.retryNode(pipelineId);
     return { success: true };
   }

@@ -127,6 +127,24 @@ const NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    id: "admin",
+    label: "Admin",
+    path: "/admin",
+    icon: (active) => (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path
+          d="M8 2l5 2v4c0 3-2.2 5.8-5 6-2.8-.2-5-3-5-6V4l5-2z"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+          fill={active ? "#ffffff18" : "none"}
+        />
+        <path d="M8 6v4" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M8 11h0" stroke={active ? "#fff" : "currentColor"} strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ]
 
 type SidebarPanelProps = {

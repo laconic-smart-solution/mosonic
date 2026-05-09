@@ -37,7 +37,8 @@ export class ContentRepository {
     const sortBy = query.sortBy ?? 'updatedAt';
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
     const filter: Record<string, unknown> = {};
-    if (query.filter?.workflowRef) filter.workflowRef = query.filter.workflowRef;
+    if (query.filter?.workflowRef)
+      filter.workflowRef = query.filter.workflowRef;
     if (query.filter?.ruleRef) filter.ruleRef = query.filter.ruleRef;
     if (query.filter?.pipelineRef)
       filter.pipelineRef = query.filter.pipelineRef;
@@ -106,6 +107,8 @@ export class ContentRepository {
   }
 
   async updateStatus(contentId: string, status: ContentStatus): Promise<void> {
-    await this.contentModel.updateOne({ contentId }, { $set: { status } }).exec();
+    await this.contentModel
+      .updateOne({ contentId }, { $set: { status } })
+      .exec();
   }
 }

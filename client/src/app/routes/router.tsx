@@ -13,12 +13,20 @@ import {
   AnalyticsPage,
   LogsPage,
   ComponentsLibPage,
+  AdminLoginPage,
+  AdminDashboardPage,
+  AdminUsersPage,
+  AdminUserNewPage,
 } from "../constants/lazyload"
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <HomePage />,
+  },
+  {
+    path: "/admin/login",
+    element: <AdminLoginPage />,
   },
   {
     element: <AppLayout />,
@@ -35,6 +43,10 @@ export const router = createBrowserRouter([
       { path: "/analytics",             element: <AnalyticsPage /> },
       { path: "/logs",                  element: <LogsPage /> },
       { path: "/components",            element: <ComponentsLibPage /> },
+
+      { path: "/admin",                 element: <AdminDashboardPage /> },
+      { path: "/admin/users",           element: <AdminUsersPage /> },
+      { path: "/admin/users/new",       element: <AdminUserNewPage /> },
     ],
   },
 ])

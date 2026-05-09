@@ -14,3 +14,8 @@ export const AnalyticsPage    = PageLoader(lazy(() => import("@/features/analyti
 export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
 export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
 export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
+
+export const AdminLoginPage     = PageLoader(lazy(() => import("@/features/admin/pages/admin-login")))
+export const AdminDashboardPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-dashboard")))
+export const AdminUsersPage     = PageLoader(lazy(() => import("@/features/admin/pages/admin-users")))
+export const AdminUserNewPage   = PageLoader(lazy(() => import("@/features/admin/pages/admin-user-new")))

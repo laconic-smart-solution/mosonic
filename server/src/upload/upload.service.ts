@@ -26,7 +26,9 @@ export class UploadService {
     private readonly uploadModel: Model<UploadDocument>,
   ) {}
 
-  async createUpload(params: CreateUploadParams): Promise<{ uploadId: string }> {
+  async createUpload(
+    params: CreateUploadParams,
+  ): Promise<{ uploadId: string }> {
     const channels: UploadChannelEntry[] = params.ruleChannels.map((c) => ({
       channel: c.channel,
       status: UploadChannelStatus.Pending,
