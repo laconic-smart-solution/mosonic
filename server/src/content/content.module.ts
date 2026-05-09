@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
-import { WorkflowNode, WorkflowNodeSchema } from '../nodes/schemas/workflow-node.schema';
+import {
+  WorkflowNode,
+  WorkflowNodeSchema,
+} from '../nodes/schemas/workflow-node.schema';
 import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
 import { UploadModule } from '../upload/upload.module';

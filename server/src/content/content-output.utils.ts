@@ -16,7 +16,7 @@ export type ResolvedContentOutputs = {
 export function mergeResolvedOutputs(
   version: Pick<ContentVersionEntry, 'outputs' | 'userEdits'>,
 ): ResolvedContentOutputs {
-  const o = version.outputs ?? ({} as ContentOutputs);
+  const o = version.outputs ?? {};
   const u = version.userEdits ?? {};
   return {
     text: coalesce(u.text, o.text),

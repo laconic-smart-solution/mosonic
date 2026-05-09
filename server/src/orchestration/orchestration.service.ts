@@ -26,7 +26,10 @@ import {
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
-import { Workflow, type WorkflowDocument } from '../workflow/schemas/workflow.schema';
+import {
+  Workflow,
+  type WorkflowDocument,
+} from '../workflow/schemas/workflow.schema';
 import { NodeExecutor } from './node-executor.service';
 
 @Injectable()
@@ -149,7 +152,10 @@ export class OrchestrationService {
       executedAt: Date | null;
     }>;
   }> {
-    const pipeline = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
+    const pipeline = await this.pipelineModel
+      .findOne({ pipelineId })
+      .lean()
+      .exec();
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -206,7 +212,11 @@ export class OrchestrationService {
       });
     }
 
-    await this.updatePipelineStatus(pipelineId, PipelineStatus.Completed, new Date());
+    await this.updatePipelineStatus(
+      pipelineId,
+      PipelineStatus.Completed,
+      new Date(),
+    );
     const contentId = await this.createContent({
       pipelineId,
       workflowId,
@@ -359,7 +369,9 @@ export class OrchestrationService {
   }
 }
 
-function parseNodeOutput(output: string | null): Record<string, unknown> | null {
+function parseNodeOutput(
+  output: string | null,
+): Record<string, unknown> | null {
   if (!output) return null;
   try {
     const parsed = JSON.parse(output) as unknown;

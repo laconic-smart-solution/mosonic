@@ -36,7 +36,8 @@ export class FileProxyService {
       stream,
       contentType: response.headers.get('content-type') ?? undefined,
       contentLength: response.headers.get('content-length') ?? undefined,
-      contentDisposition: response.headers.get('content-disposition') ?? undefined,
+      contentDisposition:
+        response.headers.get('content-disposition') ?? undefined,
     };
   }
 }

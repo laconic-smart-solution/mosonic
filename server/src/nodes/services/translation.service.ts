@@ -31,8 +31,10 @@ function normalizeTranslationConfig(
         ? c.provider
         : undefined,
     model: typeof c.model === 'string' ? c.model : 'gpt-4o',
-    sourceLanguage: typeof c.sourceLanguage === 'string' ? c.sourceLanguage : 'en',
-    targetLanguage: typeof c.targetLanguage === 'string' ? c.targetLanguage : 'th',
+    sourceLanguage:
+      typeof c.sourceLanguage === 'string' ? c.sourceLanguage : 'en',
+    targetLanguage:
+      typeof c.targetLanguage === 'string' ? c.targetLanguage : 'th',
     formalityLevel:
       c.formalityLevel === NodeFormalityLevel.Formal
         ? NodeFormalityLevel.Formal

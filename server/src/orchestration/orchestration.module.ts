@@ -4,7 +4,10 @@ import { Content, ContentSchema } from '../content/schemas/content.schema';
 import { EventsModule } from '../events/events.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
-import { WorkflowNode, WorkflowNodeSchema } from '../nodes/schemas/workflow-node.schema';
+import {
+  WorkflowNode,
+  WorkflowNodeSchema,
+} from '../nodes/schemas/workflow-node.schema';
 import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
 import { Workflow, WorkflowSchema } from '../workflow/schemas/workflow.schema';

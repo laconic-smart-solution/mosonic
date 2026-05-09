@@ -24,11 +24,14 @@ type NormalizedVideoConfig = {
   sizeForApi: OpenAI.Videos.VideoCreateParams['size'];
 };
 
-function normalizeVideoConfig(config: NodeExecutionInput['config']): NormalizedVideoConfig {
+function normalizeVideoConfig(
+  config: NodeExecutionInput['config'],
+): NormalizedVideoConfig {
   const c = config ?? {};
   const durationRaw = typeof c.duration === 'number' ? c.duration : 10;
   const resolution = typeof c.resolution === 'string' ? c.resolution : '720p';
-  const aspectRatio = typeof c.aspectRatio === 'string' ? c.aspectRatio : '16:9';
+  const aspectRatio =
+    typeof c.aspectRatio === 'string' ? c.aspectRatio : '16:9';
   const provider =
     c.provider && Object.values(LlmProvider).includes(c.provider)
       ? c.provider
@@ -235,7 +238,8 @@ export class VideoGenerationService {
   async generateVideo(
     input: VideoGenerationInput & { pipelineId: string; nodeId: string },
   ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
-    const { rule, previousOutputs, userPrompt, config, pipelineId, nodeId } = input;
+    const { rule, previousOutputs, userPrompt, config, pipelineId, nodeId } =
+      input;
     const sourceText = previousOutputs.text?.trim();
     if (!sourceText) {
       throw new UnprocessableEntityException(
@@ -252,13 +256,17 @@ export class VideoGenerationService {
 
     const client = this.getOpenAiClient(normalized.provider);
     let result = await client.videos.create({
-      model: normalized.model as OpenAI.Videos.VideoModel,
+      model: normalized.model,
       prompt,
       size: normalized.sizeForApi,
       seconds: normalized.secondsForApi,
     });
 
-    await this.emitProcessing(pipelineId, nodeId, 'Video generation started...');
+    await this.emitProcessing(
+      pipelineId,
+      nodeId,
+      'Video generation started...',
+    );
 
     let attempts = 0;
     while (result.status !== 'completed' && result.status !== 'failed') {

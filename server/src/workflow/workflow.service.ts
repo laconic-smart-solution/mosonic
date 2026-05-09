@@ -86,7 +86,8 @@ export class WorkflowService {
       .findOne({ ruleRef: normalizedRuleId })
       .sort({ createdAt: -1 })
       .exec();
-    const workflow = existing ?? (await this.createWorkflow(normalizedRuleId, prompt));
+    const workflow =
+      existing ?? (await this.createWorkflow(normalizedRuleId, prompt));
 
     if (existing?.workflowId) {
       await this.workflowModel
@@ -220,7 +221,9 @@ export class WorkflowService {
         this.llm.validateWorkflowNodeConfig(node.type, node.config);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'invalid provider configuration';
+          error instanceof Error
+            ? error.message
+            : 'invalid provider configuration';
         throw new BadRequestException(
           `Invalid config for node "${node.type}": ${message}`,
         );

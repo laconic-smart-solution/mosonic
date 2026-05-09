@@ -164,9 +164,7 @@ function chunkToString(content: unknown): string {
 export class SummarizationService {
   constructor(private readonly llm: LlmService) {}
 
-  async summarize(
-    input: SummarizationInput,
-  ): Promise<{ summary: string }> {
+  async summarize(input: SummarizationInput): Promise<{ summary: string }> {
     const { rule, previousOutputs, userPrompt, config } = input;
     const normalized = normalizeSummarizationConfig(config);
     const sourceOutput = resolveSourceOutput(
