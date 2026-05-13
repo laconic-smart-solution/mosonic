@@ -3,7 +3,8 @@ import type { ReactNode } from "react"
 import { HomeOrb } from "@/features/home/components/home-orb"
 import { HomeRecentRail } from "@/features/home/components/home-recent-rail"
 import { HomeTemplateRail } from "@/features/home/components/home-template-rail"
-import { HOME_RECENT, HOME_TEMPLATES } from "@/features/home/data/home-constants"
+import { HOME_TEMPLATES } from "@/features/home/data/home-constants"
+import type { HomeRecentSlot } from "@/features/home/lib/home-recent-slots"
 
 type HomeStageProps = {
   mounted: boolean
@@ -12,8 +13,11 @@ type HomeStageProps = {
   hovRight: number | null
   setHovLeft: (i: number | null) => void
   setHovRight: (i: number | null) => void
-  onNavigateTemplates: () => void
-  onNavigateRecent: () => void
+  onNavigateTemplate: (path: string) => void
+  recentSlots: readonly HomeRecentSlot[]
+  isRecentLoading: boolean
+  onOpenRecentContent: (contentId: string, uploadId?: string) => void
+  onOpenRecentLibrary: () => void
   children?: ReactNode
 }
 
@@ -24,8 +28,11 @@ export function HomeStage({
   hovRight,
   setHovLeft,
   setHovRight,
-  onNavigateTemplates,
-  onNavigateRecent,
+  onNavigateTemplate,
+  recentSlots,
+  isRecentLoading,
+  onOpenRecentContent,
+  onOpenRecentLibrary,
   children,
 }: HomeStageProps) {
   return (
@@ -36,17 +43,19 @@ export function HomeStage({
             templates={HOME_TEMPLATES}
             hovLeft={hovLeft}
             onHover={setHovLeft}
-            onSelect={onNavigateTemplates}
+            onNavigate={onNavigateTemplate}
           />
         </div>
       </div>
       <div className="pointer-events-none absolute top-1/2 right-3 z-20 -translate-y-1/2 sm:right-5 md:right-8">
         <div className="pointer-events-auto">
           <HomeRecentRail
-            items={HOME_RECENT}
+            slots={recentSlots}
+            isLoading={isRecentLoading}
             hovRight={hovRight}
             onHover={setHovRight}
-            onSelect={onNavigateRecent}
+            onOpenContent={onOpenRecentContent}
+            onOpenLibrary={onOpenRecentLibrary}
           />
         </div>
       </div>
@@ -62,7 +71,9 @@ export function HomeStage({
         <div className="flex w-full max-w-[640px] flex-col items-center gap-5 sm:gap-6">
           <HomeOrb orbPulse={orbPulse} />
           {children ? (
-            <div className="flex w-full flex-col items-center gap-3">{children}</div>
+            <div className="flex w-full flex-col items-center gap-3">
+              {children}
+            </div>
           ) : null}
         </div>
       </div>

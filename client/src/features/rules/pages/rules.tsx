@@ -732,7 +732,7 @@ export default function RulesPage() {
             setCreateDialogKey((k) => k + 1)
           }
         }}
-        prompt={createPrompt}
+        initialPrompt={createPrompt}
         onPromptChange={setCreatePrompt}
         promptAreaKey={createDialogKey}
         onExtract={runRuleExtract}

@@ -12,6 +12,7 @@ import {
   type WorkflowNodeConfig,
   WorkflowNodeType,
 } from '../nodes/schemas/workflow-node.schema';
+import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-3-5-sonnet-latest';

@@ -1,0 +1,176 @@
+import { useMutation } from "@tanstack/react-query"
+import { useMemo, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
+
+import { me } from "@/features/admin/api/auth-api"
+import { authFlowErrorMessage, resendOtp, verifyOtp } from "@/features/auth/api/auth-flow-api"
+import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
+import { useAuthStore } from "@/shared/stores/auth.store"
+import { useUserStore } from "@/shared/stores/user.store"
+
+function maskEmail(raw: string): string {
+  const email = raw.trim()
+  const at = email.indexOf("@")
+  if (at <= 0) return "****"
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1)
+  if (!local || !domain) return "****"
+  const visibleLen = Math.min(6, Math.max(1, local.length - 1))
+  return `${local.slice(0, visibleLen)}****@${domain}`
+}
+
+export default function VerifyOtpPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const mode = searchParams.get("mode")
+  const isForgotPasswordFlow = mode === "forgot"
+  const emailFromQuery = searchParams.get("email") || ""
+  const next = searchParams.get("next")?.trim() || "/dashboard"
+
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [emailInput, setEmailInput] = useState("")
+  const email = emailTouched ? emailInput : emailFromQuery || emailInput
+
+  const setEmail = (value: string) => {
+    setEmailTouched(true)
+    setEmailInput(value)
+  }
+
+  const [otp, setOtp] = useState("")
+  const setSession = useAuthStore((s) => s.setSession)
+  const setUser = useUserStore((s) => s.setUser)
+
+  const canSubmit = useMemo(() => otp.length === 6 && !!email.trim(), [email, otp.length])
+
+  const resendMutation = useMutation({
+    mutationFn: () => {
+      const trimmed = email.trim()
+      if (!trimmed) throw new Error("Email is required to resend OTP.")
+      return resendOtp(trimmed)
+    },
+    onSuccess: () => toast.success("OTP resent."),
+    onError: (e: unknown) =>
+      toast.error(authFlowErrorMessage(e, "Failed to resend OTP.")),
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      if (!canSubmit) throw new Error("Enter your 6-digit code.")
+      const res = await verifyOtp({ email: email.trim(), otp })
+      if (!res.accessToken) {
+        throw new Error("Verification succeeded but no access token in response.")
+      }
+      return res
+    },
+    onSuccess: async (res) => {
+      if (isForgotPasswordFlow) {
+        navigate(
+          `/reset-password?email=${encodeURIComponent(email.trim())}&token=${encodeURIComponent(res.accessToken!)}`,
+          { replace: true },
+        )
+        return
+      }
+
+      if (!res.refreshToken) {
+        toast.error("No refresh token in response; cannot start session.")
+        return
+      }
+
+      setSession({
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+      })
+
+      try {
+        const meResp = await me()
+        const role = meResp?.auth?.localUser?.role ?? null
+        setSession({
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken,
+          role: role ?? undefined,
+        })
+        const lu = meResp?.auth?.localUser
+        if (lu && typeof lu === "object") {
+          setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))
+        }
+      } catch {
+        // session still has tokens; user can refresh profile later
+      }
+
+      toast.success("Email verified")
+      navigate(next, { replace: true })
+    },
+    onError: (e: unknown) =>
+      toast.error(authFlowErrorMessage(e, "OTP verification failed. Please try again.")),
+  })
+
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Verify OTP</CardTitle>
+          <CardDescription>
+            {email.trim() ? (
+              <>
+                We sent a 6-digit code to{" "}
+                <span className="font-medium text-foreground">{maskEmail(email)}</span>.
+              </>
+            ) : (
+              "Open the link from your sign-up or forgot-password flow so your email is filled in."
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="verify-email">Email</Label>
+            <Input
+              id="verify-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Code</Label>
+            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+
+          <Button
+            className="w-full"
+            disabled={!canSubmit || verifyMutation.isPending}
+            onClick={() => verifyMutation.mutate()}
+          >
+            {verifyMutation.isPending ? "Verifying…" : isForgotPasswordFlow ? "Verify" : "Verify & continue"}
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={resendMutation.isPending}
+            onClick={() => resendMutation.mutate()}
+          >
+            {resendMutation.isPending ? "Sending…" : "Resend OTP"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

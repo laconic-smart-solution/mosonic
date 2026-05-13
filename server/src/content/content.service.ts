@@ -1,15 +1,25 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
+import type { TenancyAuth } from '../auth/tenancy.types';
 import { NodeExecutor } from '../orchestration/node-executor.service';
 import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
   WorkflowNode,
+  WorkflowNodeType,
+  NodeAspectRatio,
+  NodeMediaSourceType,
+  NodeSummaryLength,
+  type WorkflowNodeConfig,
   type WorkflowNodeDocument,
 } from '../nodes/schemas/workflow-node.schema';
 import { Pipeline } from '../pipeline/schemas/pipeline.schema';
@@ -22,6 +32,7 @@ import type {
   ContentPageItemDto,
   ContentPageQueryDto,
 } from './dto/content-page-query.dto';
+import type { GenerateNodeDto } from './dto/generate-node.dto';
 import type { RerunNodeDto } from './dto/rerun-node.dto';
 import type { SaveContentDto } from './dto/save-content.dto';
 import {
@@ -48,6 +59,7 @@ export class ContentService {
 
   constructor(
     private readonly contentRepository: ContentRepository,
+    @Inject(forwardRef(() => UploadService))
     private readonly uploadService: UploadService,
     private readonly nodeExecutor: NodeExecutor,
     @InjectModel(Pipeline.name)
@@ -58,15 +70,31 @@ export class ContentService {
     private readonly ruleModel: Model<RuleDocument>,
   ) {}
 
-  async findPage(query: ContentPageQueryDto): Promise<{
+  async findPage(
+    query: ContentPageQueryDto,
+    auth: TenancyAuth,
+  ): Promise<{
     data: ContentPageItemDto[];
     total: number;
   }> {
-    return this.contentRepository.findPage(query);
+    const result = await this.contentRepository.findPage(query, auth);
+    const refs = result.data.map((row) => row.contentId);
+    const uploadMap =
+      await this.uploadService.mapLatestUploadIdByContentRef(refs, auth);
+    return {
+      total: result.total,
+      data: result.data.map((row) => ({
+        ...row,
+        uploadId: uploadMap.get(row.contentId),
+      })),
+    };
   }
 
-  async getContentDetail(contentId: string): Promise<ContentDetailResponse> {
-    const doc = await this.contentRepository.findByIdLean(contentId);
+  async getContentDetail(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<ContentDetailResponse> {
+    const doc = await this.contentRepository.findByIdLean(contentId, auth);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
@@ -91,46 +119,95 @@ export class ContentService {
   async saveContent(
     contentId: string,
     dto: SaveContentDto,
+    auth: TenancyAuth,
   ): Promise<{ success: boolean }> {
-    const doc = await this.contentRepository.findById(contentId);
+    const doc = await this.contentRepository.findById(contentId, auth);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const snapshot = this.resolveEditableState(doc);
+    const plain = doc.toObject();
+    const snapshot = this.resolveEditableState(plain);
     const nextUserEdits: ContentUserEdits = {
       ...snapshot.userEdits,
       ...dto.userEdits,
     };
 
-    await this.contentRepository.updateEditableState(contentId, {
-      outputs: snapshot.outputs,
-      userEdits: nextUserEdits,
-      nodePromptOverrides: snapshot.nodePromptOverrides,
-    });
+    let nextOutputs: ContentOutputs = { ...snapshot.outputs };
+    if (dto.newOutputs) {
+      const keys: (keyof ContentOutputs)[] = [
+        'text',
+        'translatedText',
+        'transcription',
+        'summary',
+        'image',
+        'video',
+      ];
+      for (const k of keys) {
+        const v = dto.newOutputs[k];
+        if (typeof v === 'string' && v.trim() !== '') {
+          nextOutputs = { ...nextOutputs, [k]: v };
+        }
+      }
+    }
+
+    const { matchedCount } = await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: nextOutputs,
+        userEdits: nextUserEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+      },
+      auth,
+    );
+    if (matchedCount === 0) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
+    const refreshed = await this.contentRepository.findByIdLean(
+      contentId,
+      auth,
+    );
+    if (refreshed) {
+      const merged = mergeResolvedOutputs(this.resolveEditableState(refreshed));
+      await this.uploadService.syncResolvedOutputsForContent(
+        contentId,
+        auth,
+        merged,
+      );
+    }
+
     return { success: true };
   }
 
   /**
    * Validates references synchronously (throws HTTP errors), then runs execution in the background.
    */
-  async scheduleRerun(contentId: string, dto: RerunNodeDto): Promise<void> {
-    const content = await this.contentRepository.findById(contentId);
+  async scheduleRerun(
+    contentId: string,
+    dto: RerunNodeDto,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const content = await this.contentRepository.findById(contentId, auth);
     if (!content) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
 
     const pipeline = await this.pipelineModel
-      .findOne({ pipelineId: content.pipelineRef })
+      .findOne(
+        mergeUserIdFilter({ pipelineId: content.pipelineRef }, auth),
+      )
       .exec();
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${content.pipelineRef} not found`);
     }
 
     const wfNode = await this.workflowNodeModel
-      .findOne({
-        workflowRef: content.workflowRef,
-        nodeId: dto.nodeId,
-      })
+      .findOne(
+        mergeUserIdFilter(
+          { workflowRef: content.workflowRef, nodeId: dto.nodeId },
+          auth,
+        ),
+      )
       .exec();
     if (!wfNode) {
       throw new NotFoundException(
@@ -139,7 +216,7 @@ export class ContentService {
     }
 
     const rule = await this.ruleModel
-      .findOne({ ruleId: content.ruleRef })
+      .findOne(mergeUserIdFilter({ ruleId: content.ruleRef }, auth))
       .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
@@ -173,6 +250,202 @@ export class ContentService {
         `Content node re-run execution failed (${contentId}): ${msg}`,
       );
     });
+  }
+
+  async getAvailableNodeTypes(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<WorkflowNodeType[]> {
+    const content = await this.contentRepository.findById(contentId, auth);
+    if (!content) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+    const resolved = mergeResolvedOutputs(
+      this.resolveEditableState(content.toObject()),
+    );
+    const candidates: WorkflowNodeType[] = [
+      WorkflowNodeType.VideoGeneration,
+      WorkflowNodeType.Transcription,
+      WorkflowNodeType.Summarization,
+      WorkflowNodeType.Translation,
+      WorkflowNodeType.ImageGeneration,
+    ];
+    return candidates.filter((t) => !this.typeOutputSlotFilled(t, resolved));
+  }
+
+  async scheduleGenerateNode(
+    contentId: string,
+    dto: GenerateNodeDto,
+    auth: TenancyAuth,
+  ): Promise<{ success: true; nodeId: string }> {
+    if (dto.type === WorkflowNodeType.TextGeneration) {
+      throw new BadRequestException(
+        'Text generation is not available for Generate More.',
+      );
+    }
+
+    const content = await this.contentRepository.findById(contentId, auth);
+    if (!content) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
+    const pipeline = await this.pipelineModel
+      .findOne(
+        mergeUserIdFilter({ pipelineId: content.pipelineRef }, auth),
+      )
+      .exec();
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${content.pipelineRef} not found`);
+    }
+
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId: content.ruleRef }, auth))
+      .exec();
+    if (!rule) {
+      throw new NotFoundException(`Rule ${content.ruleRef} not found`);
+    }
+
+    const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
+    if (this.typeOutputSlotFilled(dto.type, resolved)) {
+      throw new BadRequestException(
+        'This content type already exists. Use re-run instead.',
+      );
+    }
+
+    const previousOutputsFromDb: PreviousOutputs = {
+      text: resolved.text,
+      image: resolved.image,
+      translatedText: resolved.translatedText,
+      video: resolved.video,
+      transcription: resolved.transcription,
+      summary: resolved.summary,
+    };
+
+    const nodeId = randomUUID();
+    const config = this.defaultConfigForGenerateMore(dto.type, rule);
+
+    void this.runGenerateMoreExecution({
+      content,
+      pipeline,
+      rule,
+      dto,
+      nodeId,
+      config,
+      previousOutputs: previousOutputsFromDb,
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Content generate-more execution failed (${contentId}): ${msg}`,
+      );
+    });
+
+    return { success: true, nodeId };
+  }
+
+  private typeOutputSlotFilled(
+    type: WorkflowNodeType,
+    resolved: ReturnType<typeof mergeResolvedOutputs>,
+  ): boolean {
+    const v = (s: string | undefined) => Boolean(s?.trim());
+    switch (type) {
+      case WorkflowNodeType.ImageGeneration:
+        return v(resolved.image);
+      case WorkflowNodeType.VideoGeneration:
+        return v(resolved.video);
+      case WorkflowNodeType.Translation:
+        return v(resolved.translatedText);
+      case WorkflowNodeType.Transcription:
+        return v(resolved.transcription);
+      case WorkflowNodeType.Summarization:
+        return v(resolved.summary);
+      case WorkflowNodeType.TextGeneration:
+        return v(resolved.text);
+      default:
+        return false;
+    }
+  }
+
+  private defaultConfigForGenerateMore(
+    type: WorkflowNodeType,
+    rule: RuleDocument,
+  ): WorkflowNodeConfig {
+    const channels = rule.channels ?? [];
+    const hasInstagram = channels.some(
+      (c) => (c.channel ?? '').toLowerCase() === 'instagram',
+    );
+    const audienceLang = rule.audience?.language?.trim();
+
+    switch (type) {
+      case WorkflowNodeType.VideoGeneration:
+        return {
+          model: 'sora-2',
+          duration: 15,
+          resolution: '1080p',
+          aspectRatio: hasInstagram
+            ? NodeAspectRatio.R9x16
+            : NodeAspectRatio.R16x9,
+        };
+      case WorkflowNodeType.Transcription:
+        return {
+          model: 'whisper-1',
+          sourceType: NodeMediaSourceType.Audio,
+          language: audienceLang && audienceLang.length > 0 ? audienceLang : 'auto',
+        };
+      case WorkflowNodeType.Summarization:
+        return {
+          model: 'gpt-4o',
+          summaryLength: NodeSummaryLength.Medium,
+          sourceNodeRef: 'text_generation',
+        };
+      case WorkflowNodeType.Translation:
+        return { model: 'gpt-4o' };
+      case WorkflowNodeType.ImageGeneration:
+        return { model: 'dall-e-3' };
+      default:
+        return { model: 'gpt-4o' };
+    }
+  }
+
+  private async runGenerateMoreExecution(args: {
+    content: ContentDocument;
+    pipeline: PipelineDocument;
+    rule: RuleDocument;
+    dto: GenerateNodeDto;
+    nodeId: string;
+    config: WorkflowNodeConfig;
+    previousOutputs: PreviousOutputs;
+  }): Promise<void> {
+    const {
+      content,
+      pipeline,
+      rule,
+      dto,
+      nodeId,
+      config,
+      previousOutputs,
+    } = args;
+    try {
+      await this.nodeExecutor.execute({
+        node: {
+          nodeId,
+          type: dto.type,
+          order: 99,
+          userPrompt: dto.userPrompt?.trim() ?? '',
+          config,
+          workflowRef: content.workflowRef,
+        },
+        context: {
+          rule: rule.toObject(),
+          contentPrompt: pipeline.contentPrompt,
+          previousOutputs,
+        },
+        pipelineId: pipeline.pipelineId,
+        totalNodes: pipeline.nodes?.length ?? 1,
+        contentId: content.contentId,
+      });
+    } catch {
+      // Final failure already emitted on content room by NodeExecutor.
+    }
   }
 
   private async runRerunExecution(args: {
@@ -215,8 +488,11 @@ export class ContentService {
     }
   }
 
-  async approveContent(contentId: string): Promise<{ uploadId: string }> {
-    const doc = await this.contentRepository.findById(contentId);
+  async approveContent(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<{ uploadId: string }> {
+    const doc = await this.contentRepository.findById(contentId, auth);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
@@ -224,7 +500,39 @@ export class ContentService {
       throw new BadRequestException('Only draft content can be approved');
     }
 
-    const rule = await this.ruleModel.findOne({ ruleId: doc.ruleRef }).exec();
+    return this.applyDraftApproval(doc, auth);
+  }
+
+  /**
+   * Publishing requires approved content. Call before Zernio publish: no-op if already
+   * approved; promotes draft → approved and refreshes the linked upload snapshot.
+   */
+  async autoApproveIfDraftForPublish(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const doc = await this.contentRepository.findById(contentId, auth);
+    if (!doc) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+    if (doc.status === ContentStatus.Approved) {
+      return;
+    }
+    if (doc.status !== ContentStatus.Draft) {
+      throw new BadRequestException(
+        'This content cannot be published in its current state.',
+      );
+    }
+    await this.applyDraftApproval(doc, auth);
+  }
+
+  private async applyDraftApproval(
+    doc: ContentDocument,
+    auth: TenancyAuth,
+  ): Promise<{ uploadId: string }> {
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId: doc.ruleRef }, auth))
+      .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
     }
@@ -234,29 +542,67 @@ export class ContentService {
     );
 
     await this.contentRepository.updateStatus(
-      contentId,
+      doc.contentId,
       ContentStatus.Approved,
+      auth,
     );
 
-    const { uploadId } = await this.uploadService.createUpload({
-      contentRef: doc.contentId,
-      workflowRef: doc.workflowRef,
-      ruleRef: doc.ruleRef,
-      resolvedOutputs,
-      ruleChannels: rule.channels ?? [],
-    });
-
-    return { uploadId };
+    return this.uploadService.refreshUploadForApprove(
+      {
+        userId: auth.userId,
+        contentRef: doc.contentId,
+        workflowRef: doc.workflowRef,
+        ruleRef: doc.ruleRef,
+        resolvedOutputs,
+        ruleChannels: rule.channels ?? [],
+      },
+      auth,
+    );
   }
 
-  async rejectContent(contentId: string): Promise<{ success: boolean }> {
-    const doc = await this.contentRepository.findById(contentId);
+  async ensureUploadForContent(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<{ uploadId: string }> {
+    const doc = await this.contentRepository.findById(contentId, auth);
+    if (!doc) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+    try {
+      return await this.uploadService.findUploadIdByContentRef(contentId, auth);
+    } catch {
+      const rule = await this.ruleModel
+        .findOne(mergeUserIdFilter({ ruleId: doc.ruleRef }, auth))
+        .exec();
+      if (!rule) {
+        throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
+      }
+      const resolvedOutputs = mergeResolvedOutputs(
+        this.resolveEditableState(doc),
+      );
+      return this.uploadService.createUpload({
+        userId: auth.userId,
+        contentRef: doc.contentId,
+        workflowRef: doc.workflowRef,
+        ruleRef: doc.ruleRef,
+        resolvedOutputs,
+        ruleChannels: rule.channels ?? [],
+      });
+    }
+  }
+
+  async rejectContent(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<{ success: boolean }> {
+    const doc = await this.contentRepository.findById(contentId, auth);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
     await this.contentRepository.updateStatus(
       contentId,
       ContentStatus.Rejected,
+      auth,
     );
     return { success: true };
   }

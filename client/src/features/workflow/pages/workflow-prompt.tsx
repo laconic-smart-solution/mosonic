@@ -49,7 +49,9 @@ export default function WorkflowPromptPage() {
         onSuccess: (data) => {
           const { workflowId } = data
           joinWorkflowRoom(workflowId)
-          navigate(ruleId ? `/workflow/${ruleId}` : "/rules", { state: { generating: true, ruleName } })
+          navigate(ruleId ? `/workflow/${ruleId}` : "/rules", {
+            state: { generating: true, ruleName, contentPrompt },
+          })
         },
       }
     )

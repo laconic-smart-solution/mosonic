@@ -10,14 +10,25 @@ import { type Request } from 'express';
 import { type SsoTokenClaims } from './auth.types';
 import { UsersService } from '../users/users.service';
 
+function envFlagTrue(raw: string | undefined): boolean {
+  if (raw === undefined || raw === null) return false;
+  const s = raw.trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes';
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly jwks: ReturnType<typeof createRemoteJWKSet>;
+  private readonly jwks: ReturnType<typeof createRemoteJWKSet> | null;
 
   constructor(
     private readonly config: ConfigService,
     private readonly users: UsersService,
   ) {
+    if (envFlagTrue(this.config.get<string>('SSO_AUTH_DISABLED'))) {
+      this.jwks = null;
+      return;
+    }
+
     const jwksUrl = this.config.get<string>('SSO_JWKS_URL')?.trim();
     const baseUrl = this.config
       .get<string>('SSO_BASE_URL')
@@ -33,6 +44,48 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
+
+    if (this.jwks === null) {
+      const authServerUserId = this.config
+        .get<string>('DEV_IMPERSONATE_AUTH_SERVER_USER_ID')
+        ?.trim();
+      if (!authServerUserId) {
+        throw new UnauthorizedException(
+          'SSO_AUTH_DISABLED requires DEV_IMPERSONATE_AUTH_SERVER_USER_ID',
+        );
+      }
+      const localUser =
+        await this.users.findByAuthServerUserId(authServerUserId);
+      if (!localUser) {
+        throw new UnauthorizedException(
+          `No local user for authServerUserId ${authServerUserId}`,
+        );
+      }
+      const claims: SsoTokenClaims = {
+        sub: authServerUserId,
+        userid: authServerUserId,
+        email:
+          typeof localUser.email === 'string' ? localUser.email : undefined,
+        preferred_username:
+          typeof localUser.username === 'string'
+            ? localUser.username
+            : undefined,
+        given_name:
+          typeof localUser.firstName === 'string'
+            ? localUser.firstName
+            : undefined,
+        family_name:
+          typeof localUser.lastName === 'string'
+            ? localUser.lastName
+            : undefined,
+      };
+      req.auth = {
+        claims,
+        authServerUserId,
+        localUser,
+      };
+      return true;
+    }
 
     const header = req.headers['authorization'];
     const token = this.extractBearer(header);

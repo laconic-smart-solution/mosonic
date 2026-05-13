@@ -4,49 +4,66 @@ export type HomeTemplate = {
   label: string
   sub: string
   color: string
+  /** SPA path for the left rail shortcut. */
+  path: string
   icon: ReactNode
 }
 
 export const HOME_TEMPLATES: HomeTemplate[] = [
   {
-    label: "Social Post",
-    sub: "Quick campaign",
+    label: "Dashboard",
+    sub: "Overview and KPIs",
     color: "#00A589",
+    path: "/dashboard",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-        <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.4" />
-        <circle cx="9" cy="9" r="2" fill="currentColor" opacity="0.5" />
+        <rect x="2.5" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+        <rect x="10.5" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+        <rect x="2.5" y="10.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+        <rect x="10.5" y="10.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
       </svg>
     ),
   },
   {
-    label: "Product Launch",
-    sub: "Full campaign",
+    label: "Content",
+    sub: "Library and items",
     color: "#254C94",
+    path: "/content",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-        <path d="M9 2l2 5h5l-4 3 1.5 5L9 12l-4.5 3L6 10 2 7h5L9 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path
+          d="M5.5 3.5h10v11h-10a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
+        <path d="M5.5 7h7M5.5 10h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    label: "Newsletter",
-    sub: "Email digest",
+    label: "Rules",
+    sub: "Campaign rules",
     color: "#06B6D4",
+    path: "/rules",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-        <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.4" />
-        <path d="M2 7l7 4 7-4" stroke="currentColor" strokeWidth="1.3" />
+        <path
+          d="M4.5 5.5h9M4.5 9h9M4.5 12.5h6"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+        <circle cx="4.5" cy="5.5" r="0.9" fill="currentColor" />
+        <circle cx="4.5" cy="9" r="0.9" fill="currentColor" />
+        <circle cx="4.5" cy="12.5" r="0.9" fill="currentColor" />
       </svg>
     ),
   },
 ]
 
-export const HOME_RECENT = [
-  { label: "Songkran 2026", color: "#00A589", initial: "S", updated: "2h ago" },
-  { label: "BKK Café", color: "#254C94", initial: "B", updated: "1d ago" },
-  { label: "Summer Sale", color: "#06B6D4", initial: "S", updated: "3d ago" },
-] as const
+/** Accent colors for the three “Recent” rail slots (cycles if the API returns fewer). */
+export const HOME_RECENT_RAIL_COLORS = ["#00A589", "#254C94", "#06B6D4"] as const
 
 export const PROMPT_SUGGESTIONS = [
   "Write a Songkran festival promotion for Facebook and Instagram",

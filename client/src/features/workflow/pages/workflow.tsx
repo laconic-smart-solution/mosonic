@@ -17,7 +17,6 @@ import { WorkflowFlowSkeleton } from "@/features/workflow/components/workflow-fl
 import { WorkflowGenerationProgress } from "@/features/workflow/components/workflow-generation-progress"
 import { WorkflowPalette } from "@/features/workflow/components/workflow-palette"
 import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-content-drawer"
-import { CreateWorkflowDialog } from "@/features/workflow/components/create-workflow-dialog"
 import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
 import { rfNodesToApiPayload } from "@/features/workflow/data/workflow-model"
 import { useContentPageQuery } from "@/shared/queries/content.query"
@@ -67,6 +66,8 @@ type GenerationStep = "started" | "generating" | "failed"
 type RouteState = {
   generating?: boolean
   ruleName?: string
+  /** Carried from home / workflow-prompt so the pipeline bar is pre-filled */
+  contentPrompt?: string
 }
 type ProcessingMode = "edit" | "processing" | "failed"
 
@@ -77,6 +78,11 @@ export default function WorkflowPage() {
   const { ruleId } = useParams<{ ruleId: string }>()
   const routeState = (location.state ?? {}) as RouteState
 
+  const initialNavContentPrompt =
+    typeof routeState.contentPrompt === "string"
+      ? routeState.contentPrompt.trim()
+      : ""
+
   const [wfName, setWfName] = useState("Untitled Workflow")
   const [ruleName, setRuleName] = useState<string | undefined>(
     routeState.ruleName
@@ -84,10 +90,7 @@ export default function WorkflowPage() {
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | undefined>(
     undefined
   )
-  const [workflowGenerationPrompt, setWorkflowGenerationPrompt] = useState("")
-  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false)
-  const [workflowDialogKey, setWorkflowDialogKey] = useState(0)
-  const [workflowPrompt, setWorkflowPrompt] = useState("")
+  const [workflowPrompt, setWorkflowPrompt] = useState(initialNavContentPrompt)
   const [hovPalette, setHovPalette] = useState<number | null>(null)
   const [apiNodes, setApiNodes] = useState<WorkflowNode[] | undefined>(
     undefined
@@ -168,6 +171,12 @@ export default function WorkflowPage() {
   useEffect(() => {
     if (routeState.ruleName) setRuleName(routeState.ruleName)
   }, [routeState.ruleName])
+
+  useEffect(() => {
+    const p = routeState.contentPrompt?.trim()
+    if (!p) return
+    setWorkflowPrompt(p)
+  }, [routeState.contentPrompt])
 
   useEffect(() => {
     if (!ruleId || !workflowByRuleQuery.isFetched) return
@@ -260,7 +269,11 @@ export default function WorkflowPage() {
       return [...prev, ...appended]
     })
     if (!pipelinePromptHydratedRef.current && payload.data.length > 0) {
-      setWorkflowPrompt(payload.data[0].contentPrompt ?? "")
+      setWorkflowPrompt((prev) =>
+        prev.trim()
+          ? prev
+          : (payload.data[0].contentPrompt ?? "")
+      )
       pipelinePromptHydratedRef.current = true
     }
   }, [pipelinePage, pipelinePageQuery.data])
@@ -457,7 +470,7 @@ export default function WorkflowPage() {
         if (id !== pipelineId) return
         setPipelinePaused(true)
       }),
-      onPipelineCompleted(({ pipelineId: id, contentId }) => {
+      onPipelineCompleted(({ pipelineId: id, contentId, uploadId }) => {
         if (id !== pipelineId) return
         setPipelinePaused(false)
         setTimeout(() => {
@@ -466,7 +479,9 @@ export default function WorkflowPage() {
             params.delete("pipelineId")
             return params
           })
-          navigate(`/content/${contentId}`)
+          navigate(
+            uploadId ? `/upload/${uploadId}` : `/content/${contentId}`
+          )
         }, 1000)
       }),
       onPipelineFailed(({ pipelineId: id, message }) => {
@@ -551,30 +566,33 @@ export default function WorkflowPage() {
     )
   }
 
-  function handlePromptSubmit() {
-    handleStartPipeline()
-  }
-
   function handleWorkflowGenerateSubmit(
     text: string,
     _attachments: Attachment[]
   ) {
     const contentPrompt = text.trim()
-    if (!contentPrompt || !ruleId) return
+    if (!ruleId) return
+    if (!contentPrompt) {
+      toast.error("Please describe what workflow should be generated.")
+      return
+    }
     generationInFlightRef.current = true
     setGenerationStep("started")
     if (activeWorkflowId) joinWorkflowRoom(activeWorkflowId)
 
     const onSuccess = (data: { workflowId: string }) => {
       workflowEventTargetRef.current = data.workflowId
-      setWorkflowGenerationPrompt(contentPrompt)
-      setWorkflowDialogOpen(false)
+      setWorkflowPrompt(contentPrompt)
       setActiveWorkflowId(data.workflowId)
       setApiNodes([])
       joinWorkflowRoom(data.workflowId)
       navigate(`/workflow/${ruleId}`, {
         replace: true,
-        state: { ruleName, generating: true },
+        state: {
+          ruleName,
+          generating: true,
+          contentPrompt,
+        },
       })
       void workflowByRuleQuery.refetch()
     }
@@ -653,10 +671,6 @@ export default function WorkflowPage() {
         onRuleClick={() =>
           navigate("/rules", { state: { selectedRuleId: ruleId } })
         }
-        onGenerateWorkflow={() => {
-          setWorkflowDialogOpen(true)
-          setWorkflowDialogKey((k) => k + 1)
-        }}
         onRun={handleStartPipeline}
         runLabel="Start Generation"
         onSave={
@@ -749,17 +763,18 @@ export default function WorkflowPage() {
             onRetryNode={handleRetryNode}
           />
         )}
-        {processingMode === "edit" && canvasMode === "ready" ? (
+        {processingMode === "edit" &&
+        (canvasMode === "empty" || canvasMode === "ready") ? (
           <div className="pointer-events-none absolute bottom-0 left-1/2 z-20 flex w-full -translate-x-1/2 justify-center px-4 pb-4">
             <div className="pointer-events-auto w-full max-w-[760px] rounded-2xl border border-canvas-200 bg-white/95 p-2 shadow-lg backdrop-blur">
               <p className="px-2 pb-1 text-xs font-medium text-canvas-500">
-                Content Generation Prompt
+                Workflow prompt
               </p>
               <PromptArea
                 value={workflowPrompt}
                 onChange={setWorkflowPrompt}
-                onSubmit={handlePromptSubmit}
-                placeholder="Describe the content you want this workflow to generate..."
+                onSubmit={handleWorkflowGenerateSubmit}
+                placeholder="Describe what workflow should be generated…"
                 className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
               />
             </div>
@@ -819,7 +834,8 @@ export default function WorkflowPage() {
                       </button>
                     )
                   })}
-                  {pipelineItems.length === 0 && !pipelinePageQuery.isLoading ? (
+                  {pipelineItems.length === 0 &&
+                  !pipelinePageQuery.isLoading ? (
                     <p className="py-3 text-center text-xs text-canvas-500">
                       No pipelines yet for this workflow.
                     </p>
@@ -904,14 +920,6 @@ export default function WorkflowPage() {
         }}
       />
 
-      <CreateWorkflowDialog
-        open={workflowDialogOpen}
-        onOpenChange={setWorkflowDialogOpen}
-        prompt={workflowGenerationPrompt}
-        onPromptChange={setWorkflowGenerationPrompt}
-        promptAreaKey={workflowDialogKey}
-        onGenerate={handleWorkflowGenerateSubmit}
-      />
     </div>
   )
 }

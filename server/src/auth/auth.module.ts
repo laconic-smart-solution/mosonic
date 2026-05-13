@@ -9,6 +9,6 @@ import { UsersModule } from '../users/users.module';
   imports: [UsersModule],
   controllers: [AuthController],
   providers: [SsoClientService, JwtAuthGuard, AdminGuard],
-  exports: [SsoClientService, JwtAuthGuard, AdminGuard],
+  exports: [SsoClientService, JwtAuthGuard, AdminGuard, UsersModule],
 })
 export class AuthModule {}

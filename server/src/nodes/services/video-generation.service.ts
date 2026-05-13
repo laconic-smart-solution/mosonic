@@ -10,6 +10,7 @@ import type {
   NodeExecutionResult,
   VideoGenerationInput,
 } from '../types/node-execution.types';
+import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 60;
@@ -225,14 +226,52 @@ export class VideoGenerationService {
     };
 
     try {
-      return await attemptUpload('video/mp4');
+      const result = await attemptUpload('video/mp4');
+      return await this.maybeMirrorVideoUploadToPublicUploads(result, 'video/mp4');
     } catch (error) {
       // Some file services validate MIME strictly; fallback can unblock storage.
       if (error instanceof Error && error.message.includes('status 400')) {
-        return attemptUpload('application/octet-stream');
+        const result = await attemptUpload('application/octet-stream');
+        return await this.maybeMirrorVideoUploadToPublicUploads(
+          result,
+          'application/octet-stream',
+        );
       }
       throw error;
     }
+  }
+
+  private async maybeMirrorVideoUploadToPublicUploads(
+    result: {
+      fileUrl: string;
+      relativePath: string;
+      storedFileName: string;
+      originalFileName?: string;
+    },
+    mimeType: string,
+  ): Promise<{
+    fileUrl: string;
+    relativePath: string;
+    storedFileName: string;
+    originalFileName?: string;
+  }> {
+    const base = this.configService.get<string>('FILE_SERVICE_URL')?.trim();
+    if (!base) return result;
+    try {
+      const mirrored = await mirrorFileServiceArtifactToPublicUploadsUrl(
+        this.configService,
+        base.replace(/\/+$/, ''),
+        { fileUrl: result.fileUrl, relativePath: result.relativePath },
+        result.storedFileName,
+        mimeType,
+      );
+      if (mirrored) {
+        return { ...result, fileUrl: mirrored };
+      }
+    } catch {
+      // Keep file-service URL if mirror fails
+    }
+    return result;
   }
 
   async generateVideo(

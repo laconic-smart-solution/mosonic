@@ -9,6 +9,12 @@ export enum FeedbackSignalStatus {
   Rejected = 'rejected',
 }
 
+export enum SuggestionConfidence {
+  High = 'high',
+  Medium = 'medium',
+  Low = 'low',
+}
+
 @Schema({ _id: false })
 export class AnalyticsPeriod {
   @Prop({ type: Date, required: true })
@@ -33,6 +39,21 @@ export class ChannelMetrics {
 
   @Prop({ required: true, min: 0 })
   conversions: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  likes: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  comments: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  shares: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  reach: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  engagementRate: number;
 }
 export const ChannelMetricsSchema =
   SchemaFactory.createForClass(ChannelMetrics);
@@ -44,6 +65,12 @@ export class ContentPerformanceEntry {
 
   @Prop({ required: true })
   pipelineRef: string;
+
+  @Prop({ required: true })
+  uploadRef: string;
+
+  @Prop({ required: true })
+  zernioPostId: string;
 
   @Prop({ required: true })
   channel: string;
@@ -69,10 +96,28 @@ export class CampaignSummary {
   @Prop({ required: true, min: 0 })
   totalConversions: number;
 
-  @Prop({ required: true })
+  @Prop({ required: true, min: 0, default: 0 })
+  totalLikes: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  totalComments: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  totalShares: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  totalReach: number;
+
+  @Prop({ required: true, default: 0 })
+  averageEngagementRate: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  totalPostsAnalyzed: number;
+
+  @Prop({ type: String, default: '' })
   bestPerformingChannel: string;
 
-  @Prop({ required: true })
+  @Prop({ type: String, default: '' })
   bestPerformingContent: string;
 }
 export const CampaignSummarySchema =
@@ -92,14 +137,14 @@ export class FeedbackSuggestion {
 
   @Prop({ required: true })
   reason: string;
-}
-export const FeedbackSuggestionSchema =
-  SchemaFactory.createForClass(FeedbackSuggestion);
 
-@Schema({ _id: false })
-export class FeedbackSignal {
-  @Prop({ type: [FeedbackSuggestionSchema], default: [] })
-  suggestions: FeedbackSuggestion[];
+  @Prop({
+    type: String,
+    enum: Object.values(SuggestionConfidence),
+    required: true,
+    default: SuggestionConfidence.Medium,
+  })
+  confidence: SuggestionConfidence;
 
   @Prop({
     type: String,
@@ -109,16 +154,24 @@ export class FeedbackSignal {
   })
   status: FeedbackSignalStatus;
 }
+export const FeedbackSuggestionSchema =
+  SchemaFactory.createForClass(FeedbackSuggestion);
+
+@Schema({ _id: false })
+export class FeedbackSignal {
+  @Prop({ type: [FeedbackSuggestionSchema], default: [] })
+  suggestions: FeedbackSuggestion[];
+}
 export const FeedbackSignalSchema =
   SchemaFactory.createForClass(FeedbackSignal);
 
 /**
- * Pulled analytics snapshot for a rule/workflow over a date window.
- * Immutable-style reports (no `updatedAt` per product spec).
+ * Live analytics document for a rule. One document per rule, updated in place
+ * by sync (`pullAnalyticsForRule`) and by suggestion generation.
  */
 @Schema({
   collection: 'analytics',
-  timestamps: { createdAt: true, updatedAt: false },
+  timestamps: { createdAt: true, updatedAt: true },
 })
 export class Analytics {
   @Prop({
@@ -129,11 +182,8 @@ export class Analytics {
   })
   analyticsId: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true, unique: true })
   ruleRef: string;
-
-  @Prop({ required: true, index: true })
-  workflowRef: string;
 
   @Prop({ type: AnalyticsPeriodSchema, required: true })
   period: AnalyticsPeriod;
@@ -154,5 +204,4 @@ export class Analytics {
 export const AnalyticsSchema = SchemaFactory.createForClass(Analytics);
 export type AnalyticsDocument = HydratedDocument<Analytics>;
 
-AnalyticsSchema.index({ ruleRef: 1, workflowRef: 1, pulledAt: -1 });
 AnalyticsSchema.index({ 'period.from': 1, 'period.to': 1 });

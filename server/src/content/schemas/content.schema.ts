@@ -91,6 +91,10 @@ export class Content {
   })
   contentId: string;
 
+  /** App-local tenant id (`User.userId`); legacy rows may omit. */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({ required: true, index: true })
   pipelineRef: string;
 
@@ -133,3 +137,4 @@ export type ContentDocument = HydratedDocument<Content>;
 ContentSchema.index({ pipelineRef: 1 });
 ContentSchema.index({ workflowRef: 1, status: 1 });
 ContentSchema.index({ ruleRef: 1, updatedAt: -1 });
+ContentSchema.index({ userId: 1, updatedAt: -1 });

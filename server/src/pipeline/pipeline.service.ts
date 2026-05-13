@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { OrchestrationService } from '../orchestration/orchestration.service';
 import type {
   PipelinePageItemDto,
@@ -16,7 +18,10 @@ export class PipelineService {
     private readonly pipelineModel: Model<PipelineDocument>,
   ) {}
 
-  async findPage(dto: PipelinePageQueryDto): Promise<{
+  async findPage(
+    dto: PipelinePageQueryDto,
+    auth: TenancyAuth,
+  ): Promise<{
     data: PipelinePageItemDto[];
     total: number;
   }> {
@@ -26,7 +31,7 @@ export class PipelineService {
     const sortOrder = dto.sortOrder ?? 'desc';
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
     if (dto.filter?.workflowRef) {
       filter.workflowRef = dto.filter.workflowRef;
     }
@@ -75,41 +80,21 @@ export class PipelineService {
     workflowId: string;
     ruleId: string;
     contentPrompt: string;
+    auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
-    return this.orchestration.startPipeline({
-      ...args,
-      userId: 'system',
-    });
+    return this.orchestration.startPipeline(args);
   }
 
   async retryNode(
     pipelineId: string,
     _nodeId: string,
+    auth: TenancyAuth,
   ): Promise<{ success: boolean }> {
-    await this.orchestration.retryNode(pipelineId);
+    await this.orchestration.retryNode(pipelineId, auth);
     return { success: true };
   }
 
-  getPipeline(pipelineId: string): Promise<{
-    pipeline: {
-      pipelineId: string;
-      workflowRef: string;
-      ruleRef: string;
-      contentPrompt: string;
-      status: string;
-      startedAt: Date;
-      completedAt: Date | null;
-    };
-    nodes: Array<{
-      nodeId: string;
-      type: string;
-      order: number;
-      status: string;
-      output: Record<string, unknown> | null;
-      retryCount: number;
-      executedAt: Date | null;
-    }>;
-  }> {
-    return this.orchestration.getPipeline(pipelineId);
+  getPipeline(pipelineId: string, auth: TenancyAuth) {
+    return this.orchestration.getPipeline(pipelineId, auth);
   }
 }

@@ -53,7 +53,11 @@ export function WorkflowContentDrawer({
                 className="w-full rounded border p-3 text-left transition hover:bg-muted/30"
                 onClick={() => {
                   onOpenChange(false)
-                  navigate(`/content/${item.contentId}`)
+                  navigate(
+                    item.uploadId
+                      ? `/upload/${item.uploadId}`
+                      : `/content/${item.contentId}`
+                  )
                 }}
               >
                 <div className="flex items-center justify-between">

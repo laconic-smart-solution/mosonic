@@ -44,13 +44,18 @@ export class ZernioClient {
     return res.data.profile;
   }
 
-  async getConnectUrl(platform: string, profileId: string): Promise<string> {
+  async getConnectUrl(
+    platform: string,
+    profileId: string,
+    redirectUrlOverride?: string,
+  ): Promise<string> {
+    const redirect_url = redirectUrlOverride ?? this.callbackUrl;
     const res = await axios.get<ZernioConnectResponse>(
       `${this.base}/connect/${platform}`,
       {
         params: {
           profileId,
-          redirect_url: this.callbackUrl,
+          redirect_url,
         },
         headers: this.headers,
       },

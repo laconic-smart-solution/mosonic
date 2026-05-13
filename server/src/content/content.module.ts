@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AuthModule } from '../auth/auth.module';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
 import {
   WorkflowNode,
@@ -18,9 +19,10 @@ import { Content, ContentSchema } from './schemas/content.schema';
 
 @Module({
   imports: [
+    AuthModule,
     ConfigModule,
-    OrchestrationModule,
-    UploadModule,
+    forwardRef(() => OrchestrationModule),
+    forwardRef(() => UploadModule),
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
       { name: Pipeline.name, schema: PipelineSchema },

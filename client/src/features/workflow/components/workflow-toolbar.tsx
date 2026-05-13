@@ -6,7 +6,6 @@ type WorkflowToolbarProps = {
   onWfNameChange: (v: string) => void
   ruleName?: string
   onRuleClick?: () => void
-  onGenerateWorkflow?: () => void
   onRun: () => void
   runLabel?: string
   onSave?: () => void
@@ -20,7 +19,6 @@ export function WorkflowToolbar({
   onWfNameChange,
   ruleName,
   onRuleClick,
-  onGenerateWorkflow,
   onRun,
   runLabel = "Run Pipeline",
   onSave,
@@ -79,16 +77,6 @@ export function WorkflowToolbar({
       </div>
 
       <div className="flex gap-2">
-        {onGenerateWorkflow && !readOnly ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onGenerateWorkflow}
-          >
-            Generate Workflow
-          </Button>
-        ) : null}
         {onSave && !readOnly ? (
           <Button
             type="button"

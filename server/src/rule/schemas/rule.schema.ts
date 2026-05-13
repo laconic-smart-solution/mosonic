@@ -38,6 +38,19 @@ export enum ChannelPriority {
   Low = 'low',
 }
 
+/** Which resolved output field supplies the default caption per channel */
+export enum CaptionMappingSource {
+  Text = 'text',
+  TranslatedText = 'translatedText',
+  Summary = 'summary',
+}
+
+/** Media slot used when posting (null = text-only defaults) */
+export enum ChannelMediaMapping {
+  Image = 'image',
+  Video = 'video',
+}
+
 @Schema({ _id: false })
 export class AgeRange {
   @Prop({ required: true, min: 0 })
@@ -142,6 +155,26 @@ export class Campaign {
 export const CampaignSchema = SchemaFactory.createForClass(Campaign);
 
 @Schema({ _id: false })
+export class ContentMapping {
+  @Prop({
+    type: String,
+    enum: Object.values(CaptionMappingSource),
+    required: true,
+  })
+  caption: CaptionMappingSource;
+
+  @Prop({
+    type: String,
+    enum: Object.values(ChannelMediaMapping),
+    required: false,
+    default: undefined,
+  })
+  media?: ChannelMediaMapping | null;
+}
+export const ContentMappingSchema =
+  SchemaFactory.createForClass(ContentMapping);
+
+@Schema({ _id: false })
 export class ChannelEntry {
   @Prop({ required: true })
   channel: string;
@@ -151,6 +184,10 @@ export class ChannelEntry {
 
   @Prop({ required: true })
   contentStyle: string;
+
+  /** When absent on legacy docs, treat as `{ caption: text, media: null }`. */
+  @Prop({ type: ContentMappingSchema, required: false })
+  contentMapping?: ContentMapping;
 }
 export const ChannelEntrySchema = SchemaFactory.createForClass(ChannelEntry);
 
@@ -235,6 +272,10 @@ export class Rule {
   })
   ruleId: string;
 
+  /** App-local tenant id (`User.userId`); legacy rows may omit. */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({ required: true })
   name: string;
 
@@ -272,3 +313,4 @@ export type RuleDocument = HydratedDocument<Rule>;
 
 RuleSchema.index({ name: 1 });
 RuleSchema.index({ status: 1, updatedAt: -1 });
+RuleSchema.index({ userId: 1, updatedAt: -1 });

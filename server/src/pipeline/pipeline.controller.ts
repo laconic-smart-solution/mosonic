@@ -4,9 +4,15 @@ import {
   Get,
   Param,
   Post,
+  Req,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { tenancyFromLocalUser } from '../auth/tenancy.util';
+import { User } from '../users/schemas/user.schema';
 import {
   PipelinePageQueryDto,
   PipelinePageResponseDto,
@@ -15,6 +21,7 @@ import { RetryNodeDto } from './dto/retry-node.dto';
 import { StartPipelineDto } from './dto/start-pipeline.dto';
 import { PipelineService } from './pipeline.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('pipeline')
 export class PipelineController {
   constructor(private readonly pipelineService: PipelineService) {}
@@ -28,9 +35,11 @@ export class PipelineController {
     }),
   )
   async pageable(
+    @Req() req: Request,
     @Body() body: PipelinePageQueryDto,
   ): Promise<PipelinePageResponseDto> {
-    const { data, total } = await this.pipelineService.findPage(body);
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    const { data, total } = await this.pipelineService.findPage(body, auth);
     const page = body.page ?? 1;
     const limit = body.limit ?? 10;
     const totalPages = Math.ceil(total / limit) || 0;
@@ -46,45 +55,29 @@ export class PipelineController {
   }
 
   @Post('start')
-  startPipeline(
-    @Body() dto: StartPipelineDto,
-  ): Promise<{ pipelineId: string }> {
+  startPipeline(@Req() req: Request, @Body() dto: StartPipelineDto) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.startPipeline({
       workflowId: dto.workflowId,
       ruleId: dto.ruleId,
       contentPrompt: dto.contentPrompt,
+      auth,
     });
   }
 
   @Post(':id/retry-node')
   retryNode(
+    @Req() req: Request,
     @Param('id') pipelineId: string,
     @Body() dto: RetryNodeDto,
   ): Promise<{ success: boolean }> {
-    return this.pipelineService.retryNode(pipelineId, dto.nodeId);
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.retryNode(pipelineId, dto.nodeId, auth);
   }
 
   @Get(':id')
-  getPipeline(@Param('id') pipelineId: string): Promise<{
-    pipeline: {
-      pipelineId: string;
-      workflowRef: string;
-      ruleRef: string;
-      contentPrompt: string;
-      status: string;
-      startedAt: Date;
-      completedAt: Date | null;
-    };
-    nodes: Array<{
-      nodeId: string;
-      type: string;
-      order: number;
-      status: string;
-      output: Record<string, unknown> | null;
-      retryCount: number;
-      executedAt: Date | null;
-    }>;
-  }> {
-    return this.pipelineService.getPipeline(pipelineId);
+  getPipeline(@Req() req: Request, @Param('id') pipelineId: string) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.getPipeline(pipelineId, auth);
   }
 }

@@ -4,10 +4,13 @@ import {
   IsDateString,
   IsEnum,
   IsNumber,
+  IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import {
+  CaptionMappingSource,
+  ChannelMediaMapping,
   ChannelPriority,
   GenderOption,
   PostingFrequency,
@@ -114,6 +117,15 @@ export class CampaignDto {
   customSchedule!: string[];
 }
 
+export class ContentMappingDto {
+  @IsEnum(CaptionMappingSource)
+  caption!: CaptionMappingSource;
+
+  @IsOptional()
+  @IsEnum(ChannelMediaMapping)
+  media?: ChannelMediaMapping | null;
+}
+
 export class ChannelEntryDto {
   @IsString()
   channel!: string;
@@ -123,6 +135,11 @@ export class ChannelEntryDto {
 
   @IsString()
   contentStyle!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ContentMappingDto)
+  contentMapping?: ContentMappingDto;
 }
 
 export class SeoGuidelinesDto {

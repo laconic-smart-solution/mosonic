@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
@@ -10,14 +10,18 @@ import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
 import { HomeStage } from "@/features/home/components/home-stage"
 import { HomeUserStrip } from "@/features/home/components/home-user-strip"
 import { PROMPT_SUGGESTIONS } from "@/features/home/data/home-constants"
+import { buildHomeRecentSlots } from "@/features/home/lib/home-recent-slots"
+import { useContentPageQuery } from "@/shared/queries/content.query"
 import { useRulesPageQuery } from "@/shared/queries/rule.query"
 import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
+import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { T } from "@/lib/tokens"
 
 export default function HomePage() {
   const navigate = useNavigate()
+  useSessionBootstrap()
   const [prompt, setPrompt] = useState("")
   const [focused, setFocused] = useState(false)
   const [hovLeft, setHovLeft] = useState<number | null>(null)
@@ -40,6 +44,21 @@ export default function HomePage() {
       },
     },
     true,
+  )
+
+  const recentContentsQuery = useContentPageQuery(
+    {
+      page: 1,
+      limit: 3,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+    },
+    true,
+  )
+
+  const recentSlots = useMemo(
+    () => buildHomeRecentSlots(recentContentsQuery.data?.data ?? []),
+    [recentContentsQuery.data?.data],
   )
 
   const generateWorkflow = useGenerateWorkflow()
@@ -88,7 +107,9 @@ export default function HomePage() {
         // so no events are missed while WorkflowPage is mounting.
         joinWorkflowRoom(workflowId)
         const ruleName = ruleOptions.find((r) => r.ruleId === ruleId)?.name
-        navigate(`/workflow/${ruleId}`, { state: { generating: true, ruleName } })
+        navigate(`/workflow/${ruleId}`, {
+          state: { generating: true, ruleName, contentPrompt: combined },
+        })
       },
       onSettled: () => {
         setOrbPulse(false)
@@ -123,8 +144,13 @@ export default function HomePage() {
           hovRight={hovRight}
           setHovLeft={setHovLeft}
           setHovRight={setHovRight}
-          onNavigateTemplates={() => navigate("/rules")}
-          onNavigateRecent={() => navigate("/content")}
+          onNavigateTemplate={(path) => navigate(path)}
+          recentSlots={recentSlots}
+          isRecentLoading={recentContentsQuery.isLoading}
+          onOpenRecentContent={(contentId, uid) =>
+            navigate(uid ? `/upload/${uid}` : `/content/${contentId}`)
+          }
+          onOpenRecentLibrary={() => navigate("/content")}
         >
           <HomePromptBar
             prompt={prompt}

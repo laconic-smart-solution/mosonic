@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  forwardRef,
   HttpException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,6 +10,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { EventsService } from '../events/events.service';
 import type { ExtractRuleResponseDto } from './dto/extract-rule.dto';
 import type { RuleExtractRequest } from './extract-request.types';
@@ -25,9 +28,12 @@ import {
   RuleStatus,
   VersionChangedBy,
 } from './schemas/rule.schema';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { ContentReaderService } from '../preprocessing/content-reader.service';
 import { PreprocessingService } from '../preprocessing/preprocessing.service';
 import { RuleExtractionService } from './rule-extraction.service';
+import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -65,10 +71,13 @@ export class RuleService {
     private readonly preprocessing: PreprocessingService,
     private readonly contentReader: ContentReaderService,
     private readonly events: EventsService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async requestExtraction(
     args: RuleExtractRequest,
+    auth: TenancyAuth,
   ): Promise<ExtractRuleResponseDto> {
     const now = new Date();
     const originalType =
@@ -82,6 +91,7 @@ export class RuleService {
 
     await this.ruleModel.create({
       ruleId,
+      userId: auth.userId,
       name: 'Processing rule',
       brand: {
         brandName: 'Pending',
@@ -135,7 +145,16 @@ export class RuleService {
       versions: [],
     });
 
-    void this.runExtraction(ruleId, args);
+    try {
+      await this.analyticsService.ensureForRule(ruleId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Failed to seed analytics doc for rule ${ruleId}: ${msg}`,
+      );
+    }
+
+    void this.runExtraction(ruleId, args, auth);
     return { ruleId };
   }
 
@@ -143,28 +162,38 @@ export class RuleService {
    * Start extraction from a plain prompt and wait until the rule is active.
    * Used by workflow generation when no rule is preselected.
    */
-  async extractAndAwaitReady(contentPrompt: string): Promise<string> {
+  async extractAndAwaitReady(
+    contentPrompt: string,
+    auth: TenancyAuth,
+  ): Promise<string> {
     const prompt = contentPrompt.trim();
     if (!prompt) {
       throw new BadRequestException('contentPrompt must not be empty');
     }
-    const { ruleId } = await this.requestExtraction({
-      input: prompt,
-      files: [],
-      urls: [],
-    });
-    await this.awaitRuleReady(ruleId);
+    const { ruleId } = await this.requestExtraction(
+      {
+        input: prompt,
+        files: [],
+        urls: [],
+      },
+      auth,
+    );
+    await this.awaitRuleReady(ruleId, auth);
     return ruleId;
   }
 
   async awaitRuleReady(
     ruleId: string,
+    auth: TenancyAuth,
     timeoutMs = RuleService.DEFAULT_AWAIT_TIMEOUT_MS,
   ): Promise<void> {
     const startedAt = Date.now();
     const intervalMs = 500;
     for (;;) {
-      const rule = await this.ruleModel.findOne({ ruleId }).lean().exec();
+      const rule = await this.ruleModel
+        .findOne(mergeUserIdFilter({ ruleId }, auth))
+        .lean()
+        .exec();
       if (!rule) {
         throw new NotFoundException(`Rule ${ruleId} not found`);
       }
@@ -181,8 +210,10 @@ export class RuleService {
     }
   }
 
-  async getRuleById(ruleId: string): Promise<RuleDocument> {
-    const rule = await this.ruleModel.findOne({ ruleId }).exec();
+  async getRuleById(ruleId: string, auth: TenancyAuth): Promise<RuleDocument> {
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId }, auth))
+      .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -204,8 +235,39 @@ export class RuleService {
     };
   }
 
-  async patchRule(ruleId: string, dto: UpdateRuleDto): Promise<RuleDocument> {
-    const existing = await this.ruleModel.findOne({ ruleId }).exec();
+  /** Apply a single analytics suggestion field to the rule (merged PATCH). */
+  async applySuggestionFieldPatch(
+    ruleId: string,
+    fieldPath: string,
+    suggestedValue: unknown,
+    auth: TenancyAuth,
+  ): Promise<RuleDocument> {
+    const existing = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId }, auth))
+      .exec();
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    const dto = buildSuggestionUpdateDto(
+      {
+        brand: existing.brand,
+        campaign: existing.campaign,
+        channels: existing.channels,
+      },
+      fieldPath,
+      suggestedValue,
+    );
+    return this.patchRule(ruleId, dto, auth);
+  }
+
+  async patchRule(
+    ruleId: string,
+    dto: UpdateRuleDto,
+    auth: TenancyAuth,
+  ): Promise<RuleDocument> {
+    const existing = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId }, auth))
+      .exec();
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -278,7 +340,7 @@ export class RuleService {
 
     const updated = await this.ruleModel
       .findOneAndUpdate(
-        { ruleId },
+        mergeUserIdFilter({ ruleId }, auth),
         { $set },
         { new: true, runValidators: true },
       )
@@ -292,6 +354,7 @@ export class RuleService {
   async replaceRule(
     ruleId: string,
     dto: ReplaceRuleDto,
+    auth: TenancyAuth,
   ): Promise<RuleDocument> {
     const $set = {
       name: dto.name,
@@ -304,7 +367,7 @@ export class RuleService {
 
     const updated = await this.ruleModel
       .findOneAndUpdate(
-        { ruleId },
+        mergeUserIdFilter({ ruleId }, auth),
         { $set },
         { new: true, runValidators: true },
       )
@@ -315,7 +378,10 @@ export class RuleService {
     return updated;
   }
 
-  async findPage(dto: RulePageQueryDto): Promise<{
+  async findPage(
+    dto: RulePageQueryDto,
+    auth: TenancyAuth,
+  ): Promise<{
     data: RulePageItemDto[];
     total: number;
   }> {
@@ -325,7 +391,7 @@ export class RuleService {
     const sortOrder = dto.sortOrder ?? 'desc';
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
     const nameFilter = dto.filter?.name?.trim();
     if (nameFilter) {
       filter.name = {
@@ -390,6 +456,7 @@ export class RuleService {
   private async runExtraction(
     ruleId: string,
     args: RuleExtractRequest,
+    auth: TenancyAuth,
   ): Promise<void> {
     try {
       this.events.emitToRule(ruleId, 'rule:started', { ruleId });
@@ -436,7 +503,7 @@ export class RuleService {
       }
 
       await this.ruleModel.updateOne(
-        { ruleId },
+        mergeUserIdFilter({ ruleId }, auth),
         {
           $set: {
             name: extracted.name,
@@ -469,7 +536,7 @@ export class RuleService {
     } catch (error) {
       this.logger.error(`Rule extraction failed for ${ruleId}`, error as Error);
       await this.ruleModel.updateOne(
-        { ruleId },
+        mergeUserIdFilter({ ruleId }, auth),
         { $set: { status: RuleStatus.Failed } },
       );
       const message =
