@@ -1,4 +1,5 @@
 import apiClient from "@/shared/api/api-client"
+import { extractTokensFromAuthResponse } from "@/shared/lib/extract-auth-tokens"
 
 function pick(obj: any, path: string[]) {
   let cur = obj
@@ -12,16 +13,7 @@ function pick(obj: any, path: string[]) {
 export async function login(body: { username: string; password: string }) {
   const res = await apiClient.post("/auth/login", body)
   const data = res.data
-  const accessToken =
-    pick(data, ["data", "token", "accessToken"]) ??
-    pick(data, ["data", "token", "access_token"]) ??
-    pick(data, ["token", "accessToken"]) ??
-    pick(data, ["token", "access_token"])
-  const refreshToken =
-    pick(data, ["data", "token", "refreshToken"]) ??
-    pick(data, ["data", "token", "refresh_token"]) ??
-    pick(data, ["token", "refreshToken"]) ??
-    pick(data, ["token", "refresh_token"])
+  const { accessToken, refreshToken } = extractTokensFromAuthResponse(data)
   const email = pick(data, ["data", "email"]) ?? pick(data, ["email"])
   const userId = pick(data, ["data", "userId"]) ?? pick(data, ["userId"])
   return { raw: data, accessToken, refreshToken, email, userId }

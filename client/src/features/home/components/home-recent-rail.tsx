@@ -1,60 +1,113 @@
-type RecentItem = {
-  label: string
-  color: string
-  initial: string
-  updated: string
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import type { HomeRecentSlot } from "@/features/home/lib/home-recent-slots"
 
 type HomeRecentRailProps = {
-  items: readonly RecentItem[]
+  slots: readonly HomeRecentSlot[]
+  isLoading: boolean
   hovRight: number | null
   onHover: (i: number | null) => void
-  onSelect: () => void
+  onOpenContent: (contentId: string, uploadId?: string) => void
+  onOpenLibrary: () => void
 }
 
-export function HomeRecentRail({ items, hovRight, onHover, onSelect }: HomeRecentRailProps) {
+function RecentSkeletonRow() {
+  return (
+    <div className="flex size-[52px] items-center justify-center rounded-xl border border-[#EDE9E1] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <div className="size-[30px] animate-pulse rounded-lg bg-[#EDE9E1]" />
+    </div>
+  )
+}
+
+export function HomeRecentRail({
+  slots,
+  isLoading,
+  hovRight,
+  onHover,
+  onOpenContent,
+  onOpenLibrary,
+}: HomeRecentRailProps) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center gap-2.5">
+        <RecentSkeletonRow />
+        <RecentSkeletonRow />
+        <RecentSkeletonRow />
+        <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-[#718096] uppercase">Recent</div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center gap-2.5">
-      {items.map((item, i) => (
-        <div key={item.label} className="relative">
-          <button
-            type="button"
-            onClick={onSelect}
-            onMouseEnter={() => onHover(i)}
-            onMouseLeave={() => onHover(null)}
-            className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
-            style={{
-              borderColor: hovRight === i ? `${item.color}50` : "#EDE9E1",
-              boxShadow:
-                hovRight === i
-                  ? `0 4px 16px ${item.color}20, 0 1px 3px rgba(0,0,0,0.06)`
-                  : "0 1px 3px rgba(0,0,0,0.05)",
-              transform: hovRight === i ? "scale(1.06)" : "scale(1)",
-            }}
-          >
-            <div
-              className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
-              style={{
-                background: `linear-gradient(135deg,${item.color}20,${item.color}35)`,
-                border: `1.5px solid ${item.color}40`,
-                color: item.color,
-              }}
+      {slots.map((slot, i) => {
+        const key = slot.kind === "content" ? slot.contentId : `empty-${i}`
+        const item = slot.kind === "content" ? slot : null
+        const borderColor = item && hovRight === i ? `${item.color}50` : "#EDE9E1"
+        const shadow =
+          item && hovRight === i
+            ? `0 4px 16px ${item.color}20, 0 1px 3px rgba(0,0,0,0.06)`
+            : "0 1px 3px rgba(0,0,0,0.05)"
+        const scale = item && hovRight === i ? "scale(1.06)" : "scale(1)"
+
+        const tooltipTitle =
+          slot.kind === "content" ? slot.label : "No recent item"
+        const tooltipSub =
+          slot.kind === "content" ? slot.updated : "Open content library"
+
+        return (
+          <Tooltip key={key}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() =>
+                  slot.kind === "content"
+                    ? onOpenContent(slot.contentId, slot.uploadId)
+                    : onOpenLibrary()
+                }
+                onMouseEnter={() => onHover(i)}
+                onMouseLeave={() => onHover(null)}
+                className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
+                style={{
+                  borderColor: slot.kind === "empty" && hovRight === i ? "#A0AEC0" : borderColor,
+                  boxShadow:
+                    slot.kind === "empty" && hovRight === i
+                      ? "0 4px 12px rgba(0,0,0,0.08)"
+                      : shadow,
+                  transform: slot.kind === "empty" && hovRight === i ? "scale(1.06)" : scale,
+                }}
+              >
+                {slot.kind === "content" ? (
+                  <div
+                    className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
+                    style={{
+                      background: `linear-gradient(135deg,${slot.color}20,${slot.color}35)`,
+                      border: `1.5px solid ${slot.color}40`,
+                      color: slot.color,
+                    }}
+                  >
+                    {slot.initial}
+                  </div>
+                ) : (
+                  <div className="text-lg leading-none font-semibold text-[#A0AEC0]">+</div>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="left"
+              align="center"
+              sideOffset={10}
+              className="flex max-w-[min(280px,calc(100vw-6rem))] flex-col items-stretch gap-0.5 px-3 py-2"
             >
-              {item.initial}
-            </div>
-          </button>
-          {hovRight === i ? (
-            <div className="pointer-events-none absolute top-1/2 left-[62px] z-10 -translate-y-1/2 rounded-md bg-[#111118] px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-              {item.label}
-              <div className="mt-px text-[9px] text-white/50">{item.updated}</div>
-              <div
-                className="absolute top-1/2 -left-1.25 -translate-y-1/2 border-y-[5px] border-r-[5px] border-y-transparent border-r-[#111118]"
-                aria-hidden
-              />
-            </div>
-          ) : null}
-        </div>
-      ))}
+              <span className="font-semibold">{tooltipTitle}</span>
+              <span className="text-[11px] text-background/80">{tooltipSub}</span>
+            </TooltipContent>
+          </Tooltip>
+        )
+      })}
       <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-[#718096] uppercase">Recent</div>
     </div>
   )

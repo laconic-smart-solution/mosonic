@@ -1,5 +1,5 @@
 import * as React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import {
   ArrowRight,
   ArrowUp,
@@ -73,7 +73,7 @@ export function PromptArea({
     onAttachmentsChange?.(attachments)
   }, [attachments, onAttachmentsChange])
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = "auto"
@@ -153,12 +153,10 @@ export function PromptArea({
   const urlCount = attachments.filter((a) => a.type === "url").length
 
   return (
-    <motion.div
+    <div
       ref={containerRef}
-      layout
-      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
       className={cn(
-        "w-full cursor-text overflow-hidden border bg-white",
+        "w-full cursor-text overflow-hidden border bg-white transition-[border-radius,border-color] duration-200 ease-out",
         expanded
           ? "rounded-2xl border-teal-400"
           : "rounded-full border-canvas-300 hover:border-canvas-500",
@@ -197,7 +195,6 @@ export function PromptArea({
               {attachments.map((att) => (
                 <motion.span
                   key={att.id}
-                  layout
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
@@ -313,17 +310,15 @@ export function PromptArea({
           }}
           onBlur={onBlur}
         />
-        <motion.button
+        <button
           type="button"
-          layout
-          whileTap={{ scale: 0.92 }}
           onClick={(e) => {
             e.stopPropagation()
             submit()
           }}
           disabled={!hasContent}
           className={cn(
-            "ml-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
+            "ml-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-[0.92]",
             "disabled:cursor-not-allowed",
             !hasContent
               ? "bg-canvas-300 text-canvas-500"
@@ -338,7 +333,7 @@ export function PromptArea({
           ) : (
             <ArrowRight className="h-4 w-4" />
           )}
-        </motion.button>
+        </button>
       </div>
 
       <AnimatePresence initial={false}>
@@ -386,7 +381,7 @@ export function PromptArea({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   )
 }
 

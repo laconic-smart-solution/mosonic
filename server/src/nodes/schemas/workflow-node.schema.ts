@@ -148,6 +148,10 @@ export class WorkflowNode {
   @Prop({ required: true, index: true })
   workflowRef: string;
 
+  /** Denormalized from owning workflow (`User.userId`). */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({
     type: String,
     enum: Object.values(WorkflowNodeType),
@@ -172,3 +176,4 @@ export const WorkflowNodeSchema = SchemaFactory.createForClass(WorkflowNode);
 export type WorkflowNodeDocument = HydratedDocument<WorkflowNode>;
 
 WorkflowNodeSchema.index({ workflowRef: 1, order: 1 });
+WorkflowNodeSchema.index({ userId: 1, workflowRef: 1 });

@@ -5,6 +5,9 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { mergeResolvedOutputs } from '../content/content-output.utils';
 import {
   Content,
   ContentStatus,
@@ -30,6 +33,7 @@ import {
   Workflow,
   type WorkflowDocument,
 } from '../workflow/schemas/workflow.schema';
+import { UploadService } from '../upload/upload.service';
 import { NodeExecutor } from './node-executor.service';
 
 @Injectable()
@@ -52,32 +56,36 @@ export class OrchestrationService {
     private readonly contentModel: Model<ContentDocument>,
     private readonly nodeExecutor: NodeExecutor,
     private readonly events: EventsService,
+    private readonly uploadService: UploadService,
   ) {}
 
   async startPipeline(input: {
     workflowId: string;
     ruleId: string;
     contentPrompt: string;
-    userId: string;
+    auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
-    void input.userId;
     const contentPrompt = input.contentPrompt.trim();
     if (!contentPrompt) {
       throw new BadRequestException('contentPrompt must not be empty');
     }
 
     const workflow = await this.workflowModel
-      .findOne({ workflowId: input.workflowId })
+      .findOne(mergeUserIdFilter({ workflowId: input.workflowId }, input.auth))
       .exec();
     if (!workflow) {
       throw new NotFoundException(`Workflow ${input.workflowId} not found`);
     }
-    const rule = await this.ruleModel.findOne({ ruleId: input.ruleId }).exec();
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId: input.ruleId }, input.auth))
+      .exec();
     if (!rule) {
       throw new NotFoundException(`Rule ${input.ruleId} not found`);
     }
     const nodes = await this.workflowNodeModel
-      .find({ workflowRef: workflow.workflowId })
+      .find(
+        mergeUserIdFilter({ workflowRef: workflow.workflowId }, input.auth),
+      )
       .sort({ order: 1 })
       .exec();
     if (nodes.length === 0) {
@@ -85,6 +93,7 @@ export class OrchestrationService {
     }
 
     const pipeline = await this.pipelineModel.create({
+      userId: input.auth.userId,
       workflowRef: workflow.workflowId,
       ruleRef: rule.ruleId,
       contentPrompt,
@@ -94,6 +103,7 @@ export class OrchestrationService {
         order: node.order,
         isLocked: node.isLocked,
         userPrompt: node.userPrompt ?? '',
+        config: (node.config ?? {}) as Record<string, unknown>,
         status: PipelineNodeExecutionStatus.Pending,
         input: '',
         output: null,
@@ -113,6 +123,7 @@ export class OrchestrationService {
       nodes,
       rule,
       contentPrompt,
+      userId: input.auth.userId,
     }).catch(async () => {
       await this.updatePipelineStatus(pipelineId, PipelineStatus.Failed);
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
@@ -123,7 +134,15 @@ export class OrchestrationService {
     return { pipelineId };
   }
 
-  async retryNode(pipelineId: string): Promise<void> {
+  async retryNode(pipelineId: string, auth: TenancyAuth): Promise<void> {
+    const owned = await this.pipelineModel
+      .findOne(mergeUserIdFilter({ pipelineId }, auth))
+      .select({ pipelineId: 1 })
+      .lean()
+      .exec();
+    if (!owned) {
+      throw new NotFoundException(`Pipeline ${pipelineId} not found`);
+    }
     const paused = this.pausedPipelines.get(pipelineId);
     if (!paused) {
       throw new BadRequestException('Pipeline is not paused');
@@ -132,7 +151,10 @@ export class OrchestrationService {
     paused.resolve();
   }
 
-  async getPipeline(pipelineId: string): Promise<{
+  async getPipeline(
+    pipelineId: string,
+    auth: TenancyAuth,
+  ): Promise<{
     pipeline: {
       pipelineId: string;
       workflowRef: string;
@@ -146,6 +168,9 @@ export class OrchestrationService {
       nodeId: string;
       type: string;
       order: number;
+      isLocked: boolean;
+      userPrompt: string;
+      config: Record<string, unknown>;
       status: string;
       output: Record<string, unknown> | null;
       retryCount: number;
@@ -153,7 +178,7 @@ export class OrchestrationService {
     }>;
   }> {
     const pipeline = await this.pipelineModel
-      .findOne({ pipelineId })
+      .findOne(mergeUserIdFilter({ pipelineId }, auth))
       .lean()
       .exec();
     if (!pipeline) {
@@ -173,6 +198,9 @@ export class OrchestrationService {
         nodeId: node.nodeId,
         type: node.type,
         order: node.order,
+        isLocked: node.isLocked,
+        userPrompt: node.userPrompt ?? '',
+        config: node.config ?? {},
         status: node.status,
         output: parseNodeOutput(node.output),
         retryCount: node.retryCount,
@@ -188,8 +216,9 @@ export class OrchestrationService {
     nodes: WorkflowNodeDocument[];
     rule: RuleDocument;
     contentPrompt: string;
+    userId: string;
   }): Promise<void> {
-    const { pipelineId, workflowId, ruleId, rule, contentPrompt } = args;
+    const { pipelineId, workflowId, ruleId, rule, contentPrompt, userId } = args;
     const orderedNodes = [...args.nodes].sort((a, b) => a.order - b.order);
     const totalNodes = orderedNodes.length;
     this.events.emitToPipeline(pipelineId, 'pipeline:started', {
@@ -222,10 +251,30 @@ export class OrchestrationService {
       workflowId,
       ruleId,
       context,
+      userId,
     });
+
+    const contentDoc = await this.contentModel.findOne({ contentId }).exec();
+    if (!contentDoc) {
+      throw new Error(`Content ${contentId} missing after pipeline completion`);
+    }
+    const resolvedOutputs = mergeResolvedOutputs({
+      outputs: contentDoc.outputs ?? {},
+      userEdits: contentDoc.userEdits ?? {},
+    });
+    const { uploadId } = await this.uploadService.createUpload({
+      userId,
+      contentRef: contentId,
+      workflowRef: workflowId,
+      ruleRef: ruleId,
+      resolvedOutputs,
+      ruleChannels: rule.channels ?? [],
+    });
+
     this.events.emitToPipeline(pipelineId, 'pipeline:completed', {
       pipelineId,
       contentId,
+      uploadId,
     });
   }
 
@@ -341,28 +390,23 @@ export class OrchestrationService {
     workflowId: string;
     ruleId: string;
     context: PipelineContext;
+    userId: string;
   }): Promise<string> {
     const content = await this.contentModel.create({
+      userId: args.userId,
       pipelineRef: args.pipelineId,
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
-      currentVersion: 1,
-      versions: [
-        {
-          versionNumber: 1,
-          outputs: {
-            text: args.context.previousOutputs.text,
-            image: args.context.previousOutputs.image,
-            translatedText: args.context.previousOutputs.translatedText,
-            video: args.context.previousOutputs.video,
-            transcription: args.context.previousOutputs.transcription,
-            summary: args.context.previousOutputs.summary,
-          },
-          userEdits: {},
-          nodePromptOverrides: {},
-          createdAt: new Date(),
-        },
-      ],
+      outputs: {
+        text: args.context.previousOutputs.text,
+        image: args.context.previousOutputs.image,
+        translatedText: args.context.previousOutputs.translatedText,
+        video: args.context.previousOutputs.video,
+        transcription: args.context.previousOutputs.transcription,
+        summary: args.context.previousOutputs.summary,
+      },
+      userEdits: {},
+      nodePromptOverrides: {},
       status: ContentStatus.Draft,
     });
     return content.contentId;

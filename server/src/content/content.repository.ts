@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { mergeResolvedOutputs } from './content-output.utils';
 import type {
   ContentPageItemDto,
   ContentPageQueryDto,
@@ -9,7 +12,8 @@ import {
   Content,
   ContentStatus,
   type ContentDocument,
-  type ContentVersionEntry,
+  type ContentOutputs,
+  type ContentUserEdits,
 } from './schemas/content.schema';
 
 @Injectable()
@@ -19,15 +23,26 @@ export class ContentRepository {
     private readonly contentModel: Model<ContentDocument>,
   ) {}
 
-  async findById(contentId: string): Promise<ContentDocument | null> {
-    return this.contentModel.findOne({ contentId }).exec();
+  async findById(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<ContentDocument | null> {
+    return this.contentModel
+      .findOne(mergeUserIdFilter({ contentId }, auth))
+      .exec();
   }
 
-  async findByIdLean(contentId: string) {
-    return this.contentModel.findOne({ contentId }).lean().exec();
+  async findByIdLean(contentId: string, auth: TenancyAuth) {
+    return this.contentModel
+      .findOne(mergeUserIdFilter({ contentId }, auth))
+      .lean()
+      .exec();
   }
 
-  async findPage(query: ContentPageQueryDto): Promise<{
+  async findPage(
+    query: ContentPageQueryDto,
+    auth: TenancyAuth,
+  ): Promise<{
     data: ContentPageItemDto[];
     total: number;
   }> {
@@ -36,13 +51,45 @@ export class ContentRepository {
     const skip = (page - 1) * limit;
     const sortBy = query.sortBy ?? 'updatedAt';
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
     if (query.filter?.workflowRef)
       filter.workflowRef = query.filter.workflowRef;
     if (query.filter?.ruleRef) filter.ruleRef = query.filter.ruleRef;
     if (query.filter?.pipelineRef)
       filter.pipelineRef = query.filter.pipelineRef;
     if (query.filter?.status) filter.status = query.filter.status;
+
+    const andClauses: Record<string, unknown>[] = [];
+    const nonWhitespaceOr = (
+      field: 'image' | 'video' | 'summary',
+    ): Record<string, unknown> => ({
+      $or: [
+        { [`outputs.${field}`]: { $regex: /\S/ } },
+        { [`userEdits.${field}`]: { $regex: /\S/ } },
+      ],
+    });
+    if (query.filter?.hasImage === true)
+      andClauses.push(nonWhitespaceOr('image'));
+    if (query.filter?.hasVideo === true)
+      andClauses.push(nonWhitespaceOr('video'));
+    if (query.filter?.hasSummary === true)
+      andClauses.push(nonWhitespaceOr('summary'));
+
+    const searchTrim = query.search?.trim();
+    if (searchTrim) {
+      const escaped = escapeRegExp(searchTrim);
+      andClauses.push({
+        $or: [
+          { contentId: { $regex: escaped, $options: 'i' } },
+          { ruleRef: { $regex: escaped, $options: 'i' } },
+          { workflowRef: { $regex: escaped, $options: 'i' } },
+          { pipelineRef: { $regex: escaped, $options: 'i' } },
+        ],
+      });
+    }
+    if (andClauses.length > 0) {
+      filter.$and = andClauses;
+    }
 
     const [docs, total] = await Promise.all([
       this.contentModel
@@ -51,7 +98,7 @@ export class ContentRepository {
         .skip(skip)
         .limit(limit)
         .select(
-          'contentId pipelineRef workflowRef ruleRef status currentVersion createdAt updatedAt',
+          'contentId pipelineRef workflowRef ruleRef status createdAt updatedAt outputs userEdits',
         )
         .lean()
         .exec(),
@@ -63,6 +110,8 @@ export class ContentRepository {
         const withDates = doc as {
           createdAt?: Date | string;
           updatedAt?: Date | string;
+          outputs?: ContentOutputs;
+          userEdits?: ContentUserEdits;
         };
         return {
           contentId: doc.contentId,
@@ -70,45 +119,43 @@ export class ContentRepository {
           workflowRef: doc.workflowRef,
           ruleRef: doc.ruleRef,
           status: doc.status,
-          currentVersion: doc.currentVersion,
           createdAt: new Date(withDates.createdAt ?? new Date()).toISOString(),
           updatedAt: new Date(withDates.updatedAt ?? new Date()).toISOString(),
+          outputs: mergeResolvedOutputs(withDates),
         };
       }),
       total,
     };
   }
 
-  async replaceVersionsAndSetCurrent(
+  async updateEditableState(
     contentId: string,
-    entries: ContentVersionEntry[],
-    newCurrentVersion: number,
-  ): Promise<void> {
-    await this.contentModel
-      .updateOne(
-        { contentId },
-        {
-          $set: {
-            versions: entries,
-            currentVersion: newCurrentVersion,
-          },
-        },
-      )
+    payload: {
+      outputs?: ContentOutputs;
+      userEdits?: ContentUserEdits;
+      nodePromptOverrides?: Record<string, string>;
+    },
+    auth: TenancyAuth,
+  ): Promise<{ matchedCount: number }> {
+    const res = await this.contentModel
+      .updateOne(mergeUserIdFilter({ contentId }, auth), { $set: payload })
       .exec();
+    return { matchedCount: res.matchedCount };
   }
 
-  async updateCurrentVersion(
+  async updateStatus(
     contentId: string,
-    versionNumber: number,
+    status: ContentStatus,
+    auth: TenancyAuth,
   ): Promise<void> {
     await this.contentModel
-      .updateOne({ contentId }, { $set: { currentVersion: versionNumber } })
+      .updateOne(mergeUserIdFilter({ contentId }, auth), {
+        $set: { status },
+      })
       .exec();
   }
+}
 
-  async updateStatus(contentId: string, status: ContentStatus): Promise<void> {
-    await this.contentModel
-      .updateOne({ contentId }, { $set: { status } })
-      .exec();
-  }
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

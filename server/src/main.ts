@@ -1,10 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as express from 'express';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  });
   app.enableCors({ origin: true, credentials: true });
+
+  // Public dev assets: GET /uploads/* → ./uploads (URLs use APP_URL or PUBLIC_URL + /uploads/...).
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  await mkdir(uploadsDir, { recursive: true });
+  app.use('/uploads', express.static(uploadsDir));
 
   const swaggerEnabled =
     (process.env.SWAGGER_ENABLED ?? 'true').toLowerCase() === 'true';

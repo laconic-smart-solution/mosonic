@@ -35,6 +35,7 @@ export class SsoClientService {
     password: string;
     firstName?: string;
     lastName?: string;
+    phoneNumber?: string;
   }): Promise<unknown> {
     const url =
       this.baseUrl() +
@@ -55,7 +56,7 @@ export class SsoClientService {
         'X-Application-Code': this.applicationCode(),
       },
     });
-    return res.data;
+    return this.normalizeAuthPayload(res.data);
   }
 
   async refresh(payload: { refreshToken: string }): Promise<unknown> {
@@ -63,12 +64,61 @@ export class SsoClientService {
     const res = await this.http.post(url, null, {
       params: { refreshToken: payload.refreshToken },
     });
-    return res.data;
+    return this.normalizeAuthPayload(res.data);
+  }
+
+  /**
+   * Login sometimes returns `{ data: { token } }`; refresh may return a flat token object.
+   * Wrap flat shapes so the SPA can parse both the same way.
+   */
+  private normalizeAuthPayload(data: unknown): unknown {
+    if (!data || typeof data !== 'object') {
+      return data;
+    }
+    const d = data as Record<string, unknown>;
+    if ('data' in d && d.data !== undefined) {
+      return data;
+    }
+    const hasAccess =
+      typeof d.access_token === 'string' || typeof d.accessToken === 'string';
+    const hasRefresh =
+      typeof d.refresh_token === 'string' || typeof d.refreshToken === 'string';
+    if (hasAccess || hasRefresh) {
+      return { data };
+    }
+    return data;
   }
 
   async resendOtpByEmail(payload: { email: string }): Promise<unknown> {
     const url = this.baseUrl() + `/v1/lcn-sso/auth/resend-otp/email`;
     const res = await this.http.post(url, null, { params: payload });
+    return res.data;
+  }
+
+  async verifyOtp(payload: { email: string; otp: string }): Promise<unknown> {
+    const url = this.baseUrl() + `/v1/lcn-sso/auth/verify/otp`;
+    const res = await this.http.post(url, null, {
+      params: {
+        email: payload.email,
+        otp: payload.otp,
+        applicationCode: this.applicationCode(),
+      },
+    });
+    return this.normalizeAuthPayload(res.data);
+  }
+
+  async changePassword(payload: {
+    accessToken: string;
+    newPassword: string;
+  }): Promise<unknown> {
+    const url = this.baseUrl() + `/v1/lcn-sso/auth/change-password`;
+    const res = await this.http.post(
+      url,
+      { newPassword: payload.newPassword },
+      {
+        params: { accessToken: payload.accessToken },
+      },
+    );
     return res.data;
   }
 

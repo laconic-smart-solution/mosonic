@@ -45,6 +45,11 @@ export class EventsService {
     this.emitToRoom(`content_${contentId}`, event, payload);
   }
 
+  /** Analytics dashboard / manual pull (client joins `analytics_${ruleId}`). */
+  emitToAnalyticsRule(ruleId: string, event: string, payload: unknown): void {
+    this.emitToRoom(`analytics_${ruleId}`, event, payload);
+  }
+
   /** Broadcast to all connected clients (use sparingly). */
   emitBroadcast(event: string, payload: unknown): void {
     this.io.emit(event, payload);

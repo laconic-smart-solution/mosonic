@@ -8,7 +8,13 @@ export default function AdminRouteGuard({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (!accessToken) {
-    return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />
+    return (
+      <Navigate
+        to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`}
+        replace
+        state={{ from: location.pathname }}
+      />
+    )
   }
 
   if (role !== "ADMIN") {

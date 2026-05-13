@@ -1,27 +1,23 @@
 import apiClient from "../api/api-client"
 import type {
+  AvailableNodeTypesResponse,
   ContentDetail,
   ContentOutputs,
   ContentPageQueryPayload,
   ContentPageResponse,
+  GenerateNodeBody,
+  GenerateNodeResponse,
 } from "../types/content.type"
 
 export type SaveContentBody = {
   userEdits: Partial<ContentOutputs>
+  newOutputs?: Partial<ContentOutputs>
 }
 
 export type RerunNodeBody = {
   nodeId: string
   updatedPrompt?: string
-}
-
-export type RestoreVersionBody = {
-  versionNumber: number
-}
-
-export type ContentVersionSummary = {
-  versionNumber: number
-  createdAt: string
+  previousOutputs?: Partial<ContentOutputs>
 }
 
 export const contentService = {
@@ -35,10 +31,25 @@ export const contentService = {
     return response.data
   },
 
+  getAvailableNodeTypes: async (
+    contentId: string
+  ): Promise<AvailableNodeTypesResponse> => {
+    const response = await apiClient.get(`/contents/${contentId}/available-node-types`)
+    return response.data
+  },
+
+  generateNode: async (
+    contentId: string,
+    body: GenerateNodeBody
+  ): Promise<GenerateNodeResponse> => {
+    const response = await apiClient.post(`/contents/${contentId}/generate-node`, body)
+    return response.data
+  },
+
   save: async (
     contentId: string,
     body: SaveContentBody
-  ): Promise<{ versionNumber: number }> => {
+  ): Promise<{ success: boolean }> => {
     const response = await apiClient.post(`/contents/${contentId}/save`, body)
     return response.data
   },
@@ -61,16 +72,12 @@ export const contentService = {
     return response.data
   },
 
-  getVersions: async (contentId: string): Promise<ContentVersionSummary[]> => {
-    const response = await apiClient.get(`/contents/${contentId}/versions`)
-    return response.data
-  },
-
-  restoreVersion: async (
-    contentId: string,
-    body: RestoreVersionBody
-  ): Promise<{ success: boolean }> => {
-    const response = await apiClient.post(`/contents/${contentId}/restore`, body)
+  ensureUpload: async (
+    contentId: string
+  ): Promise<{ uploadId: string }> => {
+    const response = await apiClient.post<{ uploadId: string }>(
+      `/contents/${contentId}/ensure-upload`
+    )
     return response.data
   },
 }

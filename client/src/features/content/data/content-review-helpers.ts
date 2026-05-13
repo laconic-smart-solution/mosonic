@@ -39,6 +39,13 @@ export function resolveNodeId(
   return sorted.find((n) => n.type === want)?.nodeId
 }
 
+export function outputKeyForNodeType(type: WorkflowNodeType): OutputKey | undefined {
+  const pair = (Object.entries(NODE_TYPE_BY_KEY) as [OutputKey, WorkflowNodeType][]).find(
+    ([, t]) => t === type,
+  )
+  return pair?.[0]
+}
+
 export function mergeExecutorOutput(
   nodeType: string,
   output: Record<string, unknown>,

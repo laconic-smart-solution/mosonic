@@ -10,12 +10,24 @@ export const RunPage          = PageLoader(lazy(() => import("@/features/run/pag
 export const ContentPage      = PageLoader(lazy(() => import("@/features/content/pages/content")))
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
+export const SettingsAccountsPage = PageLoader(
+  lazy(() => import("@/features/settings/pages/settings-accounts")),
+)
 export const AnalyticsPage    = PageLoader(lazy(() => import("@/features/analytics/pages/analytics")))
+export const AnalyticsDetailPage = PageLoader(lazy(() => import("@/features/analytics/pages/analytics-detail")))
 export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
 export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
 export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
 
-export const AdminLoginPage     = PageLoader(lazy(() => import("@/features/admin/pages/admin-login")))
+export const LoginPage = PageLoader(lazy(() => import("@/features/auth/pages/login")))
+export const SignupPage = PageLoader(lazy(() => import("@/features/auth/pages/signup")))
+export const ForgotPasswordPage = PageLoader(
+  lazy(() => import("@/features/auth/pages/forgot-password")),
+)
+export const VerifyOtpPage = PageLoader(lazy(() => import("@/features/auth/pages/verify-otp")))
+export const ResetPasswordPage = PageLoader(
+  lazy(() => import("@/features/auth/pages/reset-password")),
+)
 export const AdminDashboardPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-dashboard")))
 export const AdminUsersPage     = PageLoader(lazy(() => import("@/features/admin/pages/admin-users")))
 export const AdminUserNewPage   = PageLoader(lazy(() => import("@/features/admin/pages/admin-user-new")))

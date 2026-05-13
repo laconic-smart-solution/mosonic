@@ -551,6 +551,156 @@ export function updateRuleFromNode(
   return rule
 }
 
+function parseListItemFieldPath(fieldPath: string): {
+  listPath: string
+  index: number
+} | null {
+  const channelMatch = fieldPath.match(/^channels\[(\d+)\]\.channel$/)
+  if (channelMatch) {
+    return { listPath: "channels", index: Number(channelMatch[1]) }
+  }
+
+  const commonMatch = fieldPath.match(/^([^.[\]]+\.[^.[\]]+)\[(\d+)\]$/)
+  if (!commonMatch) return null
+  return {
+    listPath: commonMatch[1],
+    index: Number(commonMatch[2]),
+  }
+}
+
+export function addListItemFromNode(rule: RuleEntity, fieldPath: string): RuleEntity {
+  const parsed = parseListItemFieldPath(fieldPath)
+  if (!parsed || !Number.isInteger(parsed.index)) return rule
+  const { listPath, index } = parsed
+
+  if (listPath === "channels") {
+    const nextChannels = [...rule.channels]
+    const base = nextChannels[index] ?? {
+      channel: "",
+      priority: "medium" as const,
+      contentStyle: "custom style",
+    }
+    nextChannels.splice(index + 1, 0, {
+      ...base,
+      channel: "new-channel",
+    })
+    return { ...rule, channels: nextChannels }
+  }
+
+  const updateStringList = (items: string[]) => {
+    const next = [...items]
+    next.splice(index + 1, 0, "new-item")
+    return next
+  }
+
+  if (listPath === "brand.brandTone") {
+    return { ...rule, brand: { ...rule.brand, brandTone: updateStringList(rule.brand.brandTone) } }
+  }
+  if (listPath === "audience.location") {
+    return { ...rule, audience: { ...rule.audience, location: updateStringList(rule.audience.location) } }
+  }
+  if (listPath === "audience.interests") {
+    return { ...rule, audience: { ...rule.audience, interests: updateStringList(rule.audience.interests) } }
+  }
+  if (listPath === "campaign.goals") {
+    return { ...rule, campaign: { ...rule.campaign, goals: updateStringList(rule.campaign.goals) } }
+  }
+  if (listPath === "campaign.keywords") {
+    return { ...rule, campaign: { ...rule.campaign, keywords: updateStringList(rule.campaign.keywords) } }
+  }
+  if (listPath === "campaign.contentFormats") {
+    return {
+      ...rule,
+      campaign: {
+        ...rule.campaign,
+        contentFormats: updateStringList(rule.campaign.contentFormats),
+      },
+    }
+  }
+  if (listPath === "contentGuidelines.dos") {
+    return {
+      ...rule,
+      contentGuidelines: {
+        ...rule.contentGuidelines,
+        dos: updateStringList(rule.contentGuidelines.dos),
+      },
+    }
+  }
+  if (listPath === "contentGuidelines.donts") {
+    return {
+      ...rule,
+      contentGuidelines: {
+        ...rule.contentGuidelines,
+        donts: updateStringList(rule.contentGuidelines.donts),
+      },
+    }
+  }
+  return rule
+}
+
+export function removeListItemFromNode(rule: RuleEntity, fieldPath: string): RuleEntity {
+  const parsed = parseListItemFieldPath(fieldPath)
+  if (!parsed || !Number.isInteger(parsed.index)) return rule
+  const { listPath, index } = parsed
+
+  if (listPath === "channels") {
+    if (rule.channels.length <= 1) return rule
+    return {
+      ...rule,
+      channels: rule.channels.filter((_, i) => i !== index),
+    }
+  }
+
+  const removeFrom = (items: string[]) => {
+    if (items.length <= 1) return items
+    return items.filter((_, i) => i !== index)
+  }
+
+  if (listPath === "brand.brandTone") {
+    return { ...rule, brand: { ...rule.brand, brandTone: removeFrom(rule.brand.brandTone) } }
+  }
+  if (listPath === "audience.location") {
+    return { ...rule, audience: { ...rule.audience, location: removeFrom(rule.audience.location) } }
+  }
+  if (listPath === "audience.interests") {
+    return { ...rule, audience: { ...rule.audience, interests: removeFrom(rule.audience.interests) } }
+  }
+  if (listPath === "campaign.goals") {
+    return { ...rule, campaign: { ...rule.campaign, goals: removeFrom(rule.campaign.goals) } }
+  }
+  if (listPath === "campaign.keywords") {
+    return { ...rule, campaign: { ...rule.campaign, keywords: removeFrom(rule.campaign.keywords) } }
+  }
+  if (listPath === "campaign.contentFormats") {
+    return {
+      ...rule,
+      campaign: {
+        ...rule.campaign,
+        contentFormats: removeFrom(rule.campaign.contentFormats),
+      },
+    }
+  }
+  if (listPath === "contentGuidelines.dos") {
+    return {
+      ...rule,
+      contentGuidelines: {
+        ...rule.contentGuidelines,
+        dos: removeFrom(rule.contentGuidelines.dos),
+      },
+    }
+  }
+  if (listPath === "contentGuidelines.donts") {
+    return {
+      ...rule,
+      contentGuidelines: {
+        ...rule.contentGuidelines,
+        donts: removeFrom(rule.contentGuidelines.donts),
+      },
+    }
+  }
+  return rule
+}
+
 export function createRuleFromPrompt(prompt: string): RuleEntity {
   const id = crypto.randomUUID()
   return {

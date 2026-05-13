@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -9,18 +10,22 @@ import { ContentModule } from './content/content.module';
 import { EventsModule } from './events/events.module';
 import { LlmModule } from './llm/llm.module';
 import { LoggingModule } from './logging/logging.module';
+import { McpModule } from './mcp/mcp.module';
 import { NodesModule } from './nodes/nodes.module';
 import { OrchestrationModule } from './orchestration/orchestration.module';
 import { PipelineModule } from './pipeline/pipeline.module';
 import { RuleModule } from './rule/rule.module';
 import { UploadModule } from './upload/upload.module';
+import { WebhookModule } from './webhook/webhook.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     AdminModule,
@@ -35,7 +40,10 @@ import { AdminModule } from './admin/admin.module';
     PipelineModule,
     ContentModule,
     UploadModule,
+    WebhookModule,
     AnalyticsModule,
+    DashboardModule,
+    McpModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

@@ -49,12 +49,28 @@ export function WorkflowToolbar({
               color: T.accent,
             }}
           >
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
-              <path d="M1 3h9M1 6h6M1 9h8" stroke={T.accent} strokeWidth="1.3" strokeLinecap="round" />
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 11 11"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                d="M1 3h9M1 6h6M1 9h8"
+                stroke={T.accent}
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
             </svg>
             {ruleName}
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden>
-              <path d="M2 3.5l2.5 3 2.5-3" stroke={T.accent} strokeWidth="1.2" strokeLinecap="round" />
+              <path
+                d="M2 3.5l2.5 3 2.5-3"
+                stroke={T.accent}
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         ) : null}
@@ -74,7 +90,13 @@ export function WorkflowToolbar({
         ) : null}
         {!readOnly ? (
           <Button type="button" size="sm" onClick={onRun} className="gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+            >
               <path d="M3 2l7 4-7 4V2z" fill="currentColor" />
             </svg>
             {runLabel}

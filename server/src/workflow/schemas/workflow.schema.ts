@@ -36,6 +36,10 @@ export class Workflow {
   })
   workflowId: string;
 
+  /** App-local tenant id (`User.userId`); legacy rows may omit. */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({ required: true, index: true })
   ruleRef: string;
 
@@ -75,3 +79,4 @@ export type WorkflowDocument = HydratedDocument<Workflow>;
 
 WorkflowSchema.index({ ruleRef: 1, status: 1 });
 WorkflowSchema.index({ isTemplate: 1, templateName: 1 });
+WorkflowSchema.index({ userId: 1, updatedAt: -1 });

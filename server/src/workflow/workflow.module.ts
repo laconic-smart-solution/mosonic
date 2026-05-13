@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AuthModule } from '../auth/auth.module';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { NodesModule } from '../nodes/nodes.module';
@@ -15,6 +16,7 @@ import { WorkflowService } from './workflow.service';
 
 @Module({
   imports: [
+    AuthModule,
     EventsModule,
     LlmModule,
     NodesModule,

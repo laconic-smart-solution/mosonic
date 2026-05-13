@@ -1,13 +1,19 @@
+import type { WorkflowNodeType } from "./workflow.type"
+
 export type ContentStatus = "draft" | "approved" | "rejected"
 
 export type ContentPageQueryPayload = {
   page?: number
   limit?: number
+  search?: string
   filter?: {
     workflowRef?: string
     ruleRef?: string
     pipelineRef?: string
     status?: ContentStatus
+    hasImage?: boolean
+    hasVideo?: boolean
+    hasSummary?: boolean
   }
   sortBy?: "createdAt" | "updatedAt"
   sortOrder?: "asc" | "desc"
@@ -19,9 +25,11 @@ export type ContentPageItem = {
   workflowRef: string
   ruleRef: string
   status: ContentStatus
-  currentVersion: number
   createdAt: string
   updatedAt: string
+  /** Merged userEdits over outputs (matches content detail). */
+  outputs?: ContentOutputs
+  uploadId?: string
 }
 
 export type ContentPageResponse = {
@@ -45,19 +53,26 @@ export type ContentOutputs = {
 
 export type ContentDetail = {
   contentId: string
-  /** Merged userEdits over outputs for current version (when backend provides). */
+  /** Merged userEdits over outputs. */
   outputs?: ContentOutputs
   pipelineRef: string
   workflowRef: string
   ruleRef: string
-  currentVersion: number
-  versions: Array<{
-    versionNumber: number
-    outputs?: Record<string, unknown>
-    userEdits?: Record<string, unknown>
-    createdAt: string
-  }>
   status: ContentStatus
   createdAt: string
   updatedAt: string
+}
+
+export type AvailableNodeTypesResponse = {
+  types: WorkflowNodeType[]
+}
+
+export type GenerateNodeBody = {
+  type: WorkflowNodeType
+  userPrompt?: string
+}
+
+export type GenerateNodeResponse = {
+  success: boolean
+  nodeId: string
 }

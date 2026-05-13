@@ -44,6 +44,9 @@ export class PipelineNodeExecution {
   @Prop({ type: String, default: '' })
   userPrompt: string;
 
+  @Prop({ type: Object, default: {} })
+  config: Record<string, unknown>;
+
   @Prop({
     type: String,
     enum: Object.values(PipelineNodeExecutionStatus),
@@ -83,6 +86,10 @@ export class Pipeline {
   })
   pipelineId: string;
 
+  /** App-local tenant id (`User.userId`); legacy rows may omit. */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({ required: true, index: true })
   workflowRef: string;
 
@@ -115,3 +122,4 @@ export type PipelineDocument = HydratedDocument<Pipeline>;
 
 PipelineSchema.index({ workflowRef: 1, status: 1 });
 PipelineSchema.index({ ruleRef: 1, startedAt: -1 });
+PipelineSchema.index({ userId: 1, startedAt: -1 });

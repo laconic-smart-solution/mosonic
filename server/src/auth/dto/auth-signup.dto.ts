@@ -25,4 +25,9 @@ export class AuthSignupDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiProperty({ example: '+66123456789', required: false })
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
 }

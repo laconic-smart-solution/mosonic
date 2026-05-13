@@ -3,7 +3,12 @@ import { io, type Socket } from "socket.io-client"
 
 export type PipelineStartedEvent = { pipelineId: string; totalNodes: number }
 export type PipelinePausedEvent = { pipelineId: string; nodeId: string; nodeType: string }
-export type PipelineCompletedEvent = { pipelineId: string; contentId: string }
+export type PipelineCompletedEvent = {
+  pipelineId: string
+  contentId: string
+  /** Present when the server created an upload sidecar for this pipeline */
+  uploadId?: string
+}
 export type PipelineFailedEvent = { pipelineId: string; message?: string }
 
 export type NodeStartedEvent = {

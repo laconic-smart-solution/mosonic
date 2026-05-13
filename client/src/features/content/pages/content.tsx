@@ -1,171 +1,461 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { CONTENT_VERSIONS } from "@/features/content/data/content-mock"
-import { T } from "@/lib/tokens"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import { CircleAlertIcon, InboxIcon, Search, X } from "lucide-react"
+import { motion } from "framer-motion"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ContentListCard } from "@/features/content/components/content-list/content-list-card"
+import {
+  PAGE_SIZE_OPTIONS,
+  type SortOption,
+} from "@/features/content/components/content-list/content-list-constants"
+import { ContentListStatCard } from "@/features/content/components/content-list/content-list-stat-card"
+import { ContentPageShell } from "@/features/content/components/content-list/content-page-shell"
+import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { useContentPageQuery } from "@/shared/queries/content.query"
+import type {
+  ContentPageQueryPayload,
+  ContentStatus,
+} from "@/shared/types/content.type"
 
-function Chip({ label, color = "gray", dot = false, size = "xs" }: { label: string; color?: string; dot?: boolean; size?: string }) {
-  const map: Record<string, { bg: string; text: string; border: string }> = {
-    gray:   { bg: "#EDF2F7", text: "#4A5568", border: "#D9E1EC" },
-    indigo: { bg: T.accentLight, text: T.accent, border: T.accentBorder },
-    green:  { bg: T.greenBg, text: T.green, border: T.greenBorder },
-    amber:  { bg: T.amberBg, text: T.amber, border: T.amberBorder },
-    red:    { bg: T.redBg, text: T.red, border: T.redBorder },
-    blue:   { bg: T.blueBg, text: T.blue, border: T.blueBorder },
-  }
-  const c = map[color] ?? map.gray
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: size === "xs" ? "2px 7px" : "3px 9px", borderRadius: 20, background: c.bg, color: c.text, border: `1px solid ${c.border}`, fontSize: size === "xs" ? 10 : 11, fontWeight: 600, lineHeight: 1.5, whiteSpace: "nowrap" }}>
-      {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.text, flexShrink: 0 }} />}
-      {label}
-    </span>
-  )
-}
-
-function Btn({ children, variant = "primary", size = "xs", onClick, style: ex = {} }: { children: React.ReactNode; variant?: string; size?: string; onClick?: () => void; style?: React.CSSProperties }) {
-  const vs: Record<string, React.CSSProperties> = {
-    primary:     { background: T.accent, color: "white" },
-    secondary:   { background: "white", color: T.textPrimary, border: `1px solid ${T.surfaceBorder}` },
-    ghost:       { background: "transparent", color: T.textSecondary, border: "1px solid transparent" },
-    accent:      { background: T.accentLight, color: T.accent, border: `1px solid ${T.accentBorder}` },
-    destructive: { background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` },
-  }
-  const sizes: Record<string, React.CSSProperties> = {
-    xs: { padding: "4px 10px", fontSize: 11 },
-    sm: { padding: "6px 13px", fontSize: 12 },
-  }
-  return (
-    <button onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, whiteSpace: "nowrap", border: "none", outline: "none", ...(vs[variant] ?? vs.primary), ...(sizes[size] ?? sizes.xs), ...ex }}>{children}</button>
-  )
-}
+const SEARCH_DEBOUNCE_MS = 300
+import { cn } from "@/lib/utils"
 
 export default function ContentPage() {
   const navigate = useNavigate()
-  const [activeV, setActiveV] = useState("v2")
-  const [editText, setEditText] = useState("Songkran สุขสันต์! 🎉 ช้อปเลยวันนี้ รับส่วนลดสูงสุด 50% ฉลองเทศกาลน้ำกับเรา! #Songkran2026 #สงกรานต์ #ThaiSummer")
+  const [searchParams] = useSearchParams()
+  const hydrated = useAuthStoreHydrated()
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(12)
+  const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all")
+  const [searchInput, setSearchInput] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [sortOption, setSortOption] = useState<SortOption>("newest")
+  const [filterHasImage, setFilterHasImage] = useState(false)
+  const [filterHasVideo, setFilterHasVideo] = useState(false)
+  const [filterHasSummary, setFilterHasSummary] = useState(false)
+
+  useEffect(() => {
+    const q = searchParams.get("search")?.trim()
+    if (!q) {
+      return
+    }
+    setSearchInput(q)
+    setDebouncedSearch(q)
+  }, [searchParams])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const payload = useMemo(() => {
+    const filter: NonNullable<ContentPageQueryPayload["filter"]> = {}
+    if (statusFilter !== "all") filter.status = statusFilter
+    if (filterHasImage) filter.hasImage = true
+    if (filterHasVideo) filter.hasVideo = true
+    if (filterHasSummary) filter.hasSummary = true
+
+    const hasFilter = Object.keys(filter).length > 0
+
+    const search = debouncedSearch.length > 0 ? debouncedSearch : undefined
+
+    return {
+      page,
+      limit,
+      sortBy: "updatedAt" as const,
+      sortOrder: sortOption === "oldest" ? ("asc" as const) : ("desc" as const),
+      search,
+      filter: hasFilter ? filter : undefined,
+    }
+  }, [
+    page,
+    limit,
+    statusFilter,
+    sortOption,
+    filterHasImage,
+    filterHasVideo,
+    filterHasSummary,
+    debouncedSearch,
+  ])
+
+  const queryEnabled = hydrated
+  const { data, isPending, isError, error, refetch } = useContentPageQuery(
+    payload,
+    queryEnabled
+  )
+
+  const items = data?.data ?? []
+  const meta = data?.meta
+  const totalPages = meta?.totalPages ?? 0
+
+  const sortedItems = useMemo(() => {
+    const list = [...items]
+    if (sortOption === "title") {
+      list.sort(
+        (a, b) =>
+          a.ruleRef.localeCompare(b.ruleRef) ||
+          a.contentId.localeCompare(b.contentId)
+      )
+    } else if (sortOption === "status") {
+      list.sort(
+        (a, b) =>
+          a.status.localeCompare(b.status) ||
+          b.updatedAt.localeCompare(a.updatedAt)
+      )
+    }
+    return list
+  }, [items, sortOption])
+
+  const totalAll = meta?.total ?? 0
+  const draftPage = items.filter((i) => i.status === "draft").length
+  const approvedPage = items.filter((i) => i.status === "approved").length
+  const rejectedPage = items.filter((i) => i.status === "rejected").length
+
+  const empty =
+    !isPending &&
+    !isError &&
+    queryEnabled &&
+    items.length === 0 &&
+    (meta?.total ?? 0) === 0
+
+  const errorMessage =
+    error instanceof Error ? error.message : "Failed to load content."
+
+  function clearFilters() {
+    setSearchInput("")
+    setDebouncedSearch("")
+    setStatusFilter("all")
+    setSortOption("newest")
+    setFilterHasImage(false)
+    setFilterHasVideo(false)
+    setFilterHasSummary(false)
+    setPage(1)
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="space-y-6 bg-canvas-100 px-5 py-6 md:px-7 md:py-7">
+        <Skeleton className="h-9 w-56 max-w-full bg-canvas-200" />
+        <div className="flex flex-wrap gap-2.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className="h-[76px] min-w-[130px] flex-1 rounded-xl bg-canvas-200"
+            />
+          ))}
+        </div>
+        <Skeleton className="h-10 max-w-md bg-canvas-200" />
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[340px] rounded-2xl bg-canvas-200" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-
-      {/* Version sidebar */}
-      <div style={{ width: 196, minWidth: 196, borderRight: `1px solid ${T.surfaceBorder}`, background: "white", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.surfaceBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: T.textPrimary }}>Versions</span>
-          <button style={{ fontSize: 10, color: T.accent, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Compare</button>
+    <ContentPageShell>
+      <motion.header
+        className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div>
+          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-navy-700">
+            Content library
+          </h1>
+          <p className="mt-1 text-[13px] text-canvas-500">
+            All generated content across campaigns
+          </p>
         </div>
-        <div style={{ padding: "6px 0", flex: 1, overflowY: "auto" }}>
-          {CONTENT_VERSIONS.map((v, i) => (
-            <div key={v.id} onClick={() => setActiveV(v.id)} style={{
-              padding: "10px 16px", cursor: "pointer",
-              borderLeft: `3px solid ${activeV === v.id ? T.accent : "transparent"}`,
-              background: activeV === v.id ? T.accentLight : "transparent", transition: "all 0.12s",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: activeV === v.id ? T.accent : T.textPrimary }}>{v.label}</span>
-                <span style={{ fontSize: 10, color: T.textMuted }}>{v.time}</span>
-              </div>
-              <div style={{ fontSize: 11, color: T.textSecondary, lineHeight: 1.4 }}>{v.summary}</div>
-              {i < CONTENT_VERSIONS.length - 1 && (
-                <button style={{ marginTop: 6, fontSize: 10, color: T.textSecondary, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
-              )}
-            </div>
-          ))}
+      </motion.header>
+
+      {!isPending && !isError && meta ? (
+        <div className="mb-6 flex flex-wrap gap-2.5">
+          <ContentListStatCard value={totalAll} label="Total content" />
+          <ContentListStatCard
+            value={draftPage}
+            label="Draft"
+            dotClass="bg-amber-400"
+          />
+          <ContentListStatCard
+            value={approvedPage}
+            label="Approved"
+            dotClass="bg-teal-400"
+          />
+          <ContentListStatCard
+            value={rejectedPage}
+            label="Rejected"
+            dotClass="bg-navy-500"
+          />
+        </div>
+      ) : null}
+      {meta && meta.totalPages > 1 ? (
+        <p className="mb-4 text-xs text-canvas-500">
+          Draft, approved, and rejected counts reflect items on the current page
+          only.
+        </p>
+      ) : null}
+
+      <div className="mb-5 flex flex-wrap items-center gap-2.5">
+        <div className="relative max-w-[380px] min-w-[220px] flex-1">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-canvas-500"
+            aria-hidden
+          />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by campaign, workflow, pipeline, or content id…"
+            className="h-[38px] rounded-lg border-canvas-300 bg-card pr-3 pl-10 text-[13px] text-navy-700 placeholder:text-canvas-400 focus-visible:border-teal-400 focus-visible:ring-teal-400/30"
+          />
+        </div>
+
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v as "all" | ContentStatus)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => {
+            setLimit(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number])
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[140px]">
+            <SelectValue placeholder="Per page" />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n} per page
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-[38px] rounded-lg border-canvas-300 bg-card px-3.5 text-[13px] text-canvas-600 hover:border-canvas-500 hover:text-navy-700"
+            onClick={clearFilters}
+          >
+            <X className="mr-1 size-3.5" />
+            Clear
+          </Button>
         </div>
       </div>
 
-      {/* Draft cards */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.textPrimary }}>Draft · {activeV.toUpperCase()}</h2>
-            <p style={{ margin: "3px 0 0", fontSize: 11, color: T.textMuted }}>Songkran Promo 2026 · Run #4821</p>
-          </div>
-          <Chip label="Draft" color="amber" dot />
-        </div>
-
-        {/* Text card */}
-        <div style={{ background: "white", border: `1px solid ${T.surfaceBorder}`, borderRadius: 10, overflow: "hidden", boxShadow: T.surfaceShadow }}>
-          <div style={{ padding: "10px 14px", background: "#E0FAF5", borderBottom: "1px solid #80E5D1", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 3h12M1 6.5h9M1 10h10" stroke="#00A589" strokeWidth="1.4" strokeLinecap="round" /></svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#00A589" }}>Text Generation</span>
-              <Chip label="Done" color="green" dot />
-            </div>
-            <Btn variant="accent" size="xs">↻ Re-run</Btn>
-          </div>
-          <div style={{ padding: 14 }}>
-            <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={4}
-              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.surfaceBorder}`, borderRadius: 8, padding: "9px 11px", fontSize: 13, fontFamily: "inherit", color: T.textPrimary, resize: "vertical", outline: "none", lineHeight: 1.65, background: "#FDFCFA" }}
-              onFocus={(e) => { e.target.style.borderColor = T.accent; e.target.style.boxShadow = `0 0 0 3px ${T.accent}14` }}
-              onBlur={(e) => { e.target.style.borderColor = T.surfaceBorder; e.target.style.boxShadow = "none" }}
-            />
-          </div>
-        </div>
-
-        {/* Image card */}
-        <div style={{ background: "white", border: `1px solid ${T.surfaceBorder}`, borderRadius: 10, overflow: "hidden", boxShadow: T.surfaceShadow }}>
-          <div style={{ padding: "10px 14px", background: "#FEE2E2", borderBottom: "1px solid #FCA5A5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="#DC2626" strokeWidth="1.3" /><circle cx="5" cy="5" r="1.2" fill="#DC2626" opacity="0.5" /><path d="M1 10l3-3 3 3 2-2 4 4" stroke="#DC2626" strokeWidth="1.1" strokeLinejoin="round" /></svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: T.red }}>Image Generation</span>
-              <Chip label="Failed" color="red" dot />
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <Btn variant="destructive">Remove</Btn>
-              <Btn variant="secondary">↑ Upload</Btn>
-              <Btn variant="ghost">↻ Re-run</Btn>
-            </div>
-          </div>
-          <div style={{ padding: 14 }}>
-            <div style={{ height: 140, borderRadius: 8, border: "2px dashed #FCA5A5", background: "repeating-linear-gradient(135deg,#FFF5F5,#FFF5F5 6px,#FEE2E2 6px,#FEE2E2 12px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5 }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#FCA5A5" strokeWidth="1.5" /><path d="M12 8v5M12 15.5v.5" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" /></svg>
-              <span style={{ fontSize: 11, color: T.red, fontWeight: 600 }}>Image generation failed</span>
-              <span style={{ fontSize: 10, color: "#FCA5A5" }}>Upload a replacement or re-run this node</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Translation card */}
-        <div style={{ background: "white", border: `1px solid ${T.surfaceBorder}`, borderRadius: 10, overflow: "hidden", boxShadow: T.surfaceShadow }}>
-          <div style={{ padding: "10px 14px", background: "#FFFBEB", borderBottom: "1px solid #FCD34D", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 3.5h6M4 1.5v2M2.5 3.5c.5 2 2 3 3.5 3.5M4 3.5c-.5 2-1.5 3-3 4" stroke="#D97706" strokeWidth="1.2" strokeLinecap="round" /><path d="M7 9h6M10 7.5l2 3.5-2 3.5" stroke="#D97706" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: T.amber }}>Translation</span>
-              <Chip label="Blocked" color="amber" dot />
-            </div>
-            <Btn variant="ghost">↻ Re-run when ready</Btn>
-          </div>
-          <div style={{ padding: 14 }}>
-            <div style={{ fontSize: 11, color: T.amber, background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: 7, padding: "9px 11px", lineHeight: 1.5 }}>
-              ⏳ Waiting for Image Generation to complete before translating combined output.
-            </div>
-          </div>
-        </div>
+      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-canvas-200 pb-5">
+        <span className="text-[11px] font-semibold tracking-wider text-canvas-500 uppercase">
+          Outputs
+        </span>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasImage}
+            onCheckedChange={(v) => {
+              setFilterHasImage(v === true)
+              setPage(1)
+            }}
+          />
+          <span className="text-[13px] text-navy-700">Has image</span>
+        </Label>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasVideo}
+            onCheckedChange={(v) => {
+              setFilterHasVideo(v === true)
+              setPage(1)
+            }}
+          />
+          <span className="text-[13px] text-navy-700">Has video</span>
+        </Label>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasSummary}
+            onCheckedChange={(v) => {
+              setFilterHasSummary(v === true)
+              setPage(1)
+            }}
+          />
+          <span className="text-[13px] text-navy-700">Has summary</span>
+        </Label>
       </div>
 
-      {/* Approval panel */}
-      <div style={{ width: 252, minWidth: 252, borderLeft: `1px solid ${T.surfaceBorder}`, background: "white", display: "flex", flexDirection: "column", padding: "16px 16px" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 16 }}>Approval</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 20 }}>
-          {[
-            ["Status",   <Chip label="Draft" color="amber" dot />],
-            ["Rule",     <button style={{ background: "none", border: "none", cursor: "pointer", color: T.accent, fontSize: 12, padding: 0, fontFamily: "inherit", fontWeight: 700 }}>Songkran Rule v2 ↗</button>],
-            ["Workflow", <button style={{ background: "none", border: "none", cursor: "pointer", color: T.accent, fontSize: 12, padding: 0, fontFamily: "inherit", fontWeight: 700 }}>Songkran Promo 2026 ↗</button>],
-            ["Run",      <button style={{ background: "none", border: "none", cursor: "pointer", color: T.accent, fontSize: 12, padding: 0, fontFamily: "inherit", fontWeight: 700 }}>Run #4821 ↗</button>],
-          ].map(([k, v], i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.surfaceBorder}` }}>
-              <span style={{ fontSize: 12, color: T.textSecondary, fontWeight: 500 }}>{k as string}</span>
-              {v as React.ReactNode}
-            </div>
-          ))}
+      {isError ? (
+        <Alert variant="destructive" className="mb-6">
+          <CircleAlertIcon />
+          <AlertTitle>Could not load content</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>{errorMessage}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+            >
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!isPending && !isError && meta ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-canvas-500">
+          <span>
+            Showing{" "}
+            <strong className="font-medium text-navy-700">
+              {sortedItems.length}
+            </strong>{" "}
+            of{" "}
+            <strong className="font-medium text-navy-700">
+              {items.length}
+            </strong>{" "}
+            on this page
+            {meta.total != null ? (
+              <>
+                {" "}
+                ·{" "}
+                <strong className="font-medium text-navy-700">
+                  {meta.total}
+                </strong>{" "}
+                total
+              </>
+            ) : null}
+          </span>
+          <Select
+            value={sortOption}
+            onValueChange={(v) => {
+              setSortOption(v as SortOption)
+              setPage(1)
+            }}
+          >
+            <SelectTrigger className="h-auto w-fit min-w-[140px] border-0 bg-transparent text-[13px] text-canvas-600 shadow-none focus:ring-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="oldest">Oldest first</SelectItem>
+              <SelectItem value="title">Campaign A → Z</SelectItem>
+              <SelectItem value="status">By status</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-          <button onClick={() => navigate("/upload")} style={{ width: "100%", padding: "9px 0", background: T.accent, color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg>
-            Approve & Send to Upload
-          </button>
-          <button style={{ width: "100%", padding: "9px 0", background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 13 }}>Reject — keep editing</button>
+      ) : null}
+
+      {empty ? (
+        <div className="flex flex-col items-center py-20 text-center text-canvas-500">
+          <InboxIcon className="mb-4 size-12 text-canvas-300" aria-hidden />
+          <h3 className="mb-1.5 text-base font-semibold text-navy-700">
+            No content yet
+          </h3>
+          <p className="max-w-sm text-[13px]">
+            {debouncedSearch
+              ? "No content matched your search or filters."
+              : "Run a workflow to generate content, or relax the status filter."}
+          </p>
         </div>
-      </div>
-    </div>
+      ) : null}
+
+      {(isPending || (!empty && !isError && items.length > 0)) && !isError ? (
+        <div
+          className={cn(
+            "grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4",
+            empty && "hidden"
+          )}
+        >
+          {isPending
+            ? Array.from({ length: Math.min(limit, 6) }).map((_, i) => (
+                <div
+                  key={i}
+                  className="overflow-hidden rounded-2xl border border-canvas-200 bg-card"
+                >
+                  <Skeleton className="h-40 rounded-none bg-canvas-200" />
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-3 w-24 bg-canvas-200" />
+                    <Skeleton className="h-5 w-full bg-canvas-200" />
+                    <Skeleton className="h-8 w-full bg-canvas-200" />
+                  </div>
+                </div>
+              ))
+            : sortedItems.map((item, idx) => (
+                <ContentListCard
+                  key={item.contentId}
+                  item={item}
+                  index={idx}
+                  onOpen={(id, uid) =>
+                    navigate(uid ? `/upload/${uid}` : `/content/${id}`)
+                  }
+                />
+              ))}
+        </div>
+      ) : null}
+
+      {!isPending && !isError && meta && totalPages > 0 ? (
+        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-canvas-200 pt-6 sm:flex-row">
+          <p className="text-[13px] text-canvas-500">
+            Page <strong className="text-navy-700">{meta.page}</strong> of{" "}
+            <strong className="text-navy-700">{meta.totalPages}</strong>
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg border-canvas-300"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg border-canvas-300"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </ContentPageShell>
   )
 }

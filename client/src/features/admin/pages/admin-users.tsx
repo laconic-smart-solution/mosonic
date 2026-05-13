@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
 
-import AdminRouteGuard from "../components/admin-route-guard"
 import { adminDeleteUser, adminListUsers, adminUpdateUserRole, adminUpdateUserStatus } from "../api/admin-api"
 
 type Role = "ADMIN" | "CUSTOMER"
@@ -51,7 +50,6 @@ export default function AdminUsersPage() {
   })
 
   return (
-    <AdminRouteGuard>
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -167,7 +165,6 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminRouteGuard>
   )
 }
 

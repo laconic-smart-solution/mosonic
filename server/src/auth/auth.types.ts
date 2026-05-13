@@ -1,3 +1,5 @@
+import type { User } from '../users/schemas/user.schema';
+
 export type AuthRole = 'ADMIN' | 'CUSTOMER';
 
 export interface SsoTokenClaims {
@@ -17,5 +19,5 @@ export interface SsoTokenClaims {
 export interface RequestAuthContext {
   claims: SsoTokenClaims;
   authServerUserId: string;
-  localUser?: unknown;
+  localUser?: User;
 }

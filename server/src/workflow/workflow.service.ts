@@ -6,11 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  Workflow,
-  type WorkflowDocument,
-  WorkflowStatus,
-} from './schemas/workflow.schema';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { mergeUserIdFilter } from '../auth/tenancy.util';
 import {
   WorkflowNode,
   WorkflowNodeType,
@@ -28,6 +25,11 @@ import {
   SaveWorkflowNodesRequestDto,
   SaveWorkflowNodesResponseDto,
 } from './dto/save-workflow-nodes.dto';
+import {
+  Workflow,
+  type WorkflowDocument,
+  WorkflowStatus,
+} from './schemas/workflow.schema';
 import {
   type GeneratedWorkflowNode,
   WorkflowGenerationService,
@@ -51,6 +53,7 @@ export class WorkflowService {
 
   async generateWorkflow(
     body: GenerateWorkflowRequestDto,
+    auth: TenancyAuth,
   ): Promise<GenerateWorkflowResponseDto> {
     const prompt = body.contentPrompt.trim();
     if (!prompt) {
@@ -59,19 +62,27 @@ export class WorkflowService {
 
     const ruleId = body.ruleId?.trim();
     if (ruleId) {
-      return this.regenerateWorkflowByRuleId(ruleId, { contentPrompt: prompt });
+      return this.regenerateWorkflowByRuleId(ruleId, { contentPrompt: prompt }, auth);
     }
 
-    const resolvedRuleId = await this.ruleService.extractAndAwaitReady(prompt);
-    const workflow = await this.createWorkflow(resolvedRuleId, prompt);
+    const resolvedRuleId = await this.ruleService.extractAndAwaitReady(
+      prompt,
+      auth,
+    );
+    const workflow = await this.createWorkflow(
+      resolvedRuleId,
+      prompt,
+      auth.userId,
+    );
 
-    void this.runGeneration(workflow.workflowId, prompt, resolvedRuleId);
+    void this.runGeneration(workflow.workflowId, prompt, resolvedRuleId, auth);
     return { workflowId: workflow.workflowId, ruleId: resolvedRuleId };
   }
 
   async regenerateWorkflowByRuleId(
     ruleId: string,
     body: RegenerateWorkflowByRuleRequestDto,
+    auth: TenancyAuth,
   ): Promise<RegenerateWorkflowByRuleResponseDto> {
     const normalizedRuleId = ruleId.trim();
     if (!normalizedRuleId) {
@@ -82,17 +93,20 @@ export class WorkflowService {
       throw new BadRequestException('contentPrompt must not be empty');
     }
 
+    await this.ruleService.getRuleById(normalizedRuleId, auth);
+
     const existing = await this.workflowModel
-      .findOne({ ruleRef: normalizedRuleId })
+      .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
       .sort({ createdAt: -1 })
       .exec();
     const workflow =
-      existing ?? (await this.createWorkflow(normalizedRuleId, prompt));
+      existing ??
+      (await this.createWorkflow(normalizedRuleId, prompt, auth.userId));
 
     if (existing?.workflowId) {
       await this.workflowModel
         .updateOne(
-          { workflowId: existing.workflowId },
+          mergeUserIdFilter({ workflowId: existing.workflowId }, auth),
           {
             $set: {
               status: WorkflowStatus.Generating,
@@ -103,36 +117,53 @@ export class WorkflowService {
         .exec();
     }
 
-    void this.runGeneration(workflow.workflowId, prompt, normalizedRuleId);
+    void this.runGeneration(
+      workflow.workflowId,
+      prompt,
+      normalizedRuleId,
+      auth,
+    );
     return { workflowId: workflow.workflowId, ruleId: normalizedRuleId };
   }
 
-  async getWorkflow(workflowId: string): Promise<{
+  async getWorkflow(
+    workflowId: string,
+    auth: TenancyAuth,
+  ): Promise<{
     workflow: WorkflowDocument;
     nodes: WorkflowNodeDocument[];
   }> {
-    const workflow = await this.workflowModel.findOne({ workflowId }).exec();
+    const workflow = await this.workflowModel
+      .findOne(mergeUserIdFilter({ workflowId }, auth))
+      .exec();
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
     const nodes = await this.workflowNodeModel
-      .find({ workflowRef: workflowId })
+      .find(
+        mergeUserIdFilter({ workflowRef: workflowId }, auth),
+      )
       .sort({ order: 1 })
       .exec();
     return { workflow, nodes };
   }
 
-  async getWorkflowByRuleId(ruleId: string): Promise<{
+  async getWorkflowByRuleId(
+    ruleId: string,
+    auth: TenancyAuth,
+  ): Promise<{
     workflow: WorkflowDocument;
     nodes: WorkflowNodeDocument[];
   } | null> {
     const workflow = await this.workflowModel
-      .findOne({ ruleRef: ruleId })
+      .findOne(mergeUserIdFilter({ ruleRef: ruleId }, auth))
       .sort({ createdAt: -1 })
       .exec();
     if (!workflow) return null;
     const nodes = await this.workflowNodeModel
-      .find({ workflowRef: workflow.workflowId })
+      .find(
+        mergeUserIdFilter({ workflowRef: workflow.workflowId }, auth),
+      )
       .sort({ order: 1 })
       .exec();
     return { workflow, nodes };
@@ -141,17 +172,24 @@ export class WorkflowService {
   async saveNodes(
     workflowId: string,
     body: SaveWorkflowNodesRequestDto,
+    auth: TenancyAuth,
   ): Promise<SaveWorkflowNodesResponseDto> {
-    const workflow = await this.workflowModel.findOne({ workflowId }).exec();
+    const workflow = await this.workflowModel
+      .findOne(mergeUserIdFilter({ workflowId }, auth))
+      .exec();
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
     const normalized = this.normalizeAndValidateNodes(body.nodes);
+    const ownerUserId = workflow.userId ?? auth.userId;
 
-    await this.workflowNodeModel.deleteMany({ workflowRef: workflowId }).exec();
+    await this.workflowNodeModel
+      .deleteMany(mergeUserIdFilter({ workflowRef: workflowId }, auth))
+      .exec();
     const created = await this.workflowNodeModel.create(
       normalized.map((n) => ({
         workflowRef: workflowId,
+        userId: ownerUserId,
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,
@@ -164,7 +202,7 @@ export class WorkflowService {
     const nextVersion = (workflow.version ?? 1) + 1;
     await this.workflowModel
       .updateOne(
-        { workflowId },
+        mergeUserIdFilter({ workflowId }, auth),
         {
           $set: {
             nodes: nodeIds,
@@ -240,7 +278,8 @@ export class WorkflowService {
   private async runGeneration(
     workflowId: string,
     contentPrompt: string,
-    incomingRuleId?: string,
+    incomingRuleId: string | undefined,
+    auth: TenancyAuth,
   ): Promise<void> {
     try {
       this.events.emitToWorkflow(workflowId, 'workflow:started', {
@@ -249,17 +288,20 @@ export class WorkflowService {
 
       const ruleId = incomingRuleId?.trim()
         ? incomingRuleId.trim()
-        : await this.ruleService.extractAndAwaitReady(contentPrompt);
+        : await this.ruleService.extractAndAwaitReady(contentPrompt, auth);
 
       await this.workflowModel
-        .updateOne({ workflowId }, { $set: { ruleRef: ruleId } })
+        .updateOne(
+          mergeUserIdFilter({ workflowId }, auth),
+          { $set: { ruleRef: ruleId } },
+        )
         .exec();
 
       this.events.emitToWorkflow(workflowId, 'workflow:generating', {
         workflowId,
       });
 
-      const rule = await this.ruleService.getRuleById(ruleId);
+      const rule = await this.ruleService.getRuleById(ruleId, auth);
       const generatedNodes = await this.workflowGeneration.generate(
         rule,
         contentPrompt,
@@ -267,11 +309,13 @@ export class WorkflowService {
       const nodeIds = await this.persistGeneratedNodes(
         workflowId,
         generatedNodes,
+        auth.userId,
+        auth,
       );
 
       await this.workflowModel
         .updateOne(
-          { workflowId },
+          mergeUserIdFilter({ workflowId }, auth),
           {
             $set: {
               nodes: nodeIds,
@@ -290,7 +334,7 @@ export class WorkflowService {
         .exec();
 
       const nodes = await this.workflowNodeModel
-        .find({ workflowRef: workflowId })
+        .find(mergeUserIdFilter({ workflowRef: workflowId }, auth))
         .sort({ order: 1 })
         .lean()
         .exec();
@@ -305,7 +349,10 @@ export class WorkflowService {
         error as Error,
       );
       await this.workflowModel
-        .updateOne({ workflowId }, { $set: { status: WorkflowStatus.Failed } })
+        .updateOne(
+          mergeUserIdFilter({ workflowId }, auth),
+          { $set: { status: WorkflowStatus.Failed } },
+        )
         .exec();
       this.events.emitToWorkflow(workflowId, 'workflow:failed', {
         workflowId,
@@ -317,10 +364,12 @@ export class WorkflowService {
   private async createWorkflow(
     ruleRef: string,
     prompt: string,
+    userId: string,
   ): Promise<WorkflowDocument> {
     return this.workflowModel.create({
       name: `Workflow for: ${prompt.slice(0, 64)}`,
       ruleRef,
+      userId,
       status: WorkflowStatus.Generating,
       nodes: [],
       versions: [],
@@ -330,6 +379,8 @@ export class WorkflowService {
   private async persistGeneratedNodes(
     workflowId: string,
     nodes: GeneratedWorkflowNode[],
+    userId: string,
+    auth: TenancyAuth,
   ): Promise<string[]> {
     const normalized = [...nodes]
       .sort((a, b) => a.order - b.order)
@@ -353,10 +404,13 @@ export class WorkflowService {
       );
     }
 
-    await this.workflowNodeModel.deleteMany({ workflowRef: workflowId }).exec();
+    await this.workflowNodeModel
+      .deleteMany(mergeUserIdFilter({ workflowRef: workflowId }, auth))
+      .exec();
     const created = await this.workflowNodeModel.create(
       normalized.map((n) => ({
         workflowRef: workflowId,
+        userId,
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,

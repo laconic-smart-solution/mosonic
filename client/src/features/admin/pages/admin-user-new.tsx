@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 
-import AdminRouteGuard from "../components/admin-route-guard"
 import { adminCreateUser } from "../api/admin-api"
 
 type Role = "ADMIN" | "CUSTOMER"
@@ -44,7 +43,6 @@ export default function AdminUserNewPage() {
   })
 
   return (
-    <AdminRouteGuard>
       <div className="space-y-6 p-6">
         <div>
           <div className="text-xl font-semibold">Create user</div>
@@ -103,7 +101,6 @@ export default function AdminUserNewPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminRouteGuard>
   )
 }
 

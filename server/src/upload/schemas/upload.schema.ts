@@ -6,17 +6,19 @@ import {
   ContentOutputsSchema,
 } from '../../content/schemas/content.schema';
 
-/** Per-channel publish row inside an upload batch. */
 export enum UploadChannelStatus {
   Pending = 'pending',
+  Publishing = 'publishing',
   Scheduled = 'scheduled',
   Published = 'published',
   Failed = 'failed',
+  Skipped = 'skipped',
 }
 
 /** Aggregate upload job status across channels. */
 export enum UploadJobStatus {
   Pending = 'pending',
+  Running = 'running',
   Partial = 'partial',
   Completed = 'completed',
   Failed = 'failed',
@@ -27,6 +29,21 @@ export class UploadChannelEntry {
   @Prop({ required: true })
   channel: string;
 
+  /** Single source of truth for post caption (initialized from rule mapping; user edits via PATCH). */
+  @Prop({ type: String, default: '' })
+  caption: string;
+
+  /** Primary / single-asset media URL. */
+  @Prop({ type: String, default: null })
+  mediaUrl: string | null;
+
+  /** Carousel image URLs (first aligns with mediaUrl when applicable). */
+  @Prop({ type: [String], default: [] })
+  mediaUrls: string[];
+
+  @Prop({ type: String, default: null })
+  youtubeTitle: string | null;
+
   @Prop({
     type: String,
     enum: Object.values(UploadChannelStatus),
@@ -34,6 +51,9 @@ export class UploadChannelEntry {
     default: UploadChannelStatus.Pending,
   })
   status: UploadChannelStatus;
+
+  @Prop({ type: String, default: null })
+  zernioPostId: string | null;
 
   @Prop({ type: Date, default: null })
   scheduledAt: Date | null;
@@ -63,6 +83,10 @@ export class Upload {
   })
   uploadId: string;
 
+  /** App-local tenant id (`User.userId`); legacy rows may omit. */
+  @Prop({ type: String, index: true })
+  userId?: string;
+
   @Prop({ required: true, index: true })
   contentRef: string;
 
@@ -71,14 +95,6 @@ export class Upload {
 
   @Prop({ required: true, index: true })
   ruleRef: string;
-
-  /** True when at least one channel is scheduled for a future time. */
-  @Prop({ type: Boolean, required: true, default: false, index: true })
-  hasScheduled: boolean;
-
-  /** Earliest pending/scheduled publish time across channels; null if none. */
-  @Prop({ type: Date, default: null, index: true })
-  nextScheduledAt: Date | null;
 
   @Prop({ type: [UploadChannelEntrySchema], default: [] })
   channels: UploadChannelEntry[];
@@ -97,7 +113,13 @@ export class Upload {
 }
 
 export const UploadSchema = SchemaFactory.createForClass(Upload);
-export type UploadDocument = HydratedDocument<Upload>;
 
-UploadSchema.index({ hasScheduled: 1, nextScheduledAt: 1 });
 UploadSchema.index({ contentRef: 1, status: 1 });
+UploadSchema.index({ userId: 1, createdAt: -1 });
+UploadSchema.index({ 'channels.zernioPostId': 1 });
+/** Supports cron scans for embedded scheduled channels with Zernio ids (multikey compound). */
+UploadSchema.index({
+  'channels.status': 1,
+  'channels.zernioPostId': 1,
+});
+export type UploadDocument = HydratedDocument<Upload>;
