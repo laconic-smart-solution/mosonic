@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { useMemo } from "react"
-import { UserCog } from "lucide-react"
+import { UserCog, Wallet, GitBranch } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 
 import {
@@ -53,9 +53,33 @@ const NAV: NavItem[] = [
     path: "/dashboard",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <rect x="2" y="2" width="5" height="5" rx="1" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.4" />
-        <rect x="9" y="2" width="5" height="5" rx="1" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.4" />
-        <rect x="2" y="9" width="5" height="5" rx="1" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.4" />
+        <rect
+          x="2"
+          y="2"
+          width="5"
+          height="5"
+          rx="1"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.4"
+        />
+        <rect
+          x="9"
+          y="2"
+          width="5"
+          height="5"
+          rx="1"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.4"
+        />
+        <rect
+          x="2"
+          y="9"
+          width="5"
+          height="5"
+          rx="1"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.4"
+        />
         <rect
           x="9"
           y="9"
@@ -75,21 +99,57 @@ const NAV: NavItem[] = [
     path: "/rules",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path d="M3 4h10M3 8h7M3 12h5" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="13" cy="11" r="2.5" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.4" />
+        <path
+          d="M3 4h10M3 8h7M3 12h5"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <circle
+          cx="13"
+          cy="11"
+          r="2.5"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.4"
+        />
       </svg>
+    ),
+  },
+  {
+    id: "workflows",
+    label: "Workflows",
+    path: "/workflows",
+    icon: (active) => (
+      <GitBranch
+        className="size-4 shrink-0"
+        strokeWidth={1.65}
+        aria-hidden
+        color={active ? "#fff" : undefined}
+      />
     ),
   },
   {
     id: "content",
     label: "Content",
     path: "/content",
-    badge: "3",
     badgeColor: "#D97706",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <rect x="2" y="2" width="12" height="12" rx="2" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.4" />
-        <path d="M5 6h6M5 9h4" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
+        <rect
+          x="2"
+          y="2"
+          width="12"
+          height="12"
+          rx="2"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M5 6h6M5 9h4"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -110,6 +170,19 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    id: "cost",
+    label: "Costs",
+    path: "/cost",
+    icon: (active) => (
+      <Wallet
+        className="size-4 shrink-0"
+        strokeWidth={1.65}
+        aria-hidden
+        color={active ? "#fff" : undefined}
+      />
+    ),
+  },
+  {
     id: "settings-accounts",
     label: "Account settings",
     path: "/settings/accounts",
@@ -125,7 +198,7 @@ const NAV: NavItem[] = [
   {
     id: "admin",
     label: "Admin",
-    path: "/admin",
+    path: "/admin/dashboard",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
@@ -135,8 +208,18 @@ const NAV: NavItem[] = [
           strokeLinejoin="round"
           fill={active ? "#ffffff18" : "none"}
         />
-        <path d="M8 6v4" stroke={active ? "#fff" : "currentColor"} strokeWidth="1.2" strokeLinecap="round" />
-        <path d="M8 11h0" stroke={active ? "#fff" : "currentColor"} strokeWidth="2.2" strokeLinecap="round" />
+        <path
+          d="M8 6v4"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M8 11h0"
+          stroke={active ? "#fff" : "currentColor"}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -150,8 +233,19 @@ function navItemActive(item: NavItem, pathname: string): boolean {
       pathname.startsWith("/workflow/")
     )
   }
+  if (item.id === "workflows") {
+    return pathname === "/workflows" || pathname.startsWith("/workflows/")
+  }
+  if (item.id === "cost") {
+    return pathname === "/cost" || pathname.startsWith("/cost/")
+  }
+  if (item.id === "admin") {
+    return pathname.startsWith("/admin")
+  }
   if (item.id === "settings-accounts") {
-    return pathname === "/settings/accounts" || pathname.startsWith("/settings/")
+    return (
+      pathname === "/settings/accounts" || pathname.startsWith("/settings/")
+    )
   }
   if (item.path === "/") return pathname === "/"
   return pathname === item.path || pathname.startsWith(`${item.path}/`)
@@ -166,7 +260,7 @@ export function SidebarPanel() {
 
   const navItems = useMemo(
     () => (role === "ADMIN" ? NAV : NAV.filter((item) => item.id !== "admin")),
-    [role],
+    [role]
   )
 
   const closeMobileIfNeeded = () => {
@@ -180,32 +274,56 @@ export function SidebarPanel() {
 
   return (
     <>
-      <SidebarHeader className="gap-0 border-sidebar-border border-b px-4 pb-3.5 pt-[18px] group-data-[collapsible=icon]:px-2">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border px-4 pt-[18px] pb-3.5 group-data-[collapsible=icon]:px-2">
         <button
           type="button"
           onClick={handleHome}
           className={cn(
             "flex w-full cursor-pointer items-center gap-2.5 border-none bg-transparent p-0 text-left",
-            "group-data-[collapsible=icon]:justify-center",
+            "group-data-[collapsible=icon]:justify-center"
           )}
         >
           <div className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#00A589] to-[#254C94] shadow-[0_0_12px_#00A58950]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden
+            >
               <circle cx="8" cy="8" r="3" fill="white" opacity="0.9" />
-              <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.2" opacity="0.4" />
-              <circle cx="8" cy="8" r="7.5" stroke="white" strokeWidth="0.6" opacity="0.2" />
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                stroke="white"
+                strokeWidth="1.2"
+                opacity="0.4"
+              />
+              <circle
+                cx="8"
+                cy="8"
+                r="7.5"
+                stroke="white"
+                strokeWidth="0.6"
+                opacity="0.2"
+              />
             </svg>
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="text-sm font-bold leading-tight tracking-[-0.3px] text-white">NeuralTex</div>
-            <div className="text-[9px] font-semibold uppercase tracking-[1.2px] text-[#00A589]">AI Platform</div>
+            <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-white">
+              NeuralTex
+            </div>
+            <div className="text-[9px] font-semibold tracking-[1.2px] text-[#00A589] uppercase">
+              AI Platform
+            </div>
           </div>
         </button>
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-2.5">
         <SidebarGroup className="p-0">
-          <SidebarGroupLabel className="px-2 text-[9px] font-bold uppercase tracking-wide text-[#3A3A55]">
+          <SidebarGroupLabel className="px-2 text-[9px] font-bold tracking-wide text-[#3A3A55] uppercase">
             Platform
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -215,7 +333,7 @@ export function SidebarPanel() {
                 const displayBadge =
                   item.id === "analytics" && analyticsPending > 0
                     ? String(analyticsPending > 99 ? "99+" : analyticsPending)
-                    : item.badge ?? null
+                    : (item.badge ?? null)
                 return (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
@@ -231,9 +349,9 @@ export function SidebarPanel() {
                       className={cn(
                         "relative gap-[9px] py-[7px] pr-2 pl-2 text-[13px] font-normal text-[#8888AA]",
                         "data-active:!border-none data-active:!bg-[#1A1A2E] data-active:!text-white data-active:!shadow-none",
-                        "data-active:font-semibold hover:!bg-white/5 hover:!text-white/90",
+                        "hover:!bg-white/5 hover:!text-white/90 data-active:font-semibold",
                         active && "[&_svg]:opacity-100",
-                        !active && "[&_svg]:opacity-[0.65]",
+                        !active && "[&_svg]:opacity-[0.65]"
                       )}
                     >
                       {active ? (
@@ -242,15 +360,21 @@ export function SidebarPanel() {
                           aria-hidden
                         />
                       ) : null}
-                      <span className="relative z-10 shrink-0">{item.icon(active)}</span>
-                      <span className="relative z-10 min-w-0 flex-1 truncate">{item.label}</span>
+                      <span className="relative z-10 shrink-0">
+                        {item.icon(active)}
+                      </span>
+                      <span className="relative z-10 min-w-0 flex-1 truncate">
+                        {item.label}
+                      </span>
                     </SidebarMenuButton>
                     {displayBadge ? (
                       <SidebarMenuBadge
                         className="rounded-[10px] px-[5px] py-px text-[9px] font-bold text-white"
                         style={{
                           background:
-                            item.id === "analytics" ? T.accent : item.badgeColor ?? T.accent,
+                            item.id === "analytics"
+                              ? T.accent
+                              : (item.badgeColor ?? T.accent),
                         }}
                       >
                         {displayBadge}
@@ -263,35 +387,6 @@ export function SidebarPanel() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="border-sidebar-border border-t p-2.5">
-        <div
-          className={cn(
-            "flex cursor-pointer items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5",
-            "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5",
-          )}
-        >
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00A589] to-[#254C94] text-[11px] font-bold text-white">
-            A
-          </div>
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-xs font-semibold text-white">Apisit K.</div>
-            <div className="truncate text-[10px]" style={{ color: T.sidebarText }}>
-              BKK Agency Co.
-            </div>
-          </div>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            className="shrink-0 opacity-40 group-data-[collapsible=icon]:hidden"
-            aria-hidden
-          >
-            <path d="M3 5l3-3 3 3M3 7l3 3 3-3" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-        </div>
-      </SidebarFooter>
     </>
   )
 }

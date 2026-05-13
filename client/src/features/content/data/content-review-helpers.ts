@@ -4,12 +4,14 @@ import type { ContentOutputs } from "@/shared/types/content.type"
 export type OutputKey = keyof ContentOutputs
 
 export const OUTPUT_GRID: OutputKey[][] = [
-  ["text", "translatedText"],
+  ["keywords", "text"],
+  ["translatedText", "summary"],
   ["image", "video"],
-  ["transcription", "summary"],
+  ["transcription"],
 ]
 
 export const NODE_TYPE_BY_KEY: Record<OutputKey, WorkflowNodeType> = {
+  keywords: "keyword_planner",
   text: "text_generation",
   translatedText: "translation",
   image: "image_generation",
@@ -21,6 +23,7 @@ export const NODE_TYPE_BY_KEY: Record<OutputKey, WorkflowNodeType> = {
 export function outputsFromDetail(outputs?: ContentOutputs | null): Partial<Record<OutputKey, string | undefined>> {
   if (!outputs) return {}
   return {
+    keywords: outputs.keywords,
     text: outputs.text,
     translatedText: outputs.translatedText,
     transcription: outputs.transcription,
@@ -53,6 +56,9 @@ export function mergeExecutorOutput(
 ): Partial<Record<OutputKey, string | undefined>> {
   const next = { ...prev }
   switch (nodeType) {
+    case "keyword_planner":
+      if (typeof output.keywords === "string") next.keywords = output.keywords
+      break
     case "text_generation":
       if (typeof output.text === "string") next.text = output.text
       break
@@ -79,6 +85,8 @@ export function mergeExecutorOutput(
 
 export function cardTitle(key: OutputKey): string {
   switch (key) {
+    case "keywords":
+      return "Keywords"
     case "text":
       return "Text"
     case "translatedText":

@@ -44,7 +44,9 @@ export function WorkflowPalette({ hovPalette, onHover }: WorkflowPaletteProps) {
               <div className="text-[11px] leading-snug font-semibold" style={{ color: T.textPrimary }}>
                 {nt.label}
               </div>
-              <div className="mt-px text-[9px] text-[#718096]">{nt.locked ? "⚿ Required" : "Drag to add"}</div>
+              <div className="mt-px text-[9px] text-[#718096]">
+                {nt.type === "keywords" || nt.type === "text" ? "Required (one)" : "Drag to add"}
+              </div>
             </div>
           </div>
         ))}

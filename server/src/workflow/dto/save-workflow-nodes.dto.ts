@@ -25,10 +25,6 @@ export class SaveWorkflowNodeDto {
   isLocked!: boolean;
 
   @IsOptional()
-  @IsString()
-  userPrompt?: string;
-
-  @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
 }

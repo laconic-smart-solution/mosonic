@@ -225,6 +225,7 @@ export class ContentService {
     /** Resolved outputs match what the user sees (edits over AI). */
     const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
     const previousOutputsFromDb: PreviousOutputs = {
+      keywords: resolved.keywords,
       text: resolved.text,
       image: resolved.image,
       translatedText: resolved.translatedText,
@@ -260,9 +261,6 @@ export class ContentService {
     if (!content) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const resolved = mergeResolvedOutputs(
-      this.resolveEditableState(content.toObject()),
-    );
     const candidates: WorkflowNodeType[] = [
       WorkflowNodeType.VideoGeneration,
       WorkflowNodeType.Transcription,
@@ -270,7 +268,9 @@ export class ContentService {
       WorkflowNodeType.Translation,
       WorkflowNodeType.ImageGeneration,
     ];
-    return candidates.filter((t) => !this.typeOutputSlotFilled(t, resolved));
+    // "Generate more" is also used to re-generate an existing output type.
+    // (Re-run exists too, but generate-more can create a new variant with optional instructions.)
+    return candidates;
   }
 
   async scheduleGenerateNode(
@@ -278,9 +278,12 @@ export class ContentService {
     dto: GenerateNodeDto,
     auth: TenancyAuth,
   ): Promise<{ success: true; nodeId: string }> {
-    if (dto.type === WorkflowNodeType.TextGeneration) {
+    if (
+      dto.type === WorkflowNodeType.TextGeneration ||
+      dto.type === WorkflowNodeType.KeywordPlanner
+    ) {
       throw new BadRequestException(
-        'Text generation is not available for Generate More.',
+        'Text generation and keyword planner are not available for Generate More.',
       );
     }
 
@@ -306,13 +309,9 @@ export class ContentService {
     }
 
     const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
-    if (this.typeOutputSlotFilled(dto.type, resolved)) {
-      throw new BadRequestException(
-        'This content type already exists. Use re-run instead.',
-      );
-    }
 
     const previousOutputsFromDb: PreviousOutputs = {
+      keywords: resolved.keywords,
       text: resolved.text,
       image: resolved.image,
       translatedText: resolved.translatedText,
@@ -360,6 +359,8 @@ export class ContentService {
         return v(resolved.summary);
       case WorkflowNodeType.TextGeneration:
         return v(resolved.text);
+      case WorkflowNodeType.KeywordPlanner:
+        return v(resolved.keywords);
       default:
         return false;
     }
@@ -400,7 +401,7 @@ export class ContentService {
       case WorkflowNodeType.Translation:
         return { model: 'gpt-4o' };
       case WorkflowNodeType.ImageGeneration:
-        return { model: 'dall-e-3' };
+        return { model: 'gpt-image-1' };
       default:
         return { model: 'gpt-4o' };
     }
@@ -425,23 +426,28 @@ export class ContentService {
       previousOutputs,
     } = args;
     try {
+      const extra = dto.userPrompt?.trim();
+      const contentPrompt = extra
+        ? `${pipeline.contentPrompt}\n\n${extra}`
+        : pipeline.contentPrompt;
       await this.nodeExecutor.execute({
         node: {
           nodeId,
           type: dto.type,
           order: 99,
-          userPrompt: dto.userPrompt?.trim() ?? '',
           config,
           workflowRef: content.workflowRef,
         },
         context: {
           rule: rule.toObject(),
-          contentPrompt: pipeline.contentPrompt,
+          contentPrompt,
           previousOutputs,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: pipeline.nodes?.length ?? 1,
         contentId: content.contentId,
+        userId: pipeline.userId ?? content.userId,
+        ruleId: rule.ruleId,
       });
     } catch {
       // Final failure already emitted on content room by NodeExecutor.
@@ -464,24 +470,29 @@ export class ContentService {
     };
   }): Promise<void> {
     const { content, pipeline, wfNode, rule, dto, previousOutputs } = args;
+    const rerunBrief = dto.updatedPrompt?.trim();
+    const contentPrompt = rerunBrief
+      ? rerunBrief
+      : pipeline.contentPrompt;
     try {
       await this.nodeExecutor.execute({
         node: {
           nodeId: wfNode.nodeId,
           type: wfNode.type,
           order: wfNode.order,
-          userPrompt: dto.updatedPrompt ?? wfNode.userPrompt,
           config: wfNode.config ?? {},
           workflowRef: content.workflowRef,
         },
         context: {
           rule: rule.toObject(),
-          contentPrompt: pipeline.contentPrompt,
+          contentPrompt,
           previousOutputs,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: pipeline.nodes?.length ?? 1,
         contentId: content.contentId,
+        userId: pipeline.userId ?? content.userId,
+        ruleId: rule.ruleId,
       });
     } catch {
       // Final failure already emitted on pipeline + content rooms by NodeExecutor.
@@ -618,6 +629,7 @@ export class ContentService {
   ): PreviousOutputs {
     const merged: PreviousOutputs = { ...fallback };
     const keys: Array<keyof PreviousOutputs> = [
+      'keywords',
       'text',
       'image',
       'translatedText',

@@ -1,170 +1,190 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { toast } from "sonner"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
-import { adminDeleteUser, adminListUsers, adminUpdateUserRole, adminUpdateUserStatus } from "../api/admin-api"
-
-type Role = "ADMIN" | "CUSTOMER"
-type Status = "ACTIVE" | "DISABLED"
+import { AdminLayout } from "../components/admin-layout"
+import { useAdminUserActions, useAdminUsers } from "../hooks/use-admin-users"
 
 export default function AdminUsersPage() {
   const navigate = useNavigate()
-  const [q, setQ] = useState("")
-  const [role, setRole] = useState<Role | "all">("all")
-  const [status, setStatus] = useState<Status | "all">("all")
-
-  const queryKey = useMemo(() => ["admin", "users", { q, role, status }], [q, role, status])
-  const users = useQuery({
-    queryKey,
-    queryFn: () =>
-      adminListUsers({
-        q: q.trim() || undefined,
-        role: role === "all" ? undefined : role,
-        status: status === "all" ? undefined : status,
-        page: 1,
-        limit: 20,
-      }),
-  })
-
-  const roleMutation = useMutation({
-    mutationFn: async (args: { userId: string; role: Role }) => adminUpdateUserRole(args.userId, args.role),
-    onSuccess: () => users.refetch(),
-    onError: (e: any) => toast.error(e?.message ?? "Update role failed"),
-  })
-  const statusMutation = useMutation({
-    mutationFn: async (args: { userId: string; status: Status }) => adminUpdateUserStatus(args.userId, args.status),
-    onSuccess: () => users.refetch(),
-    onError: (e: any) => toast.error(e?.message ?? "Update status failed"),
-  })
-  const deleteMutation = useMutation({
-    mutationFn: async (userId: string) => adminDeleteUser(userId),
-    onSuccess: () => users.refetch(),
-    onError: (e: any) => toast.error(e?.message ?? "Delete failed"),
-  })
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const [status, setStatus] = useState<string | undefined>()
+  const { data, isLoading } = useAdminUsers({ page, limit: 20, search, status })
+  const { suspend, reactivate } = useAdminUserActions()
 
   return (
-      <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xl font-semibold">Users</div>
-            <div className="text-sm text-muted-foreground">Manage local users mirrored from SSO.</div>
-          </div>
-          <Button onClick={() => navigate("/admin/users/new")}>Create user</Button>
+    <AdminLayout>
+      <div className="space-y-6 p-6 md:p-8">
+        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+
+        <div className="flex flex-wrap gap-3">
+          <Input
+            placeholder="Search email or name…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className="max-w-xs"
+          />
+          <select
+            value={status ?? ""}
+            onChange={(e) => {
+              setStatus(e.target.value || undefined)
+              setPage(1)
+            }}
+            className="border-input bg-background h-9 rounded-md border px-3 text-sm shadow-xs"
+          >
+            <option value="">All users</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Search</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 md:flex-row md:items-center">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search email/username/name/SSO id" />
-            <div className="flex gap-2">
-              <Select value={role} onValueChange={(v) => setRole(v as any)}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All roles</SelectItem>
-                  <SelectItem value="ADMIN">ADMIN</SelectItem>
-                  <SelectItem value="CUSTOMER">CUSTOMER</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All status</SelectItem>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="DISABLED">DISABLED</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead>Last active</TableHead>
+                <TableHead className="text-right">Pipelines (MTD)</TableHead>
+                <TableHead className="text-right">Cost (MTD)</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="w-[100px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    Loading…
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(users.data?.data ?? []).map((u: any) => (
-                  <TableRow key={u.userId}>
-                    <TableCell className="font-medium">{u.email ?? "-"}</TableCell>
-                    <TableCell>{u.username ?? "-"}</TableCell>
-                    <TableCell>{u.role}</TableCell>
-                    <TableCell>{u.status}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={roleMutation.isPending}
-                          onClick={() =>
-                            roleMutation.mutate({
-                              userId: u.userId,
-                              role: u.role === "ADMIN" ? "CUSTOMER" : "ADMIN",
-                            })
-                          }
-                        >
-                          Toggle role
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={statusMutation.isPending}
-                          onClick={() =>
-                            statusMutation.mutate({
-                              userId: u.userId,
-                              status: u.status === "ACTIVE" ? "DISABLED" : "ACTIVE",
-                            })
-                          }
-                        >
-                          Toggle status
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={deleteMutation.isPending}
-                          onClick={() => deleteMutation.mutate(u.userId)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
+              ) : (
+                data?.users.map((user: {
+                  _id: string
+                  email?: string
+                  displayName?: string
+                  createdAt: string
+                  lastActiveAt?: string | null
+                  pipelinesThisMonth: number
+                  costThisMonthUsd: number
+                  isSuspended: boolean
+                  role: string
+                }) => (
+                  <TableRow
+                    key={user._id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/admin/users/${user._id}`)}
+                  >
+                    <TableCell>
+                      <div className="font-medium">{user.email}</div>
+                      {user.displayName ? (
+                        <div className="text-muted-foreground text-xs">{user.displayName}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.lastActiveAt
+                        ? new Date(user.lastActiveAt).toLocaleDateString()
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{user.pipelinesThisMonth}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      ${Number(user.costThisMonthUsd).toFixed(4)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span
+                        className={
+                          user.isSuspended
+                            ? "bg-destructive/15 text-destructive rounded-full px-2 py-0.5 text-xs font-medium"
+                            : "rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                        }
+                      >
+                        {user.isSuspended ? "Suspended" : "Active"}
+                      </span>
+                    </TableCell>
+                    <TableCell
+                      className="text-right"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      {user.role !== "ADMIN" ? (
+                        user.isSuspended ? (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0"
+                            disabled={reactivate.isPending}
+                            onClick={() => reactivate.mutate(user._id)}
+                          >
+                            Reactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="text-destructive h-auto p-0"
+                            disabled={suspend.isPending}
+                            onClick={() => suspend.mutate(user._id)}
+                          >
+                            Suspend
+                          </Button>
+                        )
+                      ) : null}
                     </TableCell>
                   </TableRow>
-                ))}
-                {!users.isFetching && (users.data?.data?.length ?? 0) === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                      No users
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {data ? (
+          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>
+              Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, data.total)} of {data.total} users
+            </span>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page >= (data.totalPages ?? 1)}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
+    </AdminLayout>
   )
 }
-

@@ -8,6 +8,7 @@ import {
   NodeImageStyle,
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
+import { aspectRatioToOpenAiImageSize } from '../workflow-node-config.zod';
 import type {
   ImageGenerationInput,
   NodeExecutionInput,
@@ -24,6 +25,7 @@ type NormalizedImageConfig = {
   size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
   quality: 'standard' | 'hd';
   style: 'natural' | 'vivid';
+  negativePrompt?: string;
 };
 
 function normalizeImageGenerationConfig(
@@ -35,9 +37,30 @@ function normalizeImageGenerationConfig(
       ? c.provider
       : undefined;
   const model = typeof c.model === 'string' ? c.model : 'dall-e-3';
-  const sizeRaw = typeof c.size === 'string' ? c.size : '1024x1024';
   const dalle3Sizes = new Set(['1024x1024', '1792x1024', '1024x1792']);
   const dalle2Sizes = new Set(['256x256', '512x512', '1024x1024']);
+
+  const aspect =
+    typeof c.aspectRatio === 'string' && c.aspectRatio.trim()
+      ? c.aspectRatio.trim()
+      : undefined;
+  const explicitSize =
+    typeof c.size === 'string' && c.size.trim() ? c.size.trim() : undefined;
+
+  let sizeRaw: string;
+  if (aspect) {
+    sizeRaw = aspectRatioToOpenAiImageSize(aspect, model);
+  } else if (model === 'dall-e-2') {
+    sizeRaw =
+      explicitSize && dalle2Sizes.has(explicitSize)
+        ? explicitSize
+        : '1024x1024';
+  } else {
+    sizeRaw =
+      explicitSize && dalle3Sizes.has(explicitSize)
+        ? explicitSize
+        : '1024x1024';
+  }
 
   let size: NormalizedImageConfig['size'];
   if (model === 'dall-e-2') {
@@ -49,11 +72,16 @@ function normalizeImageGenerationConfig(
   const quality =
     c.quality === NodeImageQuality.Hd ? ('hd' as const) : ('standard' as const);
   const style =
-    c.style === NodeImageStyle.Natural
-      ? ('natural' as const)
-      : ('vivid' as const);
+    c.style === NodeImageStyle.Vivid
+      ? ('vivid' as const)
+      : ('natural' as const);
 
-  return { provider, model, size, quality, style };
+  const negativePrompt =
+    typeof c.negativePrompt === 'string' && c.negativePrompt.trim()
+      ? c.negativePrompt.trim()
+      : undefined;
+
+  return { provider, model, size, quality, style, negativePrompt };
 }
 
 function clipTextForPrompt(text: string): string {
@@ -67,7 +95,6 @@ function clipTextForPrompt(text: string): string {
 function buildImagePrompt(
   rule: Rule,
   previousText: string,
-  userPrompt: string | undefined,
   config: NormalizedImageConfig,
 ): string {
   const quoted = clipTextForPrompt(previousText);
@@ -92,7 +119,9 @@ function buildImagePrompt(
     rule.contentGuidelines.donts.length
       ? `Avoid: ${rule.contentGuidelines.donts.join(', ')}`
       : '',
-    userPrompt ? `Specific instruction: ${userPrompt}` : '',
+    config.negativePrompt
+      ? `Do not include or emphasize: ${config.negativePrompt}`
+      : '',
     'No text, words, or watermarks in the image.',
     'Professional marketing quality.',
   ]
@@ -111,14 +140,9 @@ export class ImageGenerationService {
   async generateImage(
     input: ImageGenerationInput & { workflowRef: string },
   ): Promise<{ image: StoredImageOutput }> {
-    const { rule, previousOutputs, userPrompt, config, workflowRef } = input;
+    const { rule, previousOutputs, config, workflowRef } = input;
     const normalized = normalizeImageGenerationConfig(config);
-    const imagePrompt = buildImagePrompt(
-      rule,
-      previousOutputs.text,
-      userPrompt,
-      normalized,
-    );
+    const imagePrompt = buildImagePrompt(rule, previousOutputs.text, normalized);
 
     const generated = await this.llm.generateImageBase64({
       provider: normalized.provider,
@@ -160,10 +184,20 @@ export class ImageGenerationService {
       workflowRef: input.workflowRef,
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: { text },
-      userPrompt: input.userPrompt,
       config: input.config ?? {},
     });
 
-    return { output: image.fileUrl, image };
+    const normalized = normalizeImageGenerationConfig(input.config ?? {});
+
+    return {
+      output: image.fileUrl,
+      image,
+      imageCost: {
+        model: normalized.model,
+        size: normalized.size,
+        quality: normalized.quality,
+        count: 1,
+      },
+    };
   }
 }

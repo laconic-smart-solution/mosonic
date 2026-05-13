@@ -38,6 +38,7 @@ describe('UploadService', () => {
 
   function mockChannel(row: {
     channel: string;
+    included?: boolean;
     caption?: string;
     mediaUrl?: string | null;
     mediaUrls?: string[];
@@ -48,6 +49,7 @@ describe('UploadService', () => {
   }) {
     return {
       channel: row.channel,
+      included: row.included ?? true,
       status: row.status ?? UploadChannelStatus.Pending,
       caption: row.caption ?? '',
       mediaUrl: row.mediaUrl ?? null,
@@ -251,6 +253,83 @@ describe('UploadService', () => {
     expect(doc.channels[1].status).toBe(UploadChannelStatus.Published);
     expect(doc.channels[0].zernioPostId).toBeNull();
     expect(doc.channels[1].zernioPostId).toBe('post_b');
+  });
+
+  it('findByUploadId appends missing connected channels (included defaults true)', async () => {
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      userId: 'user-1',
+      channels: [mockChannel({ channel: 'instagram', caption: 'ig' })],
+      resolvedOutputs: { text: 'hello' },
+      status: UploadJobStatus.Pending,
+      markModified: jest.fn(),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [
+        { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
+        { channel: 'twitter', accountId: 'acc_tw', connectedAt: new Date() },
+      ],
+    });
+
+    const out = await service.findByUploadId('u1', {
+      userId: 'user-1',
+      role: 'CUSTOMER' as never,
+    });
+
+    const keys = out.channels.map((c) => c.channel.toLowerCase()).sort();
+    expect(keys).toEqual(['instagram', 'twitter']);
+    const twitter = out.channels.find((c) => c.channel.toLowerCase() === 'twitter');
+    expect(twitter?.included).toBe(true);
+  });
+
+  it('publishUpload uses persisted included when channel is missing from request', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      userId: 'user-1',
+      channels: [
+        mockChannel({ channel: 'instagram', caption: 'ig', included: false }),
+        mockChannel({ channel: 'facebook', caption: 'fb', included: true }),
+      ],
+      resolvedOutputs: { text: 'hello' },
+      status: UploadJobStatus.Pending,
+      save,
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [
+        { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
+        { channel: 'facebook', accountId: 'acc_fb', connectedAt: new Date() },
+      ],
+    });
+    mcpService.publishCreatePostBatch.mockResolvedValue({
+      postId: 'post_b',
+      raw: {},
+    });
+
+    await service.publishUpload(
+      'u1',
+      {
+        publishNow: true,
+        // Only specifying Facebook; Instagram should remain excluded via persisted flag.
+        channels: [{ channel: 'facebook', included: true }],
+      },
+      { userId: 'user-1', role: 'CUSTOMER' as never },
+    );
+
+    expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(1);
+    const arg = mcpService.publishCreatePostBatch.mock.calls[0]![1] as {
+      platforms: Array<{ platform: string }>;
+    };
+    expect(arg.platforms.map((p) => p.platform)).toEqual(['facebook']);
   });
 
   it('rejects publish when content cannot be auto-approved', async () => {

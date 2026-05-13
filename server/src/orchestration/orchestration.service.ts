@@ -34,6 +34,7 @@ import {
   type WorkflowDocument,
 } from '../workflow/schemas/workflow.schema';
 import { UploadService } from '../upload/upload.service';
+import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { NodeExecutor } from './node-executor.service';
 
 @Injectable()
@@ -124,7 +125,10 @@ export class OrchestrationService {
       rule,
       contentPrompt,
       userId: input.auth.userId,
-    }).catch(async () => {
+    }).catch(async (err: unknown) => {
+      if (err instanceof PipelineBudgetExceededError) {
+        return;
+      }
       await this.updatePipelineStatus(pipelineId, PipelineStatus.Failed);
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
         pipelineId,
@@ -238,6 +242,8 @@ export class OrchestrationService {
         totalNodes,
         context,
         node,
+        userId,
+        ruleId: rule.ruleId,
       });
     }
 
@@ -283,8 +289,10 @@ export class OrchestrationService {
     totalNodes: number;
     context: PipelineContext;
     node: WorkflowNodeDocument;
+    userId: string;
+    ruleId: string;
   }): Promise<void> {
-    const { pipelineId, totalNodes, context, node } = args;
+    const { pipelineId, totalNodes, context, node, userId, ruleId } = args;
 
     for (;;) {
       await this.updateNodeStatus(
@@ -298,13 +306,14 @@ export class OrchestrationService {
           nodeId: node.nodeId,
           type: node.type,
           order: node.order,
-          userPrompt: node.userPrompt,
           config: node.config ?? {},
           workflowRef: node.workflowRef,
         },
         context,
         pipelineId,
         totalNodes,
+        userId,
+        ruleId,
       };
 
       try {
@@ -320,7 +329,26 @@ export class OrchestrationService {
           ...result.output,
         };
         return;
-      } catch {
+      } catch (err) {
+        if (err instanceof PipelineBudgetExceededError) {
+          await this.updateNodeStatus(
+            pipelineId,
+            node.nodeId,
+            PipelineNodeExecutionStatus.Failed,
+          );
+          await this.updatePipelineStatus(
+            pipelineId,
+            PipelineStatus.Failed,
+            new Date(),
+          );
+          this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
+            pipelineId,
+            message: err.message,
+            reason: 'budget',
+            scope: err.scope,
+          });
+          throw err;
+        }
         await this.updateNodeStatus(
           pipelineId,
           node.nodeId,
@@ -398,6 +426,7 @@ export class OrchestrationService {
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
       outputs: {
+        keywords: args.context.previousOutputs.keywords,
         text: args.context.previousOutputs.text,
         image: args.context.previousOutputs.image,
         translatedText: args.context.previousOutputs.translatedText,

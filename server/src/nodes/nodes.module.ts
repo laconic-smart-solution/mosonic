@@ -7,6 +7,7 @@ import {
   WorkflowNodeSchema,
 } from './schemas/workflow-node.schema';
 import { ImageGenerationService } from './services/image-generation.service';
+import { KeywordPlannerService } from './services/keyword-planner.service';
 import { SummarizationService } from './services/summarization.service';
 import { TextGenerationService } from './services/text-generation.service';
 import { TranscriptionService } from './services/transcription.service';
@@ -14,6 +15,7 @@ import { TranslationService } from './services/translation.service';
 import { VideoGenerationService } from './services/video-generation.service';
 
 const NODE_SERVICES = [
+  KeywordPlannerService,
   TextGenerationService,
   ImageGenerationService,
   VideoGenerationService,

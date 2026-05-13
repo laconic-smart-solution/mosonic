@@ -3,6 +3,7 @@ import {
   Check,
   Clock,
   FileText,
+  Hash,
   ImageIcon,
   Languages,
   ListOrdered,
@@ -11,7 +12,6 @@ import {
   Video,
 } from "lucide-react"
 import type { WorkflowNodeType } from "@/shared/types/workflow.type"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/features/content/data/content-review-helpers"
 
 export const CARD_ICONS: Record<OutputKey, ReactNode> = {
+  keywords: <Hash className="size-4" />,
   text: <FileText className="size-4" />,
   translatedText: <Languages className="size-4" />,
   image: <ImageIcon className="size-4" />,
@@ -82,6 +83,8 @@ export function nodeIconBoxClass(key: OutputKey): string {
 
 export function pipelineStepLabel(type: WorkflowNodeType): string {
   switch (type) {
+    case "keyword_planner":
+      return "Keywords"
     case "text_generation":
       return "Text Gen"
     case "image_generation":
@@ -102,6 +105,8 @@ export function pipelineStepLabel(type: WorkflowNodeType): string {
 export function PipelineTypeIcon({ type }: { type: WorkflowNodeType }) {
   const ic = "size-[13px] shrink-0 text-[#00A589]"
   switch (type) {
+    case "keyword_planner":
+      return <Hash className={ic} />
     case "text_generation":
       return <FileText className={ic} />
     case "image_generation":

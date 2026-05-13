@@ -8,6 +8,16 @@ import {
 import { ChevronDown, ChevronUp, FileStack, Home, Library } from "lucide-react"
 import { toast } from "sonner"
 
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { PromptArea, type Attachment } from "@/components/core/prompt-area"
 import {
   WorkflowFlowCanvas,
@@ -91,6 +101,9 @@ export default function WorkflowPage() {
     undefined
   )
   const [workflowPrompt, setWorkflowPrompt] = useState(initialNavContentPrompt)
+  const [showWorkflowPrompt, setShowWorkflowPrompt] = useState(false)
+  const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false)
+  const [rebuildBrief, setRebuildBrief] = useState("")
   const [hovPalette, setHovPalette] = useState<number | null>(null)
   const [apiNodes, setApiNodes] = useState<WorkflowNode[] | undefined>(
     undefined
@@ -507,11 +520,11 @@ export default function WorkflowPage() {
     })
   }
 
-  function handleStartPipeline() {
+  function handleStartPipeline(contentPromptOverride?: string) {
     if (!activeWorkflowId || !ruleId) return
-    const contentPrompt = workflowPrompt.trim()
+    const contentPrompt = (contentPromptOverride ?? workflowPrompt).trim()
     if (!contentPrompt) {
-      toast.error("Please enter a content prompt first.")
+      toast.error("Please enter what you want to post about.")
       return
     }
     startPipelineMutation.mutate(
@@ -540,6 +553,16 @@ export default function WorkflowPage() {
         },
       }
     )
+  }
+
+  function handleBottomPromptSubmit(text: string, _attachments: Attachment[]) {
+    if (canvasMode === "empty") {
+      handleWorkflowGenerateSubmit(text, _attachments)
+      return
+    }
+    if (canvasMode === "ready") {
+      handleStartPipeline(text.trim())
+    }
   }
 
   function handleRetryNode(nodeId: string) {
@@ -582,7 +605,7 @@ export default function WorkflowPage() {
 
     const onSuccess = (data: { workflowId: string }) => {
       workflowEventTargetRef.current = data.workflowId
-      setWorkflowPrompt(contentPrompt)
+      setWorkflowPrompt("")
       setActiveWorkflowId(data.workflowId)
       setApiNodes([])
       joinWorkflowRoom(data.workflowId)
@@ -591,7 +614,7 @@ export default function WorkflowPage() {
         state: {
           ruleName,
           generating: true,
-          contentPrompt,
+          contentPrompt: "",
         },
       })
       void workflowByRuleQuery.refetch()
@@ -603,6 +626,16 @@ export default function WorkflowPage() {
     }
 
     generateWorkflow.mutate({ contentPrompt, ruleId }, { onSuccess })
+  }
+
+  function handleConfirmRebuild() {
+    if (!ruleId) return
+    const contentPrompt =
+      rebuildBrief.trim() ||
+      "Refresh workflow nodes from the current rule and channel settings."
+    setRebuildDialogOpen(false)
+    setRebuildBrief("")
+    handleWorkflowGenerateSubmit(contentPrompt, [])
   }
 
   function handleSelectPipelineSnapshot(item: PipelinePageItem) {
@@ -632,6 +665,14 @@ export default function WorkflowPage() {
     workflowByRuleQuery.isFetched,
     workflowByRuleQuery.isLoading,
   ])
+
+  useEffect(() => {
+    if (canvasMode === "ready") {
+      setShowWorkflowPrompt(true)
+    } else if (canvasMode === "empty") {
+      setShowWorkflowPrompt(false)
+    }
+  }, [canvasMode])
 
   const progressPercent = useMemo(() => {
     if (!totalNodes || totalNodes <= 0) return null
@@ -671,8 +712,19 @@ export default function WorkflowPage() {
         onRuleClick={() =>
           navigate("/rules", { state: { selectedRuleId: ruleId } })
         }
+        onToggleStructurePrompt={
+          canvasMode === "empty" && processingMode === "edit"
+            ? () => setShowWorkflowPrompt((v) => !v)
+            : undefined
+        }
+        structurePromptOpen={canvasMode === "empty" ? showWorkflowPrompt : undefined}
+        onRebuildWorkflow={
+          canvasMode === "ready" && processingMode === "edit"
+            ? () => setRebuildDialogOpen(true)
+            : undefined
+        }
         onRun={handleStartPipeline}
-        runLabel="Start Generation"
+        runLabel="Generate content"
         onSave={
           activeWorkflowId && processingMode === "edit" ? handleSave : undefined
         }
@@ -749,8 +801,9 @@ export default function WorkflowPage() {
                 Start your workflow
               </h2>
               <p className="mt-2 text-sm" style={{ color: T.textSecondary }}>
-                Use the prompt box to generate nodes for this workflow. You can
-                then reorder, connect, and update each node.
+                Open <span className="font-medium">Describe workflow</span> in the toolbar, then describe
+                channels, formats, or goals. Node-level prompts are not stored here—the topic for each post is
+                entered when you run <span className="font-medium">Generate content</span>.
               </p>
             </div>
           </div>
@@ -764,19 +817,32 @@ export default function WorkflowPage() {
           />
         )}
         {processingMode === "edit" &&
+        showWorkflowPrompt &&
         (canvasMode === "empty" || canvasMode === "ready") ? (
           <div className="pointer-events-none absolute bottom-0 left-1/2 z-20 flex w-full -translate-x-1/2 justify-center px-4 pb-4">
             <div className="pointer-events-auto w-full max-w-[760px] rounded-2xl border border-canvas-200 bg-white/95 p-2 shadow-lg backdrop-blur">
               <p className="px-2 pb-1 text-xs font-medium text-canvas-500">
-                Workflow prompt
+                {canvasMode === "empty"
+                  ? "Describe this workflow (structure)"
+                  : "What do you want to post about?"}
               </p>
               <PromptArea
                 value={workflowPrompt}
                 onChange={setWorkflowPrompt}
-                onSubmit={handleWorkflowGenerateSubmit}
-                placeholder="Describe what workflow should be generated…"
+                onSubmit={handleBottomPromptSubmit}
+                placeholder={
+                  canvasMode === "empty"
+                    ? "e.g. Instagram + Facebook captions, Thai translation, hero image…"
+                    : "e.g. Our Christmas sale — 50% off all items until Dec 25…"
+                }
                 className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
               />
+              {canvasMode === "ready" ? (
+                <p className="px-2 pt-1 text-[11px] text-canvas-500">
+                  Using workflow: <span className="font-medium text-canvas-700">{wfName}</span> ·{" "}
+                  {apiNodes?.length ?? 0} {apiNodes?.length === 1 ? "node" : "nodes"}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -901,6 +967,37 @@ export default function WorkflowPage() {
         </button>
       </div>
 
+      <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Rebuild workflow nodes</DialogTitle>
+            <DialogDescription>
+              Replaces the current node layout from the rule and your notes. Per-post topics stay in the
+              Generate content prompt, not here.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rebuildBrief}
+            onChange={(e) => setRebuildBrief(e.target.value)}
+            rows={5}
+            placeholder="Optional: channels, formats, translation, media… Leave blank to infer from the rule."
+            className="text-sm"
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRebuildDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmRebuild}
+              disabled={regenerateWorkflowByRule.isPending}
+            >
+              {regenerateWorkflowByRule.isPending ? "Rebuilding…" : "Rebuild"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <WorkflowContentDrawer
         open={contentDrawerOpen}
         onOpenChange={(open) => {
@@ -930,9 +1027,11 @@ function outputToRuntime(
 ): Record<string, unknown> {
   if (!output) return {}
   const textLike =
-    typeof output.text === "string"
-      ? output.text
-      : typeof output.translatedText === "string"
+    typeof output.keywords === "string"
+      ? output.keywords
+      : typeof output.text === "string"
+        ? output.text
+        : typeof output.translatedText === "string"
         ? output.translatedText
         : typeof output.transcription === "string"
           ? output.transcription
@@ -944,6 +1043,7 @@ function outputToRuntime(
       ? `${textLike.slice(0, 100)}...`
       : textLike
   switch (nodeType) {
+    case "keyword_planner":
     case "text_generation":
     case "translation":
     case "transcription":
@@ -984,7 +1084,6 @@ function mapPipelineSnapshotNodesToWorkflowNodes(
       order: node.order,
       workflowRef,
       isLocked: node.isLocked,
-      userPrompt: node.userPrompt ?? "",
       config: node.config ?? {},
       createdAt: node.executedAt ?? new Date().toISOString(),
       updatedAt: node.executedAt ?? new Date().toISOString(),

@@ -5,6 +5,7 @@ import type {
 
 /** Merged view: user edits override AI outputs when present. */
 export type ResolvedContentOutputs = {
+  keywords?: string;
   text?: string;
   image?: string;
   translatedText?: string;
@@ -20,6 +21,7 @@ export function mergeResolvedOutputs(version: {
   const o = version.outputs ?? {};
   const u = version.userEdits ?? {};
   return {
+    keywords: coalesce(u.keywords, o.keywords),
     text: coalesce(u.text, o.text),
     image: coalesce(u.image, o.image),
     translatedText: coalesce(u.translatedText, o.translatedText),

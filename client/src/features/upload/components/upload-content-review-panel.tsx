@@ -147,6 +147,17 @@ export function UploadContentReviewPanel({
   } | null>(null)
   const generatedOutputKeysRef = useRef<Set<OutputKey>>(new Set())
 
+  const generateMoreTypes = useMemo<WorkflowNodeType[]>(
+    () => [
+      "video_generation",
+      "transcription",
+      "summarization",
+      "translation",
+      "image_generation",
+    ],
+    []
+  )
+
   const [confirmApproveOpen, setConfirmApproveOpen] = useState(false)
   const [confirmRejectOpen, setConfirmRejectOpen] = useState(false)
 
@@ -348,6 +359,7 @@ export function UploadContentReviewPanel({
       }
       return contentService.save(contentId!, {
         userEdits: {
+          keywords: editedOutputs.keywords,
           text: editedOutputs.text,
           translatedText: editedOutputs.translatedText,
           transcription: editedOutputs.transcription,
@@ -386,19 +398,25 @@ export function UploadContentReviewPanel({
       .getAvailableNodeTypes(contentId)
       .then((r) => {
         if (cancelled) return
-        setAvailableTypes(r.types)
+        // Users should be able to generate (or re-generate) any supported output type,
+        // even if that output already exists in the current content.
+        const supported = new Set<WorkflowNodeType>([
+          ...generateMoreTypes,
+          ...(r.types ?? []),
+        ])
+        setAvailableTypes(generateMoreTypes.filter((t) => supported.has(t)))
         setAvailableTypesLoading(false)
       })
       .catch(() => {
         if (cancelled) return
         toast.error("Could not load available outputs.")
         setAvailableTypesLoading(false)
-        setAvailableTypes([])
+        setAvailableTypes(generateMoreTypes)
       })
     return () => {
       cancelled = true
     }
-  }, [genMoreOpen, contentId])
+  }, [genMoreOpen, contentId, generateMoreTypes])
 
   const submitGenerateMore = useCallback(
     async (type: WorkflowNodeType, userPrompt: string) => {
@@ -537,6 +555,7 @@ export function UploadContentReviewPanel({
         nodeId,
         updatedPrompt: rerunPromptDraft.trim() || undefined,
         previousOutputs: {
+          keywords: editedOutputs.keywords,
           text: editedOutputs.text,
           translatedText: editedOutputs.translatedText,
           transcription: editedOutputs.transcription,
@@ -675,7 +694,7 @@ export function UploadContentReviewPanel({
         ) : !selectedGenType ? (
           availableTypes.length === 0 ? (
             <p className="text-xs leading-relaxed text-[#857A6C]">
-              All content types are already generated for this item.
+              No output types are available.
             </p>
           ) : (
             <div className="flex max-h-[280px] flex-col gap-2 overflow-y-auto pr-1">

@@ -11,8 +11,10 @@ import { mergeUserIdFilter } from '../auth/tenancy.util';
 import {
   WorkflowNode,
   WorkflowNodeType,
+  type WorkflowNodeConfig,
   type WorkflowNodeDocument,
 } from '../nodes/schemas/workflow-node.schema';
+import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
 import { EventsService } from '../events/events.service';
 import { RuleService } from '../rule/rule.service';
 import {
@@ -25,6 +27,10 @@ import {
   SaveWorkflowNodesRequestDto,
   SaveWorkflowNodesResponseDto,
 } from './dto/save-workflow-nodes.dto';
+import type {
+  WorkflowPageItemDto,
+  WorkflowPageQueryDto,
+} from './dto/workflow-page-query.dto';
 import {
   Workflow,
   type WorkflowDocument,
@@ -35,6 +41,11 @@ import {
   WorkflowGenerationService,
 } from './services/workflow-generation.service';
 import { LlmService } from '../llm/llm.service';
+import { assertValidWorkflowNodeOrder } from './workflow-node-order.util';
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 @Injectable()
 export class WorkflowService {
@@ -169,6 +180,122 @@ export class WorkflowService {
     return { workflow, nodes };
   }
 
+  async findPage(
+    dto: WorkflowPageQueryDto,
+    auth: TenancyAuth,
+  ): Promise<{ data: WorkflowPageItemDto[]; total: number }> {
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 10;
+    const sortBy = dto.sortBy ?? 'updatedAt';
+    const sortOrder = dto.sortOrder ?? 'desc';
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
+    const q = dto.filter?.q?.trim();
+    if (q) {
+      filter.name = {
+        $regex: escapeRegex(q),
+        $options: 'i',
+      };
+    }
+    if (dto.filter?.nodeType !== undefined) {
+      const refs = await this.workflowNodeModel
+        .distinct(
+          'workflowRef',
+          mergeUserIdFilter({ type: dto.filter.nodeType }, auth),
+        )
+        .exec();
+      if (!refs.length) {
+        return { data: [], total: 0 };
+      }
+      filter.workflowId = { $in: refs };
+    }
+
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+    const sort: Record<string, 1 | -1> = { [sortBy]: sortDir };
+
+    const [rows, total] = await Promise.all([
+      this.workflowModel
+        .find(filter)
+        .select({
+          workflowId: 1,
+          ruleRef: 1,
+          name: 1,
+          status: 1,
+          updatedAt: 1,
+        })
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.workflowModel.countDocuments(filter).exec(),
+    ]);
+
+    const ids = (rows as Array<{ workflowId?: string }>)
+      .map((r) => r.workflowId)
+      .filter((id): id is string => Boolean(id?.trim()));
+
+    const nodeTypesByWorkflow = await this.loadNodeTypesForWorkflows(
+      ids,
+      auth,
+    );
+
+    type WorkflowLean = {
+      workflowId?: string;
+      ruleRef?: string;
+      name?: string;
+      status?: string;
+      updatedAt?: Date | string;
+    };
+    const data: WorkflowPageItemDto[] = (rows as WorkflowLean[]).map((row) => {
+      const workflowId = row.workflowId?.trim() ?? '';
+      const updatedAtRaw = row.updatedAt;
+      const updatedAt =
+        updatedAtRaw instanceof Date
+          ? updatedAtRaw.toISOString()
+          : typeof updatedAtRaw === 'string'
+            ? updatedAtRaw
+            : new Date().toISOString();
+      return {
+        workflowId,
+        ruleRef: row.ruleRef?.trim() ?? '',
+        name: row.name?.trim() ?? '',
+        status:
+          typeof row.status === 'string'
+            ? row.status
+            : String(row.status ?? WorkflowStatus.Generating),
+        updatedAt,
+        nodeTypes: nodeTypesByWorkflow.get(workflowId) ?? [],
+      };
+    });
+
+    return { data, total };
+  }
+
+  private async loadNodeTypesForWorkflows(
+    workflowIds: string[],
+    auth: TenancyAuth,
+  ): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    if (!workflowIds.length) return out;
+    const nodes = await this.workflowNodeModel
+      .find(mergeUserIdFilter({ workflowRef: { $in: workflowIds } }, auth))
+      .select({ workflowRef: 1, type: 1 })
+      .lean()
+      .exec();
+    for (const n of nodes) {
+      const ref =
+        typeof n.workflowRef === 'string' ? n.workflowRef.trim() : '';
+      const type = typeof n.type === 'string' ? n.type : String(n.type ?? '');
+      if (!ref || !type) continue;
+      const set = new Set(out.get(ref) ?? []);
+      set.add(type);
+      out.set(ref, Array.from(set));
+    }
+    return out;
+  }
+
   async saveNodes(
     workflowId: string,
     body: SaveWorkflowNodesRequestDto,
@@ -193,7 +320,6 @@ export class WorkflowService {
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,
-        userPrompt: n.userPrompt,
         config: n.config,
       })),
     );
@@ -228,8 +354,7 @@ export class WorkflowService {
     type: WorkflowNodeType;
     order: number;
     isLocked: boolean;
-    userPrompt?: string;
-    config: Record<string, unknown>;
+    config: WorkflowNodeConfig;
   }> {
     if (!nodes.length) {
       throw new BadRequestException('nodes must not be empty');
@@ -243,16 +368,19 @@ export class WorkflowService {
         'Exactly one text_generation node is required',
       );
     }
-    if (sorted[0]?.type !== WorkflowNodeType.TextGeneration) {
-      throw new BadRequestException('text_generation node must be first');
-    }
     const normalized = sorted.map((n, idx) => ({
       type: n.type,
       order: idx + 1,
-      isLocked:
-        n.type === WorkflowNodeType.TextGeneration ? true : Boolean(n.isLocked),
-      userPrompt: n.userPrompt?.trim() || undefined,
-      config: n.config ?? {},
+      isLocked: Boolean(n.isLocked),
+      config: (() => {
+        const parsed = parseWorkflowNodeConfig(n.type, n.config ?? {});
+        if (!parsed.ok) {
+          throw new BadRequestException(
+            `Invalid config for node "${n.type}": ${parsed.errors.join('; ')}`,
+          );
+        }
+        return parsed.data;
+      })(),
     }));
     for (const node of normalized) {
       try {
@@ -267,11 +395,13 @@ export class WorkflowService {
         );
       }
     }
-    if (normalized[0].order !== 1 || !normalized[0].isLocked) {
-      throw new BadRequestException(
-        'text_generation node must be order=1 and locked',
-      );
-    }
+    assertValidWorkflowNodeOrder(
+      normalized.map((n) => ({
+        type: n.type,
+        order: n.order,
+        config: n.config as Record<string, unknown>,
+      })),
+    );
     return normalized;
   }
 
@@ -384,25 +514,30 @@ export class WorkflowService {
   ): Promise<string[]> {
     const normalized = [...nodes]
       .sort((a, b) => a.order - b.order)
-      .map((n, idx) => ({
-        ...n,
-        order: idx + 1,
-        isLocked:
-          n.type === WorkflowNodeType.TextGeneration
-            ? true
-            : Boolean(n.isLocked),
-      }));
+      .map((n, idx) => {
+        const parsed = parseWorkflowNodeConfig(n.type, n.config);
+        if (!parsed.ok) {
+          throw new BadRequestException(
+            `Invalid generated config for node "${n.type}": ${parsed.errors.join('; ')}`,
+          );
+        }
+        return {
+          ...n,
+          order: idx + 1,
+          isLocked: Boolean(n.isLocked),
+          config: parsed.data,
+        };
+      });
     for (const node of normalized) {
       this.llm.validateWorkflowNodeConfig(node.type, node.config);
     }
-    if (
-      !normalized.length ||
-      normalized[0].type !== WorkflowNodeType.TextGeneration
-    ) {
-      throw new BadRequestException(
-        'Generated workflow must start with text_generation node',
-      );
-    }
+    assertValidWorkflowNodeOrder(
+      normalized.map((n) => ({
+        type: n.type,
+        order: n.order,
+        config: n.config as Record<string, unknown>,
+      })),
+    );
 
     await this.workflowNodeModel
       .deleteMany(mergeUserIdFilter({ workflowRef: workflowId }, auth))
@@ -414,7 +549,6 @@ export class WorkflowService {
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,
-        userPrompt: n.userPrompt,
         config: n.config,
       })),
     );

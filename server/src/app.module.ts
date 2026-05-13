@@ -21,6 +21,7 @@ import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
+import { CostModule } from './cost/cost.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AdminModule,
     LlmModule,
     PreprocessingModule,
+    CostModule,
     EventsModule,
     NodesModule,
     LoggingModule,

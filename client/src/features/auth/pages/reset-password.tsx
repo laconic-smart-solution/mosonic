@@ -1,14 +1,19 @@
 import { useMutation } from "@tanstack/react-query"
+import { Lock } from "lucide-react"
 import { useMemo, useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { CardContent, CardHeader } from "@/components/ui/card"
 import { toast } from "sonner"
 
 import { authFlowErrorMessage, changePassword } from "@/features/auth/api/auth-flow-api"
+import { AuthAlertInline } from "@/features/auth/components/auth-alert-inline"
+import { AuthCardPanel } from "@/features/auth/components/auth-card-panel"
+import { AuthInlineLink, AuthLinkFooter, AuthTextLink } from "@/features/auth/components/auth-link-footer"
+import { AuthPageHeader } from "@/features/auth/components/auth-page-header"
+import { AuthPageShell } from "@/features/auth/components/auth-page-shell"
+import { AuthPasswordField } from "@/features/auth/components/auth-password-field"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
@@ -52,46 +57,43 @@ export default function ResetPasswordPage() {
   })
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Reset password</CardTitle>
-          <CardDescription>
-            {email
-              ? `Choose a new password for ${email}.`
-              : "Choose a new password for your account."}
-          </CardDescription>
+    <AuthPageShell>
+      <AuthCardPanel>
+        <CardHeader className="space-y-0 border-b border-border/60 pb-6">
+          <AuthPageHeader
+            icon={Lock}
+            title="Reset password"
+            description={
+              email
+                ? `Choose a new password for ${email}.`
+                : "Choose a new password for your account."
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           {!accessToken && (
-            <p className="text-sm text-destructive">
+            <AuthAlertInline>
               Missing reset token. Go back to{" "}
-              <Link className="underline underline-offset-4" to="/forgot-password">
-                forgot password
-              </Link>{" "}
-              and verify your OTP again.
-            </p>
+              <AuthInlineLink to="/forgot-password">forgot password</AuthInlineLink> and verify your OTP
+              again.
+            </AuthAlertInline>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
-            />
-          </div>
+          <AuthPasswordField
+            id="new-password"
+            label="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            disabled={!accessToken}
+          />
+          <AuthPasswordField
+            id="confirm-password"
+            label="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            disabled={!accessToken}
+          />
           <p className="text-xs text-muted-foreground">Use at least 8 characters.</p>
           <Button
             className="w-full"
@@ -100,13 +102,11 @@ export default function ResetPasswordPage() {
           >
             {mutation.isPending ? "Updating…" : "Update password"}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            <Link className="text-primary underline underline-offset-4" to="/login">
-              Back to sign in
-            </Link>
-          </p>
+          <AuthLinkFooter>
+            <AuthTextLink to="/login">Back to sign in</AuthTextLink>
+          </AuthLinkFooter>
         </CardContent>
-      </Card>
-    </div>
+      </AuthCardPanel>
+    </AuthPageShell>
   )
 }

@@ -20,6 +20,7 @@ export type ChannelMediaMapping = "image" | "video"
 /** GET /upload/:id channel row */
 export type UploadChannelRow = {
   channel: string
+  included: boolean
   status: UploadChannelStatus
   caption: string
   mediaUrl: string | null
@@ -62,6 +63,7 @@ export type PublishUploadRequest = {
 }
 
 export type PatchUploadChannelBody = {
+  included?: boolean
   caption?: string | null
   mediaUrl?: string | null
   mediaUrls?: string[]

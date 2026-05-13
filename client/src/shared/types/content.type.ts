@@ -43,6 +43,7 @@ export type ContentPageResponse = {
 }
 
 export type ContentOutputs = {
+  keywords?: string
   text?: string
   translatedText?: string
   transcription?: string

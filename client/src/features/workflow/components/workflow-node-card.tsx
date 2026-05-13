@@ -2,10 +2,10 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Lock, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import type { WorkflowNode, WorkflowNodeType } from "@/shared/types/workflow.type"
 
 const NODE_TYPE_LABELS: Record<WorkflowNodeType, string> = {
+  keyword_planner: "Keyword Planner",
   text_generation: "Text Generation",
   image_generation: "Image Generation",
   video_generation: "Video Generation",
@@ -14,16 +14,49 @@ const NODE_TYPE_LABELS: Record<WorkflowNodeType, string> = {
   summarization: "Summarization",
 }
 
+function summarizeNodeConfig(node: WorkflowNode): string {
+  const c = node.config ?? {}
+  switch (node.type) {
+    case "translation":
+      return `${String(c.sourceLanguage ?? "auto")} → ${String(c.targetLanguage ?? "?")} · ${String(c.formalityLevel ?? "casual")}${c.preserveFormatting === false ? " · reflow OK" : ""}`
+    case "transcription":
+      return `Language ${String(c.language ?? "auto")} · ${String(c.sourceType ?? "audio")}`
+    case "keyword_planner":
+      return [
+        c.model,
+        c.temperature !== undefined && c.temperature !== null
+          ? String(c.temperature)
+          : "",
+        c.maxTokens !== undefined && c.maxTokens !== null
+          ? String(c.maxTokens)
+          : "",
+      ]
+        .filter((x) => x !== "")
+        .join(" · ") || "Default planner settings"
+    case "text_generation":
+      return [c.tone, c.textLength, c.outputFormat].filter(Boolean).join(" · ") || "Default text settings"
+    case "image_generation":
+      return [c.aspectRatio, c.quality, c.style].filter(Boolean).join(" · ") || "Default image settings"
+    case "video_generation":
+      return [c.aspectRatio, c.resolution].filter(Boolean).join(" · ") || "Default video settings"
+    case "summarization":
+      return [c.summaryLength, c.outputFormat].filter(Boolean).join(" · ") || "Default summary settings"
+    default:
+      return ""
+  }
+}
+
 type WorkflowNodeCardProps = {
   node: WorkflowNode
   onRemove: (nodeId: string) => void
-  onPromptChange: (nodeId: string, value: string) => void
 }
 
-export function WorkflowNodeCard({ node, onRemove, onPromptChange }: WorkflowNodeCardProps) {
+export function WorkflowNodeCard({ node, onRemove }: WorkflowNodeCardProps) {
+  const nonDeletable =
+    node.type === "text_generation" || node.type === "keyword_planner"
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.nodeId,
-    disabled: node.isLocked,
+    disabled: node.isLocked && !nonDeletable,
   })
 
   const style = {
@@ -42,7 +75,7 @@ export function WorkflowNodeCard({ node, onRemove, onPromptChange }: WorkflowNod
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
           {node.order}
         </span>
-        {!node.isLocked ? (
+        {!node.isLocked || nonDeletable ? (
           <button
             type="button"
             className="cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
@@ -64,16 +97,16 @@ export function WorkflowNodeCard({ node, onRemove, onPromptChange }: WorkflowNod
           ) : null}
         </div>
 
-        <Textarea
-          value={node.userPrompt ?? ""}
-          onChange={(e) => onPromptChange(node.nodeId, e.target.value)}
-          placeholder="Enter prompt for this node…"
-          rows={3}
-          className="resize-none text-sm"
-        />
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+          <p className="text-xs font-semibold text-muted-foreground">Node settings</p>
+          <p className="mt-1 text-foreground">{summarizeNodeConfig(node)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            What to post about is set when you run the workflow, not here.
+          </p>
+        </div>
       </div>
 
-      {!node.isLocked ? (
+      {!nonDeletable ? (
         <Button
           type="button"
           variant="ghost"

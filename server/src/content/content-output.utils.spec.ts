@@ -3,9 +3,10 @@ import { mergeResolvedOutputs } from './content-output.utils';
 describe('mergeResolvedOutputs', () => {
   it('prefers user edits over AI outputs when user value is set', () => {
     const merged = mergeResolvedOutputs({
-      outputs: { text: 'from-ai', image: 'img-ai' },
+      outputs: { keywords: 'kw1', text: 'from-ai', image: 'img-ai' },
       userEdits: { text: 'from-user' },
     });
+    expect(merged.keywords).toBe('kw1');
     expect(merged.text).toBe('from-user');
     expect(merged.image).toBe('img-ai');
   });

@@ -5,6 +5,8 @@ import type {
 } from '../schemas/workflow-node.schema';
 
 export interface PreviousOutputs {
+  /** Target keywords from keyword_planner (newline-separated or plain text). */
+  keywords?: string;
   text?: string;
   image?: string;
   translatedText?: string;
@@ -24,7 +26,6 @@ export interface NodeExecutorInput {
     nodeId: string;
     type: WorkflowNodeType;
     order: number;
-    userPrompt?: string;
     config: WorkflowNodeConfig;
     workflowRef?: string;
   };
@@ -33,12 +34,17 @@ export interface NodeExecutorInput {
   totalNodes: number;
   /** When set, mirrors pipeline node events to `content_${contentId}` for content re-run UX. */
   contentId?: string;
+  /** App-local tenant id for cost attribution. */
+  userId?: string;
+  /** Rule id (stored as campaignRef on cost entries). */
+  ruleId?: string;
 }
 
 export interface NodeExecutorOutput {
   nodeId: string;
   type: WorkflowNodeType;
   output: {
+    keywords?: string;
     text?: string;
     image?: string;
     translatedText?: string;
@@ -55,7 +61,6 @@ export interface NodeExecutionInput {
   nodeId: string;
   order: number;
   config?: WorkflowNodeConfig;
-  userPrompt?: string;
   /** Serialized upstream context (prior node outputs, rule excerpt, etc.). */
   context?: string;
   /** Populated by orchestration for brand-aware text generation. */
@@ -72,8 +77,9 @@ export interface NodeExecutionInput {
 export interface TextGenerationInput {
   rule: Rule;
   contentPrompt: string;
-  userPrompt?: string;
   config: WorkflowNodeConfig;
+  /** When set (e.g. after keyword_planner), folded into the human prompt. */
+  previousOutputs?: Pick<PreviousOutputs, 'keywords'>;
 }
 
 /** Strongly typed input for {@link ImageGenerationService.generateImage}. */
@@ -81,7 +87,6 @@ export interface ImageGenerationInput {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: { text: string };
-  userPrompt?: string;
   config: WorkflowNodeConfig;
 }
 
@@ -90,7 +95,6 @@ export interface TranslationInput {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: { text: string };
-  userPrompt?: string;
   config: WorkflowNodeConfig;
 }
 
@@ -99,7 +103,6 @@ export interface SummarizationInput {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
-  userPrompt?: string;
   config: WorkflowNodeConfig;
 }
 
@@ -108,7 +111,6 @@ export interface TranscriptionInput {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
-  userPrompt?: string;
   config: WorkflowNodeConfig;
 }
 
@@ -117,7 +119,6 @@ export interface VideoGenerationInput {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
-  userPrompt?: string;
   config: WorkflowNodeConfig;
 }
 
@@ -139,4 +140,21 @@ export interface NodeExecutionResult {
     storedFileName: string;
     originalFileName?: string;
   };
+  /** LangChain / provider token usage for LLM-backed nodes. */
+  usage?: { inputTokens: number; outputTokens: number };
+  /** Image billing metadata (normalized OpenAI params). */
+  imageCost?: {
+    model: string;
+    size: string;
+    quality: string;
+    count: number;
+  };
+  /** Video billing metadata. */
+  videoCost?: {
+    model: string;
+    videoSeconds: number;
+    videoResolution: string;
+  };
+  /** Estimated source duration in seconds (Whisper). */
+  audioDurationSeconds?: number;
 }

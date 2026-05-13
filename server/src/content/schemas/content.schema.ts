@@ -12,6 +12,9 @@ export enum ContentStatus {
 @Schema({ _id: false })
 export class ContentOutputs {
   @Prop({ type: String })
+  keywords?: string;
+
+  @Prop({ type: String })
   text?: string;
 
   @Prop({ type: String })
@@ -35,6 +38,9 @@ export const ContentOutputsSchema =
 /** User overrides layered on top of `outputs` for the same version. */
 @Schema({ _id: false })
 export class ContentUserEdits {
+  @Prop({ type: String })
+  keywords?: string;
+
   @Prop({ type: String })
   text?: string;
 

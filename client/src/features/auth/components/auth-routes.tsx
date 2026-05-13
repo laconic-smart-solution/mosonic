@@ -57,7 +57,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const role = useAuthStore((s) => s.role)
 
   if (!accessToken) {
-    return <Navigate to="/login?next=/admin" replace />
+    return <Navigate to="/login?next=/admin/dashboard" replace />
   }
 
   if (role !== "ADMIN") {

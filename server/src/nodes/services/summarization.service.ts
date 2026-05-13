@@ -4,6 +4,7 @@ import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
 import {
   LlmProvider,
+  NodeOutputFormat,
   NodeSummaryLength,
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
@@ -13,6 +14,10 @@ import type {
   PreviousOutputs,
   SummarizationInput,
 } from '../types/node-execution.types';
+import {
+  extractUsageFromAiMessage,
+  extractUsageFromStreamChunk,
+} from '../langchain-usage.util';
 
 type SummaryFormat = 'paragraph' | 'bullets' | 'tldr';
 
@@ -32,9 +37,12 @@ function normalizeSummarizationConfig(
   const outputFormatRaw =
     typeof outputFormatValue === 'string' ? outputFormatValue : 'paragraph';
   const outputFormat: SummaryFormat =
-    outputFormatRaw === 'bullets' || outputFormatRaw === 'tldr'
-      ? outputFormatRaw
-      : 'paragraph';
+    outputFormatRaw === NodeOutputFormat.Bullets ||
+    outputFormatRaw === 'bullets'
+      ? 'bullets'
+      : outputFormatRaw === NodeOutputFormat.Tldr || outputFormatRaw === 'tldr'
+        ? 'tldr'
+        : 'paragraph';
 
   return {
     provider:
@@ -112,13 +120,12 @@ function buildSystemPrompt(
     .join('\n');
 }
 
-function buildHumanPrompt(sourceOutput: string, userPrompt?: string): string {
+function buildHumanPrompt(sourceOutput: string): string {
   return [
     'Summarize the following content:',
     '',
     sourceOutput,
     '',
-    userPrompt ? `Additional instruction: ${userPrompt}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -164,8 +171,11 @@ function chunkToString(content: unknown): string {
 export class SummarizationService {
   constructor(private readonly llm: LlmService) {}
 
-  async summarize(input: SummarizationInput): Promise<{ summary: string }> {
-    const { rule, previousOutputs, userPrompt, config } = input;
+  async summarize(input: SummarizationInput): Promise<{
+    summary: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
+    const { rule, previousOutputs, config } = input;
     const normalized = normalizeSummarizationConfig(config);
     const sourceOutput = resolveSourceOutput(
       normalized.sourceNodeRef,
@@ -178,7 +188,7 @@ export class SummarizationService {
     }
 
     const systemPrompt = buildSystemPrompt(rule, normalized);
-    const humanPrompt = buildHumanPrompt(sourceOutput, userPrompt);
+    const humanPrompt = buildHumanPrompt(sourceOutput);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
@@ -189,7 +199,8 @@ export class SummarizationService {
       new HumanMessage(humanPrompt),
     ]);
     const summary = messageContentToString(res.content).trim();
-    return { summary };
+    const usage = extractUsageFromAiMessage(res);
+    return usage ? { summary, usage } : { summary };
   }
 
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {
@@ -210,13 +221,14 @@ export class SummarizationService {
       );
     }
     const systemPrompt = buildSystemPrompt(input.rule, normalized);
-    const humanPrompt = buildHumanPrompt(sourceOutput, input.userPrompt);
+    const humanPrompt = buildHumanPrompt(sourceOutput);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
       temperature: 0.2,
     });
     let summary = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
     if (input.onChunk) {
       const stream = await model.stream([
         new SystemMessage(systemPrompt),
@@ -228,6 +240,10 @@ export class SummarizationService {
           input.onChunk(piece);
           summary += piece;
         }
+        const u = extractUsageFromStreamChunk(chunk);
+        if (u) {
+          usage = u;
+        }
       }
       summary = summary.trim();
     } else {
@@ -235,12 +251,12 @@ export class SummarizationService {
         rule: input.rule,
         contentPrompt: input.contentPrompt ?? '',
         previousOutputs: input.previousOutputs ?? {},
-        userPrompt: input.userPrompt,
         config: input.config ?? {},
       });
       summary = summarized.summary;
+      usage = summarized.usage;
     }
 
-    return { output: summary };
+    return usage ? { output: summary, usage } : { output: summary };
   }
 }

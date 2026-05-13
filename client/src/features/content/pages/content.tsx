@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { CircleAlertIcon, InboxIcon, Search, X } from "lucide-react"
+import { CircleAlertIcon, InboxIcon, X } from "lucide-react"
 import { motion } from "framer-motion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -22,22 +21,66 @@ import {
 } from "@/features/content/components/content-list/content-list-constants"
 import { ContentListStatCard } from "@/features/content/components/content-list/content-list-stat-card"
 import { ContentPageShell } from "@/features/content/components/content-list/content-page-shell"
+import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { useContentPageQuery } from "@/shared/queries/content.query"
 import type {
   ContentPageQueryPayload,
   ContentStatus,
 } from "@/shared/types/content.type"
+import {
+  readListPagination,
+  setListLimitInParams,
+  setListPageInParams,
+  type ListPaginationDefaults,
+} from "@/lib/list-pagination-url"
+import { cn } from "@/lib/utils"
 
 const SEARCH_DEBOUNCE_MS = 300
-import { cn } from "@/lib/utils"
+
+const CONTENT_PAGINATION_DEFAULTS: ListPaginationDefaults = {
+  defaultPage: 1,
+  defaultLimit: 12,
+  allowedLimits: PAGE_SIZE_OPTIONS,
+}
 
 export default function ContentPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const hydrated = useAuthStoreHydrated()
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(12)
+
+  const { page, limit } = useMemo(
+    () => readListPagination(searchParams, CONTENT_PAGINATION_DEFAULTS),
+    [searchParams]
+  )
+
+  const goToPage = useCallback(
+    (next: number) => {
+      setSearchParams(
+        (prev) => setListPageInParams(prev, next, CONTENT_PAGINATION_DEFAULTS),
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+
+  const resetToFirstPage = useCallback(() => {
+    setSearchParams(
+      (prev) => setListPageInParams(prev, 1, CONTENT_PAGINATION_DEFAULTS),
+      { replace: true }
+    )
+  }, [setSearchParams])
+
+  const setLimitFromUrl = useCallback(
+    (n: (typeof PAGE_SIZE_OPTIONS)[number]) => {
+      setSearchParams(
+        (prev) => setListLimitInParams(prev, n, CONTENT_PAGINATION_DEFAULTS),
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all")
   const [searchInput, setSearchInput] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -46,11 +89,15 @@ export default function ContentPage() {
   const [filterHasVideo, setFilterHasVideo] = useState(false)
   const [filterHasSummary, setFilterHasSummary] = useState(false)
 
+  /** When true, next debouncedSearch change came from URL (?search=), do not reset page. */
+  const skipPageResetFromUrlSearch = useRef(false)
+
   useEffect(() => {
     const q = searchParams.get("search")?.trim()
     if (!q) {
       return
     }
+    skipPageResetFromUrlSearch.current = true
     setSearchInput(q)
     setDebouncedSearch(q)
   }, [searchParams])
@@ -62,9 +109,18 @@ export default function ContentPage() {
     return () => window.clearTimeout(id)
   }, [searchInput])
 
+  const searchPageResetSkip = useRef(true)
   useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+    if (searchPageResetSkip.current) {
+      searchPageResetSkip.current = false
+      return
+    }
+    if (skipPageResetFromUrlSearch.current) {
+      skipPageResetFromUrlSearch.current = false
+      return
+    }
+    resetToFirstPage()
+  }, [debouncedSearch, resetToFirstPage])
 
   const payload = useMemo(() => {
     const filter: NonNullable<ContentPageQueryPayload["filter"]> = {}
@@ -105,6 +161,13 @@ export default function ContentPage() {
   const items = data?.data ?? []
   const meta = data?.meta
   const totalPages = meta?.totalPages ?? 0
+
+  useEffect(() => {
+    if (!meta?.totalPages) return
+    if (page > meta.totalPages) {
+      goToPage(meta.totalPages)
+    }
+  }, [meta?.totalPages, page, goToPage, meta])
 
   const sortedItems = useMemo(() => {
     const list = [...items]
@@ -147,7 +210,14 @@ export default function ContentPage() {
     setFilterHasImage(false)
     setFilterHasVideo(false)
     setFilterHasSummary(false)
-    setPage(1)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete("search")
+        return setListPageInParams(next, 1, CONTENT_PAGINATION_DEFAULTS)
+      },
+      { replace: true }
+    )
   }
 
   if (!hydrated) {
@@ -218,24 +288,11 @@ export default function ContentPage() {
       ) : null}
 
       <div className="mb-5 flex flex-wrap items-center gap-2.5">
-        <div className="relative max-w-[380px] min-w-[220px] flex-1">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-canvas-500"
-            aria-hidden
-          />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by campaign, workflow, pipeline, or content id…"
-            className="h-[38px] rounded-lg border-canvas-300 bg-card pr-3 pl-10 text-[13px] text-navy-700 placeholder:text-canvas-400 focus-visible:border-teal-400 focus-visible:ring-teal-400/30"
-          />
-        </div>
-
         <Select
           value={statusFilter}
           onValueChange={(v) => {
             setStatusFilter(v as "all" | ContentStatus)
-            setPage(1)
+            resetToFirstPage()
           }}
         >
           <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[160px]">
@@ -252,8 +309,7 @@ export default function ContentPage() {
         <Select
           value={String(limit)}
           onValueChange={(v) => {
-            setLimit(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number])
-            setPage(1)
+            setLimitFromUrl(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number])
           }}
         >
           <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[140px]">
@@ -290,7 +346,7 @@ export default function ContentPage() {
             checked={filterHasImage}
             onCheckedChange={(v) => {
               setFilterHasImage(v === true)
-              setPage(1)
+              resetToFirstPage()
             }}
           />
           <span className="text-[13px] text-navy-700">Has image</span>
@@ -300,7 +356,7 @@ export default function ContentPage() {
             checked={filterHasVideo}
             onCheckedChange={(v) => {
               setFilterHasVideo(v === true)
-              setPage(1)
+              resetToFirstPage()
             }}
           />
           <span className="text-[13px] text-navy-700">Has video</span>
@@ -310,7 +366,7 @@ export default function ContentPage() {
             checked={filterHasSummary}
             onCheckedChange={(v) => {
               setFilterHasSummary(v === true)
-              setPage(1)
+              resetToFirstPage()
             }}
           />
           <span className="text-[13px] text-navy-700">Has summary</span>
@@ -362,7 +418,7 @@ export default function ContentPage() {
             value={sortOption}
             onValueChange={(v) => {
               setSortOption(v as SortOption)
-              setPage(1)
+              resetToFirstPage()
             }}
           >
             <SelectTrigger className="h-auto w-fit min-w-[140px] border-0 bg-transparent text-[13px] text-canvas-600 shadow-none focus:ring-0">
@@ -426,34 +482,18 @@ export default function ContentPage() {
         </div>
       ) : null}
 
-      {!isPending && !isError && meta && totalPages > 0 ? (
+      {!isPending && !isError && meta && totalPages > 1 ? (
         <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-canvas-200 pt-6 sm:flex-row">
           <p className="text-[13px] text-canvas-500">
             Page <strong className="text-navy-700">{meta.page}</strong> of{" "}
             <strong className="text-navy-700">{meta.totalPages}</strong>
           </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-lg border-canvas-300"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-lg border-canvas-300"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
+          <PersistedShadcnPagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            className="mx-0 w-full justify-end sm:w-auto"
+          />
         </div>
       ) : null}
     </ContentPageShell>

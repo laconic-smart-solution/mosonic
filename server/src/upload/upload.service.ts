@@ -54,6 +54,7 @@ export type CreateUploadParams = {
 
 export type UploadChannelDto = {
   channel: string;
+  included: boolean;
   status: UploadChannelStatus;
   caption: string;
   mediaUrl: string | null;
@@ -106,6 +107,7 @@ export class UploadService {
       const mediaUrl = resolveAutomappedMediaUrl(map.media, ro);
       return {
         channel: ruleCh.channel,
+        included: true,
         caption,
         mediaUrl,
         mediaUrls: [],
@@ -118,6 +120,65 @@ export class UploadService {
         failureReason: null,
       };
     });
+  }
+
+  private createDefaultChannelRow(
+    channel: string,
+    resolvedOutputs: ResolvedContentOutputs,
+  ): UploadChannelEntry {
+    const ro = resolvedOutputs ?? {};
+    const fallbackCaption = this.fallbackPrimaryCaption(ro);
+    const fallbackMedia = (ro.image?.trim() || ro.video?.trim() || null) as
+      | string
+      | null;
+    return {
+      channel,
+      included: true,
+      caption: fallbackCaption,
+      mediaUrl: fallbackMedia,
+      mediaUrls: [],
+      youtubeTitle: null,
+      status: UploadChannelStatus.Pending,
+      zernioPostId: null,
+      scheduledAt: null,
+      publishedAt: null,
+      retryCount: 0,
+      failureReason: null,
+    };
+  }
+
+  private async ensureChannelsForConnectedAccounts(
+    doc: UploadDocument,
+    userId: string,
+  ): Promise<boolean> {
+    const connected = await this.mcpService.getConnectedAccounts(userId);
+    const connectedKeys = new Set(
+      (connected.accounts ?? [])
+        .map((a) => a.channel?.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    if (connectedKeys.size === 0) return false;
+
+    const existingKeys = new Set(
+      (doc.channels ?? []).map((c) => c.channel.toLowerCase()),
+    );
+    let changed = false;
+    const ro = doc.resolvedOutputs ?? {};
+
+    for (const key of connectedKeys) {
+      if (existingKeys.has(key)) continue;
+      // Normalize display casing based on existing tabs (capitalize first) for UI consistency.
+      const channelName = key[0] ? `${key[0].toUpperCase()}${key.slice(1)}` : key;
+      doc.channels.push(this.createDefaultChannelRow(channelName, ro));
+      changed = true;
+    }
+
+    if (changed) {
+      doc.status = recomputeUploadJobStatus(doc.channels);
+      doc.markModified('channels');
+      await doc.save();
+    }
+    return changed;
   }
 
   /**
@@ -206,6 +267,7 @@ export class UploadService {
       doc.channels = this.mergeChannelsPreservingUserEdits(channels, doc.channels);
       doc.status = recomputeUploadJobStatus(doc.channels);
       await doc.save();
+      await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
       return { uploadId: doc.uploadId };
     }
     return this.createUpload(params);
@@ -281,6 +343,7 @@ export class UploadService {
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
+    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
     const roFallback = doc.resolvedOutputs ?? {};
     for (const ch of doc.channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
@@ -395,6 +458,7 @@ export class UploadService {
     }
 
     const hasUpdate =
+      body.included !== undefined ||
       body.caption !== undefined ||
       body.mediaUrl !== undefined ||
       body.mediaUrls !== undefined ||
@@ -409,6 +473,7 @@ export class UploadService {
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
+    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
 
     const roFallback = doc.resolvedOutputs ?? {};
     for (const ch of doc.channels) {
@@ -420,6 +485,9 @@ export class UploadService {
       throw new BadRequestException(`Unknown channel: ${channelParam}`);
     }
 
+    if (body.included !== undefined) {
+      row.included = Boolean(body.included);
+    }
     if (body.caption !== undefined) {
       row.caption =
         body.caption === null ? '' : ((body.caption as string) ?? '');
@@ -582,6 +650,7 @@ export class UploadService {
     this.assertUploadAccess(reloaded, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(reloaded);
     doc = reloaded;
+    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
 
     const roFallback = doc.resolvedOutputs ?? {};
     for (const ch of doc.channels) {
@@ -629,12 +698,8 @@ export class UploadService {
     for (const row of doc.channels) {
       const key = row.channel.toLowerCase();
       const entry = dtoByChannel.get(key);
-      if (!entry) {
-        continue;
-      }
-      if (!entry.included) {
-        continue;
-      }
+      const include = entry ? Boolean(entry.included) : Boolean(row.included);
+      if (!include) continue;
 
       const accountId = accountByChannel.get(key)?.trim();
       if (!accountId) {
@@ -762,6 +827,8 @@ export class UploadService {
     const doc = await this.uploadModel.findOne({ uploadId }).exec();
     if (!doc) throw new NotFoundException(`Upload ${uploadId} not found`);
     this.assertUploadAccess(doc, auth, uploadId);
+    await this.migrateLegacyChannelsFromMongo(doc);
+    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
 
     const failed = doc.channels.filter(
       (c) => c.status === UploadChannelStatus.Failed,
@@ -871,6 +938,7 @@ export class UploadService {
 
     return {
       channel: c.channel,
+      included: c.included ?? true,
       status: c.status,
       caption,
       mediaUrl,

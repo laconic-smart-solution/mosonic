@@ -1,14 +1,20 @@
 import { useMutation } from "@tanstack/react-query"
+import { LogIn } from "lucide-react"
 import { useMemo, useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 
 import { login, me } from "@/features/admin/api/auth-api"
+import { AuthCardPanel } from "@/features/auth/components/auth-card-panel"
+import { AuthLinkFooter, AuthTextLink } from "@/features/auth/components/auth-link-footer"
+import { AuthPageHeader } from "@/features/auth/components/auth-page-header"
+import { AuthPageShell } from "@/features/auth/components/auth-page-shell"
+import { AuthPasswordField } from "@/features/auth/components/auth-password-field"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
@@ -68,15 +74,16 @@ export default function LoginPage() {
   })
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>
-            Sign in using your Authorize Server credentials.
-          </CardDescription>
+    <AuthPageShell>
+      <AuthCardPanel>
+        <CardHeader className="space-y-0 border-b border-border/60 pb-6">
+          <AuthPageHeader
+            icon={LogIn}
+            title="Sign in"
+            description="Sign in using your Authorize Server credentials."
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input
@@ -86,16 +93,13 @@ export default function LoginPage() {
               autoComplete="username"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
+          <AuthPasswordField
+            id="password"
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
 
           <Button
             className="w-full"
@@ -105,19 +109,14 @@ export default function LoginPage() {
             {mutation.isPending ? "Signing in..." : "Sign in"}
           </Button>
 
-          <div className="flex flex-col gap-2 text-center text-sm text-muted-foreground">
-            <Link className="text-primary underline underline-offset-4" to={forgotHref}>
-              Forgot password?
-            </Link>
+          <AuthLinkFooter>
+            <AuthTextLink to={forgotHref}>Forgot password?</AuthTextLink>
             <span>
-              No account?{" "}
-              <Link className="text-primary underline underline-offset-4" to={signupHref}>
-                Create one
-              </Link>
+              No account? <AuthTextLink to={signupHref}>Create one</AuthTextLink>
             </span>
-          </div>
+          </AuthLinkFooter>
         </CardContent>
-      </Card>
-    </div>
+      </AuthCardPanel>
+    </AuthPageShell>
   )
 }
