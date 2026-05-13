@@ -13,6 +13,8 @@ export type WorkflowNode = {
   order: number
   isLocked: boolean
   config?: Record<string, unknown>
+  /** Optional; may still appear on API payloads for re-run context. */
+  userPrompt?: string
 }
 
 export type GenerateWorkflowPayload = {

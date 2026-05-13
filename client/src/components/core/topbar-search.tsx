@@ -106,61 +106,59 @@ export function TopbarSearch() {
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          className={cn(
-            "flex w-[280px] max-w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-left outline-none transition-shadow",
-            "hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
-          )}
-          style={{
-            background: "#EDF2F7",
-            borderColor: T.surfaceBorder,
-          }}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          aria-label="Search content and pages"
+      <PopoverTrigger
+        ref={triggerRef}
+        type="button"
+        className={cn(
+          "flex w-[280px] max-w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-left outline-none transition-shadow",
+          "hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+        )}
+        style={{
+          background: "#EDF2F7",
+          borderColor: T.surfaceBorder,
+        }}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label="Search content and pages"
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 13 13"
+          fill="none"
+          className="shrink-0"
+          aria-hidden
         >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 13 13"
-            fill="none"
-            className="shrink-0"
-            aria-hidden
-          >
-            <circle
-              cx="5.5"
-              cy="5.5"
-              r="4"
-              stroke={T.textMuted}
-              strokeWidth="1.4"
-            />
-            <path
-              d="M9 9l2.5 2.5"
-              stroke={T.textMuted}
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-          </svg>
-          <span
-            className="min-w-0 flex-1 truncate text-xs"
-            style={{ color: T.textMuted }}
-          >
-            Search content and pages…
-          </span>
-          <kbd
-            className="rounded border px-1.5 py-0.5 font-mono text-[9px]"
-            style={{
-              color: T.textMuted,
-              background: "#E8E6E0",
-              borderColor: "#D8D5CE",
-            }}
-          >
-            ⌘K
-          </kbd>
-        </button>
+          <circle
+            cx="5.5"
+            cy="5.5"
+            r="4"
+            stroke={T.textMuted}
+            strokeWidth="1.4"
+          />
+          <path
+            d="M9 9l2.5 2.5"
+            stroke={T.textMuted}
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span
+          className="min-w-0 flex-1 truncate text-xs"
+          style={{ color: T.textMuted }}
+        >
+          Search content and pages…
+        </span>
+        <kbd
+          className="rounded border px-1.5 py-0.5 font-mono text-[9px]"
+          style={{
+            color: T.textMuted,
+            background: "#E8E6E0",
+            borderColor: "#D8D5CE",
+          }}
+        >
+          ⌘K
+        </kbd>
       </PopoverTrigger>
       <PopoverContent
         align="center"

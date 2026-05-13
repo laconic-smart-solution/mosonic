@@ -1,4 +1,5 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
+import type { Formatter } from "recharts/types/component/DefaultTooltipContent"
 
 import { CostChartEmpty } from "@/features/cost/components/cost-chart-empty"
 import { T } from "@/lib/tokens"
@@ -27,6 +28,9 @@ export function SpendByProviderChart({ byProvider }: Props) {
     return <CostChartEmpty label="No spend data for this range" />
   }
 
+  const spendTooltipFormatter: Formatter = (value) =>
+    `$${Number(Array.isArray(value) ? value[0] : value ?? 0).toFixed(6)}`
+
   return (
     <div
       className="rounded-[10px] border p-4"
@@ -52,7 +56,7 @@ export function SpendByProviderChart({ byProvider }: Props) {
                 <Cell key={entry.key} fill={COLORS[entry.key] ?? "#94a3b8"} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number | undefined) => `$${Number(v ?? 0).toFixed(6)}`} />
+            <Tooltip formatter={spendTooltipFormatter} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>

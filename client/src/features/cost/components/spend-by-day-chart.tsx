@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import type { Formatter } from "recharts/types/component/DefaultTooltipContent"
 
 import { CostChartEmpty } from "@/features/cost/components/cost-chart-empty"
 import { T } from "@/lib/tokens"
@@ -27,6 +28,9 @@ export function SpendByDayChart({ byDay }: Props) {
     return <CostChartEmpty label="No daily spend for this range" />
   }
 
+  const spendTooltipFormatter: Formatter = (value) =>
+    `$${Number(Array.isArray(value) ? value[0] : value ?? 0).toFixed(6)}`
+
   return (
     <div
       className="rounded-[10px] border p-4"
@@ -41,7 +45,7 @@ export function SpendByDayChart({ byDay }: Props) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-            <Tooltip formatter={(v: number | undefined) => `$${Number(v ?? 0).toFixed(6)}`} />
+            <Tooltip formatter={spendTooltipFormatter} />
             <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>

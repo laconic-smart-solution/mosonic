@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import type { Formatter } from "recharts/types/component/DefaultTooltipContent"
 
 import type { ActivityDayRow } from "@/features/dashboard/lib/dashboard-chart-data"
 
@@ -16,6 +17,11 @@ type Props = {
 }
 
 export function DashboardActivityChart({ data, className }: Props) {
+  const tooltipFormatter: Formatter = (value) => [
+    `${Number(Array.isArray(value) ? value[0] : value ?? 0)} events`,
+    "Activity",
+  ]
+
   return (
     <div className={className}>
       <ResponsiveContainer width="100%" height="100%">
@@ -53,7 +59,7 @@ export function DashboardActivityChart({ data, className }: Props) {
               const row = payload?.[0]?.payload as ActivityDayRow | undefined
               return row?.shortDate ?? ""
             }}
-            formatter={(value: number | undefined) => [`${value ?? 0} events`, "Activity"]}
+            formatter={tooltipFormatter}
           />
           <Area
             type="monotone"

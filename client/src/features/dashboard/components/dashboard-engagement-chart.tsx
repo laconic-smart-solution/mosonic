@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import type { Formatter } from "recharts/types/component/DefaultTooltipContent"
 
 import type { EngagementRow } from "@/features/dashboard/lib/dashboard-chart-data"
 
@@ -25,6 +26,11 @@ function formatTick(n: number): string {
 }
 
 export function DashboardEngagementChart({ data, className }: Props) {
+  const tooltipFormatter: Formatter = (value) => [
+    formatTick(Number(Array.isArray(value) ? value[0] : value ?? 0)),
+    "This week",
+  ]
+
   return (
     <div className={className}>
       <ResponsiveContainer width="100%" height="100%">
@@ -53,7 +59,7 @@ export function DashboardEngagementChart({ data, className }: Props) {
               background: "hsl(var(--popover))",
               fontSize: "12px",
             }}
-            formatter={(value: number | undefined) => [formatTick(value ?? 0), "This week"]}
+            formatter={tooltipFormatter}
           />
           <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48} stroke="transparent">
             {data.map((entry, i) => (

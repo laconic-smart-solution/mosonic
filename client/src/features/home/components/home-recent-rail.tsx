@@ -60,41 +60,39 @@ export function HomeRecentRail({
 
         return (
           <Tooltip key={key}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() =>
-                  slot.kind === "content"
-                    ? onOpenContent(slot.contentId, slot.uploadId)
-                    : onOpenLibrary()
-                }
-                onMouseEnter={() => onHover(i)}
-                onMouseLeave={() => onHover(null)}
-                className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
-                style={{
-                  borderColor: slot.kind === "empty" && hovRight === i ? "#A0AEC0" : borderColor,
-                  boxShadow:
-                    slot.kind === "empty" && hovRight === i
-                      ? "0 4px 12px rgba(0,0,0,0.08)"
-                      : shadow,
-                  transform: slot.kind === "empty" && hovRight === i ? "scale(1.06)" : scale,
-                }}
-              >
-                {slot.kind === "content" ? (
-                  <div
-                    className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
-                    style={{
-                      background: `linear-gradient(135deg,${slot.color}20,${slot.color}35)`,
-                      border: `1.5px solid ${slot.color}40`,
-                      color: slot.color,
-                    }}
-                  >
-                    {slot.initial}
-                  </div>
-                ) : (
-                  <div className="text-lg leading-none font-semibold text-[#A0AEC0]">+</div>
-                )}
-              </button>
+            <TooltipTrigger
+              type="button"
+              onClick={() =>
+                slot.kind === "content"
+                  ? onOpenContent(slot.contentId, slot.uploadId)
+                  : onOpenLibrary()
+              }
+              onMouseEnter={() => onHover(i)}
+              onMouseLeave={() => onHover(null)}
+              className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
+              style={{
+                borderColor: slot.kind === "empty" && hovRight === i ? "#A0AEC0" : borderColor,
+                boxShadow:
+                  slot.kind === "empty" && hovRight === i
+                    ? "0 4px 12px rgba(0,0,0,0.08)"
+                    : shadow,
+                transform: slot.kind === "empty" && hovRight === i ? "scale(1.06)" : scale,
+              }}
+            >
+              {slot.kind === "content" ? (
+                <div
+                  className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
+                  style={{
+                    background: `linear-gradient(135deg,${slot.color}20,${slot.color}35)`,
+                    border: `1.5px solid ${slot.color}40`,
+                    color: slot.color,
+                  }}
+                >
+                  {slot.initial}
+                </div>
+              ) : (
+                <div className="text-lg leading-none font-semibold text-[#A0AEC0]">+</div>
+              )}
             </TooltipTrigger>
             <TooltipContent
               side="left"

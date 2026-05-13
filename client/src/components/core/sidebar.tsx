@@ -5,7 +5,6 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom"
 
 import {
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,

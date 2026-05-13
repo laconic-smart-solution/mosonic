@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import type { Formatter } from "recharts/types/component/DefaultTooltipContent"
 
 import { CostChartEmpty } from "@/features/cost/components/cost-chart-empty"
 import { T } from "@/lib/tokens"
@@ -41,6 +42,9 @@ export function SpendByTypeChart({ byEntryType }: Props) {
     return <CostChartEmpty label="No spend data for this range" />
   }
 
+  const spendTooltipFormatter: Formatter = (value) =>
+    `$${Number(Array.isArray(value) ? value[0] : value ?? 0).toFixed(6)}`
+
   return (
     <div
       className="rounded-[10px] border p-4"
@@ -55,7 +59,7 @@ export function SpendByTypeChart({ byEntryType }: Props) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-            <Tooltip formatter={(v: number | undefined) => `$${Number(v ?? 0).toFixed(6)}`} />
+            <Tooltip formatter={spendTooltipFormatter} />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               {data.map((entry) => (
                 <Cell key={entry.key} fill={COLORS[entry.key] ?? "#94a3b8"} />

@@ -65,13 +65,21 @@ import {
 } from "@/shared/socket/upload-events"
 import type { UploadChannelRow, UploadDetail } from "@/shared/types/upload.type"
 
-function normalizeRow(c: UploadChannelRow): UploadChannelRow {
+function normalizeRow(
+  c: Partial<UploadChannelRow> & { channel: string },
+): UploadChannelRow {
   return {
-    ...c,
+    channel: c.channel,
     included: c.included ?? true,
+    status: (c.status ?? "pending") as UploadChannelRow["status"],
     caption: c.caption ?? "",
+    mediaUrl: c.mediaUrl ?? null,
     mediaUrls: c.mediaUrls ?? [],
     youtubeTitle: c.youtubeTitle ?? null,
+    scheduledAt: c.scheduledAt ?? null,
+    publishedAt: c.publishedAt ?? null,
+    zernioPostId: c.zernioPostId ?? null,
+    failureReason: c.failureReason ?? null,
   }
 }
 
@@ -86,7 +94,7 @@ function mergeChannelUpdate(
     prev ??
     uploadData?.channels.find((c) => c.channel.toLowerCase() === channelKey)
   if (!base) {
-    return {
+    return normalizeRow({
       caption: "",
       mediaUrl: null,
       mediaUrls: [],
@@ -95,13 +103,14 @@ function mergeChannelUpdate(
       publishedAt: null,
       zernioPostId: null,
       failureReason: null,
+      included: true,
       ...updates,
-    }
+    })
   }
-  return {
+  return normalizeRow({
     ...base,
     ...updates,
-  }
+  })
 }
 
 const captionLabels: Record<string, string> = {
