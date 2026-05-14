@@ -214,18 +214,18 @@ export default function WorkflowPage() {
     setActiveWorkflowId(wf.workflowId)
     if (wf.name) setWfName(wf.name)
 
-    // During generation/regeneration, prioritize live workflow status over any
-    // stale nodes from the previous snapshot so progress state is not cleared early.
-    if (generationInFlightRef.current && wf.status === "generating") {
-      setApiNodes([])
-      setGenerationStep("generating")
-      return
-    }
-
     if (wf.status === "failed") {
       generationInFlightRef.current = false
       setGenerationStep("failed")
       setFailureMessage("Could not generate workflow. Please try again.")
+      return
+    }
+
+    // Server may still return pre-regeneration node rows while status is generating;
+    // never treat that snapshot as "ready" or clear the progress overlay.
+    if (wf.status === "generating") {
+      setApiNodes([])
+      setGenerationStep("generating")
       return
     }
 
@@ -238,11 +238,7 @@ export default function WorkflowPage() {
     }
 
     setApiNodes([])
-    if (wf.status === "generating") {
-      setGenerationStep("generating")
-    } else {
-      setGenerationStep(null)
-    }
+    setGenerationStep(null)
   }, [ruleId, workflowByRuleQuery.data, workflowByRuleQuery.isFetched])
 
   useEffect(() => {
@@ -608,6 +604,7 @@ export default function WorkflowPage() {
       setWorkflowPrompt("")
       setActiveWorkflowId(data.workflowId)
       setApiNodes([])
+      setGenerationStep("generating")
       joinWorkflowRoom(data.workflowId)
       navigate(`/workflow/${ruleId}`, {
         replace: true,
