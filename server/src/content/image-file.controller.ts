@@ -68,7 +68,7 @@ export class ImageFileController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 50 * 1024 * 1024 },
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
     }),
   )
   async uploadFile(
