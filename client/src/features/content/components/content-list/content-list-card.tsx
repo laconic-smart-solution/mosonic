@@ -162,6 +162,9 @@ export function ContentListCard({ item, index, onOpen }: Props) {
                 <h2 className="line-clamp-2 font-heading text-[15px] leading-snug tracking-tight text-navy-700">
                   {title}
                 </h2>
+                {campaignLabel.trim() ? (
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-canvas-500">{campaignLabel}</p>
+                ) : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

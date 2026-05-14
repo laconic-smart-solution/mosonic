@@ -134,6 +134,8 @@ export class ContentRepository {
       outputs?: ContentOutputs;
       userEdits?: ContentUserEdits;
       nodePromptOverrides?: Record<string, string>;
+      nodeOutputs?: Record<string, Record<string, unknown>>;
+      nodeUserEdits?: Record<string, Record<string, unknown>>;
     },
     auth: TenancyAuth,
   ): Promise<{ matchedCount: number }> {

@@ -9,6 +9,10 @@ import {
 export class RerunPreviousOutputsDto {
   @IsOptional()
   @IsString()
+  keywords?: string;
+
+  @IsOptional()
+  @IsString()
   text?: string;
 
   @IsOptional()

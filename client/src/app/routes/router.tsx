@@ -7,6 +7,7 @@ import {
   DashboardPage,
   RulesPage,
   WorkflowPage,
+  WorkflowsListPage,
   RunPage,
   ContentPage,
   ContentDetailPage,
@@ -14,6 +15,8 @@ import {
   SettingsAccountsPage,
   AnalyticsPage,
   AnalyticsDetailPage,
+  CostDashboardPage,
+  CostBudgetPage,
   LogsPage,
   ComponentsLibPage,
   LoginPage,
@@ -23,7 +26,10 @@ import {
   ResetPasswordPage,
   AdminDashboardPage,
   AdminUsersPage,
-  AdminUserNewPage,
+  AdminUserDetailPage,
+  AdminCostPage,
+  AdminContentPage,
+  AdminContentDetailPage,
 } from "../constants/lazyload"
 
 export const router = createBrowserRouter([
@@ -73,7 +79,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin/login",
-    element: <Navigate to="/login?next=/admin" replace />,
+    element: <Navigate to="/login?next=/admin/dashboard" replace />,
   },
   {
     element: <ProtectedLayout />,
@@ -83,6 +89,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/rules", element: <RulesPage /> },
+          { path: "/workflows", element: <WorkflowsListPage /> },
           { path: "/workflow/:ruleId", element: <WorkflowPage /> },
           { path: "/run", element: <RunPage /> },
           { path: "/content", element: <ContentPage /> },
@@ -93,11 +100,21 @@ export const router = createBrowserRouter([
           { path: "/settings/accounts", element: <SettingsAccountsPage /> },
           { path: "/analytics", element: <AnalyticsPage /> },
           { path: "/analytics/:ruleId", element: <AnalyticsDetailPage /> },
+          { path: "/cost", element: <CostDashboardPage /> },
+          { path: "/cost/budget", element: <CostBudgetPage /> },
           { path: "/logs", element: <LogsPage /> },
           { path: "/components", element: <ComponentsLibPage /> },
 
           {
             path: "/admin",
+            element: (
+              <AdminRoute>
+                <Navigate to="/admin/dashboard" replace />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: "/admin/dashboard",
             element: (
               <AdminRoute>
                 <AdminDashboardPage />
@@ -113,10 +130,34 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: "/admin/users/new",
+            path: "/admin/users/:userId",
             element: (
               <AdminRoute>
-                <AdminUserNewPage />
+                <AdminUserDetailPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: "/admin/cost",
+            element: (
+              <AdminRoute>
+                <AdminCostPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: "/admin/content",
+            element: (
+              <AdminRoute>
+                <AdminContentPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: "/admin/content/:contentId",
+            element: (
+              <AdminRoute>
+                <AdminContentDetailPage />
               </AdminRoute>
             ),
           },

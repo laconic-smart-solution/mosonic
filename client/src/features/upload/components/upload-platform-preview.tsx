@@ -49,7 +49,7 @@ export function UploadPlatformPreview({
     return (
       <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
         <div className="flex items-center gap-2 border-b px-3 py-2">
-          <div className="size-8 rounded-full bg-gradient-to-br from-[#f09433] via-[#dc2743] to-[#bc1888]" />
+          <div className="size-8 rounded-full bg-linear-to-br from-[#f09433] via-[#dc2743] to-[#bc1888]" />
           <span className="font-medium">{label}</span>
         </div>
         {media}
@@ -127,25 +127,49 @@ export function UploadPlatformPreview({
   }
 
   if (key === "tiktok") {
-    return (
-      <div
-        className={cn(
-          "relative min-h-[200px] overflow-hidden rounded-xl border bg-[#111] text-white",
-        )}
-      >
-        <div className="flex min-h-[180px] items-center justify-center">
-          {mediaTab === "video" && videoUrl ? (
-            <FileServiceVideo
-              url={videoUrl}
-              className="max-h-52 w-full object-cover opacity-90"
-              muted
-            />
-          ) : (
-            <span className="text-xs text-white/60">Video preview</span>
-          )}
+    const tiktokMedia =
+      mediaTab === "video" && videoUrl ? (
+        <FileServiceVideo
+          url={videoUrl}
+          className="h-full w-full object-contain"
+          muted
+        />
+      ) : imageUrls[0] ? (
+        <FileServiceImage
+          url={imageUrls[0]}
+          alt=""
+          className="h-full w-full object-contain bg-muted"
+          loadingClassName="flex h-full min-h-[140px] w-full items-center justify-center bg-muted/50"
+        />
+      ) : (
+        <div className="flex h-full min-h-[140px] flex-col items-center justify-center gap-1 px-3 text-center text-[11px] text-muted-foreground">
+          <span>No media yet</span>
+          <span className="max-w-48 text-[10px] leading-snug opacity-90">
+            Add a photo or video in the editor — TikTok supports both.
+          </span>
         </div>
-        <p className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-xs leading-relaxed">
-          {caption}
+      )
+
+    return (
+      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
+        <div className="flex items-center gap-2 border-b border-border bg-zinc-950 px-3 py-2 text-white">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-teal-400 via-pink-500 to-rose-600 text-[10px] font-bold text-white shadow-sm">
+            ♪
+          </div>
+          <span className="font-medium">{label}</span>
+        </div>
+        <div className="flex justify-center bg-muted/25 p-3">
+          <div
+            className={cn(
+              "relative w-full max-w-[220px] overflow-hidden rounded-xl border border-border/70 bg-black shadow-inner",
+              "aspect-9/16 max-h-[min(340px,52vh)]",
+            )}
+          >
+            {tiktokMedia}
+          </div>
+        </div>
+        <p className="border-t border-border/60 px-3 py-2.5 whitespace-pre-wrap leading-relaxed text-foreground">
+          {caption || " "}
         </p>
       </div>
     )

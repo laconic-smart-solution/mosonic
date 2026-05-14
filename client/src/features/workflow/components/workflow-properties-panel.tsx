@@ -5,8 +5,6 @@ import { T } from "@/lib/tokens"
 
 type WorkflowPropertiesPanelProps = {
   selNode: WFNode
-  propPrompt: string
-  setPropPrompt: (v: string) => void
   propConfig: Record<string, unknown>
   setPropConfig: (next: Record<string, unknown>) => void
   onClose: () => void
@@ -16,8 +14,6 @@ type WorkflowPropertiesPanelProps = {
 
 export function WorkflowPropertiesPanel({
   selNode,
-  propPrompt,
-  setPropPrompt,
   propConfig,
   setPropConfig,
   onClose,
@@ -29,6 +25,10 @@ export function WorkflowPropertiesPanel({
   const configFields = FIELD_DEFS[selNode.type] ?? []
 
   function updateConfig(key: string, value: string) {
+    setPropConfig({ ...propConfig, [key]: value })
+  }
+
+  function setConfigValue(key: string, value: unknown) {
     setPropConfig({ ...propConfig, [key]: value })
   }
 
@@ -80,27 +80,79 @@ export function WorkflowPropertiesPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
-        <div>
-          <label
-            className="mb-1.5 block text-[11px] font-bold"
-            style={{ color: T.textPrimary }}
-          >
-            Custom Instruction
-          </label>
-          <Textarea
-            value={propPrompt}
-            onChange={(e) => setPropPrompt(e.target.value)}
-            placeholder="Optional — if empty, uses the JSON Rule + Content Prompt + previous outputs."
-            rows={5}
-            className="resize-y bg-[#FDFCFA] text-xs leading-relaxed"
-            style={{ color: T.textPrimary }}
-          />
-          <p className="mt-1.5 text-[10px] leading-relaxed text-gray-400">
-            Leave empty to inherit from Rule + upstream outputs.
-          </p>
+        <div
+          className="rounded-lg border px-2.5 py-2 text-[11px] leading-relaxed"
+          style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
+        >
+          Tune how this step runs using the fields below. The topic or campaign brief is entered when you
+          generate content (pipeline run), not on the node.
         </div>
 
         {configFields.map((field) => {
+          if (field.control === "toggle") {
+            const on = Boolean(propConfig[field.key] ?? field.defaultValue)
+            return (
+              <div key={field.key}>
+                <label
+                  className="mb-1.5 block text-[11px] font-bold"
+                  style={{ color: T.textPrimary }}
+                >
+                  {field.label}
+                </label>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setConfigValue(field.key, true)}
+                    className="flex-1 cursor-pointer rounded-md border py-1 text-[11px]"
+                    style={{
+                      borderColor: on ? T.accent : T.surfaceBorder,
+                      background: on ? T.accentLight : "white",
+                      color: on ? T.accent : T.textSecondary,
+                      fontWeight: on ? 700 : 400,
+                    }}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfigValue(field.key, false)}
+                    className="flex-1 cursor-pointer rounded-md border py-1 text-[11px]"
+                    style={{
+                      borderColor: !on ? T.accent : T.surfaceBorder,
+                      background: !on ? T.accentLight : "white",
+                      color: !on ? T.accent : T.textSecondary,
+                      fontWeight: !on ? 700 : 400,
+                    }}
+                  >
+                    Off
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          if (field.control === "textarea") {
+            const val = String(propConfig[field.key] ?? field.defaultValue ?? "")
+            return (
+              <div key={field.key}>
+                <label
+                  className="mb-1.5 block text-[11px] font-bold"
+                  style={{ color: T.textPrimary }}
+                >
+                  {field.label}
+                </label>
+                <Textarea
+                  value={val}
+                  onChange={(e) => setConfigValue(field.key, e.target.value)}
+                  rows={field.rows ?? 3}
+                  className="resize-y bg-[#FDFCFA] text-xs leading-relaxed"
+                  style={{ color: T.textPrimary }}
+                  placeholder={field.placeholder}
+                />
+              </div>
+            )
+          }
+
           const current = String(propConfig[field.key] ?? field.defaultValue)
           if (field.control === "buttons") {
             return (
@@ -111,7 +163,7 @@ export function WorkflowPropertiesPanel({
                 >
                   {field.label}
                 </label>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   {field.options.map((option) => {
                     const active = current === option.value
                     return (
@@ -119,7 +171,7 @@ export function WorkflowPropertiesPanel({
                         key={option.value}
                         type="button"
                         onClick={() => updateConfig(field.key, option.value)}
-                        className="flex-1 cursor-pointer rounded-md border py-1 text-[11px]"
+                        className="min-w-13 flex-1 cursor-pointer rounded-md border py-1 text-[11px]"
                         style={{
                           borderColor: active ? T.accent : T.surfaceBorder,
                           background: active ? T.accentLight : "white",
@@ -192,13 +244,44 @@ export function WorkflowPropertiesPanel({
 }
 
 type FieldOption = { label: string; value: string }
-type ConfigField = {
+
+type ConfigFieldSelect = {
   key: string
   label: string
-  control: "select" | "buttons"
+  control: "select"
   options: FieldOption[]
   defaultValue: string
 }
+
+type ConfigFieldButtons = {
+  key: string
+  label: string
+  control: "buttons"
+  options: FieldOption[]
+  defaultValue: string
+}
+
+type ConfigFieldToggle = {
+  key: string
+  label: string
+  control: "toggle"
+  defaultValue: boolean
+}
+
+type ConfigFieldTextarea = {
+  key: string
+  label: string
+  control: "textarea"
+  defaultValue: string
+  rows?: number
+  placeholder?: string
+}
+
+type ConfigField =
+  | ConfigFieldSelect
+  | ConfigFieldButtons
+  | ConfigFieldToggle
+  | ConfigFieldTextarea
 
 const FIELD_DEFS: Record<string, ConfigField[]> = {
   text: [
@@ -212,6 +295,30 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "Caption", value: "caption" },
       ],
       defaultValue: "paragraph",
+    },
+    {
+      key: "tone",
+      label: "Writing tone",
+      control: "select",
+      options: [
+        { label: "Professional", value: "professional" },
+        { label: "Casual", value: "casual" },
+        { label: "Friendly", value: "friendly" },
+        { label: "Formal", value: "formal" },
+        { label: "Witty", value: "witty" },
+      ],
+      defaultValue: "professional",
+    },
+    {
+      key: "textLength",
+      label: "Length",
+      control: "buttons",
+      options: [
+        { label: "Short", value: "short" },
+        { label: "Medium", value: "medium" },
+        { label: "Long", value: "long" },
+      ],
+      defaultValue: "medium",
     },
   ],
   image: [
@@ -237,6 +344,24 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
       ],
       defaultValue: "1:1",
     },
+    {
+      key: "quality",
+      label: "Quality",
+      control: "buttons",
+      options: [
+        { label: "Standard", value: "standard" },
+        { label: "HD", value: "hd" },
+      ],
+      defaultValue: "standard",
+    },
+    {
+      key: "negativePrompt",
+      label: "Negative prompt",
+      control: "textarea",
+      defaultValue: "",
+      rows: 3,
+      placeholder: "Optional — things to avoid in the image",
+    },
   ],
   video: [
     {
@@ -247,6 +372,7 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "16:9", value: "16:9" },
         { label: "9:16", value: "9:16" },
         { label: "1:1", value: "1:1" },
+        { label: "4:5", value: "4:5" },
       ],
       defaultValue: "16:9",
     },
@@ -263,6 +389,23 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
   ],
   translation: [
     {
+      key: "sourceLanguage",
+      label: "Source Language",
+      control: "select",
+      options: [
+        { label: "Auto-detect", value: "auto" },
+        { label: "English", value: "en" },
+        { label: "Thai", value: "th" },
+        { label: "Japanese", value: "ja" },
+        { label: "Chinese", value: "zh" },
+        { label: "Korean", value: "ko" },
+        { label: "Spanish", value: "es" },
+        { label: "French", value: "fr" },
+        { label: "German", value: "de" },
+      ],
+      defaultValue: "auto",
+    },
+    {
       key: "targetLanguage",
       label: "Target Language",
       control: "select",
@@ -271,6 +414,10 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "English", value: "en" },
         { label: "Japanese", value: "ja" },
         { label: "Chinese", value: "zh" },
+        { label: "Korean", value: "ko" },
+        { label: "Spanish", value: "es" },
+        { label: "French", value: "fr" },
+        { label: "German", value: "de" },
       ],
       defaultValue: "th",
     },
@@ -282,7 +429,13 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "Formal", value: "formal" },
         { label: "Casual", value: "casual" },
       ],
-      defaultValue: "formal",
+      defaultValue: "casual",
+    },
+    {
+      key: "preserveFormatting",
+      label: "Preserve formatting",
+      control: "toggle",
+      defaultValue: true,
     },
   ],
   transcription: [
@@ -309,6 +462,17 @@ const FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "Long", value: "long" },
       ],
       defaultValue: "medium",
+    },
+    {
+      key: "outputFormat",
+      label: "Output shape",
+      control: "select",
+      options: [
+        { label: "Paragraph", value: "paragraph" },
+        { label: "Bullets", value: "bullets" },
+        { label: "TL;DR", value: "tldr" },
+      ],
+      defaultValue: "paragraph",
     },
   ],
 }

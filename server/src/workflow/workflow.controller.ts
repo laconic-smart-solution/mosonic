@@ -24,6 +24,10 @@ import {
   SaveWorkflowNodesRequestDto,
   SaveWorkflowNodesResponseDto,
 } from './dto/save-workflow-nodes.dto';
+import {
+  WorkflowPageQueryDto,
+  WorkflowPageResponseDto,
+} from './dto/workflow-page-query.dto';
 import { WorkflowService } from './workflow.service';
 
 @UseGuards(JwtAuthGuard)
@@ -45,6 +49,30 @@ export class WorkflowController {
   ): Promise<GenerateWorkflowResponseDto> {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.generateWorkflow(body, auth);
+  }
+
+  @Post('pageable')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  pageable(
+    @Req() req: Request,
+    @Body() body: WorkflowPageQueryDto,
+  ): Promise<WorkflowPageResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.workflowService.findPage(body, auth).then(({ data, total }) => {
+      const page = body.page ?? 1;
+      const limit = body.limit ?? 10;
+      const totalPages = Math.ceil(total / limit) || 0;
+      return {
+        data,
+        meta: { total, page, limit, totalPages },
+      };
+    });
   }
 
   @Get('rule/:ruleId')

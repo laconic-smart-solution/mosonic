@@ -51,7 +51,7 @@ function normalizeVideoConfig(
     durationRaw <= 5 ? '4' : durationRaw <= 10 ? '8' : '12';
 
   const sizeForApi: OpenAI.Videos.VideoCreateParams['size'] = (() => {
-    if (aspectRatio === '9:16') {
+    if (aspectRatio === '9:16' || aspectRatio === '4:5') {
       return resolution === '1080p' ? '1024x1792' : '720x1280';
     }
     if (aspectRatio === '16:9') {
@@ -75,7 +75,6 @@ function normalizeVideoConfig(
 function buildVideoPrompt(
   rule: Rule,
   previousOutputs: { text?: string; image?: string },
-  userPrompt: string | undefined,
   config: NormalizedVideoConfig,
 ): string {
   return [
@@ -94,7 +93,7 @@ function buildVideoPrompt(
     `Location: ${rule.audience.location.join(', ')}`,
     '',
     `Distribution channels: ${rule.channels.map((c) => c.channel).join(', ')}`,
-    config.aspectRatio === '9:16'
+    config.aspectRatio === '9:16' || config.aspectRatio === '4:5'
       ? 'Vertical format — optimized for mobile stories and reels.'
       : config.aspectRatio === '1:1'
         ? 'Square format — optimized for feed posts.'
@@ -114,7 +113,6 @@ function buildVideoPrompt(
     rule.contentGuidelines.requiredElements.length
       ? `Must include feel of: ${rule.contentGuidelines.requiredElements.join(', ')}`
       : '',
-    userPrompt ? `Specific instruction (highest priority): ${userPrompt}` : '',
     'No text overlays or watermarks.',
     'No spoken words or voiceover.',
     'Professional marketing video quality.',
@@ -277,8 +275,7 @@ export class VideoGenerationService {
   async generateVideo(
     input: VideoGenerationInput & { pipelineId: string; nodeId: string },
   ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
-    const { rule, previousOutputs, userPrompt, config, pipelineId, nodeId } =
-      input;
+    const { rule, previousOutputs, config, pipelineId, nodeId } = input;
     const sourceText = previousOutputs.text?.trim();
     if (!sourceText) {
       throw new UnprocessableEntityException(
@@ -289,7 +286,6 @@ export class VideoGenerationService {
     const prompt = buildVideoPrompt(
       rule,
       { text: sourceText, image: previousOutputs.image },
-      userPrompt,
       normalized,
     );
 
@@ -351,15 +347,23 @@ export class VideoGenerationService {
         'Video generation requires `rule` on NodeExecutionInput',
       );
     }
+    const normalized = normalizeVideoConfig(input.config ?? {});
     const { video, storage } = await this.generateVideo({
       rule: input.rule,
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
-      userPrompt: input.userPrompt,
       config: input.config ?? {},
       pipelineId: input.pipelineRef,
       nodeId: input.nodeId,
     });
-    return { output: video, video: storage };
+    return {
+      output: video,
+      video: storage,
+      videoCost: {
+        model: normalized.model,
+        videoSeconds: normalized.duration,
+        videoResolution: normalized.resolution,
+      },
+    };
   }
 }

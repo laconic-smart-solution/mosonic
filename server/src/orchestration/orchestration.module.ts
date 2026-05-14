@@ -1,6 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Content, ContentSchema } from '../content/schemas/content.schema';
+import { CostModule } from '../cost/cost.module';
 import { EventsModule } from '../events/events.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
@@ -17,6 +18,7 @@ import { OrchestrationService } from './orchestration.service';
 
 @Module({
   imports: [
+    CostModule,
     NodesModule,
     LoggingModule,
     EventsModule,

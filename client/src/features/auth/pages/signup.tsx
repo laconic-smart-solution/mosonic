@@ -1,19 +1,27 @@
 import { useMutation } from "@tanstack/react-query"
+import { motion, useReducedMotion } from "framer-motion"
+import { UserPlus } from "lucide-react"
 import { useMemo, useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 
 import { authFlowErrorMessage, signup } from "@/features/auth/api/auth-flow-api"
+import { AuthCardPanel } from "@/features/auth/components/auth-card-panel"
+import { AuthInlineLink, AuthLinkFooter } from "@/features/auth/components/auth-link-footer"
+import { AuthPageHeader } from "@/features/auth/components/auth-page-header"
+import { AuthPageShell } from "@/features/auth/components/auth-page-shell"
+import { AuthPasswordField } from "@/features/auth/components/auth-password-field"
 
 export default function SignupPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const nextParam = searchParams.get("next")?.trim()
+  const reduceMotion = useReducedMotion()
 
   const [form, setForm] = useState({
     firstName: "",
@@ -63,33 +71,61 @@ export default function SignupPage() {
       toast.error(authFlowErrorMessage(e, "Sign up failed. Please try again.")),
   })
 
+  const nameCellProps = reduceMotion
+    ? { initial: false as const }
+    : {
+        initial: { opacity: 0, y: 10 },
+        animate: { opacity: 1, y: 0 },
+      }
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Create account</CardTitle>
-          <CardDescription>Sign up, then verify the OTP sent to your email.</CardDescription>
+    <AuthPageShell>
+      <AuthCardPanel>
+        <CardHeader className="space-y-0 border-b border-border/60 pb-6">
+          <AuthPageHeader
+            icon={UserPlus}
+            title="Create account"
+            description="Sign up, then verify the OTP sent to your email."
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input
-                id="firstName"
-                value={form.firstName}
-                onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
-                autoComplete="given-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                value={form.lastName}
-                onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
-                autoComplete="family-name"
-              />
-            </div>
+            <motion.div
+              {...nameCellProps}
+              transition={
+                reduceMotion
+                  ? undefined
+                  : { type: "spring", stiffness: 400, damping: 30, delay: 0 }
+              }
+            >
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First name</Label>
+                <Input
+                  id="firstName"
+                  value={form.firstName}
+                  onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
+                  autoComplete="given-name"
+                />
+              </div>
+            </motion.div>
+            <motion.div
+              {...nameCellProps}
+              transition={
+                reduceMotion
+                  ? undefined
+                  : { type: "spring", stiffness: 400, damping: 30, delay: 0.06 }
+              }
+            >
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last name</Label>
+                <Input
+                  id="lastName"
+                  value={form.lastName}
+                  onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+                  autoComplete="family-name"
+                />
+              </div>
+            </motion.div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
@@ -110,16 +146,13 @@ export default function SignupPage() {
               autoComplete="email"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-              autoComplete="new-password"
-            />
-          </div>
+          <AuthPasswordField
+            id="password"
+            label="Password"
+            value={form.password}
+            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+            autoComplete="new-password"
+          />
           <div className="space-y-2">
             <Label htmlFor="phoneNumber">Phone (optional)</Label>
             <Input
@@ -141,17 +174,18 @@ export default function SignupPage() {
             {mutation.isPending ? "Creating account..." : "Sign up"}
           </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              className="text-primary underline underline-offset-4"
-              to={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : "/login"}
-            >
-              Sign in
-            </Link>
-          </p>
+          <AuthLinkFooter>
+            <p>
+              Already have an account?{" "}
+              <AuthInlineLink
+                to={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : "/login"}
+              >
+                Sign in
+              </AuthInlineLink>
+            </p>
+          </AuthLinkFooter>
         </CardContent>
-      </Card>
-    </div>
+      </AuthCardPanel>
+    </AuthPageShell>
   )
 }

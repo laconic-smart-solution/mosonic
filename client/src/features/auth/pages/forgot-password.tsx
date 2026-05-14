@@ -1,14 +1,19 @@
 import { useMutation } from "@tanstack/react-query"
+import { KeyRound } from "lucide-react"
 import { useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 
 import { authFlowErrorMessage, resendOtp } from "@/features/auth/api/auth-flow-api"
+import { AuthCardPanel } from "@/features/auth/components/auth-card-panel"
+import { AuthInlineLink, AuthLinkFooter } from "@/features/auth/components/auth-link-footer"
+import { AuthPageHeader } from "@/features/auth/components/auth-page-header"
+import { AuthPageShell } from "@/features/auth/components/auth-page-shell"
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
@@ -41,13 +46,16 @@ export default function ForgotPasswordPage() {
   })
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Forgot password</CardTitle>
-          <CardDescription>We&apos;ll email you a code to verify your account.</CardDescription>
+    <AuthPageShell>
+      <AuthCardPanel>
+        <CardHeader className="space-y-0 border-b border-border/60 pb-6">
+          <AuthPageHeader
+            icon={KeyRound}
+            title="Forgot password"
+            description="We'll email you a code to verify your account."
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -66,17 +74,18 @@ export default function ForgotPasswordPage() {
           >
             {mutation.isPending ? "Sending…" : "Continue to OTP"}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Back to{" "}
-            <Link
-              className="text-primary underline underline-offset-4"
-              to={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : "/login"}
-            >
-              Sign in
-            </Link>
-          </p>
+          <AuthLinkFooter>
+            <p>
+              Back to{" "}
+              <AuthInlineLink
+                to={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : "/login"}
+              >
+                Sign in
+              </AuthInlineLink>
+            </p>
+          </AuthLinkFooter>
         </CardContent>
-      </Card>
-    </div>
+      </AuthCardPanel>
+    </AuthPageShell>
   )
 }

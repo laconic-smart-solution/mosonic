@@ -34,7 +34,9 @@ import {
   type WorkflowDocument,
 } from '../workflow/schemas/workflow.schema';
 import { UploadService } from '../upload/upload.service';
+import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { NodeExecutor } from './node-executor.service';
+import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
 
 @Injectable()
 export class OrchestrationService {
@@ -124,7 +126,10 @@ export class OrchestrationService {
       rule,
       contentPrompt,
       userId: input.auth.userId,
-    }).catch(async () => {
+    }).catch(async (err: unknown) => {
+      if (err instanceof PipelineBudgetExceededError) {
+        return;
+      }
       await this.updatePipelineStatus(pipelineId, PipelineStatus.Failed);
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
         pipelineId,
@@ -202,7 +207,7 @@ export class OrchestrationService {
         userPrompt: node.userPrompt ?? '',
         config: node.config ?? {},
         status: node.status,
-        output: parseNodeOutput(node.output),
+        output: parsePipelineNodeOutputString(node.output),
         retryCount: node.retryCount,
         executedAt: node.executedAt,
       })),
@@ -238,6 +243,8 @@ export class OrchestrationService {
         totalNodes,
         context,
         node,
+        userId,
+        ruleId: rule.ruleId,
       });
     }
 
@@ -283,8 +290,10 @@ export class OrchestrationService {
     totalNodes: number;
     context: PipelineContext;
     node: WorkflowNodeDocument;
+    userId: string;
+    ruleId: string;
   }): Promise<void> {
-    const { pipelineId, totalNodes, context, node } = args;
+    const { pipelineId, totalNodes, context, node, userId, ruleId } = args;
 
     for (;;) {
       await this.updateNodeStatus(
@@ -298,13 +307,14 @@ export class OrchestrationService {
           nodeId: node.nodeId,
           type: node.type,
           order: node.order,
-          userPrompt: node.userPrompt,
           config: node.config ?? {},
           workflowRef: node.workflowRef,
         },
         context,
         pipelineId,
         totalNodes,
+        userId,
+        ruleId,
       };
 
       try {
@@ -320,7 +330,26 @@ export class OrchestrationService {
           ...result.output,
         };
         return;
-      } catch {
+      } catch (err) {
+        if (err instanceof PipelineBudgetExceededError) {
+          await this.updateNodeStatus(
+            pipelineId,
+            node.nodeId,
+            PipelineNodeExecutionStatus.Failed,
+          );
+          await this.updatePipelineStatus(
+            pipelineId,
+            PipelineStatus.Failed,
+            new Date(),
+          );
+          this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
+            pipelineId,
+            message: err.message,
+            reason: 'budget',
+            scope: err.scope,
+          });
+          throw err;
+        }
         await this.updateNodeStatus(
           pipelineId,
           node.nodeId,
@@ -392,12 +421,25 @@ export class OrchestrationService {
     context: PipelineContext;
     userId: string;
   }): Promise<string> {
+    const pipelineLean = await this.pipelineModel
+      .findOne({ pipelineId: args.pipelineId })
+      .lean()
+      .exec();
+    const nodeOutputs: Record<string, Record<string, unknown>> = {};
+    for (const n of pipelineLean?.nodes ?? []) {
+      const parsed = parsePipelineNodeOutputString(n.output);
+      if (parsed && Object.keys(parsed).length > 0) {
+        nodeOutputs[n.nodeId] = parsed;
+      }
+    }
+
     const content = await this.contentModel.create({
       userId: args.userId,
       pipelineRef: args.pipelineId,
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
       outputs: {
+        keywords: args.context.previousOutputs.keywords,
         text: args.context.previousOutputs.text,
         image: args.context.previousOutputs.image,
         translatedText: args.context.previousOutputs.translatedText,
@@ -407,22 +449,10 @@ export class OrchestrationService {
       },
       userEdits: {},
       nodePromptOverrides: {},
+      nodeOutputs,
+      nodeUserEdits: {},
       status: ContentStatus.Draft,
     });
     return content.contentId;
-  }
-}
-
-function parseNodeOutput(
-  output: string | null,
-): Record<string, unknown> | null {
-  if (!output) return null;
-  try {
-    const parsed = JSON.parse(output) as unknown;
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Record<string, unknown>)
-      : { output: String(parsed) };
-  } catch {
-    return { output };
   }
 }

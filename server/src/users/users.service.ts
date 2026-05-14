@@ -70,6 +70,32 @@ export class UsersService {
     return this.userModel.findOne({ userId }).exec();
   }
 
+  /**
+   * Users with at least one Zernio-connected social account (for monthly cost allocation).
+   */
+  async listUserIdsWithZernioConnectedAccounts(): Promise<
+    Array<{ userId: string; accountCount: number }>
+  > {
+    const users = await this.userModel
+      .find({})
+      .select({ userId: 1, zernioConnectedAccounts: 1 })
+      .lean()
+      .exec();
+
+    const out: Array<{ userId: string; accountCount: number }> = [];
+    for (const row of users) {
+      const userId = typeof row.userId === 'string' ? row.userId : '';
+      if (!userId) continue;
+      const count = this.normalizeConnectedAccounts(
+        row.zernioConnectedAccounts,
+      ).length;
+      if (count > 0) {
+        out.push({ userId, accountCount: count });
+      }
+    }
+    return out;
+  }
+
   async findByZernioProfileId(profileId: string): Promise<User | null> {
     const id = profileId.trim();
     if (!id) {

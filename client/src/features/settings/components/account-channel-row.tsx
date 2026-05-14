@@ -51,7 +51,7 @@ export function AccountChannelRow({
             )}
           </div>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{def.description}</p>
-          {isLinked ? (
+          {isLinked && connected ? (
             <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
               <span className="font-sans text-[10px] font-medium uppercase tracking-wide text-foreground/50">
                 Account ID

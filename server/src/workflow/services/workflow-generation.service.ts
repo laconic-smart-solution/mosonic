@@ -1,15 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../../llm/llm.service';
 import {
-  LlmProvider,
   NodeFormalityLevel,
-  NodeImageQuality,
-  NodeImageStyle,
   NodeOutputFormat,
   NodeSummaryLength,
-  type WorkflowNodeConfig,
+  NodeTextTone,
   WorkflowNodeType,
 } from '../../nodes/schemas/workflow-node.schema';
+import {
+  parseWorkflowNodeConfig,
+  parseWorkflowNodeConfigOrThrow,
+} from '../../nodes/workflow-node-config.zod';
 import type { Rule } from '../../rule/schemas/rule.schema';
 import {
   CaptionMappingSource,
@@ -21,7 +22,6 @@ export type GeneratedWorkflowNode = {
   type: WorkflowNodeType;
   order: number;
   isLocked: boolean;
-  userPrompt?: string;
   config: Record<string, unknown>;
 };
 
@@ -32,77 +32,35 @@ function nodeTypeFromString(value: unknown): WorkflowNodeType | null {
     : null;
 }
 
-function normalizeNodeConfig(
+function coerceConfigForGeneration(
   type: WorkflowNodeType,
-  config: Record<string, unknown> | undefined,
-): WorkflowNodeConfig {
-  const c = config ?? {};
-  const asString = (value: unknown, fallback: string): string =>
-    typeof value === 'string' ? value : fallback;
-  const provider =
-    typeof c.provider === 'string' &&
-    (Object.values(LlmProvider) as string[]).includes(c.provider)
-      ? (c.provider as LlmProvider)
-      : undefined;
-  switch (type) {
-    case WorkflowNodeType.TextGeneration:
-      return {
-        provider,
-        model: asString(c.model, 'gpt-4o'),
-        temperature: typeof c.temperature === 'number' ? c.temperature : 0.7,
-        maxTokens: typeof c.maxTokens === 'number' ? c.maxTokens : 500,
-        outputFormat:
-          c.outputFormat === NodeOutputFormat.Bullets ||
-          c.outputFormat === NodeOutputFormat.Caption
-            ? c.outputFormat
-            : NodeOutputFormat.Paragraph,
-      };
-    case WorkflowNodeType.ImageGeneration:
-      return {
-        provider,
-        model: asString(c.model, 'dall-e-3'),
-        size: asString(c.size, '1024x1024'),
-        quality:
-          c.quality === NodeImageQuality.Hd
-            ? NodeImageQuality.Hd
-            : NodeImageQuality.Standard,
-        style:
-          c.style === NodeImageStyle.Vivid
-            ? NodeImageStyle.Vivid
-            : NodeImageStyle.Natural,
-      };
-    case WorkflowNodeType.Translation:
-      return {
-        provider,
-        model: asString(c.model, 'gpt-4o'),
-        sourceLanguage: asString(c.sourceLanguage, 'en'),
-        targetLanguage: asString(c.targetLanguage, 'th'),
-        formalityLevel:
-          c.formalityLevel === NodeFormalityLevel.Formal
-            ? NodeFormalityLevel.Formal
-            : NodeFormalityLevel.Casual,
-      };
-    case WorkflowNodeType.Summarization:
-      return {
-        provider,
-        model: asString(c.model, 'gpt-4o'),
-        summaryLength:
-          c.summaryLength === NodeSummaryLength.Short ||
-          c.summaryLength === NodeSummaryLength.Long
-            ? c.summaryLength
-            : NodeSummaryLength.Medium,
-      };
-    case WorkflowNodeType.VideoGeneration:
-      return {
-        provider,
-        model: asString(c.model, 'sora-2'),
-      };
-    default:
-      return {
-        provider,
-        model: asString(c.model, 'gpt-4o'),
-      };
+  raw: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const parsed = parseWorkflowNodeConfig(type, raw ?? {});
+  const data = parsed.ok
+    ? parsed.data
+    : parseWorkflowNodeConfigOrThrow(type, {});
+  return data as unknown as Record<string, unknown>;
+}
+
+function inferTextToneFromRule(rule: Rule): NodeTextTone {
+  const raw = (rule.brand.brandTone[0] ?? 'friendly').toLowerCase();
+  if (raw.includes('profess')) {
+    return NodeTextTone.Professional;
   }
+  if (raw.includes('formal')) {
+    return NodeTextTone.Formal;
+  }
+  if (raw.includes('wit') || raw.includes('humor')) {
+    return NodeTextTone.Witty;
+  }
+  if (raw.includes('casual')) {
+    return NodeTextTone.Casual;
+  }
+  if (raw.includes('friend')) {
+    return NodeTextTone.Friendly;
+  }
+  return NodeTextTone.Friendly;
 }
 
 function safeJsonParse(text: string): unknown {
@@ -119,20 +77,26 @@ export class WorkflowGenerationService {
 
   constructor(private readonly llm: LlmService) {}
 
-  private fallback(rule: Rule, contentPrompt: string): GeneratedWorkflowNode[] {
+  private fallback(rule: Rule, _contentPrompt: string): GeneratedWorkflowNode[] {
     const nodes: GeneratedWorkflowNode[] = [];
-    const primaryTone = rule.brand.brandTone[0] ?? 'friendly';
     const format = rule.campaign.contentFormats[0] ?? 'caption';
     nodes.push({
+      type: WorkflowNodeType.KeywordPlanner,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.KeywordPlanner, {}),
+    });
+    nodes.push({
       type: WorkflowNodeType.TextGeneration,
-      order: 1,
-      isLocked: true,
-      userPrompt: `Write a ${primaryTone} ${format} for: ${contentPrompt}`,
-      config: normalizeNodeConfig(WorkflowNodeType.TextGeneration, {
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.TextGeneration, {
         outputFormat: format.toLowerCase().includes('caption')
           ? NodeOutputFormat.Caption
           : NodeOutputFormat.Paragraph,
-      }) as unknown as Record<string, unknown>,
+        tone: inferTextToneFromRule(rule),
+        textLength: NodeSummaryLength.Medium,
+      }),
     });
 
     const mappingNeeds = {
@@ -179,10 +143,9 @@ export class WorkflowGenerationService {
         type: WorkflowNodeType.Summarization,
         order: nodes.length + 1,
         isLocked: false,
-        userPrompt: `Summarize the generated copy for professional / short-form channels: ${contentPrompt}`,
-        config: normalizeNodeConfig(WorkflowNodeType.Summarization, {
+        config: coerceConfigForGeneration(WorkflowNodeType.Summarization, {
           summaryLength: NodeSummaryLength.Short,
-        }) as unknown as Record<string, unknown>,
+        }),
       });
     }
 
@@ -191,11 +154,11 @@ export class WorkflowGenerationService {
         type: WorkflowNodeType.Translation,
         order: nodes.length + 1,
         isLocked: false,
-        userPrompt: `Translate the generated copy to ${targetLanguages[0] ?? 'the target audience language'} and keep tone consistent.`,
-        config: normalizeNodeConfig(WorkflowNodeType.Translation, {
-          sourceLanguage: rule.audience.language || 'en',
+        config: coerceConfigForGeneration(WorkflowNodeType.Translation, {
+          sourceLanguage: rule.audience.language || 'auto',
           targetLanguage: targetLanguages[0] ?? 'th',
-        }) as unknown as Record<string, unknown>,
+          formalityLevel: NodeFormalityLevel.Casual,
+        }),
       });
     }
 
@@ -204,11 +167,10 @@ export class WorkflowGenerationService {
         type: WorkflowNodeType.ImageGeneration,
         order: nodes.length + 1,
         isLocked: false,
-        userPrompt: `Generate a visual concept for: ${contentPrompt}`,
-        config: normalizeNodeConfig(
+        config: coerceConfigForGeneration(
           WorkflowNodeType.ImageGeneration,
-          undefined,
-        ) as unknown as Record<string, unknown>,
+          {},
+        ),
       });
     }
 
@@ -217,15 +179,14 @@ export class WorkflowGenerationService {
         type: WorkflowNodeType.VideoGeneration,
         order: nodes.length + 1,
         isLocked: false,
-        userPrompt: `Generate a short video concept aligned with the campaign: ${contentPrompt}`,
-        config: normalizeNodeConfig(
+        config: coerceConfigForGeneration(
           WorkflowNodeType.VideoGeneration,
-          undefined,
-        ) as unknown as Record<string, unknown>,
+          {},
+        ),
       });
     }
 
-    return nodes;
+    return nodes.map((n, idx) => ({ ...n, order: idx + 1 }));
   }
 
   private normalizeAiOutput(
@@ -248,37 +209,56 @@ export class WorkflowGenerationService {
           typeof asObj.order === 'number' && asObj.order >= 1
             ? Math.floor(asObj.order)
             : normalized.length + 1,
-        isLocked:
-          type === WorkflowNodeType.TextGeneration
-            ? true
-            : Boolean(asObj.isLocked ?? false),
-        userPrompt:
-          typeof asObj.userPrompt === 'string' ? asObj.userPrompt : undefined,
-        config: normalizeNodeConfig(
+        isLocked: Boolean(asObj.isLocked ?? false),
+        config: coerceConfigForGeneration(
           type,
           (asObj.config as Record<string, unknown> | undefined) ?? {},
-        ) as unknown as Record<string, unknown>,
+        ),
       });
     }
 
-    const hasText = normalized.some(
+    const textCount = normalized.filter(
       (n) => n.type === WorkflowNodeType.TextGeneration,
-    );
-    if (!hasText) {
+    ).length;
+    const plannerCount = normalized.filter(
+      (n) => n.type === WorkflowNodeType.KeywordPlanner,
+    ).length;
+    if (textCount !== 1 || plannerCount > 1) {
       return this.fallback(rule, contentPrompt);
     }
 
-    const textNode =
-      normalized.find((n) => n.type === WorkflowNodeType.TextGeneration) ??
-      this.fallback(rule, contentPrompt)[0];
-    const rest = normalized.filter(
-      (n) => n.type !== WorkflowNodeType.TextGeneration,
-    );
+    let withPlanner = normalized;
+    if (plannerCount === 0) {
+      withPlanner = [
+        ...normalized,
+        {
+          type: WorkflowNodeType.KeywordPlanner,
+          order: 0,
+          isLocked: false,
+          config: coerceConfigForGeneration(
+            WorkflowNodeType.KeywordPlanner,
+            {},
+          ),
+        },
+      ];
+    }
 
-    const result = [{ ...textNode, isLocked: true, order: 1 }, ...rest].map(
-      (n, idx) => ({ ...n, order: idx + 1 }),
-    );
-    return result;
+    const planner = withPlanner.find(
+      (n) => n.type === WorkflowNodeType.KeywordPlanner,
+    )!;
+    const textNode = withPlanner.find(
+      (n) => n.type === WorkflowNodeType.TextGeneration,
+    )!;
+    const others = withPlanner
+      .filter(
+        (n) =>
+          n.type !== WorkflowNodeType.KeywordPlanner &&
+          n.type !== WorkflowNodeType.TextGeneration,
+      )
+      .sort((a, b) => a.order - b.order);
+
+    const ordered = [planner, textNode, ...others];
+    return ordered.map((n, idx) => ({ ...n, order: idx + 1 }));
   }
 
   async generate(
@@ -295,81 +275,91 @@ export class WorkflowGenerationService {
     });
 
     const nodeSchemas = {
-      text_generation: {
-        type: 'text_generation',
+      keyword_planner: {
+        type: 'keyword_planner',
         order: 1,
-        isLocked: true,
-        userPrompt: 'string — specific instruction for this node',
+        isLocked: false,
         config: {
           provider: 'openai | anthropic | google | groq | ollama',
           model: 'gpt-4o',
-          temperature: 0.7,
-          maxTokens: 500,
+          temperature: 'number 0-2',
+          maxTokens: 'integer >= 1',
+        },
+      },
+      text_generation: {
+        type: 'text_generation',
+        order: 2,
+        isLocked: false,
+        config: {
+          provider: 'openai | anthropic | google | groq | ollama',
+          model: 'gpt-4o',
+          temperature: 'number 0-2',
+          maxTokens: 'integer >= 1',
           outputFormat: 'paragraph | bullets | caption',
+          tone: 'professional | casual | friendly | formal | witty',
+          textLength: 'short | medium | long',
         },
       },
       image_generation: {
         type: 'image_generation',
         order: 2,
         isLocked: false,
-        userPrompt: 'string — specific instruction for this node',
         config: {
           provider: 'openai',
-          model: 'dall-e-3',
-          size: '1024x1024 | 1792x1024 | 1024x1792',
+          model: 'dall-e-3 | dall-e-2',
+          size: 'optional explicit OpenAI size if set',
           quality: 'standard | hd',
           style: 'natural | vivid',
+          aspectRatio: '1:1 | 16:9 | 9:16 | 4:5',
+          negativePrompt: 'optional string',
         },
       },
       translation: {
         type: 'translation',
         order: 3,
         isLocked: false,
-        userPrompt: 'string — specific instruction for this node',
         config: {
           provider: 'openai | anthropic | google | groq | ollama',
           model: 'gpt-4o',
-          sourceLanguage: 'en',
-          targetLanguage: 'th',
+          sourceLanguage: 'ISO code or auto',
+          targetLanguage: 'ISO code',
           formalityLevel: 'formal | casual',
+          preserveFormatting: 'boolean',
         },
       },
       video_generation: {
         type: 'video_generation',
         order: 4,
         isLocked: false,
-        userPrompt: 'string — specific instruction for this node',
         config: {
           provider: 'openai',
           model: 'sora-2',
-          duration: 15,
+          duration: 'integer seconds',
           resolution: '1080p | 720p',
-          aspectRatio: '16:9 | 9:16 | 1:1',
+          aspectRatio: '16:9 | 9:16 | 1:1 | 4:5',
         },
       },
       transcription: {
         type: 'transcription',
         order: 5,
         isLocked: false,
-        userPrompt: 'string — specific instruction for this node',
         config: {
           provider: 'openai | groq',
           model: 'whisper-1',
           sourceType: 'audio | video',
-          language: 'auto | en | th',
+          language: 'auto | en | th | …',
         },
       },
       summarization: {
         type: 'summarization',
         order: 6,
         isLocked: false,
-        userPrompt: 'string — specific instruction for this node',
         config: {
           provider: 'openai | anthropic | google | groq | ollama',
           model: 'gpt-4o',
           summaryLength: 'short | medium | long',
           outputFormat: 'paragraph | bullets | tldr',
-          sourceNodeRef: 'nodeId of the node to summarize',
+          sourceNodeRef: 'text_generation | translation | transcription',
         },
       },
     };
@@ -382,36 +372,25 @@ export class WorkflowGenerationService {
       '=== CONTENT REQUEST ===',
       `The user wants to create: "${contentPrompt}"`,
       '',
-      '=== CRITICAL RULES FOR userPrompt ===',
-      'Every node userPrompt MUST:',
-      `  → directly serve this specific content request: "${contentPrompt}"`,
-      '  → be a clear actionable instruction for that node type',
-      '  → reference what the user actually wants to create',
-      '  → NEVER be a generic template',
-      '  → NEVER copy brand tone labels or content format labels verbatim',
-      '  → NEVER follow pattern "Write a [tone] [format] for: [prompt]"',
-      '',
-      // `Good userPrompt examples for "${contentPrompt}":`,
-      // '  text_generation:',
-      // `    "Write a persuasive social media post for: ${contentPrompt}. Make it engaging and action-oriented."`,
-      // '  image_generation:',
-      // `    "Generate a compelling visual that represents: ${contentPrompt}"`,
-      // '  translation:',
-      // `    "Translate the content about ${contentPrompt} to target language. Keep tone natural and engaging."`,
+      '=== STRUCTURED CONFIG (required) ===',
+      'Each node MUST include a "config" object matching its type in NODE SCHEMAS below.',
+      'Use only allowed enum strings for each field. Do not invent keys.',
+      'Do NOT include userPrompt or any per-node free-text prompt fields — workflows store only reusable "how" (config); the run brief is supplied separately when executing a pipeline.',
       '',
       '=== CHANNEL CONTENT MAPPINGS ===',
       JSON.stringify(mappingContext),
       '',
       '=== NODE DECISION RULES ===',
-      '- First node MUST be text_generation, order=1, isLocked=true',
+      '- Exactly one keyword_planner and exactly one text_generation are REQUIRED',
+      '- keyword_planner MUST have a lower order number than text_generation (planner runs first)',
       '- Include translation if ANY channel mapping needsCaption is "translatedText"',
       '- Include summarization if ANY mapping needsCaption is "summary"',
       '- Include image_generation if ANY mapping needsMedia is "image"',
       '- Include video_generation if ANY mapping needsMedia is "video"',
       '- If mappings are missing on a legacy rule, infer from channels and targetLanguages',
       '- Include transcription only if audio/video input is implied in the prompt',
-      '- Order must be sequential starting from 1 with no gaps',
-      '- Preferred order: text_generation → summarization → translation → image_generation → video_generation → transcription',
+      '- Order must be sequential starting from 1 with no gaps after normalization',
+      '- Preferred order after writer: summarization → translation → image_generation → video_generation → transcription',
       '',
       '=== NODE SCHEMAS ===',
       JSON.stringify(nodeSchemas, null, 2),

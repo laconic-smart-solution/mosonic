@@ -4,9 +4,15 @@ import axios, { AxiosInstance, isAxiosError } from 'axios';
 
 import { getFriendlyZernioPublishError } from './zernio-mcp-publish.util';
 import {
-  mirrorFetchedBytesToPublicUploadsUrl,
-  resolvePublicApiBase as resolvePublicApiBaseFromConfig,
-} from '../../upload/file-service-local-mirror.util';
+  assertPdfNotUsedForPresign,
+  isLikelyZernioAccessibleMediaUrl,
+  leafFileNameFromUrl,
+  normalizePresignResponse,
+  resolvePresignMime,
+  sniffMimeFromBytes,
+  zernioMediaItemTypeFromMime,
+  type ZernioPresignResult,
+} from './zernio-rest-media.util';
 
 function axiosErrorHint(err: unknown): string {
   if (!isAxiosError(err)) return '';
@@ -38,8 +44,19 @@ function summarizeZernioAxiosError(err: unknown): string | null {
   return text ? `${prefix}: ${text}` : prefix;
 }
 
-/** Zernio REST expects embedded media objects, not raw URL strings. */
+/** Zernio REST expects embedded media objects `{ url, type }` in `mediaItems` / `customMedia`. */
 type ZernioCustomMediaItem = { url: string; type: 'image' | 'video' };
+
+function toZernioDateOnly(input: string | undefined): string | undefined {
+  const s = input?.trim();
+  if (!s) return undefined;
+  // Zernio analytics expects YYYY-MM-DD (not full ISO datetime).
+  // Accept already-correct values.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString().slice(0, 10);
+}
 
 @Injectable()
 export class ZernioRestClient {
@@ -112,7 +129,7 @@ export class ZernioRestClient {
             ? singleMedia.split(',').map((u) => u.trim()).filter(Boolean)
             : [];
 
-        const customMedia = await this.buildLocalUploadsCustomMedia(
+        const customMedia = await this.buildZernioMediaItemsFromUrls(
           rawUrls,
           mediaCache,
         );
@@ -141,6 +158,12 @@ export class ZernioRestClient {
     if (!payload.publishNow && payload.scheduledAt) {
       body.scheduledFor = payload.scheduledAt;
       body.timezone = 'UTC';
+    }
+
+    const firstPlat = platforms[0] as Record<string, unknown> | undefined;
+    const firstMedia = firstPlat?.customMedia;
+    if (Array.isArray(firstMedia) && firstMedia.length > 0) {
+      body.mediaItems = firstMedia as ZernioCustomMediaItem[];
     }
 
     this.logger.log(`[REST] body: ${JSON.stringify(body)}`);
@@ -188,47 +211,81 @@ export class ZernioRestClient {
     }
   }
 
-  /** Public base for `/uploads` links (ngrok). */
-  private resolvePublicApiBase(): string {
-    return resolvePublicApiBaseFromConfig(this.config);
+  /**
+   * Presign then upload bytes to Zernio storage (official flow).
+   * Exported for tests that mock `http` only.
+   */
+  async presignMedia(input: {
+    fileName: string;
+    fileType: string;
+  }): Promise<ZernioPresignResult> {
+    this.logger.log(`[REST] POST /media/presign → ${input.fileName} (${input.fileType})`);
+    try {
+      // Live API expects `filename` + `contentType` (not fileName/fileType).
+      const { data } = await this.http.post<Record<string, unknown>>('/media/presign', {
+        filename: input.fileName,
+        contentType: input.fileType,
+      });
+      const norm = normalizePresignResponse(data);
+      if (!norm) {
+        throw new Error(
+          `Zernio presign returned unexpected shape: ${JSON.stringify(data)}`,
+        );
+      }
+      return norm;
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Zernio REST presign threw: ${message}${detail ? ` — ${detail}` : ''}`);
+      throw new Error(
+        detail
+          ? `Zernio media presign failed — ${detail}`
+          : message || 'Zernio media presign failed',
+      );
+    }
   }
 
   /**
-   * Zernio must fetch media over the public internet. Copy bytes into `./uploads` and set
-   * `customMedia[].url` to `{APP_URL|PUBLIC_URL}/uploads/...` (served by this API).
+   * PUT to GCS (or other) presigned URL — no Zernio Bearer header.
    */
-  private async buildLocalUploadsCustomMedia(
-    rawUrls: string[],
-    cache: Map<string, ZernioCustomMediaItem>,
-  ): Promise<ZernioCustomMediaItem[]> {
-    const out: ZernioCustomMediaItem[] = [];
-    for (const raw of rawUrls) {
-      const source = this.resolveAbsoluteMediaHref(raw);
-      if (!source) continue;
-
-      let item = cache.get(source);
-      if (!item) {
-        item = await this.mirrorSourceToLocalUploadsUrl(source);
-        cache.set(source, item);
-      }
-      out.push(item);
-    }
-    return out;
-  }
-
-  private async mirrorSourceToLocalUploadsUrl(
-    sourceUrl: string,
-  ): Promise<ZernioCustomMediaItem> {
-    const publicRoot = this.resolvePublicApiBase().replace(/\/+$/, '');
-    if (!publicRoot) {
+  async putBytesToPresignedUrl(
+    uploadUrl: string,
+    bytes: Uint8Array,
+    contentType: string,
+  ): Promise<void> {
+    try {
+      await axios.put(uploadUrl, Buffer.from(bytes), {
+        headers: { 'Content-Type': contentType },
+        timeout: 120_000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        validateStatus: (s) => s >= 200 && s < 300,
+      });
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Zernio media upload to presigned URL failed: ${message}${detail ? ` — ${detail}` : ''}`,
+      );
       throw new Error(
-        'Zernio publish failed: set APP_URL or PUBLIC_URL so media can be mirrored to /uploads for Zernio to fetch',
+        detail
+          ? `Zernio media upload failed — ${detail}`
+          : message || 'Zernio media upload failed',
       );
     }
+  }
 
-    const uploadsPublicPrefix = `${publicRoot}/uploads/`;
-    if (sourceUrl.startsWith(uploadsPublicPrefix)) {
-      return { url: sourceUrl, type: this.mediaKindForUrl(sourceUrl) };
+  /**
+   * Download from source URL, upload via Zernio presign, return `publicUrl` media item.
+   */
+  private async uploadSourceUrlToZernioMediaItem(
+    sourceUrl: string,
+  ): Promise<ZernioCustomMediaItem> {
+    if (isLikelyZernioAccessibleMediaUrl(sourceUrl)) {
+      return {
+        url: sourceUrl,
+        type: this.mediaKindForUrl(sourceUrl),
+      };
     }
 
     const res = await fetch(sourceUrl, {
@@ -242,26 +299,54 @@ export class ZernioRestClient {
     const buf = new Uint8Array(await res.arrayBuffer());
     if (!buf.length) {
       throw new Error(
-        `Zernio publish failed: empty media body when mirroring: ${sourceUrl}`,
+        `Zernio publish failed: empty media body when uploading: ${sourceUrl}`,
       );
     }
 
-    const pathPart = sourceUrl.split(/[/?#]/)[0] ?? '';
-    const leaf = pathPart.split('/').pop() || 'zernio-media.png';
-    const mimeHint =
-      res.headers.get('content-type') || 'application/octet-stream';
-    const url = await mirrorFetchedBytesToPublicUploadsUrl(
-      buf,
-      leaf,
-      mimeHint,
-      publicRoot,
-    );
-    return { url, type: this.mediaKindForUrl(url) };
+    let fileName = leafFileNameFromUrl(sourceUrl);
+    const sniffed = sniffMimeFromBytes(buf);
+    const mime = sniffed?.mime
+      ? sniffed.mime
+      : resolvePresignMime(res.headers.get('content-type'), fileName);
+    if (sniffed?.ext && !/\.[a-z0-9]+$/i.test(fileName)) {
+      fileName = `${fileName}.${sniffed.ext}`;
+    }
+    assertPdfNotUsedForPresign(mime);
+
+    const { uploadUrl, publicUrl } = await this.presignMedia({
+      fileName,
+      fileType: mime,
+    });
+    await this.putBytesToPresignedUrl(uploadUrl, buf, mime);
+
+    return {
+      url: publicUrl,
+      type: zernioMediaItemTypeFromMime(mime),
+    };
+  }
+
+  private async buildZernioMediaItemsFromUrls(
+    rawUrls: string[],
+    cache: Map<string, ZernioCustomMediaItem>,
+  ): Promise<ZernioCustomMediaItem[]> {
+    const out: ZernioCustomMediaItem[] = [];
+    for (const raw of rawUrls) {
+      const source = this.resolveAbsoluteMediaHref(raw);
+      if (!source) continue;
+
+      let item = cache.get(source);
+      if (!item) {
+        item = await this.uploadSourceUrlToZernioMediaItem(source);
+        cache.set(source, item);
+      }
+      out.push(item);
+    }
+    return out;
   }
 
   private mediaKindForUrl(url: string): 'image' | 'video' {
     const pathOnly = url.split(/[?#]/)[0]?.toLowerCase() ?? '';
-    if (/\.(mp4|webm|mov|m4v|mkv)(\s|$)/.test(pathOnly)) return 'video';
+    if (/\.(mp4|webm|mov|m4v|mkv|avi)(\s|$)/.test(pathOnly)) return 'video';
     return 'image';
   }
 
@@ -377,25 +462,86 @@ export class ZernioRestClient {
     }
   }
 
-  async getPostAnalytics(postId: string): Promise<unknown | null> {
+  async getPostAnalytics(
+    postId: string,
+    opts?: { fromDate?: string; toDate?: string },
+  ): Promise<unknown | null> {
     const id = postId.trim();
     if (!id) return null;
 
-    this.logger.log(`[REST] GET /analytics/${id}`);
+    // Zernio docs: GET /v1/analytics (query param `postId`), not /analytics/:id.
+    // Accepts both Zernio post ids and external ids (auto-resolved).
+    this.logger.log(`[REST] GET /analytics?postId=${id}`);
 
     try {
-      const { data } = await this.http.get(`/analytics/${id}`);
-      this.logger.log(`[REST] analytics: ${JSON.stringify(data)}`);
+      const fromDate = toZernioDateOnly(opts?.fromDate);
+      const toDate = toZernioDateOnly(opts?.toDate);
+      const { data } = await this.http.get(`/analytics`, {
+        params: {
+          postId: id,
+          ...(fromDate ? { fromDate } : {}),
+          ...(toDate ? { toDate } : {}),
+        },
+      });
       if (data == null) return null;
       return data;
     } catch (err: unknown) {
-      if (isAxiosError(err) && err.response?.status === 404) {
-        this.logger.warn(`[REST] Analytics for ${id} not found`);
-        return null;
+      if (isAxiosError(err)) {
+        const status = err.response?.status;
+        // Zernio may return:
+        // - 202 when sync is pending
+        // - 424 when all platforms failed
+        // - 404 when post/analytics is not found
+        if (status === 202) {
+          this.logger.log(`[REST] Analytics for ${id} sync pending (202)`);
+          return null;
+        }
+        if (status === 424) {
+          this.logger.warn(`[REST] Analytics for ${id} failed on all platforms (424)`);
+          return null;
+        }
+        if (status === 404) {
+          this.logger.warn(`[REST] Analytics for ${id} not found`);
+          return null;
+        }
       }
+      const detail = summarizeZernioAxiosError(err);
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Zernio REST getPostAnalytics(${id}) threw: ${message}`);
+      this.logger.warn(
+        `Zernio REST getPostAnalytics(${id}) threw: ${detail ? `${message} (${detail})` : message}`,
+      );
       throw err;
+    }
+  }
+
+  /**
+   * DELETE /v1/accounts/{accountId} — removes the connected social account on Zernio.
+   * @see https://docs.zernio.com
+   */
+  async deleteAccount(accountId: string): Promise<void> {
+    const id = accountId.trim();
+    if (!id) {
+      throw new Error('Zernio disconnect failed: missing accountId');
+    }
+    const path = `/accounts/${encodeURIComponent(id)}`;
+    this.logger.log(`[REST] DELETE ${path}`);
+    try {
+      await this.http.delete(path);
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        this.logger.warn(
+          `Zernio REST deleteAccount(${id}): already removed (404), treating as success`,
+        );
+        return;
+      }
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Zernio REST deleteAccount(${id}) threw: ${message}`);
+      throw new Error(
+        detail
+          ? `Could not disconnect account on Zernio — ${detail}`
+          : message || 'Zernio disconnect failed',
+      );
     }
   }
 }

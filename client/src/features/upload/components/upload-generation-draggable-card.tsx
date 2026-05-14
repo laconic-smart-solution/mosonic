@@ -1,10 +1,12 @@
 import { useDraggable } from "@dnd-kit/core"
 import { GripVertical, Loader2, RefreshCw } from "lucide-react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
   cardTitle,
+  mergeNodeOutputLayers,
+  outputKeyForNodeType,
   type OutputKey,
 } from "@/features/content/data/content-review-helpers"
 import { ContentDetailNodeCard } from "@/features/content/components/content-detail/content-detail-node-card"
@@ -16,52 +18,95 @@ import type { WorkflowNode } from "@/shared/types/workflow.type"
 import { cn } from "@/lib/utils"
 
 import {
-  paletteDragIdForKey,
-  palettePayloadForKey,
+  FileServiceImage,
+  FileServiceVideo,
+} from "@/features/upload/components/upload-display-media"
+import {
+  paletteDragIdForNode,
+  palettePayloadForNode,
 } from "@/features/upload/lib/upload-palette-drag"
 
 type Props = {
-  nodeKey: OutputKey
+  wfNode: WorkflowNode
   cardIndex: number
-  editedOutputs: Partial<Record<OutputKey, string | undefined>>
+  nodeOutputs: Record<string, Record<string, unknown>>
+  nodeUserEdits: Record<string, Record<string, unknown>>
+  /** Flat merged outputs for fields not stored per-node. */
+  flatEditedOutputs: Partial<Record<OutputKey, string | undefined>>
   run: CardRunState
   displayText: string
   globalRerunning: boolean
   blockPipeline: boolean
-  wfNode: WorkflowNode | undefined
-  nodeId: string | undefined
-  onOpenRerun: (key: OutputKey) => void
-  onSubmitRerun: (key: OutputKey) => void
+  onOpenRerun: (nodeId: string) => void
+  onSubmitRerun: (nodeId: string) => void
   onRetry: () => void
-  updateOutput: (key: OutputKey, value: string | undefined) => void
-  setRunState: (key: OutputKey, partial: Partial<CardRunState>) => void
+  updateNodeUserEdit: (
+    nodeId: string,
+    key: OutputKey,
+    value: string | undefined
+  ) => void
+  setRunState: (nodeId: string, partial: Partial<CardRunState>) => void
   setLightboxUrl: (url: string) => void
-  uploadMedia: (key: "image" | "video", file: File) => void
+  uploadMediaForNode: (
+    nodeId: string,
+    kind: "image" | "video",
+    file: File
+  ) => void
   onCopyOutput: (text: string) => void
 }
 
 export function UploadGenerationDraggableCard(props: Props) {
   const {
-    nodeKey: key,
+    wfNode,
     cardIndex,
-    editedOutputs,
+    nodeOutputs,
+    nodeUserEdits,
+    flatEditedOutputs,
     run,
     displayText,
     globalRerunning,
     blockPipeline,
-    wfNode,
-    nodeId,
     onOpenRerun,
     onSubmitRerun,
     onRetry,
-    updateOutput,
+    updateNodeUserEdit,
     setRunState,
     setLightboxUrl,
-    uploadMedia,
+    uploadMediaForNode,
     onCopyOutput,
   } = props
 
+  const nodeId = wfNode.nodeId
+  const key = outputKeyForNodeType(wfNode.type)
+
   const [expanded, setExpanded] = useState(false)
+
+  const layer = useMemo(
+    () => mergeNodeOutputLayers(nodeOutputs, nodeUserEdits, nodeId),
+    [nodeOutputs, nodeUserEdits, nodeId]
+  )
+
+  const editedOutputsForCard = useMemo((): Partial<
+    Record<OutputKey, string | undefined>
+  > => {
+    const scoped: Partial<Record<OutputKey, string | undefined>> = {
+      ...flatEditedOutputs,
+    }
+    if (!key) return scoped
+    if (key === "keywords" && typeof layer.keywords === "string")
+      scoped.keywords = layer.keywords
+    if (key === "text" && typeof layer.text === "string") scoped.text = layer.text
+    if (key === "image" && typeof layer.image === "string")
+      scoped.image = layer.image
+    if (key === "translatedText" && typeof layer.translatedText === "string")
+      scoped.translatedText = layer.translatedText
+    if (key === "video" && typeof layer.video === "string") scoped.video = layer.video
+    if (key === "transcription" && typeof layer.transcription === "string")
+      scoped.transcription = layer.transcription
+    if (key === "summary" && typeof layer.summary === "string")
+      scoped.summary = layer.summary
+    return scoped
+  }, [flatEditedOutputs, key, layer])
 
   const isTextLike =
     key === "text" ||
@@ -81,13 +126,18 @@ export function UploadGenerationDraggableCard(props: Props) {
 
   const hasBodyOutput =
     key === "image"
-      ? !!editedOutputs.image
+      ? !!editedOutputsForCard.image
       : key === "video"
-        ? !!editedOutputs.video
+        ? !!editedOutputsForCard.video
         : isNonEmptyOutput(displayText)
 
-  const payload = palettePayloadForKey(key, editedOutputs)
-  const dragId = paletteDragIdForKey(key)
+  const payload = palettePayloadForNode(
+    nodeId,
+    wfNode.type,
+    nodeOutputs,
+    nodeUserEdits
+  )
+  const dragId = paletteDragIdForNode(nodeId)
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
@@ -100,6 +150,21 @@ export function UploadGenerationDraggableCard(props: Props) {
     run.phase === "running" ||
     run.phase === "processing" ||
     run.phase === "retrying"
+
+  const title = key ? cardTitle(key) : wfNode.type
+
+  const thumbImage =
+    typeof layer.image === "string" ? layer.image : undefined
+  const thumbVideo =
+    typeof layer.video === "string" ? layer.video : undefined
+
+  if (!key) {
+    return (
+      <div className="rounded-lg border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
+        Unsupported node type: {wfNode.type}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -125,26 +190,24 @@ export function UploadGenerationDraggableCard(props: Props) {
         ) : (
           <span
             className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center text-[10px] text-muted-foreground"
-            title="Transcript cannot be used as a caption drag source"
+            title="This step has no draggable preview yet"
           >
             —
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-foreground">{cardTitle(key)}</p>
-          {wfNode ? (
-            <p className="text-[10px] text-muted-foreground">
-              Step {wfNode.order}
-            </p>
-          ) : null}
+          <p className="text-xs font-semibold text-foreground">{title}</p>
+          <p className="text-[10px] text-muted-foreground">
+            Step {wfNode.order}
+          </p>
         </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="h-8 shrink-0 gap-1 px-2 text-[11px]"
-          disabled={!nodeId || globalRerunning}
-          onClick={() => onOpenRerun(key)}
+          disabled={globalRerunning}
+          onClick={() => onOpenRerun(nodeId)}
         >
           {showStreaming ? (
             <Loader2 className="size-3.5 animate-spin" />
@@ -164,21 +227,21 @@ export function UploadGenerationDraggableCard(props: Props) {
             <p className="line-clamp-3 whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">
               {displayText || "—"}
             </p>
-          ) : key === "image" && editedOutputs.image ? (
+          ) : key === "image" && thumbImage ? (
             <div className="h-16 overflow-hidden rounded-md border bg-muted/30">
-              <img
-                src={editedOutputs.image}
+              <FileServiceImage
+                url={thumbImage}
                 alt=""
                 className="size-full object-cover"
+                loadingClassName="size-full min-h-16 text-[10px]"
               />
             </div>
-          ) : key === "video" && editedOutputs.video ? (
+          ) : key === "video" && thumbVideo ? (
             <div className="h-16 overflow-hidden rounded-md border bg-black">
-              <video
-                src={editedOutputs.video}
+              <FileServiceVideo
+                url={thumbVideo}
                 className="size-full object-cover"
                 muted
-                playsInline
               />
             </div>
           ) : (
@@ -198,7 +261,7 @@ export function UploadGenerationDraggableCard(props: Props) {
             nodeKey={key}
             cardIndex={cardIndex}
             run={run}
-            editedOutputs={editedOutputs}
+            editedOutputs={editedOutputsForCard}
             globalRerunning={blockPipeline}
             displayText={displayText}
             hasBodyOutput={hasBodyOutput}
@@ -207,13 +270,19 @@ export function UploadGenerationDraggableCard(props: Props) {
             wfNode={wfNode}
             nodeId={nodeId}
             onCopyOutput={(t) => void onCopyOutput(t)}
-            onOpenRerun={onOpenRerun}
-            onSubmitRerun={onSubmitRerun}
+            onOpenRerun={(_key: OutputKey) => {
+              void _key
+              onOpenRerun(nodeId)
+            }}
+            onSubmitRerun={(_key: OutputKey) => {
+              void _key
+              void onSubmitRerun(nodeId)
+            }}
             onRetry={onRetry}
-            updateOutput={updateOutput}
-            setRunState={setRunState}
+            updateOutput={(k, v) => updateNodeUserEdit(nodeId, k, v)}
+            setRunState={(_k, partial) => setRunState(nodeId, partial)}
             setLightboxUrl={setLightboxUrl}
-            uploadMedia={uploadMedia}
+            uploadMedia={(kind, f) => uploadMediaForNode(nodeId, kind, f)}
           />
           <div className="px-3 pb-2">
             <button

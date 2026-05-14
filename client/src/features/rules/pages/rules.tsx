@@ -270,9 +270,18 @@ export default function RulesPage() {
 
   useEffect(() => {
     if (!selectedRule) return
-    setTreeDraft((prev) =>
-      prev && prev.ruleId === selectedRule.ruleId ? prev : selectedRule
-    )
+    setTreeDraft((prev) => {
+      if (!prev || prev.ruleId !== selectedRule.ruleId) {
+        return selectedRule
+      }
+      // While extracting we cache a placeholder rule (`processing`). After completion the
+      // query refetches the real rule — we must replace the draft or we keep stale status and
+      // every list field looks "edited" vs server (false "N pending" / save bar).
+      if (prev.status === "processing" && selectedRule.status !== "processing") {
+        return selectedRule
+      }
+      return prev
+    })
   }, [selectedRule])
 
   const treeWorkingRule = treeDraft?.ruleId === selectedRule?.ruleId ? treeDraft : selectedRule

@@ -12,6 +12,9 @@ export enum ContentStatus {
 @Schema({ _id: false })
 export class ContentOutputs {
   @Prop({ type: String })
+  keywords?: string;
+
+  @Prop({ type: String })
   text?: string;
 
   @Prop({ type: String })
@@ -35,6 +38,9 @@ export const ContentOutputsSchema =
 /** User overrides layered on top of `outputs` for the same version. */
 @Schema({ _id: false })
 export class ContentUserEdits {
+  @Prop({ type: String })
+  keywords?: string;
+
   @Prop({ type: String })
   text?: string;
 
@@ -115,6 +121,14 @@ export class Content {
   /** Node-type key -> prompt override used by re-run flows. */
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
   nodePromptOverrides: Record<string, string>;
+
+  /** Per workflow nodeId → AI output payload (e.g. `{ image }`, `{ text }`). */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  nodeOutputs: Record<string, Record<string, unknown>>;
+
+  /** Per nodeId → user overrides for that node's fields (merged over nodeOutputs when flattening). */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  nodeUserEdits: Record<string, Record<string, unknown>>;
 
   /** Legacy version fields kept for backward DB compatibility (unused by new flows). */
   @Prop({ type: Number, min: 1 })

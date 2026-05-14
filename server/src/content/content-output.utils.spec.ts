@@ -3,9 +3,10 @@ import { mergeResolvedOutputs } from './content-output.utils';
 describe('mergeResolvedOutputs', () => {
   it('prefers user edits over AI outputs when user value is set', () => {
     const merged = mergeResolvedOutputs({
-      outputs: { text: 'from-ai', image: 'img-ai' },
+      outputs: { keywords: 'kw1', text: 'from-ai', image: 'img-ai' },
       userEdits: { text: 'from-user' },
     });
+    expect(merged.keywords).toBe('kw1');
     expect(merged.text).toBe('from-user');
     expect(merged.image).toBe('img-ai');
   });
@@ -24,5 +25,26 @@ describe('mergeResolvedOutputs', () => {
       userEdits: { text: '' },
     });
     expect(merged.text).toBe('');
+  });
+
+  it('last image wins when merging nodeOutputs with workflow order', () => {
+    const merged = mergeResolvedOutputs(
+      {
+        outputs: { text: 't', image: 'legacy' },
+        userEdits: {},
+        nodeOutputs: {
+          n1: { image: 'first.png' },
+          n2: { image: 'second.png' },
+        },
+      },
+      {
+        workflowNodesOrdered: [
+          { nodeId: 'n1', type: 'image_generation' },
+          { nodeId: 'n2', type: 'image_generation' },
+        ],
+      },
+    );
+    expect(merged.image).toBe('second.png');
+    expect(merged.text).toBe('t');
   });
 });

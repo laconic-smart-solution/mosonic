@@ -4,9 +4,16 @@ import type {
   GenerateWorkflowResponse,
   GetWorkflowResponse,
   SaveWorkflowNodesPayload,
+  WorkflowPageQueryPayload,
+  WorkflowPageResponse,
 } from "../types/workflow.type"
 
 export const workflowService = {
+  pageable: async (payload: WorkflowPageQueryPayload): Promise<WorkflowPageResponse> => {
+    const { data } = await apiClient.post<WorkflowPageResponse>("/workflow/pageable", payload)
+    return data
+  },
+
   generateWorkflow: async (payload: GenerateWorkflowPayload): Promise<GenerateWorkflowResponse> => {
     const response = await apiClient.post(`/workflow/generate`, payload)
     return response.data

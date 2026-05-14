@@ -59,7 +59,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const [nodes, setNodes, onNodesChange] = useNodesState<WfRfNode>(initialNodes)
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
     const [selectedId, setSelectedId] = useState<string | null>(null)
-    const [propPrompt, setPropPrompt] = useState("")
     const [propConfig, setPropConfig] = useState<Record<string, unknown>>({})
 
     const rf = useRef<ReactFlowInstance<WfRfNode> | null>(null)
@@ -71,7 +70,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       setNodes(rfNodes)
       setEdges(rfEdges)
       setSelectedId(null)
-      setPropPrompt("")
       setPropConfig({})
       // Fit view after React Flow renders the new nodes
       queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
@@ -109,7 +107,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const onSelectionChange = useCallback((p: OnSelectionChangeParams<WfRfNode>) => {
       const n = p.nodes[0]
       setSelectedId(n?.id ?? null)
-      setPropPrompt(n?.data.prompt ?? "")
       setPropConfig((n?.data.config as Record<string, unknown>) ?? {})
     }, [])
 
@@ -147,12 +144,19 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             wfType,
             status: "idle",
             locked: meta.locked,
-            prompt: "",
             config: defaultConfigForNewCanvasNode(wfType),
           },
           draggable: !meta.locked,
         }
-        setNodes((nds) => [...nds, newNode])
+        setNodes((nds) => {
+          if (wfType === "keywords" && nds.some((n) => n.data.wfType === "keywords")) {
+            return nds
+          }
+          if (wfType === "text" && nds.some((n) => n.data.wfType === "text")) {
+            return nds
+          }
+          return [...nds, newNode]
+        })
       },
       [readOnly, setNodes],
     )
@@ -171,7 +175,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const closePanel = useCallback(() => {
       setNodes((nds) => nds.map((n) => ({ ...n, selected: false })))
       setSelectedId(null)
-      setPropPrompt("")
       setPropConfig({})
     }, [setNodes])
 
@@ -179,7 +182,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       (nodeId: string) => {
         if (readOnly) return
         const node = nodes.find((entry) => entry.id === nodeId)
-        if (!node || node.data.locked) return
+        const nonDeletable =
+          node?.data.wfType === "text" || node?.data.wfType === "keywords"
+        if (!node || nonDeletable) return
         setNodes((nds) => nds.filter((entry) => entry.id !== nodeId))
         setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
         if (selectedId === nodeId) closePanel()
@@ -225,14 +230,13 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
                 ...n,
                 data: {
                   ...n.data,
-                  prompt: propPrompt,
                   config: propConfig,
                 },
               }
             : n,
         ),
       )
-    }, [readOnly, selectedId, propPrompt, propConfig, setNodes])
+    }, [readOnly, selectedId, propConfig, setNodes])
 
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -270,14 +274,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         {selNode && !readOnly ? (
           <WorkflowPropertiesPanel
             selNode={selNode}
-            propPrompt={propPrompt}
-            setPropPrompt={setPropPrompt}
             propConfig={propConfig}
             setPropConfig={setPropConfig}
             onClose={closePanel}
             onApply={applyChanges}
             onReset={() => {
-              setPropPrompt(selNode.prompt ?? "")
               setPropConfig(selNode.config ?? {})
             }}
           />

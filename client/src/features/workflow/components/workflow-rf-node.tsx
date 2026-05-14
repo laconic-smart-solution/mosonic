@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react"
 import {
   NODE_W,
   WF_NODE_TYPES,
+  canvasConfigSummary,
   statusStyle,
   type WfRfNode,
 } from "@/features/workflow/data/workflow-model"
@@ -14,6 +15,7 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
     WF_NODE_TYPES.find((t) => t.type === data.wfType) ?? WF_NODE_TYPES[0]
   const sc = statusStyle(data.status)
   const isSel = selected
+  const nonDeletable = data.wfType === "text" || data.wfType === "keywords"
   const previewImageSrc = useFileObjectUrl(data.previewImage)
   const previewVideoSrc = useFileObjectUrl(data.previewVideo)
 
@@ -27,10 +29,10 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
         boxShadow: isSel
           ? `0 0 0 3px ${nt.color}20, 0 4px 20px ${nt.color}18, 0 2px 6px rgba(0,0,0,0.06)`
           : "0 2px 8px rgba(0,0,0,0.06)",
-        cursor: data.locked ? "pointer" : "grab",
+        cursor: nonDeletable ? "grab" : data.locked ? "pointer" : "grab",
       }}
     >
-      {!data.locked ? (
+      {data.wfType !== "keywords" ? (
         <Handle
           type="target"
           position={Position.Left}
@@ -93,9 +95,9 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-2.5 py-1.5">
         <div
           className="line-clamp-2 text-[11px] leading-snug"
-          style={{ color: data.prompt ? T.textSecondary : "#718096" }}
+          style={{ color: T.textSecondary }}
         >
-          {data.prompt || "Click to add custom instruction…"}
+          {canvasConfigSummary(data.wfType, data.config ?? {})}
         </div>
         {data.processingMessage ? (
           <div className="line-clamp-2 text-[10px] leading-snug text-[#2563EB]">
@@ -158,23 +160,36 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
               Retry
             </button>
           ) : null}
-          {isSel && !data.locked ? (
+          {isSel ? (
             <div className="flex gap-0.5">
-              <button
-                type="button"
-                title="Drag to reorder"
-                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
-                style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
-              >
-                ::
-              </button>
-              <button
-                type="button"
-                onClick={() => data.onDelete?.()}
-                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border border-[#FCA5A5] bg-[#FEE2E2] text-[11px] text-[#DC2626]"
-              >
-                ✕
-              </button>
+              {!nonDeletable ? (
+                <>
+                  <button
+                    type="button"
+                    title="Drag to reorder"
+                    className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
+                    style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
+                  >
+                    ::
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => data.onDelete?.()}
+                    className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border border-[#FCA5A5] bg-[#FEE2E2] text-[11px] text-[#DC2626]"
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  title="Drag to reorder"
+                  className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
+                  style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
+                >
+                  ::
+                </button>
+              )}
             </div>
           ) : null}
         </div>

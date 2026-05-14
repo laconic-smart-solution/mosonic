@@ -1,12 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { workflowService } from "../services/workflow.service"
-import type { GenerateWorkflowPayload } from "../types/workflow.type"
+import type { GenerateWorkflowPayload, WorkflowPageQueryPayload } from "../types/workflow.type"
+
+export const useWorkflowsPageQuery = (
+  body: WorkflowPageQueryPayload,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["workflow", "pageable", body],
+    queryFn: () => workflowService.pageable(body),
+    enabled,
+    retry: false,
+  })
+}
 
 export const useGenerateWorkflow = () => {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: GenerateWorkflowPayload) =>
       workflowService.generateWorkflow(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+    },
   })
 }
 
@@ -17,6 +33,7 @@ export const useRegenerateWorkflowByRuleMutation = () => {
       workflowService.regenerateByRule(ruleId, { contentPrompt }),
     onSuccess: (_data, { ruleId }) => {
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
   })
 }
@@ -59,6 +76,7 @@ export const useSaveWorkflowNodesMutation = () => {
     }) => workflowService.saveNodes(workflowId, { nodes }),
     onSuccess: (_, { workflowId, ruleId }) => {
       toast.success("Workflow saved")
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
       if (ruleId) void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
       else void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
     },

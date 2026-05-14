@@ -23,7 +23,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { type OutputKey, cardTitle, resolveNodeId } from "@/features/content/data/content-review-helpers"
+import { type OutputKey, cardTitle, outputKeyForNodeType } from "@/features/content/data/content-review-helpers"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
 import { LightboxInner, CARD_ICONS, nodeIconBoxClass } from "./content-detail-review-ui"
@@ -31,17 +31,17 @@ import { LightboxInner, CARD_ICONS, nodeIconBoxClass } from "./content-detail-re
 type WorkflowNodesLite = WorkflowNode[]
 
 type RerunSheetProps = {
-  openKey: OutputKey | null
+  openNodeId: string | null
   workflowNodes: WorkflowNodesLite
   globalRerunning: boolean
   draft: string
   onDraftChange: (v: string) => void
   onOpenChange: (open: boolean) => void
-  onSubmit: (key: OutputKey) => void
+  onSubmit: (nodeId: string) => void
 }
 
 export function ContentDetailRerunSheet({
-  openKey,
+  openNodeId,
   workflowNodes,
   globalRerunning,
   draft,
@@ -49,9 +49,16 @@ export function ContentDetailRerunSheet({
   onOpenChange,
   onSubmit,
 }: RerunSheetProps) {
+  const openNode = openNodeId
+    ? workflowNodes.find((n) => n.nodeId === openNodeId)
+    : undefined
+  const openKey: OutputKey | undefined = openNode
+    ? outputKeyForNodeType(openNode.type)
+    : undefined
+
   return (
     <Sheet
-      open={!!openKey}
+      open={!!openNodeId}
       onOpenChange={(open) => onOpenChange(open)}
     >
       <SheetContent
@@ -77,6 +84,8 @@ export function ContentDetailRerunSheet({
                 </span>
                 Re-run {cardTitle(openKey)}
               </>
+            ) : openNode ? (
+              <span>Re-run node</span>
             ) : null}
           </SheetTitle>
           <SheetDescription>
@@ -101,12 +110,8 @@ export function ContentDetailRerunSheet({
           <Button
             type="button"
             className="bg-[#0F1F3D] text-white hover:bg-[#1A3260]"
-            disabled={
-              !openKey ||
-              !resolveNodeId(workflowNodes, openKey) ||
-              globalRerunning
-            }
-            onClick={() => openKey && onSubmit(openKey)}
+            disabled={!openNodeId || globalRerunning}
+            onClick={() => openNodeId && onSubmit(openNodeId)}
           >
             Re-run node
           </Button>

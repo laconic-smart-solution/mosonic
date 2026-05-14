@@ -1,7 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CostService } from '../cost/cost.service';
+import { RecordCostDto } from '../cost/dto/record-cost.dto';
+import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
-import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import {
+  LlmProvider,
+  WorkflowNodeType,
+  type WorkflowNodeConfig,
+} from '../nodes/schemas/workflow-node.schema';
 import { ImageGenerationService } from '../nodes/services/image-generation.service';
+import { KeywordPlannerService } from '../nodes/services/keyword-planner.service';
 import { SummarizationService } from '../nodes/services/summarization.service';
 import { TextGenerationService } from '../nodes/services/text-generation.service';
 import { TranscriptionService } from '../nodes/services/transcription.service';
@@ -24,12 +32,14 @@ export class NodeExecutor {
 
   constructor(
     private readonly events: EventsService,
+    private readonly keywordPlanner: KeywordPlannerService,
     private readonly textGeneration: TextGenerationService,
     private readonly imageGeneration: ImageGenerationService,
     private readonly videoGeneration: VideoGenerationService,
     private readonly translation: TranslationService,
     private readonly transcription: TranscriptionService,
     private readonly summarization: SummarizationService,
+    private readonly costService: CostService,
   ) {}
 
   async execute(input: NodeExecutorInput): Promise<NodeExecutorOutput> {
@@ -50,6 +60,9 @@ export class NodeExecutor {
       try {
         return await this.executeNode(input);
       } catch (error) {
+        if (error instanceof PipelineBudgetExceededError) {
+          throw error;
+        }
         lastError = error;
         this.logger.error(
           [
@@ -94,7 +107,6 @@ export class NodeExecutor {
       workflowRef: input.node.workflowRef ?? input.pipelineId,
       nodeId: input.node.nodeId,
       order: input.node.order,
-      userPrompt: input.node.userPrompt,
       config: input.node.config,
       rule: input.context.rule,
       contentPrompt: input.context.contentPrompt,
@@ -109,6 +121,7 @@ export class NodeExecutor {
     };
 
     const result = await this.executeNodeByType(input.node.type, nodeInput);
+    await this.recordNodeCostIfApplicable(input, result);
     const output = this.mapNodeOutput(input.node.type, result);
 
     this.events.emitToPipeline(input.pipelineId, 'node:completed', {
@@ -150,6 +163,8 @@ export class NodeExecutor {
     input: NodeExecutionInput,
   ): Promise<NodeExecutionResult> {
     switch (type) {
+      case WorkflowNodeType.KeywordPlanner:
+        return this.keywordPlanner.execute(input);
       case WorkflowNodeType.TextGeneration:
         return this.textGeneration.execute(input);
       case WorkflowNodeType.ImageGeneration:
@@ -171,6 +186,8 @@ export class NodeExecutor {
     result: NodeExecutionResult,
   ): NodeExecutorOutput['output'] {
     switch (type) {
+      case WorkflowNodeType.KeywordPlanner:
+        return { keywords: result.output ?? undefined };
       case WorkflowNodeType.TextGeneration:
         return { text: result.output ?? undefined };
       case WorkflowNodeType.ImageGeneration:
@@ -186,6 +203,123 @@ export class NodeExecutor {
       default:
         return {};
     }
+  }
+
+  private async recordNodeCostIfApplicable(
+    input: NodeExecutorInput,
+    result: NodeExecutionResult,
+  ): Promise<void> {
+    const dto = this.buildRecordCostDto(input, result);
+    if (!dto) {
+      return;
+    }
+    try {
+      await this.costService.recordNodeCost(dto);
+    } catch (e) {
+      if (e instanceof PipelineBudgetExceededError) {
+        throw e;
+      }
+      this.logger.warn(
+        `Cost recording failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  private buildRecordCostDto(
+    input: NodeExecutorInput,
+    result: NodeExecutionResult,
+  ): RecordCostDto | null {
+    if (!input.userId || !input.ruleId) {
+      return null;
+    }
+    const cfg = (input.node.config ?? {}) as WorkflowNodeConfig;
+    const provider = this.providerFromConfig(cfg);
+    const base: Pick<
+      RecordCostDto,
+      | 'userId'
+      | 'pipelineRef'
+      | 'campaignRef'
+      | 'contentRef'
+      | 'nodeId'
+      | 'nodeType'
+      | 'provider'
+    > = {
+      userId: input.userId,
+      pipelineRef: input.pipelineId,
+      campaignRef: input.ruleId,
+      contentRef: input.contentId,
+      nodeId: input.node.nodeId,
+      nodeType: input.node.type,
+      provider,
+    };
+
+    switch (input.node.type) {
+      case WorkflowNodeType.KeywordPlanner:
+      case WorkflowNodeType.TextGeneration:
+      case WorkflowNodeType.Translation:
+      case WorkflowNodeType.Summarization: {
+        const model =
+          typeof cfg.model === 'string' && cfg.model.trim()
+            ? cfg.model.trim()
+            : 'gpt-4o';
+        return {
+          ...base,
+          providerModel: model,
+          entryType: 'openai_llm',
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+        };
+      }
+      case WorkflowNodeType.ImageGeneration: {
+        const ic = result.imageCost;
+        if (!ic) {
+          return null;
+        }
+        return {
+          ...base,
+          providerModel: ic.model,
+          entryType: 'openai_image',
+          imageCount: ic.count,
+          imageSize: ic.size,
+          imageQuality: ic.quality,
+        };
+      }
+      case WorkflowNodeType.VideoGeneration: {
+        const vc = result.videoCost;
+        if (!vc) {
+          return null;
+        }
+        return {
+          ...base,
+          providerModel: vc.model,
+          entryType: 'openai_video',
+          videoSeconds: vc.videoSeconds,
+          videoResolution: vc.videoResolution,
+        };
+      }
+      case WorkflowNodeType.Transcription: {
+        const model =
+          typeof cfg.model === 'string' && cfg.model.trim()
+            ? cfg.model.trim()
+            : 'whisper-1';
+        return {
+          ...base,
+          providerModel: model,
+          entryType: 'openai_llm',
+          audioDurationSeconds: result.audioDurationSeconds,
+        };
+      }
+      default:
+        return null;
+    }
+  }
+
+  private providerFromConfig(cfg: WorkflowNodeConfig): string {
+    const p = cfg.provider;
+    if (p && (Object.values(LlmProvider) as string[]).includes(p)) {
+      return p;
+    }
+    return LlmProvider.OpenAI;
   }
 
   private getFriendlyError(error: unknown): string {

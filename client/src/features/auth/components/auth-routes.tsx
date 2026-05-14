@@ -6,7 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom"
 
-import PageLoader from "@/components/core/page-loader"
+import Loader from "@/components/core/loader"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { useAuthStore } from "@/shared/stores/auth.store"
 
@@ -18,7 +18,7 @@ export function GuestOnlyRoute({ children }: { children: ReactNode }) {
   const next = searchParams.get("next")?.trim() || "/dashboard"
 
   if (!hydrated) {
-    return <PageLoader />
+    return <Loader />
   }
 
   if (accessToken) {
@@ -35,7 +35,7 @@ export function ProtectedLayout() {
   const location = useLocation()
 
   if (!hydrated) {
-    return <PageLoader />
+    return <Loader />
   }
 
   if (!accessToken) {
@@ -57,7 +57,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const role = useAuthStore((s) => s.role)
 
   if (!accessToken) {
-    return <Navigate to="/login?next=/admin" replace />
+    return <Navigate to="/login?next=/admin/dashboard" replace />
   }
 
   if (role !== "ADMIN") {

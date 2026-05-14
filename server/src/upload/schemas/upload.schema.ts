@@ -29,6 +29,13 @@ export class UploadChannelEntry {
   @Prop({ required: true })
   channel: string;
 
+  /**
+   * Whether this channel should be included by default when publishing the upload.
+   * Persisted so user choices are remembered across sessions.
+   */
+  @Prop({ type: Boolean, required: true, default: true })
+  included: boolean;
+
   /** Single source of truth for post caption (initialized from rule mapping; user edits via PATCH). */
   @Prop({ type: String, default: '' })
   caption: string;

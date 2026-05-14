@@ -139,8 +139,8 @@ export class TranscriptionService {
 
   async transcribe(
     input: TranscriptionInput,
-  ): Promise<{ transcription: string }> {
-    const { userPrompt, config } = input;
+  ): Promise<{ transcription: string; audioDurationSeconds: number }> {
+    const { config } = input;
     const normalized = normalizeTranscriptionConfig(config);
     if (!normalized.sourceUrl) {
       throw new UnprocessableEntityException(
@@ -149,6 +149,10 @@ export class TranscriptionService {
     }
 
     const { buffer } = await this.downloadSource(normalized.sourceUrl);
+    const audioDurationSeconds = Math.max(
+      1,
+      Math.round(buffer.byteLength / 16_000),
+    );
     const fileName = fileNameFromUrl(
       normalized.sourceUrl,
       normalized.sourceType,
@@ -162,10 +166,12 @@ export class TranscriptionService {
       mimeType,
       model: normalized.model,
       language: normalized.language,
-      prompt: userPrompt,
     });
 
-    return { transcription: transcription.trim() };
+    return {
+      transcription: transcription.trim(),
+      audioDurationSeconds,
+    };
   }
 
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {
@@ -175,14 +181,17 @@ export class TranscriptionService {
       );
     }
 
-    const { transcription } = await this.transcribe({
+    const { transcription, audioDurationSeconds } = await this.transcribe({
       rule: input.rule,
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
-      userPrompt: input.userPrompt,
       config: input.config ?? {},
     });
 
-    return { output: transcription, transcription };
+    return {
+      output: transcription,
+      transcription,
+      audioDurationSeconds,
+    };
   }
 }

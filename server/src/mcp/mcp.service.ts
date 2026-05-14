@@ -100,7 +100,31 @@ export class McpService {
   }
 
   async disconnectAccount(userId: string, channel: string): Promise<void> {
-    await this.usersService.disconnectZernioConnectedAccount(userId, channel);
+    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    const record = this.findConnectedAccountForDisconnect(accounts, channel);
+    if (!record) {
+      throw new NotFoundException(
+        `No connected account for channel "${channel.trim()}"`,
+      );
+    }
+    await this.zernioRest.deleteAccount(record.accountId);
+    await this.usersService.disconnectZernioConnectedAccount(
+      userId,
+      record.channel,
+    );
+  }
+
+  /** Resolve stored row when UI uses `twitter` vs Zernio storing `x` (or vice versa). */
+  private findConnectedAccountForDisconnect(
+    accounts: ConnectedAccountRecord[],
+    requestChannel: string,
+  ): ConnectedAccountRecord | undefined {
+    const key = requestChannel.trim().toLowerCase();
+    const keys =
+      key === 'twitter' || key === 'x'
+        ? new Set<string>(['twitter', 'x'])
+        : new Set<string>([key]);
+    return accounts.find((a) => keys.has(a.channel));
   }
 
   async publishCreatePostBatch(

@@ -8,8 +8,9 @@ import {
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
+import { ArrowLeft } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,7 @@ import {
 } from "@/features/upload/lib/upload-platform-media"
 import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { cn } from "@/lib/utils"
+import { useGetContentQuery } from "@/shared/queries/content.query"
 import {
   usePatchUploadChannelMutation,
   usePublishUploadMutation,
@@ -63,12 +65,21 @@ import {
 } from "@/shared/socket/upload-events"
 import type { UploadChannelRow, UploadDetail } from "@/shared/types/upload.type"
 
-function normalizeRow(c: UploadChannelRow): UploadChannelRow {
+function normalizeRow(
+  c: Partial<UploadChannelRow> & { channel: string },
+): UploadChannelRow {
   return {
-    ...c,
+    channel: c.channel,
+    included: c.included ?? true,
+    status: (c.status ?? "pending") as UploadChannelRow["status"],
     caption: c.caption ?? "",
+    mediaUrl: c.mediaUrl ?? null,
     mediaUrls: c.mediaUrls ?? [],
     youtubeTitle: c.youtubeTitle ?? null,
+    scheduledAt: c.scheduledAt ?? null,
+    publishedAt: c.publishedAt ?? null,
+    zernioPostId: c.zernioPostId ?? null,
+    failureReason: c.failureReason ?? null,
   }
 }
 
@@ -83,7 +94,7 @@ function mergeChannelUpdate(
     prev ??
     uploadData?.channels.find((c) => c.channel.toLowerCase() === channelKey)
   if (!base) {
-    return {
+    return normalizeRow({
       caption: "",
       mediaUrl: null,
       mediaUrls: [],
@@ -92,13 +103,14 @@ function mergeChannelUpdate(
       publishedAt: null,
       zernioPostId: null,
       failureReason: null,
+      included: true,
       ...updates,
-    }
+    })
   }
-  return {
+  return normalizeRow({
     ...base,
     ...updates,
-  }
+  })
 }
 
 const captionLabels: Record<string, string> = {
@@ -126,6 +138,8 @@ export default function UploadPage() {
   const { uploadId } = useParams<{ uploadId?: string }>()
   const uploadQuery = useGetUploadQuery(uploadId)
   const upload = uploadQuery.data
+  const contentQuery = useGetContentQuery(upload?.contentRef)
+  const workflowRuleId = contentQuery.data?.ruleRef
   const zernioAccountsQuery = useZernioAccountsQuery(Boolean(uploadId))
   const publishMutation = usePublishUploadMutation()
   const patchMutation = usePatchUploadChannelMutation()
@@ -169,22 +183,39 @@ export default function UploadPage() {
     })
   }, [liveStatusByChannel, upload?.channels])
 
-  const activeKey = useMemo(() => {
-    if (!channels.length) return ""
-    const keys = new Set(channels.map((c) => c.channel.toLowerCase()))
-    if (selectedChannelKey && keys.has(selectedChannelKey)) {
-      return selectedChannelKey
-    }
-    return channels[0]!.channel.toLowerCase()
-  }, [channels, selectedChannelKey])
+  const allChannelTabs = useMemo(
+    () => [
+      { channel: "Facebook" },
+      { channel: "Instagram" },
+      { channel: "Twitter" },
+      { channel: "LinkedIn" },
+      { channel: "YouTube" },
+      { channel: "TikTok" },
+    ],
+    []
+  )
 
+  /** Zernio may return `x` while upload rows use `twitter`; treat as one connection. */
   const connectedChannelSet = useMemo(() => {
     const set = new Set<string>()
     for (const item of zernioAccountsQuery.data?.accounts ?? []) {
       set.add(item.channel.toLowerCase())
     }
+    if (set.has("x")) set.add("twitter")
+    if (set.has("twitter")) set.add("x")
     return set
   }, [zernioAccountsQuery.data?.accounts])
+
+  const activeKey = useMemo(() => {
+    const tabKeys = new Set(allChannelTabs.map((t) => t.channel.toLowerCase()))
+    if (selectedChannelKey && tabKeys.has(selectedChannelKey)) {
+      return selectedChannelKey
+    }
+    if (!channels.length) {
+      return allChannelTabs[0]?.channel.toLowerCase() ?? ""
+    }
+    return channels[0]!.channel.toLowerCase()
+  }, [channels, selectedChannelKey, allChannelTabs])
 
   useEffect(() => {
     if (!upload) return
@@ -317,8 +348,32 @@ export default function UploadPage() {
   }, [queryClient, uploadId])
 
   const activeRow = useMemo(() => {
-    return channels.find((c) => c.channel.toLowerCase() === activeKey)
-  }, [channels, activeKey])
+    const fromChannels = channels.find(
+      (c) => c.channel.toLowerCase() === activeKey,
+    )
+    if (fromChannels) return fromChannels
+
+    const live = liveStatusByChannel[activeKey]
+    if (live) return normalizeRow(live)
+
+    const tab = allChannelTabs.find(
+      (t) => t.channel.toLowerCase() === activeKey,
+    )
+    if (!tab || !upload) return undefined
+    return normalizeRow({
+      channel: tab.channel,
+      included: true,
+      status: "pending",
+      caption: "",
+      mediaUrl: null,
+      mediaUrls: [],
+      youtubeTitle: null,
+      scheduledAt: null,
+      publishedAt: null,
+      zernioPostId: null,
+      failureReason: null,
+    })
+  }, [channels, activeKey, allChannelTabs, upload, liveStatusByChannel])
 
   const activeIsScheduled = activeRow?.status === "scheduled"
 
@@ -337,6 +392,81 @@ export default function UploadPage() {
     }))
   }, [])
 
+  const channelRowByKey = useMemo(() => {
+    const m = new Map<string, UploadChannelRow>()
+    for (const c of channels) {
+      m.set(c.channel.toLowerCase(), c)
+    }
+    return m
+  }, [channels])
+
+  const includedByKey = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const t of allChannelTabs) {
+      const key = t.channel.toLowerCase()
+      const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
+      out[key] = row ? Boolean(row.included) : true
+    }
+    return out
+  }, [allChannelTabs, channelRowByKey, liveStatusByChannel])
+
+  const includeSwitchDisabledByKey = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const t of allChannelTabs) {
+      const key = t.channel.toLowerCase()
+      const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
+      out[key] = row?.status === "scheduled"
+    }
+    return out
+  }, [allChannelTabs, channelRowByKey, liveStatusByChannel])
+
+  const handleChannelIncludedChange = useCallback(
+    (channelKey: string, checked: boolean) => {
+      if (!uploadId) return
+      const channel = allChannelTabs.find(
+        (t) => t.channel.toLowerCase() === channelKey,
+      )?.channel
+      if (!channel) return
+
+      void patchMutation
+        .mutateAsync({
+          uploadId,
+          channel,
+          body: { included: checked },
+        })
+        .then(() => {
+          setLiveStatusByChannel((prev) => {
+            const fromList = channels.find(
+              (c) => c.channel.toLowerCase() === channelKey,
+            )
+            const base =
+              prev[channelKey] ??
+              fromList ??
+              normalizeRow({
+                channel,
+                included: true,
+                status: "pending",
+                caption: "",
+                mediaUrl: null,
+                mediaUrls: [],
+                youtubeTitle: null,
+                scheduledAt: null,
+                publishedAt: null,
+                zernioPostId: null,
+                failureReason: null,
+              })
+            return {
+              ...prev,
+              [channelKey]: { ...base, included: checked },
+            }
+          })
+          toast.success(checked ? "Channel included" : "Channel excluded")
+        })
+        .catch((err) => toast.error(getApiErrorMessage(err)))
+    },
+    [uploadId, allChannelTabs, patchMutation, channels],
+  )
+
   const captionEffective = useMemo(() => {
     if (!upload) return ""
     return effectiveCaptionForDraft(activeDraft, upload.resolvedOutputs)
@@ -345,9 +475,26 @@ export default function UploadPage() {
   const dotStatusByKey = useMemo(() => {
     const out: Record<string, ChannelTabDotStatus> = {}
     if (!upload) return out
-    for (const ch of channels) {
-      const key = ch.channel.toLowerCase()
+    const channelRowsByKey = new Map(
+      channels.map((c) => [c.channel.toLowerCase(), c]),
+    )
+    for (const t of allChannelTabs) {
+      const key = t.channel.toLowerCase()
+      const ch = channelRowsByKey.get(key)
       const connected = connectedChannelSet.has(key)
+      if (!ch) {
+        const draft = draftsByChannel[key] ?? createEmptyDraft()
+        const hasText =
+          effectiveCaptionForDraft(draft, upload.resolvedOutputs).trim().length >
+          0
+        out[key] = getTabDotStatus({
+          serverStatus: "pending",
+          connected,
+          hasAssignedText: hasText,
+          isSaved: !draft.dirty,
+        })
+        continue
+      }
       const draft =
         draftsByChannel[key] ??
         draftFromUploadRow(ch, key, upload.resolvedOutputs)
@@ -362,7 +509,13 @@ export default function UploadPage() {
       })
     }
     return out
-  }, [channels, connectedChannelSet, draftsByChannel, upload])
+  }, [
+    allChannelTabs,
+    channels,
+    connectedChannelSet,
+    draftsByChannel,
+    upload,
+  ])
 
   const publishAllVisual = useMemo(() => {
     const connected = channels.filter((c) =>
@@ -738,9 +891,20 @@ export default function UploadPage() {
     >
       <div className="p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-base font-medium text-foreground">
-            Upload content
-          </h1>
+          <div className="space-y-1">
+            {workflowRuleId ? (
+              <Link
+                to={`/workflow/${workflowRuleId}`}
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to workflow
+              </Link>
+            ) : null}
+            <h1 className="text-base font-medium text-foreground">
+              Upload content
+            </h1>
+          </div>
           <Button
             type="button"
             size="sm"
@@ -764,13 +928,17 @@ export default function UploadPage() {
         </div>
 
         <UploadChannelTabs
-          channels={channels}
+          channels={allChannelTabs}
           activeKey={activeKey}
           onSelect={(key) => {
             setSelectedChannelKey(key)
             setScheduledEditOpen(false)
           }}
           dotStatusByKey={dotStatusByKey}
+          includedByKey={includedByKey}
+          onIncludedChange={handleChannelIncludedChange}
+          includeSwitchDisabledByKey={includeSwitchDisabledByKey}
+          includeSwitchPending={patchMutation.isPending}
         />
 
         <div className="min-h-[min(520px,70vh)] min-w-0 overflow-hidden">
@@ -828,7 +996,7 @@ export default function UploadPage() {
                 </div>
 
                 {activeRow && mediaCfg ? (
-                  <div className="h-[70vh] space-y-3 overflow-y-auto">
+                    <div className="h-[70vh] space-y-3 overflow-y-auto">
                     {activeIsScheduled && scheduledEditOpen ? (
                       <div className="space-y-3 rounded-lg border border-[#D7ECFF] bg-[#F3F8FE] p-3">
                         <div>
