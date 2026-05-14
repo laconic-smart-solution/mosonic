@@ -50,7 +50,7 @@ import { useGetWorkflowQuery } from "@/shared/queries/workflow.query"
 import { contentService } from "@/shared/services/content.service"
 import { uploadService } from "@/shared/services/upload.service"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
-import type { ContentDetail, ContentOutputs } from "@/shared/types/content.type"
+import type { ContentDetail } from "@/shared/types/content.type"
 import type { WorkflowNode, WorkflowNodeType } from "@/shared/types/workflow.type"
 import {
   joinContentRoom,
@@ -230,19 +230,6 @@ export function UploadContentReviewPanel({
     setHasUnsavedChanges(true)
     setApproveEnabled(false)
   }, [])
-
-  const updateOutput = useCallback(
-    (key: OutputKey, value: string | undefined) => {
-      const nid = lastNodeIdForOutputKey(workflowNodes, key)
-      if (!nid) return
-      setNodeUserEdits((prev) => ({
-        ...prev,
-        [nid]: { ...prev[nid], [key]: value },
-      }))
-      markDirty()
-    },
-    [markDirty, workflowNodes]
-  )
 
   const updateNodeUserEdit = useCallback(
     (nodeId: string, key: OutputKey, value: string | undefined) => {
