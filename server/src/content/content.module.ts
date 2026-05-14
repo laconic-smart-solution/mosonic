@@ -15,6 +15,8 @@ import { ContentController } from './content.controller';
 import { ContentRepository } from './content.repository';
 import { FileProxyController } from './file-proxy.controller';
 import { FileProxyService } from './file-proxy.service';
+import { ImageFileController } from './image-file.controller';
+import { ImageFileService } from './image-file.service';
 import { ContentService } from './content.service';
 import { Content, ContentSchema } from './schemas/content.schema';
 
@@ -32,8 +34,17 @@ import { Content, ContentSchema } from './schemas/content.schema';
       { name: Rule.name, schema: RuleSchema },
     ]),
   ],
-  controllers: [ContentController, FileProxyController],
-  providers: [ContentService, ContentRepository, FileProxyService],
+  controllers: [
+    ContentController,
+    FileProxyController,
+    ImageFileController,
+  ],
+  providers: [
+    ContentService,
+    ContentRepository,
+    FileProxyService,
+    ImageFileService,
+  ],
   exports: [MongooseModule, ContentService],
 })
 export class ContentModule {}

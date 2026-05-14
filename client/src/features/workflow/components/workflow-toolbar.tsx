@@ -112,7 +112,7 @@ export function WorkflowToolbar({
           </Button>
         ) : null}
         {!readOnly ? (
-          <Button type="button" size="sm" onClick={onRun} className="gap-1.5">
+          <Button type="button" size="sm" onClick={() => onRun()} className="gap-1.5">
             <svg
               width="12"
               height="12"

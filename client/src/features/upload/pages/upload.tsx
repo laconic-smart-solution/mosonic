@@ -132,6 +132,53 @@ function toDatetimeLocalValue(iso: string | null | undefined) {
   return local.toISOString().slice(0, 16)
 }
 
+const CANONICAL_UPLOAD_TAB_ORDER = [
+  "Facebook",
+  "Instagram",
+  "Twitter",
+  "LinkedIn",
+  "YouTube",
+  "TikTok",
+] as const
+
+function isTwitterFamilyKey(key: string): boolean {
+  return key === "twitter" || key === "x"
+}
+
+function uploadRowMatchesCanonicalTab(
+  canonicalName: string,
+  rowChannelKey: string,
+): boolean {
+  const tabKey = normalizeChannelKey(canonicalName)
+  const rowKey = rowChannelKey
+  if (isTwitterFamilyKey(tabKey) && isTwitterFamilyKey(rowKey)) return true
+  return tabKey === rowKey
+}
+
+/** Header tabs: only channels on this upload, canonical order then any extra rows. */
+function channelTabsForUpload(
+  rows: UploadChannelRow[] | undefined,
+): { channel: string }[] {
+  if (!rows?.length) return []
+  const tabs: { channel: string }[] = []
+  const consumed = new Set<number>()
+  for (const name of CANONICAL_UPLOAD_TAB_ORDER) {
+    const idx = rows.findIndex(
+      (r, i) =>
+        !consumed.has(i) &&
+        uploadRowMatchesCanonicalTab(name, normalizeChannelKey(r.channel)),
+    )
+    if (idx === -1) continue
+    consumed.add(idx)
+    tabs.push({ channel: rows[idx]!.channel })
+  }
+  for (let i = 0; i < rows.length; i++) {
+    if (consumed.has(i)) continue
+    tabs.push({ channel: rows[i]!.channel })
+  }
+  return tabs
+}
+
 export default function UploadPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -183,16 +230,9 @@ export default function UploadPage() {
     })
   }, [liveStatusByChannel, upload?.channels])
 
-  const allChannelTabs = useMemo(
-    () => [
-      { channel: "Facebook" },
-      { channel: "Instagram" },
-      { channel: "Twitter" },
-      { channel: "LinkedIn" },
-      { channel: "YouTube" },
-      { channel: "TikTok" },
-    ],
-    []
+  const channelTabs = useMemo(
+    () => channelTabsForUpload(upload?.channels),
+    [upload?.channels],
   )
 
   /** Zernio may return `x` while upload rows use `twitter`; treat as one connection. */
@@ -207,15 +247,15 @@ export default function UploadPage() {
   }, [zernioAccountsQuery.data?.accounts])
 
   const activeKey = useMemo(() => {
-    const tabKeys = new Set(allChannelTabs.map((t) => t.channel.toLowerCase()))
+    const tabKeys = new Set(channelTabs.map((t) => t.channel.toLowerCase()))
     if (selectedChannelKey && tabKeys.has(selectedChannelKey)) {
       return selectedChannelKey
     }
     if (!channels.length) {
-      return allChannelTabs[0]?.channel.toLowerCase() ?? ""
+      return channelTabs[0]?.channel.toLowerCase() ?? ""
     }
     return channels[0]!.channel.toLowerCase()
-  }, [channels, selectedChannelKey, allChannelTabs])
+  }, [channels, selectedChannelKey, channelTabs])
 
   useEffect(() => {
     if (!upload) return
@@ -356,7 +396,7 @@ export default function UploadPage() {
     const live = liveStatusByChannel[activeKey]
     if (live) return normalizeRow(live)
 
-    const tab = allChannelTabs.find(
+    const tab = channelTabs.find(
       (t) => t.channel.toLowerCase() === activeKey,
     )
     if (!tab || !upload) return undefined
@@ -373,7 +413,7 @@ export default function UploadPage() {
       zernioPostId: null,
       failureReason: null,
     })
-  }, [channels, activeKey, allChannelTabs, upload, liveStatusByChannel])
+  }, [channels, activeKey, channelTabs, upload, liveStatusByChannel])
 
   const activeIsScheduled = activeRow?.status === "scheduled"
 
@@ -402,28 +442,28 @@ export default function UploadPage() {
 
   const includedByKey = useMemo(() => {
     const out: Record<string, boolean> = {}
-    for (const t of allChannelTabs) {
+    for (const t of channelTabs) {
       const key = t.channel.toLowerCase()
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
       out[key] = row ? Boolean(row.included) : true
     }
     return out
-  }, [allChannelTabs, channelRowByKey, liveStatusByChannel])
+  }, [channelTabs, channelRowByKey, liveStatusByChannel])
 
   const includeSwitchDisabledByKey = useMemo(() => {
     const out: Record<string, boolean> = {}
-    for (const t of allChannelTabs) {
+    for (const t of channelTabs) {
       const key = t.channel.toLowerCase()
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
       out[key] = row?.status === "scheduled"
     }
     return out
-  }, [allChannelTabs, channelRowByKey, liveStatusByChannel])
+  }, [channelTabs, channelRowByKey, liveStatusByChannel])
 
   const handleChannelIncludedChange = useCallback(
     (channelKey: string, checked: boolean) => {
       if (!uploadId) return
-      const channel = allChannelTabs.find(
+      const channel = channelTabs.find(
         (t) => t.channel.toLowerCase() === channelKey,
       )?.channel
       if (!channel) return
@@ -464,7 +504,7 @@ export default function UploadPage() {
         })
         .catch((err) => toast.error(getApiErrorMessage(err)))
     },
-    [uploadId, allChannelTabs, patchMutation, channels],
+    [uploadId, channelTabs, patchMutation, channels],
   )
 
   const captionEffective = useMemo(() => {
@@ -478,7 +518,7 @@ export default function UploadPage() {
     const channelRowsByKey = new Map(
       channels.map((c) => [c.channel.toLowerCase(), c]),
     )
-    for (const t of allChannelTabs) {
+    for (const t of channelTabs) {
       const key = t.channel.toLowerCase()
       const ch = channelRowsByKey.get(key)
       const connected = connectedChannelSet.has(key)
@@ -510,7 +550,7 @@ export default function UploadPage() {
     }
     return out
   }, [
-    allChannelTabs,
+    channelTabs,
     channels,
     connectedChannelSet,
     draftsByChannel,
@@ -928,7 +968,7 @@ export default function UploadPage() {
         </div>
 
         <UploadChannelTabs
-          channels={allChannelTabs}
+          channels={channelTabs}
           activeKey={activeKey}
           onSelect={(key) => {
             setSelectedChannelKey(key)
