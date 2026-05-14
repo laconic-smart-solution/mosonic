@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { randomUuid } from "@/lib/random-uuid"
 
 export interface Attachment {
   id: string
@@ -118,7 +119,7 @@ export function PromptArea({
   function handleFiles(files: FileList | null) {
     if (!files) return
     const next: Attachment[] = Array.from(files).map((f) => ({
-      id: crypto.randomUUID(),
+      id: randomUuid(),
       type: "file",
       label: f.name,
       data: f,
@@ -135,7 +136,7 @@ export function PromptArea({
     setAttachments((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: randomUuid(),
         type: "url",
         label: cleaned,
         data: urlValue.trim(),

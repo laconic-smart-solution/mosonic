@@ -25,6 +25,7 @@ import {
 } from "@/features/workflow/data/workflow-model"
 
 import type { WorkflowNode } from "@/shared/types/workflow.type"
+import { randomUuid } from "@/lib/random-uuid"
 import { WorkflowPropertiesPanel } from "./workflow-properties-panel"
 import { WorkflowRfNode } from "./workflow-rf-node"
 
@@ -134,7 +135,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           x: e.clientX,
           y: e.clientY,
         })
-        const id = `n-${crypto.randomUUID()}`
+        const id = `n-${randomUuid()}`
         const newNode: WfRfNode = {
           id,
           type: "wfNode",
