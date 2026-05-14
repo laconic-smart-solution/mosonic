@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react"
 import type { ChipColor } from "@/lib/tokens"
+import { randomUuid } from "@/lib/random-uuid"
 
 export type RuleStatus = "active" | "archived" | "draft" | "processing" | "failed"
 
@@ -702,7 +703,7 @@ export function removeListItemFromNode(rule: RuleEntity, fieldPath: string): Rul
 }
 
 export function createRuleFromPrompt(prompt: string): RuleEntity {
-  const id = crypto.randomUUID()
+  const id = randomUuid()
   return {
     ...DEFAULT_GENERATED_RULE,
     ruleId: id,
