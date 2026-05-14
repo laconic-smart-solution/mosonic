@@ -6,6 +6,7 @@ export const DashboardPage    = PageLoader(lazy(() => import("@/features/dashboa
 export const RulesPage        = PageLoader(lazy(() => import("@/features/rules/pages/rules")))
 export const WorkflowPromptPage = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-prompt")))
 export const WorkflowPage       = PageLoader(lazy(() => import("@/features/workflow/pages/workflow")))
+export const WorkflowsListPage  = PageLoader(lazy(() => import("@/features/workflow/pages/workflows")))
 export const RunPage          = PageLoader(lazy(() => import("@/features/run/pages/run")))
 export const ContentPage      = PageLoader(lazy(() => import("@/features/content/pages/content")))
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
@@ -14,7 +15,11 @@ export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
 )
 export const AnalyticsPage    = PageLoader(lazy(() => import("@/features/analytics/pages/analytics")))
-export const AnalyticsDetailPage = PageLoader(lazy(() => import("@/features/analytics/pages/analytics-detail")))
+export const AnalyticsDetailPage = PageLoader(
+  lazy(() => import("@/features/analytics/pages/analytics-detail")),
+)
+export const CostDashboardPage = PageLoader(lazy(() => import("@/features/cost/pages/cost-dashboard")))
+export const CostBudgetPage = PageLoader(lazy(() => import("@/features/cost/pages/cost-budget")))
 export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
 export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
 export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
@@ -29,5 +34,10 @@ export const ResetPasswordPage = PageLoader(
   lazy(() => import("@/features/auth/pages/reset-password")),
 )
 export const AdminDashboardPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-dashboard")))
-export const AdminUsersPage     = PageLoader(lazy(() => import("@/features/admin/pages/admin-users")))
-export const AdminUserNewPage   = PageLoader(lazy(() => import("@/features/admin/pages/admin-user-new")))
+export const AdminUsersPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-users")))
+export const AdminUserDetailPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-user-detail")))
+export const AdminCostPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-cost")))
+export const AdminContentPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-content")))
+export const AdminContentDetailPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-content-detail")),
+)

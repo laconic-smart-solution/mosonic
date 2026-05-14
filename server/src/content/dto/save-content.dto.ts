@@ -1,8 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 /** Merged into content `outputs` when persisting Generate More results. */
 export class NewOutputsBodyDto {
+  @IsOptional()
+  @IsString()
+  keywords?: string;
+
   @IsOptional()
   @IsString()
   text?: string;
@@ -29,6 +33,10 @@ export class NewOutputsBodyDto {
 }
 
 export class UserEditsBodyDto {
+  @IsOptional()
+  @IsString()
+  keywords?: string;
+
   @IsOptional()
   @IsString()
   text?: string;
@@ -63,4 +71,9 @@ export class SaveContentDto {
   @ValidateNested()
   @Type(() => NewOutputsBodyDto)
   newOutputs?: NewOutputsBodyDto;
+
+  /** Per-node user overrides merged into `nodeUserEdits` on save. */
+  @IsOptional()
+  @IsObject()
+  nodeUserEdits?: Record<string, Record<string, unknown>>;
 }

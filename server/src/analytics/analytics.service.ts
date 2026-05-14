@@ -215,7 +215,8 @@ export class AnalyticsService {
     }
 
     const to = new Date();
-    const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Zernio defaults to 90 days when omitted; keep our stored period consistent.
+    const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
     const uploads = await this.uploadModel
       .find({
@@ -257,7 +258,10 @@ export class AnalyticsService {
         }
 
         try {
-          const raw = await this.zernioRest.getPostAnalytics(pid);
+          const raw = await this.zernioRest.getPostAnalytics(pid, {
+            fromDate: from.toISOString().slice(0, 10),
+            toDate: to.toISOString().slice(0, 10),
+          });
           const metrics = normalizeMetrics(raw);
           contentPerformance.push({
             contentRef: upload.contentRef,

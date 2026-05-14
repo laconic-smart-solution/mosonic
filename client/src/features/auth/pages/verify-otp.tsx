@@ -1,9 +1,10 @@
 import { useMutation } from "@tanstack/react-query"
+import { MailCheck } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Label } from "@/components/ui/label"
@@ -11,6 +12,10 @@ import { toast } from "sonner"
 
 import { me } from "@/features/admin/api/auth-api"
 import { authFlowErrorMessage, resendOtp, verifyOtp } from "@/features/auth/api/auth-flow-api"
+import { AuthCardPanel } from "@/features/auth/components/auth-card-panel"
+import { AuthOtpBlock } from "@/features/auth/components/auth-otp-block"
+import { AuthPageHeader } from "@/features/auth/components/auth-page-header"
+import { AuthPageShell } from "@/features/auth/components/auth-page-shell"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
@@ -78,22 +83,25 @@ export default function VerifyOtpPage() {
         return
       }
 
-      if (!res.refreshToken) {
+      if (!res.refreshToken || !res.accessToken) {
         toast.error("No refresh token in response; cannot start session.")
         return
       }
 
+      const accessToken = res.accessToken
+      const refreshToken = res.refreshToken
+
       setSession({
-        accessToken: res.accessToken,
-        refreshToken: res.refreshToken,
+        accessToken,
+        refreshToken,
       })
 
       try {
         const meResp = await me()
         const role = meResp?.auth?.localUser?.role ?? null
         setSession({
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken,
+          accessToken,
+          refreshToken,
           role: role ?? undefined,
         })
         const lu = meResp?.auth?.localUser
@@ -111,23 +119,28 @@ export default function VerifyOtpPage() {
       toast.error(authFlowErrorMessage(e, "OTP verification failed. Please try again.")),
   })
 
+  const emailLocked = Boolean(emailFromQuery.trim())
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-md items-center px-4 py-10">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Verify OTP</CardTitle>
-          <CardDescription>
-            {email.trim() ? (
-              <>
-                We sent a 6-digit code to{" "}
-                <span className="font-medium text-foreground">{maskEmail(email)}</span>.
-              </>
-            ) : (
-              "Open the link from your sign-up or forgot-password flow so your email is filled in."
-            )}
-          </CardDescription>
+    <AuthPageShell>
+      <AuthCardPanel>
+        <CardHeader className="space-y-0 border-b border-border/60 pb-6">
+          <AuthPageHeader
+            icon={MailCheck}
+            title="Verify OTP"
+            description={
+              email.trim() ? (
+                <>
+                  We sent a 6-digit code to{" "}
+                  <span className="font-medium text-foreground">{maskEmail(email)}</span>.
+                </>
+              ) : (
+                "Open the link from your sign-up or forgot-password flow so your email is filled in."
+              )
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="verify-email">Email</Label>
             <Input
@@ -136,11 +149,12 @@ export default function VerifyOtpPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              disabled={emailLocked}
+              className={emailLocked ? "bg-muted/50 text-muted-foreground" : undefined}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Code</Label>
+          <AuthOtpBlock>
             <InputOTP maxLength={6} value={otp} onChange={setOtp}>
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -151,7 +165,7 @@ export default function VerifyOtpPage() {
                 <InputOTPSlot index={5} />
               </InputOTPGroup>
             </InputOTP>
-          </div>
+          </AuthOtpBlock>
 
           <Button
             className="w-full"
@@ -170,7 +184,7 @@ export default function VerifyOtpPage() {
             {resendMutation.isPending ? "Sending…" : "Resend OTP"}
           </Button>
         </CardContent>
-      </Card>
-    </div>
+      </AuthCardPanel>
+    </AuthPageShell>
   )
 }

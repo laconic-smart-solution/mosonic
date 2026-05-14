@@ -2,10 +2,8 @@ import { motion } from "framer-motion"
 import {
   Copy,
   ImageIcon,
-  Loader2,
   Pencil,
   RefreshCw,
-  Trash2,
   Video,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,15 +14,7 @@ import {
 } from "@/features/content/data/content-review-helpers"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
-import {
-  CARD_ICONS,
-  PreviewImageWithOverlay,
-  MediaVideoBlock,
-  NodeOutputBadge,
-  type CardRunState,
-  nodeIconBoxClass,
-  pipelineStepLabel,
-} from "./content-detail-review-ui"
+import { PreviewImageWithOverlay, MediaVideoBlock, type CardRunState } from "./content-detail-review-ui"
 
 export type ContentDetailNodeCardProps = {
   nodeKey: OutputKey
@@ -57,10 +47,8 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
     editedOutputs,
     globalRerunning,
     displayText,
-    hasBodyOutput,
     isTextLike,
     highlight,
-    wfNode,
     nodeId,
     onCopyOutput,
     onOpenRerun,

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { UsersService } from '../users/users.service';
 import { McpService } from './mcp.service';
@@ -19,11 +19,16 @@ describe('McpService', () => {
   const zernioMcp = {} as unknown as jest.Mocked<ZernioMcpClient>;
   const zernioRest = {
     publishCreatePost: jest.fn(),
-  } as unknown as jest.Mocked<Pick<ZernioRestClient, 'publishCreatePost'>>;
+    deleteAccount: jest.fn(),
+  } as unknown as jest.Mocked<
+    Pick<ZernioRestClient, 'publishCreatePost' | 'deleteAccount'>
+  >;
   const usersService = {
     getZernioPublishContext: jest.fn(),
     syncZernioConnectedAccounts: jest.fn(),
     findByUserId: jest.fn(),
+    getZernioConnectedAccounts: jest.fn(),
+    disconnectZernioConnectedAccount: jest.fn(),
   } as unknown as jest.Mocked<UsersService>;
   const oauthState = {} as ZernioOauthStateService;
   const config = {} as ConfigService;
@@ -118,6 +123,45 @@ describe('McpService', () => {
       publishNow: true,
       scheduledAt: null,
     });
+  });
+
+  it('disconnectAccount calls Zernio DELETE then removes local row', async () => {
+    usersService.getZernioConnectedAccounts.mockResolvedValue([
+      { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
+    ]);
+    zernioRest.deleteAccount.mockResolvedValue(undefined);
+
+    await service.disconnectAccount('u1', 'instagram');
+
+    expect(zernioRest.deleteAccount).toHaveBeenCalledWith('acc_ig');
+    expect(usersService.disconnectZernioConnectedAccount).toHaveBeenCalledWith(
+      'u1',
+      'instagram',
+    );
+  });
+
+  it('disconnectAccount resolves twitter when stored as x', async () => {
+    usersService.getZernioConnectedAccounts.mockResolvedValue([
+      { channel: 'x', accountId: 'acc_x', connectedAt: new Date() },
+    ]);
+    zernioRest.deleteAccount.mockResolvedValue(undefined);
+
+    await service.disconnectAccount('u1', 'twitter');
+
+    expect(zernioRest.deleteAccount).toHaveBeenCalledWith('acc_x');
+    expect(usersService.disconnectZernioConnectedAccount).toHaveBeenCalledWith(
+      'u1',
+      'x',
+    );
+  });
+
+  it('disconnectAccount throws when channel is not connected', async () => {
+    usersService.getZernioConnectedAccounts.mockResolvedValue([]);
+
+    await expect(service.disconnectAccount('u1', 'linkedin')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(zernioRest.deleteAccount).not.toHaveBeenCalled();
   });
 });
 

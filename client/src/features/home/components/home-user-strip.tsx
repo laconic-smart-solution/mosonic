@@ -53,25 +53,23 @@ export function HomeUserStrip() {
         </div>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "flex cursor-pointer items-center gap-1.5 rounded-md border border-[#EDE9E1] bg-white px-2.5 py-1 text-[11px] font-medium text-[#4A5568] shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
-              "outline-none focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
-            )}
-            aria-label="Account menu"
-          >
-            {contextLabel}
-            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden>
-              <path
-                d="M1.5 3.5l3 3 3-3"
-                stroke="#4A5568"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+        <DropdownMenuTrigger
+          type="button"
+          className={cn(
+            "flex cursor-pointer items-center gap-1.5 rounded-md border border-[#EDE9E1] bg-white px-2.5 py-1 text-[11px] font-medium text-[#4A5568] shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
+            "outline-none focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+          )}
+          aria-label="Account menu"
+        >
+          {contextLabel}
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden>
+            <path
+              d="M1.5 3.5l3 3 3-3"
+              stroke="#4A5568"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuItem onClick={() => navigate("/dashboard")}>

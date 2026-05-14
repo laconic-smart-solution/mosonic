@@ -137,6 +137,7 @@ export class LlmService {
     const capabilityByNodeType: Partial<
       Record<WorkflowNodeType, LlmCapability>
     > = {
+      [WorkflowNodeType.KeywordPlanner]: 'chat',
       [WorkflowNodeType.TextGeneration]: 'chat',
       [WorkflowNodeType.Translation]: 'chat',
       [WorkflowNodeType.Summarization]: 'chat',
@@ -351,7 +352,8 @@ export class LlmService {
       this.assertProviderCapability(provider, 'image_generation');
       const apiKey = this.requireApiKeyForProvider(provider);
       const client = new OpenAI({ apiKey });
-      const model = 'dall-e-3';
+      const requestedModel = (params.model ?? '').trim();
+      const model = requestedModel || 'gpt-image-1';
       const isDalle3 = model === 'dall-e-3';
 
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
@@ -366,12 +368,71 @@ export class LlmService {
         body.style = params.style;
       }
 
-      const response = await client.images.generate(body);
-      const base64 = response.data?.[0]?.b64_json;
-      if (!base64) {
-        throw new Error('Image generation returned no base64 payload');
+      const callWithCompat = async (
+        req: OpenAI.Images.ImageGenerateParamsNonStreaming,
+      ): Promise<OpenAI.Images.ImagesResponse> => {
+        try {
+          return await client.images.generate(req);
+        } catch (error: unknown) {
+          const msg = this.formatError(error);
+          // Some gateways / older endpoints reject `response_format`.
+          if (msg.includes("Unknown parameter: 'response_format'")) {
+            const without = { ...req };
+            delete (without as { response_format?: unknown }).response_format;
+            return await client.images.generate(without);
+          }
+          throw error;
+        }
+      };
+
+      let response: OpenAI.Images.ImagesResponse;
+      try {
+        response = await callWithCompat(body);
+      } catch (error: unknown) {
+        // Back-compat: some environments don't recognize `dall-e-3` even when configured.
+        const msg = this.formatError(error);
+        if (
+          model === 'dall-e-3' &&
+          (msg.includes("model 'dall-e-3' does not exist") ||
+            msg.includes('does not exist') ||
+            msg.includes('invalid_value'))
+        ) {
+          const fallbackBody: OpenAI.Images.ImageGenerateParamsNonStreaming = {
+            model: 'gpt-image-1',
+            prompt: params.prompt,
+            size: params.size,
+            n: 1,
+            response_format: 'b64_json',
+          };
+          response = await callWithCompat(fallbackBody);
+        } else {
+          throw error;
+        }
       }
-      return { base64, mimeType: 'image/png' };
+
+      const row = response.data?.[0];
+      const base64 = row?.b64_json;
+      if (base64) {
+        return { base64, mimeType: 'image/png' };
+      }
+
+      const url = row?.url;
+      if (typeof url === 'string' && url.trim()) {
+        const res = await fetch(url.trim(), {
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!res.ok) {
+          throw new Error(
+            `Image generation returned URL but download failed (${res.status})`,
+          );
+        }
+        const mimeType =
+          res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
+        const buf = Buffer.from(await res.arrayBuffer());
+        return { base64: buf.toString('base64'), mimeType };
+      }
+
+      throw new Error('Image generation returned no base64 payload');
     } catch (error) {
       this.logger.error(
         `OpenAI image generation failed: ${this.formatError(error)}`,

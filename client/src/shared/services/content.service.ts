@@ -12,6 +12,7 @@ import type {
 export type SaveContentBody = {
   userEdits: Partial<ContentOutputs>
   newOutputs?: Partial<ContentOutputs>
+  nodeUserEdits?: Record<string, Record<string, unknown>>
 }
 
 export type RerunNodeBody = {

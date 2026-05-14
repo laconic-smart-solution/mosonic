@@ -5,13 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { SsoClientService } from '../auth/sso-client.service';
+import { SsoClientService } from '../../auth/sso-client.service';
 import {
   User,
   type UserDocument,
   UserRole,
   UserStatus,
-} from '../users/schemas/user.schema';
+} from '../../users/schemas/user.schema';
 
 function tryGet(obj: unknown, path: string[]): unknown {
   let cur: unknown = obj;
@@ -24,74 +24,11 @@ function tryGet(obj: unknown, path: string[]): unknown {
 }
 
 @Injectable()
-export class AdminService {
+export class AdminUserProvisioningService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly sso: SsoClientService,
   ) {}
-
-  async statsUsers() {
-    const [total, admins, customers, disabled] = await Promise.all([
-      this.userModel.countDocuments({}).exec(),
-      this.userModel.countDocuments({ role: UserRole.ADMIN }).exec(),
-      this.userModel.countDocuments({ role: UserRole.CUSTOMER }).exec(),
-      this.userModel.countDocuments({ status: UserStatus.DISABLED }).exec(),
-    ]);
-
-    const now = new Date();
-    const daysAgo = (d: number) =>
-      new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
-    const [new7d, new30d] = await Promise.all([
-      this.userModel.countDocuments({ createdAt: { $gte: daysAgo(7) } }).exec(),
-      this.userModel
-        .countDocuments({ createdAt: { $gte: daysAgo(30) } })
-        .exec(),
-    ]);
-
-    return { total, admins, customers, disabled, new7d, new30d };
-  }
-
-  async listUsers(args: {
-    q?: string;
-    role?: UserRole;
-    status?: UserStatus;
-    page?: number;
-    limit?: number;
-  }) {
-    const page = Math.max(1, args.page ?? 1);
-    const limit = Math.min(100, Math.max(1, args.limit ?? 10));
-    const skip = (page - 1) * limit;
-
-    const filter: Record<string, unknown> = {};
-    if (args.role) filter.role = args.role;
-    if (args.status) filter.status = args.status;
-    if (args.q) {
-      const q = args.q.trim();
-      if (q) {
-        filter.$or = [
-          { email: { $regex: q, $options: 'i' } },
-          { username: { $regex: q, $options: 'i' } },
-          { firstName: { $regex: q, $options: 'i' } },
-          { lastName: { $regex: q, $options: 'i' } },
-          { authServerUserId: { $regex: q, $options: 'i' } },
-        ];
-      }
-    }
-
-    const [total, data] = await Promise.all([
-      this.userModel.countDocuments(filter).exec(),
-      this.userModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
-
-    const totalPages = Math.ceil(total / limit) || 0;
-    return { data, meta: { total, page, limit, totalPages } };
-  }
 
   async createUserViaSso(args: {
     email: string;
@@ -132,7 +69,6 @@ export class AdminService {
       });
       return { user, sso: ssoResp };
     } catch (e) {
-      // Rollback SSO user (best-effort).
       try {
         await this.sso.deleteUser(authServerUserId);
       } catch {

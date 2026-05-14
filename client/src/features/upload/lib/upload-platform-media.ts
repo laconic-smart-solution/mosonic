@@ -38,8 +38,8 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     displayName: "YouTube",
   },
   tiktok: {
-    tabs: ["video"],
-    maxCarousel: 0,
+    tabs: ["single", "video"],
+    maxCarousel: 1,
     displayName: "TikTok",
   },
 }

@@ -26,7 +26,9 @@ import { Pipeline } from '../pipeline/schemas/pipeline.schema';
 import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import { UploadService } from '../upload/upload.service';
+import { WorkflowService } from '../workflow/workflow.service';
 import { mergeResolvedOutputs } from './content-output.utils';
+import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
 import { ContentRepository } from './content.repository';
 import type {
   ContentPageItemDto,
@@ -49,6 +51,8 @@ export type ContentDetailResponse = {
   ruleRef: string;
   status: ContentStatus;
   outputs: ReturnType<typeof mergeResolvedOutputs>;
+  nodeOutputs: Record<string, Record<string, unknown>>;
+  nodeUserEdits: Record<string, Record<string, unknown>>;
   createdAt: string;
   updatedAt: string;
 };
@@ -61,6 +65,7 @@ export class ContentService {
     private readonly contentRepository: ContentRepository,
     @Inject(forwardRef(() => UploadService))
     private readonly uploadService: UploadService,
+    private readonly workflowService: WorkflowService,
     private readonly nodeExecutor: NodeExecutor,
     @InjectModel(Pipeline.name)
     private readonly pipelineModel: Model<PipelineDocument>,
@@ -99,7 +104,13 @@ export class ContentService {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
     const snapshot = this.resolveEditableState(doc);
-    const outputs = mergeResolvedOutputs(snapshot);
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      doc.workflowRef,
+      auth,
+    );
+    const outputs = mergeResolvedOutputs(snapshot, {
+      workflowNodesOrdered,
+    });
 
     const createdAtRaw = (doc as { createdAt?: Date }).createdAt;
     const updatedAtRaw = (doc as { updatedAt?: Date }).updatedAt;
@@ -111,6 +122,8 @@ export class ContentService {
       ruleRef: doc.ruleRef,
       status: doc.status,
       outputs,
+      nodeOutputs: snapshot.nodeOutputs ?? {},
+      nodeUserEdits: snapshot.nodeUserEdits ?? {},
       createdAt: this.versionDateToIso(createdAtRaw ?? new Date()),
       updatedAt: this.versionDateToIso(updatedAtRaw ?? new Date()),
     };
@@ -131,8 +144,24 @@ export class ContentService {
       ...snapshot.userEdits,
       ...dto.userEdits,
     };
+    const nextNodeUserEdits: Record<string, Record<string, unknown>> = {
+      ...snapshot.nodeUserEdits,
+      ...(dto.nodeUserEdits ?? {}),
+    };
 
-    let nextOutputs: ContentOutputs = { ...snapshot.outputs };
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      plain.workflowRef,
+      auth,
+    );
+
+    let nextOutputs: ContentOutputs = {
+      ...snapshot.outputs,
+      ...flattenNodeOutputsToAiOutputs(
+        workflowNodesOrdered,
+        snapshot.nodeOutputs ?? {},
+        nextNodeUserEdits,
+      ),
+    };
     if (dto.newOutputs) {
       const keys: (keyof ContentOutputs)[] = [
         'text',
@@ -156,6 +185,8 @@ export class ContentService {
         outputs: nextOutputs,
         userEdits: nextUserEdits,
         nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: snapshot.nodeOutputs,
+        nodeUserEdits: nextNodeUserEdits,
       },
       auth,
     );
@@ -168,7 +199,14 @@ export class ContentService {
       auth,
     );
     if (refreshed) {
-      const merged = mergeResolvedOutputs(this.resolveEditableState(refreshed));
+      const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+        refreshed.workflowRef,
+        auth,
+      );
+      const merged = mergeResolvedOutputs(
+        this.resolveEditableState(refreshed),
+        { workflowNodesOrdered },
+      );
       await this.uploadService.syncResolvedOutputsForContent(
         contentId,
         auth,
@@ -222,9 +260,17 @@ export class ContentService {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
     }
 
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      content.workflowRef,
+      auth,
+    );
     /** Resolved outputs match what the user sees (edits over AI). */
-    const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
+    const resolved = mergeResolvedOutputs(
+      this.resolveEditableState(content.toObject()),
+      { workflowNodesOrdered },
+    );
     const previousOutputsFromDb: PreviousOutputs = {
+      keywords: resolved.keywords,
       text: resolved.text,
       image: resolved.image,
       translatedText: resolved.translatedText,
@@ -244,6 +290,7 @@ export class ContentService {
       rule,
       dto,
       previousOutputs,
+      auth,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -260,9 +307,6 @@ export class ContentService {
     if (!content) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const resolved = mergeResolvedOutputs(
-      this.resolveEditableState(content.toObject()),
-    );
     const candidates: WorkflowNodeType[] = [
       WorkflowNodeType.VideoGeneration,
       WorkflowNodeType.Transcription,
@@ -270,7 +314,9 @@ export class ContentService {
       WorkflowNodeType.Translation,
       WorkflowNodeType.ImageGeneration,
     ];
-    return candidates.filter((t) => !this.typeOutputSlotFilled(t, resolved));
+    // "Generate more" is also used to re-generate an existing output type.
+    // (Re-run exists too, but generate-more can create a new variant with optional instructions.)
+    return candidates;
   }
 
   async scheduleGenerateNode(
@@ -278,9 +324,12 @@ export class ContentService {
     dto: GenerateNodeDto,
     auth: TenancyAuth,
   ): Promise<{ success: true; nodeId: string }> {
-    if (dto.type === WorkflowNodeType.TextGeneration) {
+    if (
+      dto.type === WorkflowNodeType.TextGeneration ||
+      dto.type === WorkflowNodeType.KeywordPlanner
+    ) {
       throw new BadRequestException(
-        'Text generation is not available for Generate More.',
+        'Text generation and keyword planner are not available for Generate More.',
       );
     }
 
@@ -305,14 +354,17 @@ export class ContentService {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
     }
 
-    const resolved = mergeResolvedOutputs(this.resolveEditableState(content));
-    if (this.typeOutputSlotFilled(dto.type, resolved)) {
-      throw new BadRequestException(
-        'This content type already exists. Use re-run instead.',
-      );
-    }
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      content.workflowRef,
+      auth,
+    );
+    const resolved = mergeResolvedOutputs(
+      this.resolveEditableState(content.toObject()),
+      { workflowNodesOrdered },
+    );
 
     const previousOutputsFromDb: PreviousOutputs = {
+      keywords: resolved.keywords,
       text: resolved.text,
       image: resolved.image,
       translatedText: resolved.translatedText,
@@ -324,14 +376,27 @@ export class ContentService {
     const nodeId = randomUUID();
     const config = this.defaultConfigForGenerateMore(dto.type, rule);
 
+    const { order } = await this.workflowService.appendWorkflowNode(
+      content.workflowRef,
+      {
+        nodeId,
+        type: dto.type,
+        config,
+        userPrompt: dto.userPrompt,
+      },
+      auth,
+    );
+
     void this.runGenerateMoreExecution({
       content,
       pipeline,
       rule,
       dto,
       nodeId,
+      order,
       config,
       previousOutputs: previousOutputsFromDb,
+      auth,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -360,6 +425,8 @@ export class ContentService {
         return v(resolved.summary);
       case WorkflowNodeType.TextGeneration:
         return v(resolved.text);
+      case WorkflowNodeType.KeywordPlanner:
+        return v(resolved.keywords);
       default:
         return false;
     }
@@ -400,7 +467,7 @@ export class ContentService {
       case WorkflowNodeType.Translation:
         return { model: 'gpt-4o' };
       case WorkflowNodeType.ImageGeneration:
-        return { model: 'dall-e-3' };
+        return { model: 'gpt-image-1' };
       default:
         return { model: 'gpt-4o' };
     }
@@ -412,8 +479,10 @@ export class ContentService {
     rule: RuleDocument;
     dto: GenerateNodeDto;
     nodeId: string;
+    order: number;
     config: WorkflowNodeConfig;
     previousOutputs: PreviousOutputs;
+    auth: TenancyAuth;
   }): Promise<void> {
     const {
       content,
@@ -421,28 +490,45 @@ export class ContentService {
       rule,
       dto,
       nodeId,
+      order,
       config,
       previousOutputs,
+      auth,
     } = args;
     try {
-      await this.nodeExecutor.execute({
+      const extra = dto.userPrompt?.trim();
+      const contentPrompt = extra
+        ? `${pipeline.contentPrompt}\n\n${extra}`
+        : pipeline.contentPrompt;
+      const totalNodes = await this.workflowNodeModel.countDocuments(
+        mergeUserIdFilter({ workflowRef: content.workflowRef }, auth),
+      );
+      const result = await this.nodeExecutor.execute({
         node: {
           nodeId,
           type: dto.type,
-          order: 99,
-          userPrompt: dto.userPrompt?.trim() ?? '',
+          order,
           config,
           workflowRef: content.workflowRef,
         },
         context: {
           rule: rule.toObject(),
-          contentPrompt: pipeline.contentPrompt,
+          contentPrompt,
           previousOutputs,
         },
         pipelineId: pipeline.pipelineId,
-        totalNodes: pipeline.nodes?.length ?? 1,
+        totalNodes: Math.max(totalNodes, 1),
         contentId: content.contentId,
+        userId: pipeline.userId ?? content.userId,
+        ruleId: rule.ruleId,
       });
+      await this.persistNodeCompletion(
+        content.contentId,
+        content.workflowRef,
+        nodeId,
+        result.output as Record<string, unknown>,
+        auth,
+      );
     } catch {
       // Final failure already emitted on content room by NodeExecutor.
     }
@@ -454,35 +540,45 @@ export class ContentService {
     wfNode: WorkflowNodeDocument;
     rule: RuleDocument;
     dto: RerunNodeDto;
-    previousOutputs: {
-      text?: string;
-      image?: string;
-      translatedText?: string;
-      video?: string;
-      transcription?: string;
-      summary?: string;
-    };
+    previousOutputs: PreviousOutputs;
+    auth: TenancyAuth;
   }): Promise<void> {
-    const { content, pipeline, wfNode, rule, dto, previousOutputs } = args;
+    const { content, pipeline, wfNode, rule, dto, previousOutputs, auth } =
+      args;
+    const rerunBrief = dto.updatedPrompt?.trim();
+    const contentPrompt = rerunBrief
+      ? rerunBrief
+      : pipeline.contentPrompt;
     try {
-      await this.nodeExecutor.execute({
+      const totalNodes = await this.workflowNodeModel.countDocuments(
+        mergeUserIdFilter({ workflowRef: content.workflowRef }, auth),
+      );
+      const result = await this.nodeExecutor.execute({
         node: {
           nodeId: wfNode.nodeId,
           type: wfNode.type,
           order: wfNode.order,
-          userPrompt: dto.updatedPrompt ?? wfNode.userPrompt,
           config: wfNode.config ?? {},
           workflowRef: content.workflowRef,
         },
         context: {
           rule: rule.toObject(),
-          contentPrompt: pipeline.contentPrompt,
+          contentPrompt,
           previousOutputs,
         },
         pipelineId: pipeline.pipelineId,
-        totalNodes: pipeline.nodes?.length ?? 1,
+        totalNodes: Math.max(totalNodes, 1),
         contentId: content.contentId,
+        userId: pipeline.userId ?? content.userId,
+        ruleId: rule.ruleId,
       });
+      await this.persistNodeCompletion(
+        content.contentId,
+        content.workflowRef,
+        wfNode.nodeId,
+        result.output as Record<string, unknown>,
+        auth,
+      );
     } catch {
       // Final failure already emitted on pipeline + content rooms by NodeExecutor.
     }
@@ -537,8 +633,13 @@ export class ContentService {
       throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
     }
 
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      doc.workflowRef,
+      auth,
+    );
     const resolvedOutputs = mergeResolvedOutputs(
-      this.resolveEditableState(doc),
+      this.resolveEditableState(doc.toObject()),
+      { workflowNodesOrdered },
     );
 
     await this.contentRepository.updateStatus(
@@ -577,8 +678,13 @@ export class ContentService {
       if (!rule) {
         throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
       }
+      const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+        doc.workflowRef,
+        auth,
+      );
       const resolvedOutputs = mergeResolvedOutputs(
-        this.resolveEditableState(doc),
+        this.resolveEditableState(doc.toObject()),
+        { workflowNodesOrdered },
       );
       return this.uploadService.createUpload({
         userId: auth.userId,
@@ -612,12 +718,84 @@ export class ContentService {
     return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
   }
 
+  private async loadWorkflowNodesOrdered(
+    workflowRef: string,
+    auth: TenancyAuth,
+  ): Promise<Array<{ nodeId: string; type: string }>> {
+    const nodes = await this.workflowNodeModel
+      .find(mergeUserIdFilter({ workflowRef }, auth))
+      .sort({ order: 1 })
+      .select({ nodeId: 1, type: 1 })
+      .lean()
+      .exec();
+    return nodes.map((n) => ({
+      nodeId: n.nodeId,
+      type: typeof n.type === 'string' ? n.type : String(n.type ?? ''),
+    }));
+  }
+
+  private async persistNodeCompletion(
+    contentId: string,
+    workflowRef: string,
+    nodeId: string,
+    output: Record<string, unknown>,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const doc = await this.contentRepository.findByIdLean(contentId, auth);
+    if (!doc) return;
+    const snapshot = this.resolveEditableState(
+      doc as {
+        outputs?: ContentOutputs;
+        userEdits?: ContentUserEdits;
+        nodePromptOverrides?: Record<string, string>;
+        nodeOutputs?: Record<string, Record<string, unknown>>;
+        nodeUserEdits?: Record<string, Record<string, unknown>>;
+        versions?: Array<{
+          versionNumber: number;
+          outputs?: ContentOutputs;
+          userEdits?: ContentUserEdits;
+          nodePromptOverrides?: Record<string, string>;
+          createdAt?: Date | string;
+        }>;
+        currentVersion?: number;
+      },
+    );
+    const mergedNodeOutputs = {
+      ...(snapshot.nodeOutputs ?? {}),
+      [nodeId]: output,
+    };
+    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
+      workflowRef,
+      auth,
+    );
+    const nextOutputs: ContentOutputs = {
+      ...snapshot.outputs,
+      ...flattenNodeOutputsToAiOutputs(
+        workflowNodesOrdered,
+        mergedNodeOutputs,
+        snapshot.nodeUserEdits ?? {},
+      ),
+    };
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: nextOutputs,
+        userEdits: snapshot.userEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: mergedNodeOutputs,
+        nodeUserEdits: snapshot.nodeUserEdits,
+      },
+      auth,
+    );
+  }
+
   private mergeRerunPreviousOutputs(
     fallback: PreviousOutputs,
     incoming?: PreviousOutputs,
   ): PreviousOutputs {
     const merged: PreviousOutputs = { ...fallback };
     const keys: Array<keyof PreviousOutputs> = [
+      'keywords',
       'text',
       'image',
       'translatedText',
@@ -644,6 +822,8 @@ export class ContentService {
     outputs?: ContentOutputs;
     userEdits?: ContentUserEdits;
     nodePromptOverrides?: Record<string, string>;
+    nodeOutputs?: Record<string, Record<string, unknown>>;
+    nodeUserEdits?: Record<string, Record<string, unknown>>;
     versions?: Array<{
       versionNumber: number;
       outputs?: ContentOutputs;
@@ -656,12 +836,22 @@ export class ContentService {
     outputs: ContentOutputs;
     userEdits: ContentUserEdits;
     nodePromptOverrides: Record<string, string>;
+    nodeOutputs: Record<string, Record<string, unknown>>;
+    nodeUserEdits: Record<string, Record<string, unknown>>;
   } {
-    if (content.outputs || content.userEdits || content.nodePromptOverrides) {
+    if (
+      content.outputs ||
+      content.userEdits ||
+      content.nodePromptOverrides ||
+      content.nodeOutputs ||
+      content.nodeUserEdits
+    ) {
       return {
         outputs: content.outputs ?? {},
         userEdits: content.userEdits ?? {},
         nodePromptOverrides: content.nodePromptOverrides ?? {},
+        nodeOutputs: content.nodeOutputs ?? {},
+        nodeUserEdits: content.nodeUserEdits ?? {},
       };
     }
 
@@ -673,6 +863,8 @@ export class ContentService {
       outputs: preferred?.outputs ?? {},
       userEdits: preferred?.userEdits ?? {},
       nodePromptOverrides: preferred?.nodePromptOverrides ?? {},
+      nodeOutputs: {},
+      nodeUserEdits: {},
     };
   }
 }

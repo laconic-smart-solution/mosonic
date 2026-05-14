@@ -94,29 +94,27 @@ export function Topbar() {
 
       <div className="flex shrink-0 items-center gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                "flex cursor-pointer items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-xs transition-colors outline-none",
-                "focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
-              )}
-              style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
-              aria-label="Account menu"
-            >
-              <div className="flex size-5 shrink-0 items-center justify-center rounded-[5px] bg-gradient-to-br from-[#00A589] to-[#254C94] text-[9px] font-bold text-white">
-                {initials}
-              </div>
-              <span className="max-w-[140px] truncate font-medium">{displayName}</span>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
-                <path
-                  d="M2 4l3 3 3-3"
-                  stroke={T.textMuted}
-                  strokeWidth="1.3"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+          <DropdownMenuTrigger
+            type="button"
+            className={cn(
+              "flex cursor-pointer items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-xs transition-colors outline-none",
+              "focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+            )}
+            style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
+            aria-label="Account menu"
+          >
+            <div className="flex size-5 shrink-0 items-center justify-center rounded-[5px] bg-gradient-to-br from-[#00A589] to-[#254C94] text-[9px] font-bold text-white">
+              {initials}
+            </div>
+            <span className="max-w-[140px] truncate font-medium">{displayName}</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+              <path
+                d="M2 4l3 3 3-3"
+                stroke={T.textMuted}
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-48">
             <DropdownMenuItem variant="destructive" onClick={handleLogout}>

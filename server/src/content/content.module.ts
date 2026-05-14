@@ -10,6 +10,7 @@ import {
 import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
 import { UploadModule } from '../upload/upload.module';
+import { WorkflowModule } from '../workflow/workflow.module';
 import { ContentController } from './content.controller';
 import { ContentRepository } from './content.repository';
 import { FileProxyController } from './file-proxy.controller';
@@ -23,6 +24,7 @@ import { Content, ContentSchema } from './schemas/content.schema';
     ConfigModule,
     forwardRef(() => OrchestrationModule),
     forwardRef(() => UploadModule),
+    WorkflowModule,
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
       { name: Pipeline.name, schema: PipelineSchema },

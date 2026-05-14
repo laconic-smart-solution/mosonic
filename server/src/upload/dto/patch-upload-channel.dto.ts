@@ -1,6 +1,7 @@
 import {
   Allow,
   IsArray,
+  IsBoolean,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -10,6 +11,10 @@ import {
  * At least one field should be sent (enforced in service).
  */
 export class PatchUploadChannelBodyDto {
+  @IsOptional()
+  @IsBoolean()
+  included?: boolean;
+
   @IsOptional()
   @Allow()
   caption?: string | null;

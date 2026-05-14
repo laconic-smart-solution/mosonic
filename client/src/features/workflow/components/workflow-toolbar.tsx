@@ -6,6 +6,11 @@ type WorkflowToolbarProps = {
   onWfNameChange: (v: string) => void
   ruleName?: string
   onRuleClick?: () => void
+  /** Empty canvas: toggle structure-generation prompt bar */
+  onToggleStructurePrompt?: () => void
+  structurePromptOpen?: boolean
+  /** Ready canvas: open rebuild dialog */
+  onRebuildWorkflow?: () => void
   onRun: () => void
   runLabel?: string
   onSave?: () => void
@@ -19,6 +24,9 @@ export function WorkflowToolbar({
   onWfNameChange,
   ruleName,
   onRuleClick,
+  onToggleStructurePrompt,
+  structurePromptOpen,
+  onRebuildWorkflow,
   onRun,
   runLabel = "Run Pipeline",
   onSave,
@@ -77,6 +85,21 @@ export function WorkflowToolbar({
       </div>
 
       <div className="flex gap-2">
+        {onRebuildWorkflow && !readOnly ? (
+          <Button type="button" variant="outline" size="sm" onClick={onRebuildWorkflow}>
+            Rebuild nodes
+          </Button>
+        ) : null}
+        {onToggleStructurePrompt && !readOnly ? (
+          <Button
+            type="button"
+            variant={structurePromptOpen ? "default" : "outline"}
+            size="sm"
+            onClick={onToggleStructurePrompt}
+          >
+            Describe workflow
+          </Button>
+        ) : null}
         {onSave && !readOnly ? (
           <Button
             type="button"

@@ -35,11 +35,13 @@ export function FileServiceVideo({
   className,
   controls = false,
   muted = true,
+  playsInline = true,
 }: {
   url: string
   className?: string
   controls?: boolean
   muted?: boolean
+  playsInline?: boolean
 }) {
   const src = useFileObjectUrl(url)
   if (!src) {
@@ -60,7 +62,7 @@ export function FileServiceVideo({
       className={className}
       controls={controls}
       muted={muted}
-      playsInline
+      playsInline={playsInline}
     />
   )
 }

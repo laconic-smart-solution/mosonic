@@ -43,6 +43,7 @@ export type ContentPageResponse = {
 }
 
 export type ContentOutputs = {
+  keywords?: string
   text?: string
   translatedText?: string
   transcription?: string
@@ -55,6 +56,8 @@ export type ContentDetail = {
   contentId: string
   /** Merged userEdits over outputs. */
   outputs?: ContentOutputs
+  nodeOutputs?: Record<string, Record<string, unknown>>
+  nodeUserEdits?: Record<string, Record<string, unknown>>
   pipelineRef: string
   workflowRef: string
   ruleRef: string

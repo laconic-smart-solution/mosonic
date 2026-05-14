@@ -5,11 +5,18 @@ import type { Rule } from '../../rule/schemas/rule.schema';
 import {
   LlmProvider,
   NodeOutputFormat,
+  NodeSummaryLength,
+  NodeTextTone,
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
+import {
+  extractUsageFromAiMessage,
+  extractUsageFromStreamChunk,
+} from '../langchain-usage.util';
 import type {
   NodeExecutionInput,
   NodeExecutionResult,
+  PreviousOutputs,
   TextGenerationInput,
 } from '../types/node-execution.types';
 
@@ -19,6 +26,8 @@ type NormalizedTextConfig = {
   temperature: number;
   maxTokens: number;
   outputFormat: NodeOutputFormat;
+  tone: NodeTextTone;
+  textLength: NodeSummaryLength;
 };
 
 function normalizeTextGenerationConfig(
@@ -38,6 +47,15 @@ function normalizeTextGenerationConfig(
       c.outputFormat === NodeOutputFormat.Caption
         ? c.outputFormat
         : NodeOutputFormat.Paragraph,
+    tone:
+      c.tone && Object.values(NodeTextTone).includes(c.tone)
+        ? c.tone
+        : NodeTextTone.Professional,
+    textLength:
+      c.textLength === NodeSummaryLength.Short ||
+      c.textLength === NodeSummaryLength.Long
+        ? c.textLength
+        : NodeSummaryLength.Medium,
   };
 }
 
@@ -77,6 +95,24 @@ function buildSystemPrompt(rule: Rule, config: NormalizedTextConfig): string {
     '=== RESTRICTIONS ===',
     rule.brand.brandRestrictions.join('\n'),
     '',
+    '=== VOICE FOR THIS NODE ===',
+    `Writing tone: ${config.tone}`,
+    config.tone === NodeTextTone.Professional
+      ? 'Polished, credible, business-appropriate.'
+      : config.tone === NodeTextTone.Casual
+        ? 'Relaxed, conversational, approachable.'
+        : config.tone === NodeTextTone.Friendly
+          ? 'Warm, welcoming, human.'
+          : config.tone === NodeTextTone.Formal
+            ? 'Precise, elevated register; avoid slang.'
+            : 'Clever, playful, but still on-brand.',
+    `Target length band: ${config.textLength}`,
+    config.textLength === NodeSummaryLength.Short
+      ? 'Keep the piece brief (roughly a few sentences).'
+      : config.textLength === NodeSummaryLength.Medium
+        ? 'Standard length for the chosen output format.'
+        : 'Allow richer detail while staying within maxTokens.',
+    '',
     '=== OUTPUT FORMAT ===',
     `Format: ${config.outputFormat}`,
     config.outputFormat === NodeOutputFormat.Paragraph
@@ -92,13 +128,19 @@ function buildSystemPrompt(rule: Rule, config: NormalizedTextConfig): string {
     .join('\n');
 }
 
-function buildHumanPrompt(contentPrompt: string, userPrompt?: string): string {
+function buildHumanPrompt(
+  contentPrompt: string,
+  previousOutputs?: PreviousOutputs,
+): string {
+  const kw = previousOutputs?.keywords?.trim();
   return [
     `Content request: ${contentPrompt}`,
-    userPrompt ? `Additional instruction: ${userPrompt}` : '',
+    kw
+      ? `Target keywords from the keyword planner (use naturally in the copy, do not stuff):\n${kw}`
+      : '',
   ]
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n');
 }
 
 function messageContentToString(content: unknown): string {
@@ -145,11 +187,16 @@ export class TextGenerationService {
    * Brand-grounded copy generation. Use from tests or when you already have
    * `rule` + `contentPrompt` without wrapping in {@link NodeExecutionInput}.
    */
-  async generateText(input: TextGenerationInput): Promise<{ text: string }> {
-    const { rule, contentPrompt, userPrompt, config } = input;
+  async generateText(
+    input: TextGenerationInput,
+  ): Promise<{
+    text: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
+    const { rule, contentPrompt, config, previousOutputs } = input;
     const normalized = normalizeTextGenerationConfig(config);
     const systemPrompt = buildSystemPrompt(rule, normalized);
-    const humanPrompt = buildHumanPrompt(contentPrompt, userPrompt);
+    const humanPrompt = buildHumanPrompt(contentPrompt, previousOutputs);
 
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
@@ -164,7 +211,8 @@ export class TextGenerationService {
     ]);
 
     const text = messageContentToString(res.content).trim();
-    return { text };
+    const usage = extractUsageFromAiMessage(res);
+    return usage ? { text, usage } : { text };
   }
 
   /**
@@ -180,7 +228,10 @@ export class TextGenerationService {
     const contentPrompt = input.contentPrompt ?? '';
     const normalized = normalizeTextGenerationConfig(input.config ?? {});
     const systemPrompt = buildSystemPrompt(input.rule, normalized);
-    const humanPrompt = buildHumanPrompt(contentPrompt, input.userPrompt);
+    const humanPrompt = buildHumanPrompt(
+      contentPrompt,
+      input.previousOutputs,
+    );
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
@@ -188,6 +239,7 @@ export class TextGenerationService {
       maxTokens: normalized.maxTokens,
     });
     let text = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
     if (input.onChunk) {
       const stream = await model.stream([
         new SystemMessage(systemPrompt),
@@ -199,17 +251,22 @@ export class TextGenerationService {
           input.onChunk(piece);
           text += piece;
         }
+        const u = extractUsageFromStreamChunk(chunk);
+        if (u) {
+          usage = u;
+        }
       }
       text = text.trim();
     } else {
       const generated = await this.generateText({
         rule: input.rule,
         contentPrompt,
-        userPrompt: input.userPrompt,
         config: input.config ?? {},
+        previousOutputs: input.previousOutputs,
       });
       text = generated.text;
+      usage = generated.usage;
     }
-    return { output: text };
+    return usage ? { output: text, usage } : { output: text };
   }
 }

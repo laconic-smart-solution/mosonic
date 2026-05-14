@@ -173,7 +173,12 @@ export function draftToPatchBody(
   const key = normalizeChannelKey(row.channel)
   const caption = effectiveCaptionForDraft(draft, resolved)
   const { mediaUrl, mediaUrls } = draftToMediaStorage(draft, key)
-  const body: PatchUploadChannelBody = { caption, mediaUrl, mediaUrls }
+  const body: PatchUploadChannelBody = {
+    included: row.included ?? true,
+    caption,
+    mediaUrl,
+    mediaUrls,
+  }
   if (key === "youtube") {
     body.youtubeTitle = draft.youtubeTitle.trim() || null
   }
@@ -197,10 +202,12 @@ export function buildSingleChannelPublishRequest(params: {
 
   const channels = upload.channels.map((r) => {
     const key = r.channel.toLowerCase()
-    if (key !== channelKey || !connectedSet.has(key)) {
+    if (!connectedSet.has(key)) {
       return { channel: r.channel, included: false }
     }
-    return { channel: r.channel, included: true }
+    // Persisted include flag is the default; single-channel publish overrides to just this channel.
+    const included = key === channelKey ? true : Boolean(r.included)
+    return { channel: r.channel, included }
   })
 
   return { publishNow, scheduledAt, channels }

@@ -12,6 +12,10 @@ import type {
   NodeExecutionResult,
   TranslationInput,
 } from '../types/node-execution.types';
+import {
+  extractUsageFromAiMessage,
+  extractUsageFromStreamChunk,
+} from '../langchain-usage.util';
 
 type NormalizedTranslationConfig = {
   provider?: LlmProvider;
@@ -19,26 +23,31 @@ type NormalizedTranslationConfig = {
   sourceLanguage: string;
   targetLanguage: string;
   formalityLevel: NodeFormalityLevel;
+  preserveFormatting: boolean;
 };
 
 function normalizeTranslationConfig(
   config: WorkflowNodeConfig | undefined,
 ): NormalizedTranslationConfig {
   const c = config ?? {};
+  const rawSource =
+    typeof c.sourceLanguage === 'string' && c.sourceLanguage.trim()
+      ? c.sourceLanguage.trim()
+      : 'auto';
   return {
     provider:
       c.provider && Object.values(LlmProvider).includes(c.provider)
         ? c.provider
         : undefined,
     model: typeof c.model === 'string' ? c.model : 'gpt-4o',
-    sourceLanguage:
-      typeof c.sourceLanguage === 'string' ? c.sourceLanguage : 'en',
+    sourceLanguage: rawSource,
     targetLanguage:
       typeof c.targetLanguage === 'string' ? c.targetLanguage : 'th',
     formalityLevel:
       c.formalityLevel === NodeFormalityLevel.Formal
         ? NodeFormalityLevel.Formal
         : NodeFormalityLevel.Casual,
+    preserveFormatting: c.preserveFormatting !== false,
   };
 }
 
@@ -59,12 +68,19 @@ function buildSystemPrompt(
     `Call to action: ${rule.brand.callToAction}`,
     '',
     '=== TRANSLATION SETTINGS ===',
-    `Source language: ${config.sourceLanguage}`,
+    `Source language: ${
+      config.sourceLanguage === 'auto'
+        ? 'auto-detect from the input text (infer the language of the source copy)'
+        : config.sourceLanguage
+    }`,
     `Target language: ${config.targetLanguage}`,
     `Formality level: ${config.formalityLevel}`,
     config.formalityLevel === NodeFormalityLevel.Formal
       ? 'Use formal register. Professional and respectful tone.'
       : 'Use casual register. Friendly, warm, conversational tone.',
+    config.preserveFormatting
+      ? 'Preserve line breaks, lists, and emoji placement from the source unless they harm readability in the target language.'
+      : 'You may reflow formatting for clarity in the target language.',
     '',
     '=== AUDIENCE ===',
     `Target audience: ${rule.audience.description}`,
@@ -77,7 +93,9 @@ function buildSystemPrompt(
     '=== OUTPUT ===',
     'Return only the translated content.',
     'No explanation, no preamble, no original text.',
-    'Preserve formatting — if original has line breaks, keep them.',
+    config.preserveFormatting
+      ? 'Preserve formatting — if original has line breaks, keep them unless readability suffers.'
+      : 'You may reflow paragraphs for readability in the target language.',
     'Keep brand name, product names, and CTAs as defined — do not translate them.',
     `Keep these words untranslated: ${rule.brand.brandName}, ${rule.brand.callToAction}`,
   ]
@@ -85,17 +103,12 @@ function buildSystemPrompt(
     .join('\n');
 }
 
-function buildHumanPrompt(
-  text: string,
-  targetLanguage: string,
-  userPrompt?: string,
-): string {
+function buildHumanPrompt(text: string, targetLanguage: string): string {
   return [
     `Translate the following content to ${targetLanguage}:`,
     '',
     text,
     '',
-    userPrompt ? `Additional instruction: ${userPrompt}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -143,14 +156,16 @@ export class TranslationService {
 
   async translate(
     input: TranslationInput,
-  ): Promise<{ translatedText: string }> {
-    const { rule, previousOutputs, userPrompt, config } = input;
+  ): Promise<{
+    translatedText: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
+    const { rule, previousOutputs, config } = input;
     const normalized = normalizeTranslationConfig(config);
     const systemPrompt = buildSystemPrompt(rule, normalized);
     const humanPrompt = buildHumanPrompt(
       previousOutputs.text,
       normalized.targetLanguage,
-      userPrompt,
     );
 
     const model = this.llm.getChatModelForPlainText({
@@ -163,7 +178,8 @@ export class TranslationService {
       new HumanMessage(humanPrompt),
     ]);
     const translatedText = messageContentToString(res.content).trim();
-    return { translatedText };
+    const usage = extractUsageFromAiMessage(res);
+    return usage ? { translatedText, usage } : { translatedText };
   }
 
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {
@@ -184,7 +200,6 @@ export class TranslationService {
     const humanPrompt = buildHumanPrompt(
       sourceText,
       normalized.targetLanguage,
-      input.userPrompt,
     );
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
@@ -192,6 +207,7 @@ export class TranslationService {
       temperature: 0.2,
     });
     let translatedText = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
     if (input.onChunk) {
       const stream = await model.stream([
         new SystemMessage(systemPrompt),
@@ -203,6 +219,10 @@ export class TranslationService {
           input.onChunk(piece);
           translatedText += piece;
         }
+        const u = extractUsageFromStreamChunk(chunk);
+        if (u) {
+          usage = u;
+        }
       }
       translatedText = translatedText.trim();
     } else {
@@ -210,11 +230,11 @@ export class TranslationService {
         rule: input.rule,
         contentPrompt: input.contentPrompt ?? '',
         previousOutputs: { text: sourceText },
-        userPrompt: input.userPrompt,
         config: input.config ?? {},
       });
       translatedText = translated.translatedText;
+      usage = translated.usage;
     }
-    return { output: translatedText };
+    return usage ? { output: translatedText, usage } : { output: translatedText };
   }
 }

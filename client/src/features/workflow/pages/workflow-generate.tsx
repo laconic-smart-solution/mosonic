@@ -79,13 +79,18 @@ export default function WorkflowGeneratePage() {
 
   const handleAddNode = useCallback((type: WorkflowNodeType) => {
     setNodes((prev) => {
+      if (type === "keyword_planner" && prev.some((n) => n.type === "keyword_planner")) {
+        return prev
+      }
+      if (type === "text_generation" && prev.some((n) => n.type === "text_generation")) {
+        return prev
+      }
       const nextOrder = prev.length + 1
       const newNode: WorkflowNode = {
         nodeId: generateNodeId(),
         type,
         order: nextOrder,
         isLocked: false,
-        userPrompt: "",
       }
       return [...prev, newNode]
     })

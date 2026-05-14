@@ -125,7 +125,8 @@ export class RuleExtractionService {
               },
               channels: [
                 {
-                  channel: 'facebook | instagram | twitter | linkedin',
+                  channel:
+                    'facebook | instagram | twitter | linkedin | youtube | tiktok',
                   priority: 'high | medium | low',
                   contentStyle: 'string',
                   contentMapping: {
@@ -178,10 +179,9 @@ const CAPTIONS = new Set(['text', 'translatedText', 'summary']);
 function normalizeExtractedChannel(
   ch: ExtractedRuleDraft['channels'][0] & Record<string, unknown>,
 ): ExtractedRuleDraft['channels'][0] {
-  const caption =
-    CAPTIONS.has(String(ch.contentMapping?.caption))
-      ? (ch.contentMapping?.caption as 'text' | 'translatedText' | 'summary')
-      : 'text';
+  const caption = CAPTIONS.has(String(ch.contentMapping?.caption))
+    ? (ch.contentMapping?.caption as 'text' | 'translatedText' | 'summary')
+    : 'text';
   const rawMedia = ch.contentMapping?.media;
   const media: 'image' | 'video' | null =
     rawMedia === 'image' || rawMedia === 'video' ? rawMedia : null;

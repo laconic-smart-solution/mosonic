@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
  * `Pipeline.nodes[]`, not on this document.
  */
 export enum WorkflowNodeType {
+  KeywordPlanner = 'keyword_planner',
   TextGeneration = 'text_generation',
   ImageGeneration = 'image_generation',
   VideoGeneration = 'video_generation',
@@ -20,6 +21,8 @@ export enum NodeOutputFormat {
   Paragraph = 'paragraph',
   Bullets = 'bullets',
   Caption = 'caption',
+  /** Summarization node only */
+  Tldr = 'tldr',
 }
 
 export enum NodeImageQuality {
@@ -36,6 +39,17 @@ export enum NodeAspectRatio {
   R16x9 = '16:9',
   R9x16 = '9:16',
   R1x1 = '1:1',
+  /** Portrait ~4:5 feed; image API uses nearest OpenAI size */
+  R4x5 = '4:5',
+}
+
+/** Primary copy tone for text_generation (refines system prompt). */
+export enum NodeTextTone {
+  Professional = 'professional',
+  Casual = 'casual',
+  Friendly = 'friendly',
+  Formal = 'formal',
+  Witty = 'witty',
 }
 
 export enum NodeFormalityLevel {
@@ -84,6 +98,13 @@ export class WorkflowNodeConfig {
   @Prop({ type: String, enum: Object.values(NodeOutputFormat) })
   outputFormat?: NodeOutputFormat;
 
+  @Prop({ type: String, enum: Object.values(NodeTextTone) })
+  tone?: NodeTextTone;
+
+  /** Target length for text_generation (short / medium / long). */
+  @Prop({ type: String, enum: Object.values(NodeSummaryLength) })
+  textLength?: NodeSummaryLength;
+
   /** e.g. 1024x1024 */
   @Prop({ type: String })
   size?: string;
@@ -103,6 +124,10 @@ export class WorkflowNodeConfig {
   @Prop({ type: String, enum: Object.values(NodeAspectRatio) })
   aspectRatio?: NodeAspectRatio;
 
+  /** Image generation — things to avoid in the visual */
+  @Prop({ type: String })
+  negativePrompt?: string;
+
   @Prop({ type: String })
   sourceLanguage?: string;
 
@@ -111,6 +136,9 @@ export class WorkflowNodeConfig {
 
   @Prop({ type: String, enum: Object.values(NodeFormalityLevel) })
   formalityLevel?: NodeFormalityLevel;
+
+  @Prop({ type: Boolean })
+  preserveFormatting?: boolean;
 
   @Prop({ type: String, enum: Object.values(NodeMediaSourceType) })
   sourceType?: NodeMediaSourceType;
