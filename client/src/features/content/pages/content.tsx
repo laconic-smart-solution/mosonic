@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { CircleAlertIcon, InboxIcon, X } from "lucide-react"
 import { motion } from "framer-motion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -29,6 +29,7 @@ import type {
   ContentStatus,
 } from "@/shared/types/content.type"
 import {
+  navigateSearchParams,
   readListPagination,
   setListLimitInParams,
   setListPageInParams,
@@ -46,39 +47,42 @@ const CONTENT_PAGINATION_DEFAULTS: ListPaginationDefaults = {
 
 export default function ContentPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const locationRef = useRef(location)
+  locationRef.current = location
   const hydrated = useAuthStoreHydrated()
 
   const { page, limit } = useMemo(
-    () => readListPagination(searchParams, CONTENT_PAGINATION_DEFAULTS),
-    [searchParams]
+    () =>
+      readListPagination(
+        new URLSearchParams(location.search),
+        CONTENT_PAGINATION_DEFAULTS
+      ),
+    [location.search]
   )
 
   const goToPage = useCallback(
     (next: number) => {
-      setSearchParams(
-        (prev) => setListPageInParams(prev, next, CONTENT_PAGINATION_DEFAULTS),
-        { replace: true }
-      )
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListPageInParams(params, next, CONTENT_PAGINATION_DEFAULTS)
+      })
     },
-    [setSearchParams]
+    [navigate]
   )
 
   const resetToFirstPage = useCallback(() => {
-    setSearchParams(
-      (prev) => setListPageInParams(prev, 1, CONTENT_PAGINATION_DEFAULTS),
-      { replace: true }
-    )
-  }, [setSearchParams])
+    navigateSearchParams(navigate, locationRef.current, (params) => {
+      setListPageInParams(params, 1, CONTENT_PAGINATION_DEFAULTS)
+    })
+  }, [navigate])
 
   const setLimitFromUrl = useCallback(
     (n: (typeof PAGE_SIZE_OPTIONS)[number]) => {
-      setSearchParams(
-        (prev) => setListLimitInParams(prev, n, CONTENT_PAGINATION_DEFAULTS),
-        { replace: true }
-      )
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListLimitInParams(params, n, CONTENT_PAGINATION_DEFAULTS)
+      })
     },
-    [setSearchParams]
+    [navigate]
   )
 
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all")
@@ -93,14 +97,14 @@ export default function ContentPage() {
   const skipPageResetFromUrlSearch = useRef(false)
 
   useEffect(() => {
-    const q = searchParams.get("search")?.trim()
+    const q = new URLSearchParams(location.search).get("search")?.trim()
     if (!q) {
       return
     }
     skipPageResetFromUrlSearch.current = true
     setSearchInput(q)
     setDebouncedSearch(q)
-  }, [searchParams])
+  }, [location.search])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -210,14 +214,10 @@ export default function ContentPage() {
     setFilterHasImage(false)
     setFilterHasVideo(false)
     setFilterHasSummary(false)
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.delete("search")
-        return setListPageInParams(next, 1, CONTENT_PAGINATION_DEFAULTS)
-      },
-      { replace: true }
-    )
+    navigateSearchParams(navigate, locationRef.current, (params) => {
+      params.delete("search")
+      setListPageInParams(params, 1, CONTENT_PAGINATION_DEFAULTS)
+    })
   }
 
   if (!hydrated) {

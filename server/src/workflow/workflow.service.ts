@@ -348,6 +348,66 @@ export class WorkflowService {
     return { success: true };
   }
 
+  /**
+   * Appends a single node to an existing workflow (e.g. Generate More).
+   * Does not re-run full saveNodes validation; caller must pass an allowed type.
+   */
+  async appendWorkflowNode(
+    workflowId: string,
+    args: {
+      nodeId: string;
+      type: WorkflowNodeType;
+      config: WorkflowNodeConfig;
+      userPrompt?: string;
+    },
+    auth: TenancyAuth,
+  ): Promise<{ nodeId: string; order: number }> {
+    const workflow = await this.workflowModel
+      .findOne(mergeUserIdFilter({ workflowId }, auth))
+      .exec();
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
+
+    const last = await this.workflowNodeModel
+      .findOne(mergeUserIdFilter({ workflowRef: workflowId }, auth))
+      .sort({ order: -1 })
+      .select({ order: 1 })
+      .lean()
+      .exec();
+    const nextOrder = (last?.order ?? 0) + 1;
+    const ownerUserId = workflow.userId ?? auth.userId;
+
+    await this.workflowNodeModel.create({
+      nodeId: args.nodeId,
+      workflowRef: workflowId,
+      userId: ownerUserId,
+      type: args.type,
+      order: nextOrder,
+      isLocked: false,
+      userPrompt: args.userPrompt?.trim() ?? '',
+      config: args.config ?? {},
+    });
+
+    const nextVersion = (workflow.version ?? 1) + 1;
+    const nextNodeIds = [...(workflow.nodes ?? []), args.nodeId];
+    await this.workflowModel
+      .updateOne(mergeUserIdFilter({ workflowId }, auth), {
+        $push: {
+          nodes: args.nodeId,
+          versions: {
+            versionNumber: nextVersion,
+            nodes: nextNodeIds,
+            createdAt: new Date(),
+          },
+        },
+        $set: { version: nextVersion },
+      })
+      .exec();
+
+    return { nodeId: args.nodeId, order: nextOrder };
+  }
+
   private normalizeAndValidateNodes(
     nodes: SaveWorkflowNodesRequestDto['nodes'],
   ): Array<{

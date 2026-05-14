@@ -1,7 +1,25 @@
+import type { Location, NavigateFunction } from "react-router-dom"
+
 export type ListPaginationDefaults = {
   defaultPage: number
   defaultLimit: number
   allowedLimits: readonly number[]
+}
+
+/** Apply query updates using the current location (avoids stale `useSearchParams` snapshots with RR7). */
+export function navigateSearchParams(
+  navigate: NavigateFunction,
+  location: Pick<Location, "pathname" | "search">,
+  updater: (params: URLSearchParams) => void,
+  options?: { replace?: boolean },
+): void {
+  const params = new URLSearchParams(location.search)
+  updater(params)
+  const qs = params.toString()
+  navigate(
+    { pathname: location.pathname, search: qs ? `?${qs}` : "" },
+    { replace: options?.replace ?? true },
+  )
 }
 
 export function readListPagination(
@@ -21,32 +39,30 @@ export function readListPagination(
   return { page, limit }
 }
 
-/** Set page in query; omits param when equal to default (usually 1). */
+/** Set page in query; omits param when equal to default (usually 1). Mutates `params`. */
 export function setListPageInParams(
-  prev: URLSearchParams,
+  params: URLSearchParams,
   page: number,
   defaults: ListPaginationDefaults,
 ): URLSearchParams {
-  const next = new URLSearchParams(prev)
-  if (page <= defaults.defaultPage) next.delete("page")
-  else next.set("page", String(page))
-  return next
+  if (page <= defaults.defaultPage) params.delete("page")
+  else params.set("page", String(page))
+  return params
 }
 
-/** Set limit and reset page to default (first page). */
+/** Set limit and reset page to default (first page). Mutates `params`. */
 export function setListLimitInParams(
-  prev: URLSearchParams,
+  params: URLSearchParams,
   limit: number,
   defaults: ListPaginationDefaults,
 ): URLSearchParams {
-  const next = new URLSearchParams(prev)
   const safe = defaults.allowedLimits.includes(limit as never)
     ? limit
     : defaults.defaultLimit
-  if (safe === defaults.defaultLimit) next.delete("limit")
-  else next.set("limit", String(safe))
-  next.delete("page")
-  return next
+  if (safe === defaults.defaultLimit) params.delete("limit")
+  else params.set("limit", String(safe))
+  params.delete("page")
+  return params
 }
 
 export function getPaginationItems(

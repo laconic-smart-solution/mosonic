@@ -26,4 +26,25 @@ describe('mergeResolvedOutputs', () => {
     });
     expect(merged.text).toBe('');
   });
+
+  it('last image wins when merging nodeOutputs with workflow order', () => {
+    const merged = mergeResolvedOutputs(
+      {
+        outputs: { text: 't', image: 'legacy' },
+        userEdits: {},
+        nodeOutputs: {
+          n1: { image: 'first.png' },
+          n2: { image: 'second.png' },
+        },
+      },
+      {
+        workflowNodesOrdered: [
+          { nodeId: 'n1', type: 'image_generation' },
+          { nodeId: 'n2', type: 'image_generation' },
+        ],
+      },
+    );
+    expect(merged.image).toBe('second.png');
+    expect(merged.text).toBe('t');
+  });
 });

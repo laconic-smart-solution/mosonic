@@ -122,6 +122,14 @@ export class Content {
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
   nodePromptOverrides: Record<string, string>;
 
+  /** Per workflow nodeId → AI output payload (e.g. `{ image }`, `{ text }`). */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  nodeOutputs: Record<string, Record<string, unknown>>;
+
+  /** Per nodeId → user overrides for that node's fields (merged over nodeOutputs when flattening). */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  nodeUserEdits: Record<string, Record<string, unknown>>;
+
   /** Legacy version fields kept for backward DB compatibility (unused by new flows). */
   @Prop({ type: Number, min: 1 })
   currentVersion?: number;

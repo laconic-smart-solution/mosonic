@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import { format } from "date-fns"
 import {
@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
 import { cn } from "@/lib/utils"
 import {
+  navigateSearchParams,
   readListPagination,
   setListLimitInParams,
   setListPageInParams,
@@ -77,39 +78,42 @@ function statusBadgeClass(status: string): string {
 
 export default function WorkflowsPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const locationRef = useRef(location)
+  locationRef.current = location
   const hydrated = useAuthStoreHydrated()
 
   const { page, limit } = useMemo(
-    () => readListPagination(searchParams, WORKFLOW_PAGINATION_DEFAULTS),
-    [searchParams],
+    () =>
+      readListPagination(
+        new URLSearchParams(location.search),
+        WORKFLOW_PAGINATION_DEFAULTS
+      ),
+    [location.search]
   )
 
   const goToPage = useCallback(
     (next: number) => {
-      setSearchParams(
-        (prev) => setListPageInParams(prev, next, WORKFLOW_PAGINATION_DEFAULTS),
-        { replace: true },
-      )
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListPageInParams(params, next, WORKFLOW_PAGINATION_DEFAULTS)
+      })
     },
-    [setSearchParams],
+    [navigate]
   )
 
   const resetToFirstPage = useCallback(() => {
-    setSearchParams(
-      (prev) => setListPageInParams(prev, 1, WORKFLOW_PAGINATION_DEFAULTS),
-      { replace: true },
-    )
-  }, [setSearchParams])
+    navigateSearchParams(navigate, locationRef.current, (params) => {
+      setListPageInParams(params, 1, WORKFLOW_PAGINATION_DEFAULTS)
+    })
+  }, [navigate])
 
   const setLimitFromUrl = useCallback(
     (n: (typeof PAGE_LIMITS)[number]) => {
-      setSearchParams(
-        (prev) => setListLimitInParams(prev, n, WORKFLOW_PAGINATION_DEFAULTS),
-        { replace: true },
-      )
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListLimitInParams(params, n, WORKFLOW_PAGINATION_DEFAULTS)
+      })
     },
-    [setSearchParams],
+    [navigate]
   )
   const [searchInput, setSearchInput] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
