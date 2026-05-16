@@ -112,11 +112,46 @@ const videoAspect = z.enum([
   NodeAspectRatio.R4x5,
 ]);
 
+const SORA_DURATION_LITERALS = [4, 8, 12, 16, 20] as const;
+
+function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim()
+        ? Number(raw)
+        : 8;
+  const value = Number.isFinite(n) ? n : 8;
+  let best: (typeof SORA_DURATION_LITERALS)[number] = SORA_DURATION_LITERALS[0];
+  let bestDiff = Math.abs(value - best);
+  for (const s of SORA_DURATION_LITERALS) {
+    const d = Math.abs(value - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
+
+const soraDurationSchema = z.preprocess(
+  (val) => (val === undefined ? undefined : snapToSoraDuration(val)),
+  z
+    .union([
+      z.literal(4),
+      z.literal(8),
+      z.literal(12),
+      z.literal(16),
+      z.literal(20),
+    ])
+    .optional(),
+);
+
 const videoConfigSchema = z
   .object({
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
-    duration: z.number().int().min(1).max(120).optional(),
+    duration: soraDurationSchema,
     resolution: z.string().min(1).optional(),
     aspectRatio: videoAspect.optional(),
   })
@@ -200,8 +235,8 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
   },
   [WorkflowNodeType.VideoGeneration]: {
     model: 'sora-2',
-    duration: 15,
-    resolution: '1080p',
+    duration: 8,
+    resolution: '720p',
     aspectRatio: NodeAspectRatio.R16x9,
   },
   [WorkflowNodeType.Translation]: {

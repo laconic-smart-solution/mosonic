@@ -2,20 +2,17 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 
+import {
+  LlmProvider,
+  WorkflowNodeType,
+} from '../workflow-node-llm.enums';
+
+export { WorkflowNodeType, LlmProvider } from '../workflow-node-llm.enums';
 /**
  * Node **definition** only (template + provider defaults).
  * Per-run execution (input, output, status, retryCount) lives in
  * `Pipeline.nodes[]`, not on this document.
  */
-export enum WorkflowNodeType {
-  KeywordPlanner = 'keyword_planner',
-  TextGeneration = 'text_generation',
-  ImageGeneration = 'image_generation',
-  VideoGeneration = 'video_generation',
-  Translation = 'translation',
-  Transcription = 'transcription',
-  Summarization = 'summarization',
-}
 
 export enum NodeOutputFormat {
   Paragraph = 'paragraph',
@@ -66,14 +63,6 @@ export enum NodeSummaryLength {
   Short = 'short',
   Medium = 'medium',
   Long = 'long',
-}
-
-export enum LlmProvider {
-  OpenAI = 'openai',
-  Anthropic = 'anthropic',
-  Google = 'google',
-  Groq = 'groq',
-  Ollama = 'ollama',
 }
 
 /**

@@ -11,6 +11,7 @@ export const RunPage          = PageLoader(lazy(() => import("@/features/run/pag
 export const ContentPage      = PageLoader(lazy(() => import("@/features/content/pages/content")))
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
+export const PostsPage        = PageLoader(lazy(() => import("@/features/posts/pages/posts-page")))
 export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
 )

@@ -13,6 +13,7 @@ import { UserRole } from '../users/schemas/user.schema';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { ContentService } from '../content/content.service';
 import { EventsService } from '../events/events.service';
+import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
 import type { ChannelEntry } from '../rule/schemas/rule.schema';
@@ -62,7 +63,6 @@ export type UploadChannelDto = {
   youtubeTitle: string | null;
   scheduledAt: string | null;
   publishedAt: string | null;
-  zernioPostId: string | null;
   failureReason: string | null;
 };
 
@@ -92,6 +92,7 @@ export class UploadService {
     private readonly uploadModel: Model<UploadDocument>,
     private readonly mcpService: McpService,
     private readonly events: EventsService,
+    private readonly postService: PostService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
   ) {}
@@ -113,7 +114,6 @@ export class UploadService {
         mediaUrls: [],
         youtubeTitle: null,
         status: UploadChannelStatus.Pending,
-        zernioPostId: null,
         scheduledAt: null,
         publishedAt: null,
         retryCount: 0,
@@ -139,7 +139,6 @@ export class UploadService {
       mediaUrls: [],
       youtubeTitle: null,
       status: UploadChannelStatus.Pending,
-      zernioPostId: null,
       scheduledAt: null,
       publishedAt: null,
       retryCount: 0,
@@ -359,10 +358,7 @@ export class UploadService {
     return {
       uploadId: detail.uploadId,
       status: detail.status,
-      channels: detail.channels.map((ch) => ({
-        ...ch,
-        zernioPostId: ch.zernioPostId,
-      })),
+      channels: detail.channels,
       summary: this.buildSummaryFromDto(detail.channels),
     };
   }
@@ -550,24 +546,47 @@ export class UploadService {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
 
-    const scheduledChannels = doc.channels.filter(
-      (ch) =>
-        ch.status === UploadChannelStatus.Scheduled &&
-        Boolean(ch.zernioPostId?.trim()),
+    const channelFilter = body.channel?.trim().toLowerCase() ?? null;
+
+    const scheduledPosts = await this.postService.findScheduledPostsForUpload(
+      doc.uploadId,
     );
-    if (scheduledChannels.length === 0) {
+
+    let scheduledChannels = doc.channels.filter(
+      (ch) => ch.status === UploadChannelStatus.Scheduled,
+    );
+    if (channelFilter) {
+      scheduledChannels = scheduledChannels.filter(
+        (ch) => ch.channel.toLowerCase() === channelFilter,
+      );
+    }
+    if (scheduledPosts.length === 0 || scheduledChannels.length === 0) {
       throw new BadRequestException(
-        'No scheduled post found. Only scheduled posts can be updated.',
+        channelFilter
+          ? `No scheduled post found for ${body.channel}.`
+          : 'No scheduled post found. Only scheduled posts can be updated.',
       );
     }
 
-    const scheduledYoutubeChannels = scheduledChannels.filter(
-      (ch) => ch.channel.toLowerCase() === 'youtube',
-    );
-    if (hasTitleUpdate && scheduledYoutubeChannels.length === 0) {
-      throw new BadRequestException(
-        'No scheduled YouTube post found to update.',
+    if (channelFilter) {
+      const targetChannel = scheduledChannels[0]!;
+      if (
+        hasTitleUpdate &&
+        targetChannel.channel.toLowerCase() !== 'youtube'
+      ) {
+        throw new BadRequestException(
+          'YouTube title can only be updated for a scheduled YouTube channel.',
+        );
+      }
+    } else {
+      const scheduledYoutubeChannels = scheduledChannels.filter(
+        (ch) => ch.channel.toLowerCase() === 'youtube',
       );
+      if (hasTitleUpdate && scheduledYoutubeChannels.length === 0) {
+        throw new BadRequestException(
+          'No scheduled YouTube post found to update.',
+        );
+      }
     }
 
     const content = hasCaptionUpdate
@@ -580,13 +599,27 @@ export class UploadService {
         ? ''
         : (body.youtubeTitle ?? '')
       : undefined;
+
+    const matchingPosts = channelFilter
+      ? scheduledPosts.filter((p) =>
+          (p.channels ?? []).some(
+            (c) => String(c).trim().toLowerCase() === channelFilter,
+          ),
+        )
+      : scheduledPosts;
+
     const postIds = [
       ...new Set(
-        scheduledChannels
-          .map((ch) => ch.zernioPostId?.trim())
+        matchingPosts
+          .map((p) => p.zernioPostId?.trim())
           .filter((id): id is string => Boolean(id)),
       ),
     ];
+    if (postIds.length === 0) {
+      throw new BadRequestException(
+        'No Zernio post id on scheduled records for this upload.',
+      );
+    }
 
     for (const postId of postIds) {
       await this.mcpService.updatePost({
@@ -607,6 +640,21 @@ export class UploadService {
       if (hasTitleUpdate && ch.channel.toLowerCase() === 'youtube') {
         ch.youtubeTitle = title ?? null;
       }
+    }
+
+    if (channelFilter) {
+      await this.postService.updateScheduledPostForChannel(
+        doc.uploadId,
+        channelFilter,
+        {
+          ...(scheduledDate ? { scheduledAt: scheduledDate } : {}),
+          ...(hasCaptionUpdate ? { caption: content } : {}),
+        },
+      );
+    } else if (scheduledDate) {
+      await this.postService.updateScheduledPostsOnUpload(doc.uploadId, {
+        scheduledAt: scheduledDate,
+      });
     }
 
     doc.status = recomputeUploadJobStatus(doc.channels);
@@ -691,15 +739,23 @@ export class UploadService {
       row: UploadChannelEntry;
       caption: string;
       mediaUrl: string | null;
+      mediaUrls: string[];
       youtubeTitle: string | null;
     };
     const workList: Work[] = [];
+
+    const nonPublishableStatuses = new Set<UploadChannelStatus>([
+      UploadChannelStatus.Published,
+      UploadChannelStatus.Scheduled,
+      UploadChannelStatus.Publishing,
+    ]);
 
     for (const row of doc.channels) {
       const key = row.channel.toLowerCase();
       const entry = dtoByChannel.get(key);
       const include = entry ? Boolean(entry.included) : Boolean(row.included);
       if (!include) continue;
+      if (nonPublishableStatuses.has(row.status)) continue;
 
       const accountId = accountByChannel.get(key)?.trim();
       if (!accountId) {
@@ -715,55 +771,74 @@ export class UploadService {
         );
       }
 
-      const mediaUrl = this.rowPrimaryMedia(row);
+      const mediaUrls = this.resolveRowMediaForPublish(row, roFallback);
+      this.assertChannelMediaForPublish(row.channel, mediaUrls);
+      const mediaUrl = mediaUrls[0] ?? null;
       const youtubeTitle = key === 'youtube' ? this.rowYoutubeTitle(row) : null;
 
-      workList.push({ row, caption, mediaUrl, youtubeTitle });
+      workList.push({ row, caption, mediaUrl, mediaUrls, youtubeTitle });
     }
 
     if (workList.length === 0) {
       throw new BadRequestException('No channels selected.');
     }
 
+    const scheduledIso = body.publishNow ? null : body.scheduledAt!.trim();
+    const scheduledDate = body.publishNow ? null : new Date(scheduledIso!);
+    const now = new Date();
+
+    const publisherUserId = doc.userId ?? auth.userId;
+    if (!publisherUserId?.trim()) {
+      throw new BadRequestException('Upload is missing userId for post record.');
+    }
+
+    const channelsSucceeded: string[] = [];
+
     for (const w of workList) {
+      const chKey = w.row.channel.toLowerCase();
       w.row.status = UploadChannelStatus.Publishing;
       w.row.failureReason = null;
-      w.row.zernioPostId = null;
       if (body.publishNow) {
         w.row.scheduledAt = null;
       }
       w.row.publishedAt = null;
       this.emitUploadEvent(doc.uploadId, 'upload:started', {
         uploadId: doc.uploadId,
-        channel: w.row.channel.toLowerCase(),
+        channel: chKey,
       });
-    }
+      doc.status = recomputeUploadJobStatus(doc.channels);
+      await doc.save();
 
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+      try {
+        const { postId } = await this.mcpService.publishCreatePostBatch(
+          auth.userId,
+          {
+            platforms: [
+              {
+                platform: chKey,
+                accountId: accountByChannel.get(chKey)!,
+                content: w.caption,
+                mediaUrl: w.mediaUrl,
+                mediaUrls: w.mediaUrls.length ? w.mediaUrls : null,
+                title: w.youtubeTitle,
+              },
+            ],
+            publishNow: body.publishNow,
+            scheduledAt: scheduledIso,
+          },
+        );
 
-    const scheduledIso = body.publishNow ? null : body.scheduledAt!.trim();
-
-    try {
-      const { postId } = await this.mcpService.publishCreatePostBatch(
-        auth.userId,
-        {
-          platforms: workList.map((w) => ({
-            platform: w.row.channel.toLowerCase(),
-            accountId: accountByChannel.get(w.row.channel.toLowerCase())!,
-            content: w.caption,
-            mediaUrl: w.mediaUrl,
-            title: w.youtubeTitle,
-          })),
+        await this.postService.createPostFromSuccessfulPublish({
+          userId: publisherUserId,
+          uploadRef: doc.uploadId,
+          ruleRef: doc.ruleRef,
+          contentRef: doc.contentRef,
+          zernioPostId: postId,
+          channels: [chKey],
           publishNow: body.publishNow,
-          scheduledAt: scheduledIso,
-        },
-      );
+          scheduledAt: scheduledDate,
+        });
 
-      const scheduledDate = body.publishNow ? null : new Date(scheduledIso!);
-      const now = new Date();
-
-      for (const w of workList) {
         if (body.publishNow) {
           w.row.status = UploadChannelStatus.Published;
           w.row.publishedAt = now;
@@ -773,9 +848,9 @@ export class UploadService {
           w.row.scheduledAt = scheduledDate;
           w.row.publishedAt = null;
         }
-        w.row.zernioPostId = postId || null;
         w.row.failureReason = null;
-        const chKey = w.row.channel.toLowerCase();
+        channelsSucceeded.push(chKey);
+
         if (body.publishNow) {
           this.emitUploadEvent(doc.uploadId, 'upload:completed', {
             uploadId: doc.uploadId,
@@ -790,25 +865,23 @@ export class UploadService {
             postId: postId || null,
           });
         }
-      }
-    } catch (err: unknown) {
-      const msg = getFriendlyZernioPublishError(err);
-      for (const w of workList) {
+      } catch (err: unknown) {
+        const msg = getFriendlyZernioPublishError(err);
         w.row.status = UploadChannelStatus.Failed;
         w.row.failureReason = msg;
         w.row.retryCount = (w.row.retryCount ?? 0) + 1;
         this.emitUploadEvent(doc.uploadId, 'upload:failed', {
           uploadId: doc.uploadId,
-          channel: w.row.channel.toLowerCase(),
+          channel: chKey,
           message: msg,
         });
       }
+
+      doc.status = recomputeUploadJobStatus(doc.channels);
+      await doc.save();
     }
 
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
-
-    const channelsPublished = workList.map((w) => w.row.channel.toLowerCase());
+    const channelsPublished = channelsSucceeded;
     this.emitUploadEvent(doc.uploadId, 'upload:all_completed', {
       uploadId: doc.uploadId,
       publishNow: body.publishNow,
@@ -869,14 +942,63 @@ export class UploadService {
   }
 
   private rowPrimaryMedia(row: UploadChannelEntry): string | null {
-    const urls =
-      (row.mediaUrls ?? []).map((u) => u.trim()).filter((u) => u.length > 0) ??
-      [];
-    if (urls.length > 0) {
-      return urls[0]!;
+    return this.rowAllMedia(row)[0] ?? null;
+  }
+
+  /** All media URLs for Zernio carousel / multi-image publish (deduped, order preserved). */
+  private rowAllMedia(row: UploadChannelEntry): string[] {
+    const fromArray = (row.mediaUrls ?? [])
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const u of fromArray) {
+      if (seen.has(u)) continue;
+      seen.add(u);
+      out.push(u);
     }
-    const u = (row.mediaUrl ?? '').trim();
-    return u.length > 0 ? u : null;
+    if (out.length > 0) return out;
+    const single = (row.mediaUrl ?? '').trim();
+    return single.length > 0 ? [single] : [];
+  }
+
+  private resolveRowMediaForPublish(
+    row: UploadChannelEntry,
+    ro: ResolvedContentOutputs,
+  ): string[] {
+    const urls = this.rowAllMedia(row);
+    if (urls.length > 0) return urls;
+    const fallback = (ro.image?.trim() || ro.video?.trim() || '').trim();
+    return fallback.length > 0 ? [fallback] : [];
+  }
+
+  private channelRequiresMedia(channelKey: string): boolean {
+    const key = channelKey.trim().toLowerCase();
+    return key === 'youtube' || key === 'tiktok';
+  }
+
+  private isVideoMediaUrl(url: string): boolean {
+    return /\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(url.trim());
+  }
+
+  private assertChannelMediaForPublish(
+    channel: string,
+    mediaUrls: string[],
+  ): void {
+    const key = channel.trim().toLowerCase();
+    if (!this.channelRequiresMedia(key)) return;
+
+    if (mediaUrls.length === 0) {
+      throw new BadRequestException(
+        `${channel} requires media (image or video) before publishing.`,
+      );
+    }
+
+    if (key === 'youtube' && !mediaUrls.some((u) => this.isVideoMediaUrl(u))) {
+      throw new BadRequestException(
+        `${channel} requires a video before publishing.`,
+      );
+    }
   }
 
   private rowYoutubeTitle(row: UploadChannelEntry): string | null {
@@ -946,7 +1068,6 @@ export class UploadService {
       youtubeTitle: c.youtubeTitle ?? null,
       scheduledAt: c.scheduledAt ? c.scheduledAt.toISOString() : null,
       publishedAt: c.publishedAt ? c.publishedAt.toISOString() : null,
-      zernioPostId: c.zernioPostId ?? null,
       failureReason: c.failureReason,
     };
   }
@@ -956,9 +1077,6 @@ export class UploadService {
     ro?: ResolvedContentOutputs,
   ): void {
     const legacy = row as unknown as Record<string, unknown>;
-    if (!row.zernioPostId && typeof legacy.postId === 'string') {
-      row.zernioPostId = legacy.postId;
-    }
     const outs = ro ?? {};
     if (!(row.caption ?? '').trim()) {
       row.caption = this.fallbackPrimaryCaption(outs);

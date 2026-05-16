@@ -157,7 +157,7 @@ export class ImageGenerationService {
       base64: generated.base64,
       mimeType: generated.mimeType,
       fileName: `workflow-${workflowRef}-image-${timePart}.png`,
-      folderPath: `workflow-images/${workflowRef}`,
+      folderPath: `neural-tex/workflow-images/${workflowRef}`,
     });
 
     return { image };

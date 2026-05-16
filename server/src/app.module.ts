@@ -15,6 +15,7 @@ import { NodesModule } from './nodes/nodes.module';
 import { OrchestrationModule } from './orchestration/orchestration.module';
 import { PipelineModule } from './pipeline/pipeline.module';
 import { RuleModule } from './rule/rule.module';
+import { PostModule } from './post/post.module';
 import { UploadModule } from './upload/upload.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { WorkflowModule } from './workflow/workflow.module';
@@ -42,6 +43,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PipelineModule,
     ContentModule,
     UploadModule,
+    PostModule,
     WebhookModule,
     AnalyticsModule,
     DashboardModule,

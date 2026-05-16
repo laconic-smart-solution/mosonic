@@ -17,9 +17,9 @@ import { ZernioRestClient } from '../mcp/zernio/zernio-rest.client';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import { RuleService } from '../rule/rule.service';
 import { Content, type ContentDocument } from '../content/schemas/content.schema';
+import { Post, PostStatus, type PostDocument } from '../post/schemas/post.schema';
 import {
   Upload,
-  UploadChannelStatus,
   type UploadDocument,
 } from '../upload/schemas/upload.schema';
 import { SyncLock, type SyncLockDocument } from '../upload/sync-lock.schema';
@@ -42,6 +42,8 @@ export class AnalyticsService {
     private readonly config: ConfigService,
     @InjectModel(SyncLock.name)
     private readonly syncLockModel: Model<SyncLockDocument>,
+    @InjectModel(Post.name)
+    private readonly postModel: Model<PostDocument>,
     @InjectModel(Content.name)
     private readonly contentModel: Model<ContentDocument>,
     @InjectModel(Upload.name) private readonly uploadModel: Model<UploadDocument>,
@@ -218,25 +220,25 @@ export class AnalyticsService {
     // Zernio defaults to 90 days when omitted; keep our stored period consistent.
     const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
-    const uploads = await this.uploadModel
+    const posts = await this.postModel
       .find({
         ruleRef,
-        channels: {
-          $elemMatch: {
-            zernioPostId: { $exists: true, $nin: [null, ''] },
-            status: {
-              $in: [
-                UploadChannelStatus.Published,
-                UploadChannelStatus.Scheduled,
-              ],
-            },
-          },
+        status: {
+          $in: [PostStatus.Published, PostStatus.Scheduled],
         },
+        zernioPostId: { $exists: true, $nin: [null, ''] },
       })
+      .select({
+        contentRef: 1,
+        uploadRef: 1,
+        zernioPostId: 1,
+        channels: 1,
+      })
+      .lean()
       .exec();
 
-    if (!uploads.length) {
-      this.logger.debug(`No published/scheduled Zernio uploads for ${ruleRef}`);
+    if (!posts.length) {
+      this.logger.debug(`No published/scheduled Zernio posts for ${ruleRef}`);
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
         ruleId: ruleRef,
         message: 'No published or scheduled posts with Zernio ids found for this rule.',
@@ -244,39 +246,66 @@ export class AnalyticsService {
       return null;
     }
 
+    const uploadRefs = [
+      ...new Set(
+        posts
+          .map((p) => String(p.uploadRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const uploadRows = uploadRefs.length
+      ? await this.uploadModel
+          .find({ uploadId: { $in: uploadRefs } })
+          .select({ uploadId: 1, workflowRef: 1 })
+          .lean()
+          .exec()
+      : [];
+    const pipelineByUpload = new Map(
+      uploadRows.map((u) => [String(u.uploadId), String(u.workflowRef ?? '')]),
+    );
+
     const contentPerformance: ContentPerformanceEntry[] = [];
+    const metricsByPid = new Map<
+      string,
+      ReturnType<typeof normalizeMetrics>
+    >();
 
-    for (const upload of uploads) {
-      for (const ch of upload.channels) {
-        const pid = ch.zernioPostId?.trim();
-        if (!pid) continue;
-        if (
-          ch.status !== UploadChannelStatus.Published &&
-          ch.status !== UploadChannelStatus.Scheduled
-        ) {
-          continue;
+    for (const post of posts) {
+      const pid = String(post.zernioPostId ?? '').trim();
+      if (!pid) continue;
+      const pipelineRef =
+        pipelineByUpload.get(String(post.uploadRef)) ?? '';
+      const chans = Array.isArray(post.channels) ? post.channels : [];
+
+      for (const channel of chans) {
+        const ch = String(channel ?? '').trim();
+        if (!ch) continue;
+
+        let metrics = metricsByPid.get(pid);
+        if (!metrics) {
+          try {
+            const raw = await this.zernioRest.getPostAnalytics(pid, {
+              fromDate: from.toISOString().slice(0, 10),
+              toDate: to.toISOString().slice(0, 10),
+            });
+            metrics = normalizeMetrics(raw);
+            metricsByPid.set(pid, metrics);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.logger.warn(`Failed to get analytics for post ${pid}: ${msg}`);
+            await this.sleep(500);
+            continue;
+          }
         }
 
-        try {
-          const raw = await this.zernioRest.getPostAnalytics(pid, {
-            fromDate: from.toISOString().slice(0, 10),
-            toDate: to.toISOString().slice(0, 10),
-          });
-          const metrics = normalizeMetrics(raw);
-          contentPerformance.push({
-            contentRef: upload.contentRef,
-            pipelineRef: upload.workflowRef,
-            uploadRef: upload.uploadId,
-            zernioPostId: pid,
-            channel: ch.channel,
-            metrics,
-          });
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Failed to get analytics for post ${pid}: ${msg}`,
-          );
-        }
+        contentPerformance.push({
+          contentRef: String(post.contentRef ?? ''),
+          pipelineRef,
+          uploadRef: String(post.uploadRef ?? ''),
+          zernioPostId: pid,
+          channel: ch,
+          metrics,
+        });
         await this.sleep(500);
       }
     }

@@ -15,6 +15,11 @@ import {
   mirrorFileServiceArtifactToPublicUploadsUrl,
   resolvePublicApiBase,
 } from './file-service-local-mirror.util';
+import {
+  isFileServiceUnsupportedTypeError,
+  isVideoUpload,
+  uploadBufferToFileService,
+} from './file-service-upload.util';
 
 /**
  * POST /upload/media — stores media and returns a **public** URL (for Zernio etc.).
@@ -68,40 +73,33 @@ export class UploadMediaController {
       return { url };
     }
 
-    const base = fileServiceBase;
-    const endpoint = `${base.replace(/\/+$/, '')}/upload`;
-    const blob = new Blob([new Uint8Array(file.buffer)], {
-      type: file.mimetype,
-    });
-    const form = new FormData();
-    form.append('file', blob, file.originalname);
-
-    const response = await fetch(endpoint, { method: 'POST', body: form });
-    if (response.status !== 201) {
-      const body = await response.text().catch(() => '');
-      throw new BadRequestException(
-        `File service upload failed (${response.status}): ${body || response.statusText}`,
-      );
+    const base = fileServiceBase.replace(/\/+$/, '');
+    let uploaded: Awaited<ReturnType<typeof uploadBufferToFileService>>;
+    try {
+      uploaded = await uploadBufferToFileService({
+        fileServiceBase: base,
+        buffer: new Uint8Array(file.buffer),
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+      });
+    } catch (error) {
+      // File-service may still block `.mp4` by extension; store under ./uploads when public base is set.
+      if (
+        publicBase &&
+        isVideoUpload(file.originalname, file.mimetype) &&
+        isFileServiceUnsupportedTypeError(error)
+      ) {
+        const url = await mirrorFetchedBytesToPublicUploadsUrl(
+          new Uint8Array(file.buffer),
+          file.originalname,
+          file.mimetype || 'video/mp4',
+          publicBase,
+        );
+        return { url };
+      }
+      throw error;
     }
-    const payload = (await response.json()) as {
-      success?: boolean;
-      data?: {
-        fileUrl?: string;
-        relativePath?: string;
-      };
-    };
-    const data = payload?.data;
-    if (!payload?.success || !data) {
-      throw new BadRequestException(
-        'File service returned an invalid response',
-      );
-    }
-    const fileUrl = data.fileUrl?.trim() || '';
-    const relativePath = data.relativePath?.trim() || '';
-    const url = fileUrl || relativePath;
-    if (!url.trim()) {
-      throw new BadRequestException('File service did not return a file URL');
-    }
+    const url = uploaded.fileUrl;
 
     if (!mirrorEnabled) {
       return { url };
@@ -110,7 +108,10 @@ export class UploadMediaController {
     const mirrored = await mirrorFileServiceArtifactToPublicUploadsUrl(
       this.config,
       base,
-      { fileUrl, relativePath },
+      {
+        fileUrl: uploaded.fileUrl,
+        relativePath: uploaded.relativePath,
+      },
       file.originalname,
       file.mimetype,
     );

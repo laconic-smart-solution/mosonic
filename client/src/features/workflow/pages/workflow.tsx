@@ -561,6 +561,22 @@ export default function WorkflowPage() {
     }
   }
 
+  function handleCancelPipeline() {
+    if (pipelineId) leavePipelineRoom(pipelineId)
+    setPipelineId(undefined)
+    setSearchParams((params) => {
+      params.delete("pipelineId")
+      return params
+    })
+    setProcessingMode("edit")
+    setPipelinePaused(false)
+    setPipelineFailedMessage("")
+    setNodeRuntimeById({})
+    setCompletedNodes(0)
+    completedNodeIdsRef.current.clear()
+    setTotalNodes(null)
+  }
+
   function handleRetryNode(nodeId: string) {
     if (!pipelineId) return
     retryNodeMutation.mutate(
@@ -601,7 +617,6 @@ export default function WorkflowPage() {
 
     const onSuccess = (data: { workflowId: string }) => {
       workflowEventTargetRef.current = data.workflowId
-      setWorkflowPrompt("")
       setActiveWorkflowId(data.workflowId)
       setApiNodes([])
       setGenerationStep("generating")
@@ -611,7 +626,7 @@ export default function WorkflowPage() {
         state: {
           ruleName,
           generating: true,
-          contentPrompt: "",
+          contentPrompt,
         },
       })
       void workflowByRuleQuery.refetch()
@@ -728,6 +743,7 @@ export default function WorkflowPage() {
         isSaving={saveNodesMutation.isPending}
         readOnly={processingMode === "processing"}
         showCancel={processingMode === "processing"}
+        onCancel={handleCancelPipeline}
       />
 
       {processingMode === "processing" ? (

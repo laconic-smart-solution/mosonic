@@ -19,7 +19,10 @@ import {
   displayLinkedRef,
   listCardPrimaryTitle,
 } from "@/features/content/lib/content-display"
-import { FileServiceImage } from "@/features/upload/components/upload-display-media"
+import {
+  FileServiceImage,
+  FileServiceVideo,
+} from "@/features/upload/components/upload-display-media"
 import { ContentListStatusBadge } from "./content-list-status-badge"
 import { formatRelativeTime, previewEmoji } from "./content-list-format"
 
@@ -34,14 +37,18 @@ function hasOutput(value: string | undefined): boolean {
 }
 
 type GridHeroResolved =
+  | { kind: "video"; url: string }
   | { kind: "image"; url: string }
   | { kind: "text"; label: string; body: string }
   | null
 
-/** Preview priority for grid hero: image → summary → translation → transcript → text (no video). */
+/** Preview priority for grid hero: video → image → summary → translation → transcript → text. */
 function resolveGridHeroOutput(
   o: ContentOutputs | undefined
 ): GridHeroResolved {
+  if (hasOutput(o?.video)) {
+    return { kind: "video", url: o!.video!.trim() }
+  }
   if (hasOutput(o?.image)) {
     return { kind: "image", url: o!.image!.trim() }
   }
@@ -90,7 +97,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
   const hasVideo = hasOutput(o?.video)
   const hasSummary = hasOutput(o?.summary)
   const gridHero = resolveGridHeroOutput(o)
-  const showImageHero = gridHero?.kind === "image"
+  const showMediaHero =
+    gridHero?.kind === "image" || gridHero?.kind === "video"
 
   return (
     <motion.article
@@ -114,7 +122,17 @@ export function ContentListCard({ item, index, onOpen }: Props) {
       )}
     >
       <div className="relative flex h-40 items-center justify-center overflow-hidden">
-        {showImageHero ? (
+        {gridHero?.kind === "video" ? (
+          <FileServiceVideo
+            url={gridHero.url}
+            className="absolute inset-0 size-full object-cover"
+            muted
+            playsInline
+            controls={false}
+            autoPlay
+            loop
+          />
+        ) : gridHero?.kind === "image" ? (
           <FileServiceImage
             url={gridHero.url}
             alt=""
@@ -125,7 +143,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         <div
           className={cn(
             "absolute inset-0",
-            showImageHero ? "opacity-80" : "opacity-95"
+            showMediaHero ? "opacity-80" : "opacity-95"
           )}
         />
         <div className="relative z-10 flex max-h-full w-full flex-col items-center justify-center gap-1.5 px-3 text-center">
@@ -204,6 +222,17 @@ export function ContentListCard({ item, index, onOpen }: Props) {
           <span
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
+              hasVideo
+                ? "border-canvas-200/80 bg-amber-50 text-amber-700"
+                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+            )}
+            title="Video"
+          >
+            <Video className="size-2.5" />
+          </span>
+          <span
+            className={cn(
+              "flex size-5 items-center justify-center rounded-md border",
               hasImage
                 ? "border-canvas-200/80 bg-teal-50 text-teal-600"
                 : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
@@ -222,17 +251,6 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             title="Translation"
           >
             <Languages className="size-2.5" />
-          </span>
-          <span
-            className={cn(
-              "flex size-5 items-center justify-center rounded-md border",
-              hasVideo
-                ? "border-canvas-200/80 bg-amber-50 text-amber-700"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
-            )}
-            title="Video"
-          >
-            <Video className="size-2.5" />
           </span>
           <span
             className={cn(

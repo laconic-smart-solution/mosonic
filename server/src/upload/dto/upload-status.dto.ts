@@ -12,7 +12,6 @@ export type UploadChannelStatusDto = {
   youtubeTitle?: string | null;
   scheduledAt: string | null;
   publishedAt: string | null;
-  zernioPostId: string | null;
   failureReason: string | null;
 };
 

@@ -9,6 +9,7 @@ import type { UploadResolvedOutputs } from "@/shared/types/upload.type"
 import {
   effectiveCaptionForDraft,
   type ChannelDraft,
+  type WorkflowNodeLayersSnapshot,
 } from "@/features/upload/lib/upload-channel-draft"
 
 import type { UploadPaletteDragPayload } from "./upload-dnd-payload"
@@ -18,6 +19,7 @@ type DropVisual = "idle" | "accept" | "reject"
 type UploadTextDropZoneProps = {
   draft: ChannelDraft
   resolved: UploadResolvedOutputs
+  workflowLayers?: WorkflowNodeLayersSnapshot | null
   captionSourceLabel: string
   activeDrag: UploadPaletteDragPayload | null
   disabled?: boolean
@@ -33,6 +35,7 @@ function textDropVisual(active: UploadPaletteDragPayload | null): DropVisual {
 export function UploadTextDropZone({
   draft,
   resolved,
+  workflowLayers = null,
   captionSourceLabel,
   activeDrag,
   disabled = false,
@@ -41,7 +44,7 @@ export function UploadTextDropZone({
 }: UploadTextDropZoneProps) {
   const visual = textDropVisual(disabled ? null : activeDrag)
   const { isOver, setNodeRef } = useDroppable({ id: "drop-text", disabled })
-  const caption = effectiveCaptionForDraft(draft, resolved)
+  const caption = effectiveCaptionForDraft(draft, resolved, workflowLayers)
   const has = caption.trim().length > 0
 
   const border =

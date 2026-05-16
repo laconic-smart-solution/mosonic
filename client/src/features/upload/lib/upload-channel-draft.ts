@@ -6,6 +6,8 @@ import type {
   UploadResolvedOutputs,
 } from "@/shared/types/upload.type"
 
+import { mergeNodeOutputLayers } from "@/features/content/data/content-review-helpers"
+
 import {
   captionFromOutputs,
   type CaptionSourceOption,
@@ -18,9 +20,17 @@ import {
   type MediaTabMode,
 } from "./upload-platform-media"
 
+/** Live per-node layers from the generation panel (required to resolve pinned captions). */
+export type WorkflowNodeLayersSnapshot = {
+  nodeOutputs: Record<string, Record<string, unknown>>
+  nodeUserEdits: Record<string, Record<string, unknown>>
+}
+
 export type ChannelDraft = {
   captionSource: CaptionSourceOption
   captionCustom: string
+  /** When set with a semantic captionSource, pull text from this workflow node's output/edits instead of flattened resolved outputs. */
+  captionSourceNodeId?: string | undefined
   mediaTab: MediaTabMode
   imageUrls: string[]
   videoUrl: string | null
@@ -32,6 +42,7 @@ export function createEmptyDraft(): ChannelDraft {
   return {
     captionSource: "text",
     captionCustom: "",
+    captionSourceNodeId: undefined,
     mediaTab: "single",
     imageUrls: [],
     videoUrl: null,
@@ -124,6 +135,7 @@ export function draftFromUploadRow(
   return {
     captionSource,
     captionCustom,
+    captionSourceNodeId: undefined,
     mediaTab,
     imageUrls,
     videoUrl,
@@ -132,17 +144,102 @@ export function draftFromUploadRow(
   }
 }
 
+function semanticCaptionFromLayer(
+  source: Exclude<CaptionSourceOption, "custom">,
+  layer: Record<string, unknown>,
+): string {
+  switch (source) {
+    case "text":
+      return typeof layer.text === "string" ? layer.text : ""
+    case "translatedText":
+      return typeof layer.translatedText === "string"
+        ? layer.translatedText
+        : ""
+    case "summary":
+      return typeof layer.summary === "string" ? layer.summary : ""
+    default:
+      return ""
+  }
+}
+
 export function effectiveCaptionForDraft(
   draft: ChannelDraft,
   resolved: UploadResolvedOutputs,
+  layers?: WorkflowNodeLayersSnapshot | null,
 ): string {
   if (draft.captionSource === "custom") {
     return draft.captionCustom.trim()
   }
-  return captionFromOutputs(
-    draft.captionSource as Exclude<CaptionSourceOption, "custom">,
-    resolved,
+  const source = draft.captionSource as Exclude<CaptionSourceOption, "custom">
+  const nid = draft.captionSourceNodeId?.trim()
+  if (nid && layers) {
+    const merged = mergeNodeOutputLayers(
+      layers.nodeOutputs,
+      layers.nodeUserEdits,
+      nid,
+    )
+    const pinned = semanticCaptionFromLayer(source, merged).trim()
+    if (pinned.length > 0) return pinned
+  }
+  return captionFromOutputs(source, resolved)
+}
+
+export function channelRequiresMedia(channelKey: string): boolean {
+  const key = normalizeChannelKey(channelKey)
+  return key === "youtube" || key === "tiktok"
+}
+
+/** Media URLs that would be used on publish (draft overrides persisted row). */
+export function effectiveMediaUrlsForPublish(
+  draft: ChannelDraft,
+  row: UploadChannelRow,
+  resolved: UploadResolvedOutputs,
+  channelKey: string,
+): string[] {
+  const stored = draft.dirty
+    ? draftToMediaStorage(draft, channelKey)
+    : {
+        mediaUrl: row.mediaUrl,
+        mediaUrls: row.mediaUrls ?? [],
+      }
+
+  const urls = (
+    stored.mediaUrls?.length
+      ? stored.mediaUrls
+      : stored.mediaUrl
+        ? [stored.mediaUrl]
+        : []
   )
+    .map((u) => u?.trim())
+    .filter(Boolean) as string[]
+
+  if (urls.length > 0) return urls
+
+  const fallback = (resolved.image?.trim() || resolved.video?.trim() || "").trim()
+  return fallback ? [fallback] : []
+}
+
+export function getChannelMediaValidationError(
+  channelKey: string,
+  draft: ChannelDraft,
+  row: UploadChannelRow,
+  resolved: UploadResolvedOutputs,
+): string | null {
+  if (!channelRequiresMedia(channelKey)) return null
+
+  const key = normalizeChannelKey(channelKey)
+  const urls = effectiveMediaUrlsForPublish(draft, row, resolved, channelKey)
+  const label = getPlatformMediaConfig(channelKey).displayName
+
+  if (urls.length === 0) {
+    return `${label} requires media (image or video) before publishing.`
+  }
+
+  if (key === "youtube" && !urls.some((u) => isVideoUrl(u))) {
+    return `${label} requires a video before publishing.`
+  }
+
+  return null
 }
 
 export function draftToMediaStorage(
@@ -169,9 +266,10 @@ export function draftToPatchBody(
   row: UploadChannelRow,
   draft: ChannelDraft,
   resolved: UploadResolvedOutputs,
+  layers?: WorkflowNodeLayersSnapshot | null,
 ): PatchUploadChannelBody {
   const key = normalizeChannelKey(row.channel)
-  const caption = effectiveCaptionForDraft(draft, resolved)
+  const caption = effectiveCaptionForDraft(draft, resolved, layers)
   const { mediaUrl, mediaUrls } = draftToMediaStorage(draft, key)
   const body: PatchUploadChannelBody = {
     included: row.included ?? true,
@@ -205,8 +303,7 @@ export function buildSingleChannelPublishRequest(params: {
     if (!connectedSet.has(key)) {
       return { channel: r.channel, included: false }
     }
-    // Persisted include flag is the default; single-channel publish overrides to just this channel.
-    const included = key === channelKey ? true : Boolean(r.included)
+    const included = key === channelKey
     return { channel: r.channel, included }
   })
 

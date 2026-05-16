@@ -13,7 +13,28 @@ import type {
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
 
 const POLL_INTERVAL_MS = 5000;
-const MAX_POLL_ATTEMPTS = 60;
+const VIDEO_GENERATION_TIMEOUT_MS = 15 * 60 * 1000;
+const MAX_POLL_ATTEMPTS = VIDEO_GENERATION_TIMEOUT_MS / POLL_INTERVAL_MS;
+
+/** OpenAI Sora `seconds` parameter — only these values are valid. */
+export const SORA_VIDEO_DURATIONS = [4, 8, 12, 16, 20] as const;
+export type SoraVideoDuration = (typeof SORA_VIDEO_DURATIONS)[number];
+
+export function normalizeSoraDurationSeconds(
+  raw: number | undefined,
+): SoraVideoDuration {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 8;
+  let best: SoraVideoDuration = SORA_VIDEO_DURATIONS[0];
+  let bestDiff = Math.abs(n - best);
+  for (const s of SORA_VIDEO_DURATIONS) {
+    const d = Math.abs(n - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
 
 type NormalizedVideoConfig = {
   provider?: LlmProvider;
@@ -29,7 +50,16 @@ function normalizeVideoConfig(
   config: NodeExecutionInput['config'],
 ): NormalizedVideoConfig {
   const c = config ?? {};
-  const durationRaw = typeof c.duration === 'number' ? c.duration : 10;
+  const durationVal = (c as Record<string, unknown>).duration;
+  const durationRaw =
+    typeof durationVal === 'number'
+      ? durationVal
+      : typeof durationVal === 'string' && durationVal.trim()
+        ? Number(durationVal)
+        : 8;
+  const duration = normalizeSoraDurationSeconds(
+    Number.isFinite(durationRaw) ? durationRaw : undefined,
+  );
   const resolution = typeof c.resolution === 'string' ? c.resolution : '720p';
   const aspectRatio =
     typeof c.aspectRatio === 'string' ? c.aspectRatio : '16:9';
@@ -46,25 +76,32 @@ function normalizeVideoConfig(
     'sora-2-2025-12-08',
   ]);
   const model = allowedModels.has(requestedModel) ? requestedModel : 'sora-2';
+  const isSoraPro = model.includes('pro');
 
-  const secondsForApi: OpenAI.Videos.VideoCreateParams['seconds'] =
-    durationRaw <= 5 ? '4' : durationRaw <= 10 ? '8' : '12';
+  const secondsForApi = String(
+    duration,
+  ) as OpenAI.Videos.VideoCreateParams['seconds'];
 
+  /** sora-2 (non-pro) only accepts 720x1280 and 1280x720 per OpenAI API. */
   const sizeForApi: OpenAI.Videos.VideoCreateParams['size'] = (() => {
-    if (aspectRatio === '9:16' || aspectRatio === '4:5') {
-      return resolution === '1080p' ? '1024x1792' : '720x1280';
+    const wantsHd = resolution === '1080p' && isSoraPro;
+    const portrait =
+      aspectRatio === '9:16' ||
+      aspectRatio === '4:5' ||
+      aspectRatio === '1:1';
+    if (portrait) {
+      return wantsHd ? '1024x1792' : '720x1280';
     }
     if (aspectRatio === '16:9') {
-      return resolution === '1080p' ? '1792x1024' : '1280x720';
+      return wantsHd ? '1792x1024' : '1280x720';
     }
-    // Sora API does not expose true 1:1 size. Use portrait fallback and reinforce square feel in prompt.
-    return resolution === '1080p' ? '1024x1792' : '720x1280';
+    return wantsHd ? '1024x1792' : '720x1280';
   })();
 
   return {
     provider,
     model,
-    duration: durationRaw,
+    duration,
     resolution,
     aspectRatio,
     secondsForApi,
@@ -306,7 +343,7 @@ export class VideoGenerationService {
     let attempts = 0;
     while (result.status !== 'completed' && result.status !== 'failed') {
       if (attempts >= MAX_POLL_ATTEMPTS) {
-        throw new Error('Video generation timed out after 5 minutes.');
+        throw new Error('Video generation timed out after 15 minutes.');
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       result = await client.videos.retrieve(result.id);
@@ -335,7 +372,7 @@ export class VideoGenerationService {
     const storage = await this.uploadVideoBuffer({
       videoBuffer,
       fileName,
-      folderPath: `videos/${pipelineId}`,
+      folderPath: `neural-tex/videos/${pipelineId}`,
     });
 
     return { video: storage.fileUrl, storage };

@@ -9,44 +9,110 @@ import {
   parseMcpToolJson,
 } from './zernio-mcp-publish.util';
 
+const PLACEHOLDER_ZERNIO_KEYS = new Set([
+  'your_zernio_api_key_here',
+  'changeme',
+  'replace_me',
+]);
+
 @Injectable()
 export class ZernioMcpClient implements OnModuleInit {
-  private client!: Client;
+  private client: Client | null = null;
+  private connected = false;
+  private connectError: string | null = null;
   private readonly logger = new Logger(ZernioMcpClient.name);
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
-    await this.connect();
+    try {
+      await this.connect();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.connectError = message;
+      this.connected = false;
+      this.logger.warn(
+        `Zernio MCP not connected at startup (${message}). ` +
+          'Publishing and analytics via MCP will fail until ZERNIO_API_KEY is valid. ' +
+          'Other API features will still run.',
+      );
+    }
   }
 
-  private async connect() {
-    const apiKey = this.config.get<string>('ZERNIO_API_KEY');
-    const mcpUrl = this.config.get<string>('ZERNIO_MCP_URL');
-    if (!apiKey) {
-      this.logger.error('ZERNIO_API_KEY is not set');
-      throw new Error('ZERNIO_API_KEY is not set');
+  isConnected(): boolean {
+    return this.connected;
+  }
+
+  private isMcpDisabled(): boolean {
+    const raw = this.config.get<string>('ZERNIO_MCP_DISABLED')?.trim().toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes';
+  }
+
+  private resolveCredentials(): { apiKey: string; mcpUrl: string } | null {
+    if (this.isMcpDisabled()) {
+      return null;
+    }
+    const apiKey = this.config.get<string>('ZERNIO_API_KEY')?.trim() ?? '';
+    const mcpUrl = this.config.get<string>('ZERNIO_MCP_URL')?.trim() ?? '';
+    if (!apiKey || PLACEHOLDER_ZERNIO_KEYS.has(apiKey.toLowerCase())) {
+      return null;
     }
     if (!mcpUrl) {
-      this.logger.error('ZERNIO_MCP_URL is not set');
-      throw new Error('ZERNIO_MCP_URL is not set');
+      return null;
+    }
+    return { apiKey, mcpUrl };
+  }
+
+  private async connect(): Promise<void> {
+    const creds = this.resolveCredentials();
+    if (!creds) {
+      throw new Error(
+        'Zernio MCP is not configured (set ZERNIO_API_KEY and ZERNIO_MCP_URL, or ZERNIO_MCP_DISABLED=true to skip)',
+      );
     }
 
-    this.client = new Client({
+    const client = new Client({
       name: 'neuraltex',
       version: '1.0.0',
     });
 
-    const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+    const transport = new StreamableHTTPClientTransport(new URL(creds.mcpUrl), {
       requestInit: {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${creds.apiKey}`,
         },
       },
     });
 
-    await this.client.connect(transport);
+    await client.connect(transport);
+    this.client = client;
+    this.connected = true;
+    this.connectError = null;
     this.logger.log('Connected to Zernio MCP server');
+  }
+
+  private async ensureConnected(): Promise<Client> {
+    if (this.connected && this.client) {
+      return this.client;
+    }
+    try {
+      await this.connect();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : String(err);
+      this.connectError = message;
+      this.connected = false;
+      throw new Error(
+        `Zernio MCP is unavailable: ${message}. Check ZERNIO_API_KEY and ZERNIO_MCP_URL.`,
+      );
+    }
+    if (!this.client) {
+      throw new Error(
+        this.connectError ??
+          'Zernio MCP is unavailable. Check ZERNIO_API_KEY and ZERNIO_MCP_URL.',
+      );
+    }
+    return this.client;
   }
 
   /**
@@ -64,7 +130,8 @@ export class ZernioMcpClient implements OnModuleInit {
   }) {
     this.logger.log(`Publishing to: ${payload.platforms}`);
 
-    return await this.client.callTool({
+    const client = await this.ensureConnected();
+    return await client.callTool({
       name: 'posts_cross_post',
       arguments: {
         content: payload.content,
@@ -116,7 +183,8 @@ export class ZernioMcpClient implements OnModuleInit {
     }
 
     try {
-      const result = await this.client.callTool({
+      const client = await this.ensureConnected();
+      const result = await client.callTool({
         name: 'posts_create_post',
         arguments: {
           profile_id: payload.profileId,
@@ -208,7 +276,8 @@ export class ZernioMcpClient implements OnModuleInit {
     }
 
     try {
-      const result = await this.client.callTool({
+      const client = await this.ensureConnected();
+      const result = await client.callTool({
         name: 'posts_update',
         arguments: args,
       });
@@ -236,7 +305,8 @@ export class ZernioMcpClient implements OnModuleInit {
   /** Zernio MCP `get_analytics` — returns parsed JSON body or null on empty / tool error. */
   async getPostAnalytics(postId: string): Promise<unknown | null> {
     try {
-      const result = await this.client.callTool({
+      const client = await this.ensureConnected();
+      const result = await client.callTool({
         name: 'get_analytics',
         arguments: { post_id: postId },
       });
@@ -274,7 +344,8 @@ export class ZernioMcpClient implements OnModuleInit {
       this.config.get<string>('ZERNIO_MCP_GET_POST_TOOL')?.trim() ||
       'posts_get';
     try {
-      const result = await this.client.callTool({
+      const client = await this.ensureConnected();
+      const result = await client.callTool({
         name: toolName,
         arguments: { post_id: postId },
       });
@@ -301,7 +372,8 @@ export class ZernioMcpClient implements OnModuleInit {
   }
 
   async listTools() {
-    const { tools } = await this.client.listTools();
+    const client = await this.ensureConnected();
+    const { tools } = await client.listTools();
     console.log('tools', tools);
     return tools.map((t) => ({ name: t.name, description: t.description }));
   }

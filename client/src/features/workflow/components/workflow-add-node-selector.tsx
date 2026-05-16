@@ -1,9 +1,9 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+} from "@/components/ui/modal"
 import type { WorkflowNodeType } from "@/shared/types/workflow.type"
 
 const ADDABLE_NODE_TYPES: { type: WorkflowNodeType; label: string; description: string }[] = [
@@ -31,11 +31,11 @@ export function WorkflowAddNodeSelector({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add Node</DialogTitle>
-        </DialogHeader>
+    <Modal open={open} onOpenChange={onOpenChange}>
+      <ModalContent className="max-w-sm sm:max-w-sm">
+        <ModalHeader>
+          <ModalTitle>Add Node</ModalTitle>
+        </ModalHeader>
 
         <div className="space-y-2">
           {ADDABLE_NODE_TYPES.map(({ type, label, description }) => (
@@ -50,7 +50,7 @@ export function WorkflowAddNodeSelector({
             </button>
           ))}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ModalContent>
+    </Modal>
   )
 }

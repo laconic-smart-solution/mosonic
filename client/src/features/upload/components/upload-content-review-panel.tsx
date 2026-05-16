@@ -21,8 +21,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import {
+  backendTypeToCanvas,
+  buildGenerateMoreDefaultConfig,
+  type GenerateMoreRuleHint,
+} from "@/features/workflow/data/workflow-model"
 
 import {
   type OutputKey,
@@ -46,12 +51,16 @@ import {
   pipelineStepLabel,
 } from "@/features/content/components/content-detail/content-detail-review-ui"
 import { useGetContentQuery } from "@/shared/queries/content.query"
+import { useRuleByIdQuery } from "@/shared/queries/rule.query"
 import { useGetWorkflowQuery } from "@/shared/queries/workflow.query"
 import { contentService } from "@/shared/services/content.service"
 import { uploadService } from "@/shared/services/upload.service"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
 import type { ContentDetail } from "@/shared/types/content.type"
-import type { WorkflowNode, WorkflowNodeType } from "@/shared/types/workflow.type"
+import type {
+  WorkflowNode,
+  WorkflowNodeType,
+} from "@/shared/types/workflow.type"
 import {
   joinContentRoom,
   leaveContentRoom,
@@ -64,6 +73,7 @@ import {
 } from "@/shared/socket/content-events"
 
 import { UploadGenerationDraggableCard } from "@/features/upload/components/upload-generation-draggable-card"
+import type { WorkflowNodeLayersSnapshot } from "@/features/upload/lib/upload-channel-draft"
 
 function staticTextFromLayer(
   layer: Record<string, unknown>,
@@ -79,9 +89,7 @@ function staticTextFromLayer(
         ? layer.translatedText
         : ""
     case "transcription":
-      return typeof layer.transcription === "string"
-        ? layer.transcription
-        : ""
+      return typeof layer.transcription === "string" ? layer.transcription : ""
     case "summary":
       return typeof layer.summary === "string" ? layer.summary : ""
     default:
@@ -99,6 +107,8 @@ export type UploadContentReviewPanelProps = {
   preview?: ReactNode
   /** Left column when embedded: scheduled/post status + platform card preview */
   channelPreview?: ReactNode
+  /** Fired whenever per-node outputs / edits change (used to resolve pinned drag-drop captions). */
+  onWorkflowLayersChange?: (layers: WorkflowNodeLayersSnapshot) => void
 }
 
 export function UploadContentReviewPanel({
@@ -107,12 +117,16 @@ export function UploadContentReviewPanel({
   embedInUpload = false,
   preview,
   channelPreview,
+  onWorkflowLayersChange,
 }: UploadContentReviewPanelProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const contentQuery = useGetContentQuery(contentId)
   const data = contentQuery.data
+
+  const ruleQuery = useRuleByIdQuery<GenerateMoreRuleHint>(data?.ruleRef)
+  const ruleHint = ruleQuery.data
 
   const workflowQuery = useGetWorkflowQuery(data?.workflowRef, {
     refetchInterval: false,
@@ -129,7 +143,9 @@ export function UploadContentReviewPanel({
 
   const generationNodes = useMemo(
     () =>
-      sortedWorkflowNodes.filter((n) => n.type !== "keyword_planner") as WorkflowNode[],
+      sortedWorkflowNodes.filter(
+        (n) => n.type !== "keyword_planner"
+      ) as WorkflowNode[],
     [sortedWorkflowNodes]
   )
 
@@ -157,7 +173,9 @@ export function UploadContentReviewPanel({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const [rerunNodeId, setRerunNodeId] = useState<string | null>(null)
-  const [rerunPromptDraft, setRerunPromptDraft] = useState("")
+  const [rerunConfigDraft, setRerunConfigDraft] = useState<
+    Record<string, unknown>
+  >({})
   const [runByNodeId, setRunByNodeId] = useState<
     Partial<Record<string, ReturnType<typeof emptyRunState>>>
   >({})
@@ -172,17 +190,19 @@ export function UploadContentReviewPanel({
   const [availableTypesLoading, setAvailableTypesLoading] = useState(false)
   const [selectedGenType, setSelectedGenType] =
     useState<WorkflowNodeType | null>(null)
-  const [genMorePromptDraft, setGenMorePromptDraft] = useState("")
+  const [genMoreConfigDraft, setGenMoreConfigDraft] = useState<
+    Record<string, unknown>
+  >({})
   const [isGeneratingMore, setIsGeneratingMore] = useState(false)
   const [generateMorePending, setGenerateMorePending] = useState<{
     nodeId: string
     type: WorkflowNodeType
-    userPrompt: string
+    config: Record<string, unknown>
   } | null>(null)
 
   const generateMoreRetryRef = useRef<{
     type: WorkflowNodeType
-    userPrompt: string
+    config: Record<string, unknown>
     nodeId: string
   } | null>(null)
 
@@ -226,6 +246,10 @@ export function UploadContentReviewPanel({
     setNodeUserEdits(data.nodeUserEdits ?? {})
   }, [data, hasUnsavedChanges])
 
+  useEffect(() => {
+    onWorkflowLayersChange?.({ nodeOutputs, nodeUserEdits })
+  }, [nodeOutputs, nodeUserEdits, onWorkflowLayersChange])
+
   const markDirty = useCallback(() => {
     setHasUnsavedChanges(true)
     setApproveEnabled(false)
@@ -242,12 +266,16 @@ export function UploadContentReviewPanel({
     [markDirty]
   )
 
-  const getNodePromptById = useCallback(
+  const getNodeConfigById = useCallback(
     (nodeId: string) => {
       const n = workflowNodes.find((x) => x.nodeId === nodeId)
-      return n?.userPrompt?.trim() ?? ""
+      if (!n) return {}
+      return {
+        ...buildGenerateMoreDefaultConfig(n.type, ruleHint),
+        ...(n.config ?? {}),
+      }
     },
-    [workflowNodes]
+    [workflowNodes, ruleHint]
   )
 
   const setRunState = useCallback(
@@ -270,7 +298,11 @@ export function UploadContentReviewPanel({
     const cleanups = [
       onContentNodeStarted((p) => {
         if (!filter(p)) return
-        setRunState(p.nodeId, { phase: "running", stream: "", errorMessage: "" })
+        setRunState(p.nodeId, {
+          phase: "running",
+          stream: "",
+          errorMessage: "",
+        })
       }),
       onContentNodeStreaming((p) => {
         if (!filter(p)) return
@@ -356,8 +388,6 @@ export function UploadContentReviewPanel({
     },
     onSuccess: async () => {
       toast.success("Changes saved")
-      setHasUnsavedChanges(false)
-      setApproveEnabled(true)
       void queryClient.invalidateQueries({
         queryKey: ["contents"],
         exact: false,
@@ -365,6 +395,15 @@ export function UploadContentReviewPanel({
       if (uploadId) {
         void queryClient.invalidateQueries({ queryKey: ["upload", uploadId] })
       }
+      // Refetch content before clearing dirty state so the effect below does not
+      // re-apply stale cached nodeOutputs (e.g. missing generate-more results).
+      try {
+        await queryClient.refetchQueries({ queryKey: ["content", contentId] })
+      } catch {
+        void queryClient.invalidateQueries({ queryKey: ["content", contentId] })
+      }
+      setHasUnsavedChanges(false)
+      setApproveEnabled(true)
     },
     onError: () => {
       toast.error("Failed to save. Please try again.")
@@ -374,7 +413,7 @@ export function UploadContentReviewPanel({
   useEffect(() => {
     if (!genMoreOpen || !contentId) return
     setSelectedGenType(null)
-    setGenMorePromptDraft("")
+    setGenMoreConfigDraft({})
     let cancelled = false
     setAvailableTypesLoading(true)
     void contentService
@@ -402,7 +441,7 @@ export function UploadContentReviewPanel({
   }, [genMoreOpen, contentId, generateMoreTypes])
 
   const submitGenerateMore = useCallback(
-    async (type: WorkflowNodeType, userPrompt: string) => {
+    async (type: WorkflowNodeType, config: Record<string, unknown>) => {
       if (!contentId) return
       const key = outputKeyForNodeType(type)
       if (!key) {
@@ -413,15 +452,15 @@ export function UploadContentReviewPanel({
       setApproveEnabled(false)
       setGenMoreOpen(false)
       setSelectedGenType(null)
-      setGenMorePromptDraft("")
+      setGenMoreConfigDraft({})
       try {
         const { nodeId } = await contentService.generateNode(contentId, {
           type,
-          userPrompt: userPrompt.trim() || undefined,
+          config,
         })
         setRunState(nodeId, { phase: "running", stream: "", errorMessage: "" })
-        generateMoreRetryRef.current = { type, userPrompt, nodeId }
-        setGenerateMorePending({ nodeId, type, userPrompt })
+        generateMoreRetryRef.current = { type, config, nodeId }
+        setGenerateMorePending({ nodeId, type, config })
         if (data?.workflowRef) {
           void queryClient.invalidateQueries({
             queryKey: ["workflow", data.workflowRef],
@@ -429,7 +468,7 @@ export function UploadContentReviewPanel({
         }
       } catch {
         toast.error("Could not start generation.")
-        generateMoreRetryRef.current = { type, userPrompt, nodeId: "" }
+        generateMoreRetryRef.current = { type, config, nodeId: "" }
         setIsGeneratingMore(false)
       }
     },
@@ -515,7 +554,7 @@ export function UploadContentReviewPanel({
   function openRerun(nodeId: string) {
     if (globalRerunning || isGeneratingMore) return
     setRerunNodeId(nodeId)
-    setRerunPromptDraft(getNodePromptById(nodeId))
+    setRerunConfigDraft(getNodeConfigById(nodeId))
     setRunByNodeId((prev) => ({ ...prev, [nodeId]: emptyRunState() }))
   }
 
@@ -535,7 +574,7 @@ export function UploadContentReviewPanel({
     try {
       await contentService.rerunNode(contentId, {
         nodeId,
-        updatedPrompt: rerunPromptDraft.trim() || undefined,
+        updatedConfig: rerunConfigDraft,
         previousOutputs: {
           keywords: editedOutputs.keywords,
           text: editedOutputs.text,
@@ -656,7 +695,7 @@ export function UploadContentReviewPanel({
         setGenMoreOpen(open)
         if (!open) {
           setSelectedGenType(null)
-          setGenMorePromptDraft("")
+          setGenMoreConfigDraft({})
         }
       }}
     >
@@ -675,7 +714,7 @@ export function UploadContentReviewPanel({
         }
       />
       <PopoverContent
-        className="w-[min(100vw-2rem,360px)] p-4"
+        className="w-[min(100vw-2rem,300px)] p-4"
         side="bottom"
         align="start"
       >
@@ -700,7 +739,12 @@ export function UploadContentReviewPanel({
                   key={t}
                   type="button"
                   className="flex w-full items-center gap-2.5 rounded-xl border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2.5 text-left text-sm text-[#0F1F3D] transition-colors hover:border-[#00C9A7]/50 hover:bg-[#E0FAF5]/30"
-                  onClick={() => setSelectedGenType(t)}
+                  onClick={() => {
+                    setSelectedGenType(t)
+                    setGenMoreConfigDraft(
+                      buildGenerateMoreDefaultConfig(t, ruleHint)
+                    )
+                  }}
                 >
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#E0FAF5]">
                     <PipelineTypeIcon type={t} />
@@ -721,19 +765,25 @@ export function UploadContentReviewPanel({
             >
               ← Change type
             </Button>
-            <Textarea
-              value={genMorePromptDraft}
-              onChange={(e) => setGenMorePromptDraft(e.target.value)}
-              placeholder="Optional instructions for this generation…"
-              className="min-h-[88px] resize-y border-[#c6880c] text-sm"
-            />
+            <p className="text-[11px] leading-relaxed text-[#857A6C]">
+              Tune how this step runs. The campaign brief from the original run
+              is reused automatically.
+            </p>
+            <div className="max-h-[min(50vh,320px)] overflow-y-auto pr-1">
+              <WorkflowNodeConfigFields
+                canvasType={backendTypeToCanvas(selectedGenType)}
+                config={genMoreConfigDraft}
+                onChange={setGenMoreConfigDraft}
+                compact
+              />
+            </div>
             <Button
               type="button"
               size="sm"
               className="h-9 w-full bg-[#254C94] text-white hover:bg-[#1A3260]"
               disabled={blockPipeline}
               onClick={() =>
-                void submitGenerateMore(selectedGenType, genMorePromptDraft)
+                void submitGenerateMore(selectedGenType, genMoreConfigDraft)
               }
             >
               Start generation
@@ -746,7 +796,7 @@ export function UploadContentReviewPanel({
 
   return (
     <TooltipProvider>
-      <div className="relative flex min-h-0 flex-1 flex-col bg-[color:var(--nt-canvas)]">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {showRejectedBanner ? (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
             This content has been rejected. You can continue editing.
@@ -837,7 +887,7 @@ export function UploadContentReviewPanel({
                               r?.nodeId &&
                               generateMorePending?.nodeId === r.nodeId
                             ) {
-                              void submitGenerateMore(r.type, r.userPrompt)
+                              void submitGenerateMore(r.type, r.config)
                               return
                             }
                             void submitRerun(nodeId)
@@ -906,8 +956,7 @@ export function UploadContentReviewPanel({
                   const baseText = staticTextFromLayer(layer, key)
                   const displayText =
                     run.phase === "streaming" || run.phase === "running"
-                      ? run.stream ||
-                        (run.phase === "running" ? "" : baseText)
+                      ? run.stream || (run.phase === "running" ? "" : baseText)
                       : baseText
 
                   const hasBodyOutput =
@@ -926,11 +975,14 @@ export function UploadContentReviewPanel({
                   }
                   if (typeof layer.keywords === "string")
                     editedForCard.keywords = layer.keywords
-                  if (typeof layer.text === "string") editedForCard.text = layer.text
-                  if (typeof layer.image === "string") editedForCard.image = layer.image
+                  if (typeof layer.text === "string")
+                    editedForCard.text = layer.text
+                  if (typeof layer.image === "string")
+                    editedForCard.image = layer.image
                   if (typeof layer.translatedText === "string")
                     editedForCard.translatedText = layer.translatedText
-                  if (typeof layer.video === "string") editedForCard.video = layer.video
+                  if (typeof layer.video === "string")
+                    editedForCard.video = layer.video
                   if (typeof layer.transcription === "string")
                     editedForCard.transcription = layer.transcription
                   if (typeof layer.summary === "string")
@@ -965,7 +1017,7 @@ export function UploadContentReviewPanel({
                           r?.nodeId &&
                           generateMorePending?.nodeId === r.nodeId
                         ) {
-                          void submitGenerateMore(r.type, r.userPrompt)
+                          void submitGenerateMore(r.type, r.config)
                           return
                         }
                         void submitRerun(nodeId)
@@ -1013,8 +1065,8 @@ export function UploadContentReviewPanel({
           openNodeId={rerunNodeId}
           workflowNodes={workflowNodes}
           globalRerunning={blockPipeline}
-          draft={rerunPromptDraft}
-          onDraftChange={setRerunPromptDraft}
+          configDraft={rerunConfigDraft}
+          onConfigChange={setRerunConfigDraft}
           onOpenChange={(open) => {
             if (!open) setRerunNodeId(null)
           }}

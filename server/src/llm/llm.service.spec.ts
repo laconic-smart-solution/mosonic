@@ -3,7 +3,7 @@ import { LlmService } from './llm.service';
 import {
   LlmProvider,
   WorkflowNodeType,
-} from '../nodes/schemas/workflow-node.schema';
+} from '../nodes/workflow-node-llm.enums';
 
 describe('LlmService', () => {
   const config = {

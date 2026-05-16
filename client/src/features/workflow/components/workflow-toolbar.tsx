@@ -17,6 +17,8 @@ type WorkflowToolbarProps = {
   isSaving?: boolean
   readOnly?: boolean
   showCancel?: boolean
+  /** Leave the in-flight pipeline view (running or paused) and return to edit mode. */
+  onCancel?: () => void
 }
 
 export function WorkflowToolbar({
@@ -33,6 +35,7 @@ export function WorkflowToolbar({
   isSaving,
   readOnly,
   showCancel,
+  onCancel,
 }: WorkflowToolbarProps) {
   return (
     <div
@@ -125,8 +128,8 @@ export function WorkflowToolbar({
             {runLabel}
           </Button>
         ) : null}
-        {showCancel ? (
-          <Button type="button" size="sm" variant="outline">
+        {showCancel && onCancel ? (
+          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
         ) : null}

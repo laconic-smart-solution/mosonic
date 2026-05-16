@@ -17,6 +17,8 @@ export type SaveContentBody = {
 
 export type RerunNodeBody = {
   nodeId: string
+  updatedConfig?: Record<string, unknown>
+  /** @deprecated Use `updatedConfig` instead. */
   updatedPrompt?: string
   previousOutputs?: Partial<ContentOutputs>
 }

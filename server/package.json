@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/main.js",
     "tunnel": "ngrok http 3000 --domain=snarly-anika-retrogradely.ngrok-free.dev",
     "start:tunnel": "concurrently \"yarn start:dev\" \"yarn tunnel\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -20,6 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "migrate:keyword-planner": "ts-node -r tsconfig-paths/register scripts/backfill-keyword-planner.ts",
+    "migrate:posts": "ts-node -r tsconfig-paths/register scripts/migrate-upload-zernio-to-posts.ts",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {

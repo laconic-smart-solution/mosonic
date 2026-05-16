@@ -4,6 +4,7 @@ import type {
   ChannelPublishRequest,
   PublishUploadRequest,
   UploadChannelRow,
+  UploadChannelStatus,
   UploadDetail,
   UploadResolvedOutputs,
 } from "@/shared/types/upload.type"
@@ -96,6 +97,45 @@ export function defaultChannelSelection(
     captionSource: inferCaptionSource(row, resolved),
     captionDraft: row.caption ?? "",
     mediaChoice: "auto",
+  }
+}
+
+export function isChannelPublishEligible(
+  status: UploadChannelStatus | undefined,
+): boolean {
+  return status === "pending" || status === "failed"
+}
+
+/** Global publish/schedule — included + connected + eligible channels only. */
+export function buildGlobalPublishRequest(
+  upload: UploadDetail,
+  includedByKey: Record<string, boolean>,
+  connectedChannelSet: Set<string>,
+  publishNow: boolean,
+  scheduledLocal: string,
+): PublishUploadRequest {
+  const scheduledAt = publishNow
+    ? null
+    : scheduledLocal.trim()
+      ? new Date(scheduledLocal).toISOString()
+      : null
+
+  const channels: ChannelPublishRequest[] = upload.channels.map((row) => {
+    const key = row.channel.toLowerCase()
+    const connected = connectedChannelSet.has(key)
+    const eligible = isChannelPublishEligible(row.status)
+    const included =
+      Boolean(includedByKey[key]) && connected && eligible
+    return {
+      channel: row.channel,
+      included,
+    }
+  })
+
+  return {
+    publishNow,
+    scheduledAt,
+    channels,
   }
 }
 

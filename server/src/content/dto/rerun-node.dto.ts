@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -41,6 +42,11 @@ export class RerunNodeDto {
   @IsNotEmpty()
   nodeId!: string;
 
+  @IsOptional()
+  @IsObject()
+  updatedConfig?: Record<string, unknown>;
+
+  /** @deprecated Use `updatedConfig` instead; ignored when `updatedConfig` is provided. */
   @IsOptional()
   @IsString()
   updatedPrompt?: string;

@@ -8,10 +8,10 @@ import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import OpenAI from 'openai';
 import {
+  type WorkflowNodeLlmConfigSubset,
   LlmProvider,
-  type WorkflowNodeConfig,
   WorkflowNodeType,
-} from '../nodes/schemas/workflow-node.schema';
+} from '../nodes/workflow-node-llm.enums';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o';
@@ -131,7 +131,7 @@ export class LlmService {
 
   validateWorkflowNodeConfig(
     type: WorkflowNodeType,
-    config: WorkflowNodeConfig | undefined,
+    config: WorkflowNodeLlmConfigSubset | undefined,
   ): void {
     const provider = this.resolveProvider(config?.provider);
     const capabilityByNodeType: Partial<
@@ -168,9 +168,16 @@ export class LlmService {
    * Model resolution: `options.model` (e.g. workflow node `config.model`) →
    * `OPENAI_MODEL` env → built-in default.
    */
-  getChatModel(options?: { provider?: string; model?: string }): BaseChatModel {
+  getChatModel(options?: {
+    provider?: string;
+    model?: string;
+    /** Default 0.3. Use ~0.55 for workflow planning for more varied JSON plans. */
+    temperature?: number;
+  }): BaseChatModel {
     const provider = this.resolveProvider(options?.provider);
     this.assertProviderCapability(provider, 'chat');
+    const temperature =
+      typeof options?.temperature === 'number' ? options.temperature : 0.3;
 
     if (provider === LlmProvider.OpenAI) {
       const apiKey = this.requireApiKeyForProvider(provider);
@@ -179,7 +186,7 @@ export class LlmService {
       return new ChatOpenAI({
         apiKey,
         model,
-        temperature: 0.3,
+        temperature,
         modelKwargs: {
           response_format: { type: 'json_object' },
         },
@@ -190,13 +197,13 @@ export class LlmService {
       const model =
         this.config.get<string>('ANTHROPIC_MODEL')?.trim() ||
         DEFAULT_ANTHROPIC_MODEL;
-      return new ChatAnthropic({ apiKey, model, temperature: 0.3 });
+      return new ChatAnthropic({ apiKey, model, temperature });
     }
     if (provider === LlmProvider.Google) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
         this.config.get<string>('GOOGLE_MODEL')?.trim() || DEFAULT_GOOGLE_MODEL;
-      return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0.3 });
+      return new ChatGoogleGenerativeAI({ apiKey, model, temperature });
     }
     if (provider === LlmProvider.Groq) {
       const apiKey = this.requireApiKeyForProvider(provider);
@@ -206,7 +213,7 @@ export class LlmService {
         apiKey,
         model,
         configuration: { baseURL: 'https://api.groq.com/openai/v1' },
-        temperature: 0.3,
+        temperature,
       });
     }
 
@@ -214,7 +221,7 @@ export class LlmService {
       this.config.get<string>('OLLAMA_MODEL')?.trim() || DEFAULT_OLLAMA_MODEL;
     return new ChatOllama({
       model,
-      temperature: 0.3,
+      temperature,
       baseUrl: this.config.get<string>('OLLAMA_BASE_URL')?.trim() || undefined,
       format: 'json',
     });
@@ -363,9 +370,10 @@ export class LlmService {
         n: 1,
         response_format: 'b64_json',
       };
+      // DALL·E 3 historically accepted `style`; current Images API rejects it
+      // ("Unknown parameter: 'style'"). Style is already reflected in the prompt text.
       if (isDalle3) {
         body.quality = params.quality;
-        body.style = params.style;
       }
 
       const callWithCompat = async (

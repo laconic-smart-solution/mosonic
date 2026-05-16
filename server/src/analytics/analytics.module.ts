@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { McpModule } from '../mcp/mcp.module';
+import { Post, PostSchema } from '../post/schemas/post.schema';
 import { RuleModule } from '../rule/rule.module';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
 import { ContentModule } from '../content/content.module';
@@ -30,6 +31,7 @@ import { Analytics, AnalyticsSchema } from './schemas/analytics.schema';
       { name: Analytics.name, schema: AnalyticsSchema },
       { name: Rule.name, schema: RuleSchema },
       { name: SyncLock.name, schema: SyncLockSchema },
+      { name: Post.name, schema: PostSchema },
     ]),
   ],
   controllers: [AnalyticsController],

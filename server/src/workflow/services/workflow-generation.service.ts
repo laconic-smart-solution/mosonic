@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../../llm/llm.service';
 import {
+  NodeAspectRatio,
   NodeFormalityLevel,
+  NodeImageQuality,
+  NodeMediaSourceType,
   NodeOutputFormat,
   NodeSummaryLength,
   NodeTextTone,
@@ -25,22 +28,46 @@ export type GeneratedWorkflowNode = {
   config: Record<string, unknown>;
 };
 
-function nodeTypeFromString(value: unknown): WorkflowNodeType | null {
-  return typeof value === 'string' &&
-    (Object.values(WorkflowNodeType) as string[]).includes(value)
-    ? (value as WorkflowNodeType)
-    : null;
+const WORKFLOW_PLAN_TEMPERATURE = 0.55;
+
+/** Exported for tests — deterministic plan when the LLM fails or returns invalid JSON. */
+export function generateFallbackWorkflowNodes(
+  rule: Rule,
+  contentPrompt: string,
+): GeneratedWorkflowNode[] {
+  return buildFallbackNodes(rule, contentPrompt);
 }
 
 function coerceConfigForGeneration(
   type: WorkflowNodeType,
   raw: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
-  const parsed = parseWorkflowNodeConfig(type, raw ?? {});
-  const data = parsed.ok
-    ? parsed.data
-    : parseWorkflowNodeConfigOrThrow(type, {});
-  return data as unknown as Record<string, unknown>;
+  const base = parseWorkflowNodeConfig(type, {});
+  if (!base.ok) {
+    return parseWorkflowNodeConfigOrThrow(type, {}) as unknown as Record<
+      string,
+      unknown
+    >;
+  }
+  let acc: Record<string, unknown> = { ...(base.data as object) } as Record<
+    string,
+    unknown
+  >;
+  const incoming =
+    raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === undefined) continue;
+    const trial = { ...acc, [k]: v };
+    const r = parseWorkflowNodeConfig(type, trial);
+    if (r.ok) {
+      acc = { ...(r.data as object) } as Record<string, unknown>;
+    }
+  }
+  const final = parseWorkflowNodeConfig(type, acc);
+  if (final.ok) {
+    return final.data as unknown as Record<string, unknown>;
+  }
+  return base.data as unknown as Record<string, unknown>;
 }
 
 function inferTextToneFromRule(rule: Rule): NodeTextTone {
@@ -63,6 +90,295 @@ function inferTextToneFromRule(rule: Rule): NodeTextTone {
   return NodeTextTone.Friendly;
 }
 
+export type ContentPromptHints = {
+  wantsVideo: boolean;
+  wantsCarousel: boolean;
+  wantsTranscription: boolean;
+  wantsSummary: boolean;
+  prefersCaption: boolean;
+  longForm: boolean;
+  mentionsTranslate: boolean;
+};
+
+export function inferContentPromptHints(contentPrompt: string): ContentPromptHints {
+  const p = contentPrompt.trim();
+  const pl = p.toLowerCase();
+  return {
+    wantsVideo:
+      /\b(video|reel|reels|tiktok|shorts?|story\s*clip|motion|animated\s+ad)\b/i.test(
+        p,
+      ),
+    wantsCarousel:
+      /\b(carousel|multiple\s+images|multi[- ]image|photo\s+series|slideshow)\b/i.test(
+        p,
+      ),
+    wantsTranscription:
+      /\b(podcast|transcrib|audio\s+clip|voice\s+note|interview\s+recording)\b/i.test(
+        p,
+      ),
+    wantsSummary:
+      /\b(summary|tl;dr|tldr|executive\s+summary|digest)\b/i.test(pl),
+    prefersCaption:
+      /\b(caption|instagram\s+post|ig\s+post|tweet|x\s+post)\b/i.test(pl) ||
+      pl.length < 140,
+    longForm:
+      pl.length > 320 ||
+      /\b(blog|article|newsletter|long[- ]form|white\s*paper)\b/.test(pl),
+    mentionsTranslate:
+      /\b(translat|localized|locali[sz]e|thai\s+version|japanese\s+version)\b/i.test(
+        pl,
+      ),
+  };
+}
+
+export function buildRuleSummary(rule: Rule): Record<string, unknown> {
+  return {
+    ruleId: rule.ruleId,
+    name: rule.name,
+    brand: {
+      brandName: rule.brand.brandName,
+      industry: rule.brand.industry,
+      brandTone: rule.brand.brandTone,
+    },
+    audience: {
+      description: rule.audience.description,
+      language: rule.audience.language,
+      targetLanguages: rule.audience.targetLanguages,
+      location: rule.audience.location?.slice(0, 5),
+    },
+    campaign: {
+      goals: rule.campaign.goals,
+      contentFormats: rule.campaign.contentFormats,
+    },
+    channels: rule.channels.map((c) => {
+      const m = normalizedRuleChannelMapping(c);
+      return {
+        channel: c.channel,
+        captionMapping: m.caption,
+        mediaMapping: m.media,
+        hasExplicitMapping: c.contentMapping != null,
+      };
+    }),
+    contentGuidelines: {
+      donts: rule.contentGuidelines.donts.slice(0, 8),
+      requiredElements: rule.contentGuidelines.requiredElements.slice(0, 8),
+    },
+  };
+}
+
+function inferVisualAspectFromPromptAndRule(
+  contentPrompt: string,
+  rule: Rule,
+  hints: ContentPromptHints,
+): NodeAspectRatio {
+  const pl = contentPrompt.toLowerCase();
+  if (
+    /\b(reel|stories|story|tiktok|vertical|9:16|portrait)\b/.test(pl) ||
+    (hints.wantsVideo &&
+      !/\b(youtube|linkedin|widescreen|16:9|landscape)\b/.test(pl))
+  ) {
+    if (
+      rule.channels.some((c) =>
+        ['instagram', 'tiktok'].includes(c.channel.toLowerCase()),
+      ) ||
+      /\b(reel|tiktok|story)\b/.test(pl)
+    ) {
+      return NodeAspectRatio.R9x16;
+    }
+  }
+  if (
+    rule.channels.some((c) =>
+      ['youtube', 'linkedin'].includes(c.channel.toLowerCase()),
+    ) &&
+    !/\b(instagram|tiktok|reel)\b/.test(pl)
+  ) {
+    return NodeAspectRatio.R16x9;
+  }
+  if (
+    rule.channels.some((c) =>
+      ['instagram', 'tiktok'].includes(c.channel.toLowerCase()),
+    )
+  ) {
+    return NodeAspectRatio.R9x16;
+  }
+  return NodeAspectRatio.R1x1;
+}
+
+function textOutputFormatFrom(
+  rule: Rule,
+  hints: ContentPromptHints,
+): NodeOutputFormat {
+  const format = rule.campaign.contentFormats[0] ?? 'caption';
+  if (hints.longForm) {
+    return NodeOutputFormat.Paragraph;
+  }
+  if (
+    hints.prefersCaption ||
+    format.toLowerCase().includes('caption') ||
+    /\bcaption\b/i.test(rule.campaign.contentFormats.join(' '))
+  ) {
+    return NodeOutputFormat.Caption;
+  }
+  if (format.toLowerCase().includes('bullet')) {
+    return NodeOutputFormat.Bullets;
+  }
+  return NodeOutputFormat.Paragraph;
+}
+
+function buildFallbackNodes(
+  rule: Rule,
+  contentPrompt: string,
+): GeneratedWorkflowNode[] {
+  const hints = inferContentPromptHints(contentPrompt);
+  const nodes: GeneratedWorkflowNode[] = [];
+  const format = textOutputFormatFrom(rule, hints);
+
+  nodes.push({
+    type: WorkflowNodeType.KeywordPlanner,
+    order: nodes.length + 1,
+    isLocked: false,
+    config: coerceConfigForGeneration(WorkflowNodeType.KeywordPlanner, {}),
+  });
+  nodes.push({
+    type: WorkflowNodeType.TextGeneration,
+    order: nodes.length + 1,
+    isLocked: false,
+    config: coerceConfigForGeneration(WorkflowNodeType.TextGeneration, {
+      outputFormat: format,
+      tone: inferTextToneFromRule(rule),
+      textLength: hints.longForm
+        ? NodeSummaryLength.Long
+        : NodeSummaryLength.Medium,
+    }),
+  });
+
+  const mappingNeeds = {
+    translation: rule.channels.some(
+      (c) =>
+        normalizedRuleChannelMapping(c).caption ===
+        CaptionMappingSource.TranslatedText,
+    ),
+    summary: rule.channels.some(
+      (c) =>
+        normalizedRuleChannelMapping(c).caption ===
+        CaptionMappingSource.Summary,
+    ),
+    image: rule.channels.some(
+      (c) =>
+        normalizedRuleChannelMapping(c).media === ChannelMediaMapping.Image,
+    ),
+    video: rule.channels.some(
+      (c) =>
+        normalizedRuleChannelMapping(c).media === ChannelMediaMapping.Video,
+    ),
+  };
+
+  const mappingDriven = rule.channels.some((c) => c.contentMapping != null);
+
+  const hasVisualChannel = rule.channels.some((c) =>
+    ['instagram', 'facebook', 'tiktok', 'youtube'].includes(
+      c.channel.toLowerCase(),
+    ),
+  );
+  const targetLanguages = rule.audience.targetLanguages.filter(
+    (l) => l && l !== rule.audience.language,
+  );
+
+  let needImage = mappingDriven
+    ? mappingNeeds.image
+    : hasVisualChannel &&
+      (!hints.wantsVideo || hints.wantsCarousel);
+  if (!mappingDriven && hints.wantsCarousel) {
+    needImage = true;
+  }
+
+  let needVideo = mappingDriven ? mappingNeeds.video : hints.wantsVideo;
+
+  let needTranslation = mappingDriven
+    ? mappingNeeds.translation
+    : targetLanguages.length > 0 || hints.mentionsTranslate;
+
+  let needSummary = mappingDriven ? mappingNeeds.summary : hints.wantsSummary;
+
+  const visualAspect = inferVisualAspectFromPromptAndRule(
+    contentPrompt,
+    rule,
+    hints,
+  );
+
+  if (needSummary) {
+    nodes.push({
+      type: WorkflowNodeType.Summarization,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.Summarization, {
+        summaryLength: NodeSummaryLength.Short,
+      }),
+    });
+  }
+
+  if (needTranslation) {
+    nodes.push({
+      type: WorkflowNodeType.Translation,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.Translation, {
+        sourceLanguage: rule.audience.language || 'auto',
+        targetLanguage: targetLanguages[0] ?? 'th',
+        formalityLevel: NodeFormalityLevel.Casual,
+      }),
+    });
+  }
+
+  if (needImage) {
+    nodes.push({
+      type: WorkflowNodeType.ImageGeneration,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.ImageGeneration, {
+        aspectRatio: visualAspect,
+        quality: hints.wantsCarousel
+          ? NodeImageQuality.Hd
+          : NodeImageQuality.Standard,
+      }),
+    });
+  }
+
+  if (needVideo) {
+    nodes.push({
+      type: WorkflowNodeType.VideoGeneration,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.VideoGeneration, {
+        aspectRatio: visualAspect,
+        duration: /\b(4|four)\s*s(ec)?\b/i.test(contentPrompt)
+          ? 4
+          : /\b(12|twelve)\s*s(ec)?\b/i.test(contentPrompt)
+            ? 12
+            : /\b(16|sixteen)\s*s(ec)?\b/i.test(contentPrompt)
+              ? 16
+              : /\b(20|twenty)\s*s(ec)?\b/i.test(contentPrompt)
+                ? 20
+                : 8,
+      }),
+    });
+  }
+
+  if (hints.wantsTranscription) {
+    nodes.push({
+      type: WorkflowNodeType.Transcription,
+      order: nodes.length + 1,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.Transcription, {
+        sourceType: NodeMediaSourceType.Audio,
+        language: 'auto',
+      }),
+    });
+  }
+
+  return nodes.map((n, idx) => ({ ...n, order: idx + 1 }));
+}
+
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -71,122 +387,258 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
+const NODE_TYPE_ALIASES: Record<string, WorkflowNodeType> = {
+  keyword_planner: WorkflowNodeType.KeywordPlanner,
+  keywordplanner: WorkflowNodeType.KeywordPlanner,
+  KeywordPlanner: WorkflowNodeType.KeywordPlanner,
+  text_generation: WorkflowNodeType.TextGeneration,
+  textgeneration: WorkflowNodeType.TextGeneration,
+  TextGeneration: WorkflowNodeType.TextGeneration,
+  image_generation: WorkflowNodeType.ImageGeneration,
+  imagegeneration: WorkflowNodeType.ImageGeneration,
+  video_generation: WorkflowNodeType.VideoGeneration,
+  videogeneration: WorkflowNodeType.VideoGeneration,
+  translation: WorkflowNodeType.Translation,
+  Translation: WorkflowNodeType.Translation,
+  transcription: WorkflowNodeType.Transcription,
+  Transcription: WorkflowNodeType.Transcription,
+  summarization: WorkflowNodeType.Summarization,
+  Summarization: WorkflowNodeType.Summarization,
+};
+
+function nodeTypeFromAiValue(value: unknown): WorkflowNodeType | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  const normKey = trimmed.replace(/[\s-]+/g, '_');
+  const lowered = normKey.toLowerCase();
+  const compact = lowered.replace(/_/g, '');
+
+  const fromAlias =
+    NODE_TYPE_ALIASES[trimmed] ??
+    NODE_TYPE_ALIASES[lowered] ??
+    NODE_TYPE_ALIASES[normKey];
+  if (fromAlias) return fromAlias;
+
+  const allowed = Object.values(WorkflowNodeType) as string[];
+  if (allowed.includes(lowered)) return lowered as WorkflowNodeType;
+
+  for (const t of allowed) {
+    if (t.replace(/_/g, '') === compact) {
+      return t as WorkflowNodeType;
+    }
+  }
+  return null;
+}
+
+function parseNodesFromLlm(aiNodes: unknown[]): GeneratedWorkflowNode[] {
+  const normalized: GeneratedWorkflowNode[] = [];
+  for (const item of aiNodes) {
+    if (!item || typeof item !== 'object') continue;
+    const asObj = item as Record<string, unknown>;
+    const type = nodeTypeFromAiValue(asObj.type);
+    if (!type) continue;
+    normalized.push({
+      type,
+      order:
+        typeof asObj.order === 'number' && asObj.order >= 1
+          ? Math.floor(asObj.order)
+          : normalized.length + 1,
+      isLocked: Boolean(asObj.isLocked ?? false),
+      config: coerceConfigForGeneration(
+        type,
+        (asObj.config as Record<string, unknown> | undefined) ?? {},
+      ),
+    });
+  }
+  return normalized;
+}
+
+function salvagePlannerAndText(
+  nodes: GeneratedWorkflowNode[],
+): GeneratedWorkflowNode[] | null {
+  const texts = nodes.filter(
+    (n) => n.type === WorkflowNodeType.TextGeneration,
+  );
+  if (texts.length === 0) return null;
+  const textNode =
+    texts.slice().sort((a, b) => a.order - b.order)[0] ?? texts[0]!;
+
+  let planners = nodes.filter(
+    (n) => n.type === WorkflowNodeType.KeywordPlanner,
+  );
+  if (planners.length > 1) {
+    planners = [planners.slice().sort((a, b) => a.order - b.order)[0]!];
+  }
+
+  const others = nodes.filter(
+    (n) =>
+      n.type !== WorkflowNodeType.KeywordPlanner &&
+      n.type !== WorkflowNodeType.TextGeneration,
+  );
+
+  const planner =
+    planners[0] ??
+    ({
+      type: WorkflowNodeType.KeywordPlanner,
+      order: 0,
+      isLocked: false,
+      config: coerceConfigForGeneration(WorkflowNodeType.KeywordPlanner, {}),
+    } satisfies GeneratedWorkflowNode);
+
+  const mergedOthers = [...others].sort((a, b) => a.order - b.order);
+  return [planner, textNode, ...mergedOthers];
+}
+
+export function normalizeWorkflowAiNodes(
+  aiNodes: unknown,
+  rule: Rule,
+  contentPrompt: string,
+  logger: Logger,
+): GeneratedWorkflowNode[] {
+  if (!Array.isArray(aiNodes)) {
+    logger.warn(
+      `workflow plan normalize: ai output is not an array; using fallback. snippet=${String(aiNodes).slice(0, 80)}`,
+    );
+    return generateFallbackWorkflowNodes(rule, contentPrompt);
+  }
+
+  let parsed = parseNodesFromLlm(aiNodes);
+  if (!parsed.length) {
+    logger.warn(
+      'workflow plan normalize: no valid node types after parse; using fallback',
+    );
+    return generateFallbackWorkflowNodes(rule, contentPrompt);
+  }
+
+  const salvaged = salvagePlannerAndText(parsed);
+  if (!salvaged) {
+    const textCount = parsed.filter(
+      (n) => n.type === WorkflowNodeType.TextGeneration,
+    ).length;
+    logger.warn(
+      `workflow plan normalize: missing text_generation (count=${textCount}); using fallback`,
+    );
+    return generateFallbackWorkflowNodes(rule, contentPrompt);
+  }
+
+  const plannerCount = salvaged.filter(
+    (n) => n.type === WorkflowNodeType.KeywordPlanner,
+  ).length;
+  const textCount = salvaged.filter(
+    (n) => n.type === WorkflowNodeType.TextGeneration,
+  ).length;
+  if (plannerCount > 1 || textCount !== 1) {
+    logger.warn(
+      `workflow plan normalize: unexpected planner/text counts after salvage (planner=${plannerCount} text=${textCount}); using fallback`,
+    );
+    return generateFallbackWorkflowNodes(rule, contentPrompt);
+  }
+
+  const planner = salvaged.find(
+    (n) => n.type === WorkflowNodeType.KeywordPlanner,
+  )!;
+  const textNode = salvaged.find(
+    (n) => n.type === WorkflowNodeType.TextGeneration,
+  )!;
+  const others = salvaged.filter(
+    (n) =>
+      n.type !== WorkflowNodeType.KeywordPlanner &&
+      n.type !== WorkflowNodeType.TextGeneration,
+  );
+
+  const ordered = [planner, textNode, ...others];
+  return ordered.map((n, idx) => ({ ...n, order: idx + 1 }));
+}
+
+function buildPlanningPrompt(
+  rule: Rule,
+  contentPrompt: string,
+  mappingContext: Array<{
+    channel: string;
+    needsCaption: string;
+    needsMedia: string | null;
+  }>,
+): string {
+  const summary = buildRuleSummary(rule);
+  const hints = inferContentPromptHints(contentPrompt);
+
+  const nodeSchemas = {
+    keyword_planner: {
+      config:
+        'provider?, model?, temperature?, maxTokens? — defaults are fine if omitted',
+    },
+    text_generation: {
+      config:
+        'outputFormat: paragraph | bullets | caption; tone; textLength: short | medium | long; optional provider/model',
+    },
+    image_generation: {
+      config:
+        'model dall-e-3 | dall-e-2; quality standard | hd; style natural | vivid; aspectRatio 1:1 | 16:9 | 9:16 | 4:5',
+    },
+    translation: {
+      config: 'sourceLanguage, targetLanguage (ISO or auto), formalityLevel',
+    },
+    video_generation: {
+      config:
+        'model sora-2 | sora-2-pro; duration 4|8|12|16|20; resolution 720p|1080p (1080p only with sora-2-pro); aspectRatio',
+    },
+    transcription: { config: 'sourceType audio|video; language; model whisper-1' },
+    summarization: {
+      config: 'summaryLength; outputFormat paragraph|bullets|tldr; sourceNodeRef',
+    },
+  };
+
+  const examples = `Example A — short social caption + image:
+{"nodes":[{"type":"keyword_planner","order":1,"isLocked":false,"config":{}},{"type":"text_generation","order":2,"isLocked":false,"config":{"outputFormat":"caption","tone":"friendly","textLength":"short"}},{"type":"image_generation","order":3,"isLocked":false,"config":{"model":"dall-e-3","quality":"standard","aspectRatio":"1:1"}}]}
+
+Example B — vertical video for Reels:
+{"nodes":[{"type":"keyword_planner","order":1,"isLocked":false,"config":{}},{"type":"text_generation","order":2,"isLocked":false,"config":{"outputFormat":"caption","tone":"casual","textLength":"medium"}},{"type":"video_generation","order":3,"isLocked":false,"config":{"model":"sora-2","duration":8,"resolution":"720p","aspectRatio":"9:16"}}]}
+
+Example C — long article + translate:
+{"nodes":[{"type":"keyword_planner","order":1,"isLocked":false,"config":{}},{"type":"text_generation","order":2,"isLocked":false,"config":{"outputFormat":"paragraph","tone":"professional","textLength":"long"}},{"type":"translation","order":3,"isLocked":false,"config":{"sourceLanguage":"en","targetLanguage":"th","formalityLevel":"casual"}}]}`;
+
+  return [
+    'You are a workflow planning engine for a multi-channel content platform.',
+    'Return ONLY a JSON object: {"nodes":[...]} — no markdown, no code fences.',
+    '',
+    '=== PRIMARY CONTENT REQUEST (highest priority) ===',
+    contentPrompt.trim(),
+    '',
+    '=== INFERRED HINTS (use with rule; do not echo) ===',
+    JSON.stringify(hints),
+    '',
+    '=== RULE SUMMARY (structured) ===',
+    JSON.stringify(summary, null, 2),
+    '',
+    '=== CHANNEL MAPPINGS ===',
+    JSON.stringify(mappingContext, null, 2),
+    '',
+    '=== DECISION MATRIX ===',
+    '- Always include exactly one keyword_planner (first) and one text_generation (second).',
+    '- Choose text_generation outputFormat from the content request: short social → caption; long editorial → paragraph.',
+    '- If mappings needCaption is translatedText OR user asks for translation → translation after text.',
+    '- If mappings needCaption is summary OR user asks for summary → summarization (usually after text; set sourceNodeRef if needed).',
+    '- If mappings needMedia is image OR user asks for carousel/still creative → image_generation with aspectRatio matching channel (IG/TikTok often 9:16 or 4:5).',
+    '- If mappings needMedia is video OR user asks for reel/short/video → video_generation; prefer 9:16 for vertical platforms.',
+    '- transcription only if user explicitly needs audio/podcast transcribed.',
+    '- Tailor config enums to the CONTENT REQUEST above, not generic defaults.',
+    '',
+    '=== NODE CONFIG KEYS (snake_case type strings) ===',
+    JSON.stringify(nodeSchemas, null, 2),
+    '',
+    '=== EXAMPLES ===',
+    examples,
+  ].join('\n');
+}
+
 @Injectable()
 export class WorkflowGenerationService {
   private readonly logger = new Logger(WorkflowGenerationService.name);
 
   constructor(private readonly llm: LlmService) {}
 
-  private fallback(rule: Rule, _contentPrompt: string): GeneratedWorkflowNode[] {
-    const nodes: GeneratedWorkflowNode[] = [];
-    const format = rule.campaign.contentFormats[0] ?? 'caption';
-    nodes.push({
-      type: WorkflowNodeType.KeywordPlanner,
-      order: nodes.length + 1,
-      isLocked: false,
-      config: coerceConfigForGeneration(WorkflowNodeType.KeywordPlanner, {}),
-    });
-    nodes.push({
-      type: WorkflowNodeType.TextGeneration,
-      order: nodes.length + 1,
-      isLocked: false,
-      config: coerceConfigForGeneration(WorkflowNodeType.TextGeneration, {
-        outputFormat: format.toLowerCase().includes('caption')
-          ? NodeOutputFormat.Caption
-          : NodeOutputFormat.Paragraph,
-        tone: inferTextToneFromRule(rule),
-        textLength: NodeSummaryLength.Medium,
-      }),
-    });
-
-    const mappingNeeds = {
-      translation: rule.channels.some(
-        (c) =>
-          normalizedRuleChannelMapping(c).caption ===
-          CaptionMappingSource.TranslatedText,
-      ),
-      summary: rule.channels.some(
-        (c) =>
-          normalizedRuleChannelMapping(c).caption ===
-          CaptionMappingSource.Summary,
-      ),
-      image: rule.channels.some(
-        (c) =>
-          normalizedRuleChannelMapping(c).media === ChannelMediaMapping.Image,
-      ),
-      video: rule.channels.some(
-        (c) =>
-          normalizedRuleChannelMapping(c).media === ChannelMediaMapping.Video,
-      ),
-    };
-
-    const mappingDriven = rule.channels.some((c) => c.contentMapping != null);
-
-    const hasVisualChannel = rule.channels.some((c) =>
-      ['instagram', 'facebook', 'tiktok', 'youtube'].includes(
-        c.channel.toLowerCase(),
-      ),
-    );
-    const targetLanguages = rule.audience.targetLanguages.filter(
-      (l) => l && l !== rule.audience.language,
-    );
-
-    const needImage = mappingDriven ? mappingNeeds.image : hasVisualChannel;
-    const needTranslation = mappingDriven
-      ? mappingNeeds.translation
-      : targetLanguages.length > 0;
-    const needSummary = mappingDriven ? mappingNeeds.summary : false;
-    const needVideo = mappingDriven ? mappingNeeds.video : false;
-
-    if (needSummary) {
-      nodes.push({
-        type: WorkflowNodeType.Summarization,
-        order: nodes.length + 1,
-        isLocked: false,
-        config: coerceConfigForGeneration(WorkflowNodeType.Summarization, {
-          summaryLength: NodeSummaryLength.Short,
-        }),
-      });
-    }
-
-    if (needTranslation) {
-      nodes.push({
-        type: WorkflowNodeType.Translation,
-        order: nodes.length + 1,
-        isLocked: false,
-        config: coerceConfigForGeneration(WorkflowNodeType.Translation, {
-          sourceLanguage: rule.audience.language || 'auto',
-          targetLanguage: targetLanguages[0] ?? 'th',
-          formalityLevel: NodeFormalityLevel.Casual,
-        }),
-      });
-    }
-
-    if (needImage) {
-      nodes.push({
-        type: WorkflowNodeType.ImageGeneration,
-        order: nodes.length + 1,
-        isLocked: false,
-        config: coerceConfigForGeneration(
-          WorkflowNodeType.ImageGeneration,
-          {},
-        ),
-      });
-    }
-
-    if (needVideo) {
-      nodes.push({
-        type: WorkflowNodeType.VideoGeneration,
-        order: nodes.length + 1,
-        isLocked: false,
-        config: coerceConfigForGeneration(
-          WorkflowNodeType.VideoGeneration,
-          {},
-        ),
-      });
-    }
-
-    return nodes.map((n, idx) => ({ ...n, order: idx + 1 }));
+  private fallback(rule: Rule, contentPrompt: string): GeneratedWorkflowNode[] {
+    return generateFallbackWorkflowNodes(rule, contentPrompt);
   }
 
   private normalizeAiOutput(
@@ -194,71 +646,7 @@ export class WorkflowGenerationService {
     rule: Rule,
     contentPrompt: string,
   ): GeneratedWorkflowNode[] {
-    if (!Array.isArray(aiNodes)) {
-      return this.fallback(rule, contentPrompt);
-    }
-    const normalized: GeneratedWorkflowNode[] = [];
-    for (const item of aiNodes) {
-      if (!item || typeof item !== 'object') continue;
-      const asObj = item as Record<string, unknown>;
-      const type = nodeTypeFromString(asObj.type);
-      if (!type) continue;
-      normalized.push({
-        type,
-        order:
-          typeof asObj.order === 'number' && asObj.order >= 1
-            ? Math.floor(asObj.order)
-            : normalized.length + 1,
-        isLocked: Boolean(asObj.isLocked ?? false),
-        config: coerceConfigForGeneration(
-          type,
-          (asObj.config as Record<string, unknown> | undefined) ?? {},
-        ),
-      });
-    }
-
-    const textCount = normalized.filter(
-      (n) => n.type === WorkflowNodeType.TextGeneration,
-    ).length;
-    const plannerCount = normalized.filter(
-      (n) => n.type === WorkflowNodeType.KeywordPlanner,
-    ).length;
-    if (textCount !== 1 || plannerCount > 1) {
-      return this.fallback(rule, contentPrompt);
-    }
-
-    let withPlanner = normalized;
-    if (plannerCount === 0) {
-      withPlanner = [
-        ...normalized,
-        {
-          type: WorkflowNodeType.KeywordPlanner,
-          order: 0,
-          isLocked: false,
-          config: coerceConfigForGeneration(
-            WorkflowNodeType.KeywordPlanner,
-            {},
-          ),
-        },
-      ];
-    }
-
-    const planner = withPlanner.find(
-      (n) => n.type === WorkflowNodeType.KeywordPlanner,
-    )!;
-    const textNode = withPlanner.find(
-      (n) => n.type === WorkflowNodeType.TextGeneration,
-    )!;
-    const others = withPlanner
-      .filter(
-        (n) =>
-          n.type !== WorkflowNodeType.KeywordPlanner &&
-          n.type !== WorkflowNodeType.TextGeneration,
-      )
-      .sort((a, b) => a.order - b.order);
-
-    const ordered = [planner, textNode, ...others];
-    return ordered.map((n, idx) => ({ ...n, order: idx + 1 }));
+    return normalizeWorkflowAiNodes(aiNodes, rule, contentPrompt, this.logger);
   }
 
   async generate(
@@ -274,141 +662,20 @@ export class WorkflowGenerationService {
       };
     });
 
-    const nodeSchemas = {
-      keyword_planner: {
-        type: 'keyword_planner',
-        order: 1,
-        isLocked: false,
-        config: {
-          provider: 'openai | anthropic | google | groq | ollama',
-          model: 'gpt-4o',
-          temperature: 'number 0-2',
-          maxTokens: 'integer >= 1',
-        },
-      },
-      text_generation: {
-        type: 'text_generation',
-        order: 2,
-        isLocked: false,
-        config: {
-          provider: 'openai | anthropic | google | groq | ollama',
-          model: 'gpt-4o',
-          temperature: 'number 0-2',
-          maxTokens: 'integer >= 1',
-          outputFormat: 'paragraph | bullets | caption',
-          tone: 'professional | casual | friendly | formal | witty',
-          textLength: 'short | medium | long',
-        },
-      },
-      image_generation: {
-        type: 'image_generation',
-        order: 2,
-        isLocked: false,
-        config: {
-          provider: 'openai',
-          model: 'dall-e-3 | dall-e-2',
-          size: 'optional explicit OpenAI size if set',
-          quality: 'standard | hd',
-          style: 'natural | vivid',
-          aspectRatio: '1:1 | 16:9 | 9:16 | 4:5',
-          negativePrompt: 'optional string',
-        },
-      },
-      translation: {
-        type: 'translation',
-        order: 3,
-        isLocked: false,
-        config: {
-          provider: 'openai | anthropic | google | groq | ollama',
-          model: 'gpt-4o',
-          sourceLanguage: 'ISO code or auto',
-          targetLanguage: 'ISO code',
-          formalityLevel: 'formal | casual',
-          preserveFormatting: 'boolean',
-        },
-      },
-      video_generation: {
-        type: 'video_generation',
-        order: 4,
-        isLocked: false,
-        config: {
-          provider: 'openai',
-          model: 'sora-2',
-          duration: 'integer seconds',
-          resolution: '1080p | 720p',
-          aspectRatio: '16:9 | 9:16 | 1:1 | 4:5',
-        },
-      },
-      transcription: {
-        type: 'transcription',
-        order: 5,
-        isLocked: false,
-        config: {
-          provider: 'openai | groq',
-          model: 'whisper-1',
-          sourceType: 'audio | video',
-          language: 'auto | en | th | …',
-        },
-      },
-      summarization: {
-        type: 'summarization',
-        order: 6,
-        isLocked: false,
-        config: {
-          provider: 'openai | anthropic | google | groq | ollama',
-          model: 'gpt-4o',
-          summaryLength: 'short | medium | long',
-          outputFormat: 'paragraph | bullets | tldr',
-          sourceNodeRef: 'text_generation | translation | transcription',
-        },
-      },
-    };
-
-    const prompt = [
-      'You are a workflow planning engine for a content generation platform.',
-      'Decide which nodes are needed based on the rule, channel content mappings, and content prompt.',
-      'Return a JSON object with a single key "nodes" containing an array of node objects.',
-      '',
-      '=== CONTENT REQUEST ===',
-      `The user wants to create: "${contentPrompt}"`,
-      '',
-      '=== STRUCTURED CONFIG (required) ===',
-      'Each node MUST include a "config" object matching its type in NODE SCHEMAS below.',
-      'Use only allowed enum strings for each field. Do not invent keys.',
-      'Do NOT include userPrompt or any per-node free-text prompt fields — workflows store only reusable "how" (config); the run brief is supplied separately when executing a pipeline.',
-      '',
-      '=== CHANNEL CONTENT MAPPINGS ===',
-      JSON.stringify(mappingContext),
-      '',
-      '=== NODE DECISION RULES ===',
-      '- Exactly one keyword_planner and exactly one text_generation are REQUIRED',
-      '- keyword_planner MUST have a lower order number than text_generation (planner runs first)',
-      '- Include translation if ANY channel mapping needsCaption is "translatedText"',
-      '- Include summarization if ANY mapping needsCaption is "summary"',
-      '- Include image_generation if ANY mapping needsMedia is "image"',
-      '- Include video_generation if ANY mapping needsMedia is "video"',
-      '- If mappings are missing on a legacy rule, infer from channels and targetLanguages',
-      '- Include transcription only if audio/video input is implied in the prompt',
-      '- Order must be sequential starting from 1 with no gaps after normalization',
-      '- Preferred order after writer: summarization → translation → image_generation → video_generation → transcription',
-      '',
-      '=== NODE SCHEMAS ===',
-      JSON.stringify(nodeSchemas, null, 2),
-      '',
-      `Rule: ${JSON.stringify(rule)}`,
-    ].join('\n');
+    const prompt = buildPlanningPrompt(rule, contentPrompt, mappingContext);
 
     const MAX_ATTEMPTS = 2;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        // getChatModel already has temperature: 0.3 and json_object mode
-        const model = this.llm.getChatModel();
+        const model = this.llm.getChatModel({
+          temperature: WORKFLOW_PLAN_TEMPERATURE,
+        });
 
         const res = await model.invoke([
           [
             'system',
-            'You are a workflow planning engine. Return strict JSON only. No markdown, no code fences.',
+            'You are a workflow planning engine. Output only valid minified or pretty JSON with a top-level "nodes" array.',
           ],
           ['human', prompt],
         ]);
@@ -422,9 +689,9 @@ export class WorkflowGenerationService {
 
         const nodes = Array.isArray(parsed)
           ? parsed
-          : ((parsed as { nodes: GeneratedWorkflowNode[] })?.nodes ?? []);
+          : ((parsed as { nodes?: unknown })?.nodes ?? []);
 
-        if (!nodes.length) {
+        if (!Array.isArray(nodes) || !nodes.length) {
           throw new Error('AI returned empty nodes array');
         }
 
@@ -442,7 +709,7 @@ export class WorkflowGenerationService {
         );
 
         if (attempt === MAX_ATTEMPTS) {
-          this.logger.warn('Using fallback workflow');
+          this.logger.warn('Using fallback workflow (content-aware)');
           return this.fallback(rule, contentPrompt);
         }
 

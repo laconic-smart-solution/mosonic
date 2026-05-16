@@ -104,6 +104,69 @@ describe('ZernioRestClient', () => {
     );
   });
 
+  it('publishCreatePost builds customMedia from mediaUrls array', async () => {
+    let presignCount = 0;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () =>
+        new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]).buffer,
+    }) as unknown as typeof fetch;
+
+    mockHttp.post.mockImplementation((path: string) => {
+      if (path === '/media/presign') {
+        presignCount += 1;
+        return Promise.resolve({
+          data: {
+            uploadUrl: `https://storage.googleapis.com/bucket/put-${presignCount}`,
+            publicUrl: `https://storage.googleapis.com/bucket/final-${presignCount}.jpg`,
+          },
+        });
+      }
+      if (path === '/posts') {
+        return Promise.resolve({
+          data: { post: { _id: 'post_multi' } },
+        });
+      }
+      return Promise.reject(new Error(`unexpected path ${path}`));
+    });
+
+    const client = makeClient();
+    const out = await client.publishCreatePost({
+      profileId: 'prof1',
+      platforms: [
+        {
+          platform: 'instagram',
+          accountId: 'acc1',
+          content: 'Carousel',
+          mediaUrl: null,
+          mediaUrls: [
+            'https://files.example.com/a.jpg',
+            'https://files.example.com/b.jpg',
+          ],
+        },
+      ],
+      publishNow: true,
+      scheduledAt: null,
+    });
+
+    expect(out.postId).toBe('post_multi');
+    expect(presignCount).toBe(2);
+    const postsCall = mockHttp.post.mock.calls.find((c) => c[0] === '/posts');
+    const body = postsCall![1] as Record<string, unknown>;
+    const mediaItems = body.mediaItems as Array<{ url: string; type: string }>;
+    expect(mediaItems).toHaveLength(2);
+    expect(mediaItems[0]?.url).toBe(
+      'https://storage.googleapis.com/bucket/final-1.jpg',
+    );
+    expect(mediaItems[1]?.url).toBe(
+      'https://storage.googleapis.com/bucket/final-2.jpg',
+    );
+    const plats = body.platforms as Array<Record<string, unknown>>;
+    expect(plats[0].customMedia).toEqual(mediaItems);
+  });
+
   it('sniffs mime when source returns octet-stream and no extension', async () => {
     // PNG signature
     global.fetch = jest.fn().mockResolvedValue({
@@ -213,5 +276,46 @@ describe('ZernioRestClient', () => {
 
     const client = makeClient();
     await expect(client.deleteAccount('gone')).resolves.toBeUndefined();
+  });
+
+  it('deletePost sends DELETE /posts/:id', async () => {
+    mockHttp.delete.mockResolvedValue({ status: 200 });
+
+    const client = makeClient();
+    const out = await client.deletePost('z_post_1');
+
+    expect(out).toEqual({ success: true });
+    expect(mockHttp.delete).toHaveBeenCalledWith('/posts/z_post_1');
+  });
+
+  it('deletePost treats 404 as success', async () => {
+    const err = Object.assign(new Error('Not Found'), {
+      isAxiosError: true,
+      response: { status: 404, data: {} },
+    });
+    mockHttp.delete.mockRejectedValue(err);
+
+    const client = makeClient();
+    await expect(client.deletePost('gone')).resolves.toEqual({ success: true });
+  });
+
+  it('unpublishPost skips unsupported platforms without API call', async () => {
+    const client = makeClient();
+    const out = await client.unpublishPost('z_post_1', 'instagram');
+
+    expect(out).toEqual({ success: false, notSupported: true });
+    expect(mockHttp.post).not.toHaveBeenCalled();
+  });
+
+  it('unpublishPost sends POST /posts/:id/unpublish', async () => {
+    mockHttp.post.mockResolvedValue({ status: 200 });
+
+    const client = makeClient();
+    const out = await client.unpublishPost('z_post_1', 'facebook');
+
+    expect(out).toEqual({ success: true });
+    expect(mockHttp.post).toHaveBeenCalledWith('/posts/z_post_1/unpublish', {
+      platform: 'facebook',
+    });
   });
 });

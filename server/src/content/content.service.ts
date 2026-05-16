@@ -27,6 +27,7 @@ import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import { UploadService } from '../upload/upload.service';
 import { WorkflowService } from '../workflow/workflow.service';
+import { parseWorkflowNodeConfigOrThrow } from '../nodes/workflow-node-config.zod';
 import { mergeResolvedOutputs } from './content-output.utils';
 import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
 import { ContentRepository } from './content.repository';
@@ -283,10 +284,29 @@ export class ContentService {
       dto.previousOutputs,
     );
 
+    let nodeForRun = wfNode;
+    if (dto.updatedConfig && Object.keys(dto.updatedConfig).length > 0) {
+      const mergedConfig = parseWorkflowNodeConfigOrThrow(wfNode.type, {
+        ...(wfNode.config ?? {}),
+        ...dto.updatedConfig,
+      });
+      await this.workflowNodeModel
+        .updateOne(
+          mergeUserIdFilter(
+            { workflowRef: content.workflowRef, nodeId: dto.nodeId },
+            auth,
+          ),
+          { $set: { config: mergedConfig } },
+        )
+        .exec();
+      nodeForRun = wfNode;
+      nodeForRun.config = mergedConfig;
+    }
+
     void this.runRerunExecution({
       content,
       pipeline,
-      wfNode,
+      wfNode: nodeForRun,
       rule,
       dto,
       previousOutputs,
@@ -374,7 +394,17 @@ export class ContentService {
     };
 
     const nodeId = randomUUID();
-    const config = this.defaultConfigForGenerateMore(dto.type, rule);
+    const baseConfig = this.defaultConfigForGenerateMore(dto.type, rule);
+    let config: WorkflowNodeConfig;
+    try {
+      config = parseWorkflowNodeConfigOrThrow(dto.type, {
+        ...baseConfig,
+        ...(dto.config ?? {}),
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(`Invalid node config: ${msg}`);
+    }
 
     const { order } = await this.workflowService.appendWorkflowNode(
       content.workflowRef,
@@ -446,8 +476,8 @@ export class ContentService {
       case WorkflowNodeType.VideoGeneration:
         return {
           model: 'sora-2',
-          duration: 15,
-          resolution: '1080p',
+          duration: 8,
+          resolution: '720p',
           aspectRatio: hasInstagram
             ? NodeAspectRatio.R9x16
             : NodeAspectRatio.R16x9,
@@ -496,10 +526,7 @@ export class ContentService {
       auth,
     } = args;
     try {
-      const extra = dto.userPrompt?.trim();
-      const contentPrompt = extra
-        ? `${pipeline.contentPrompt}\n\n${extra}`
-        : pipeline.contentPrompt;
+      const contentPrompt = pipeline.contentPrompt;
       const totalNodes = await this.workflowNodeModel.countDocuments(
         mergeUserIdFilter({ workflowRef: content.workflowRef }, auth),
       );
@@ -543,12 +570,8 @@ export class ContentService {
     previousOutputs: PreviousOutputs;
     auth: TenancyAuth;
   }): Promise<void> {
-    const { content, pipeline, wfNode, rule, dto, previousOutputs, auth } =
-      args;
-    const rerunBrief = dto.updatedPrompt?.trim();
-    const contentPrompt = rerunBrief
-      ? rerunBrief
-      : pipeline.contentPrompt;
+    const { content, pipeline, wfNode, rule, previousOutputs, auth } = args;
+    const contentPrompt = pipeline.contentPrompt;
     try {
       const totalNodes = await this.workflowNodeModel.countDocuments(
         mergeUserIdFilter({ workflowRef: content.workflowRef }, auth),

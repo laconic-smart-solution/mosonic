@@ -38,7 +38,15 @@ function summarizeNodeConfig(node: WorkflowNode): string {
     case "image_generation":
       return [c.aspectRatio, c.quality, c.style].filter(Boolean).join(" · ") || "Default image settings"
     case "video_generation":
-      return [c.aspectRatio, c.resolution].filter(Boolean).join(" · ") || "Default video settings"
+      return [
+        c.duration !== undefined && c.duration !== null
+          ? `${String(c.duration)}s`
+          : "",
+        c.aspectRatio,
+        c.resolution,
+      ]
+        .filter(Boolean)
+        .join(" · ") || "Default video settings"
     case "summarization":
       return [c.summaryLength, c.outputFormat].filter(Boolean).join(" · ") || "Default summary settings"
     default:

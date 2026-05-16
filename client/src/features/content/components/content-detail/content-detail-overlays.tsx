@@ -10,23 +10,32 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { Textarea } from "@/components/ui/textarea"
-import { type OutputKey, cardTitle, outputKeyForNodeType } from "@/features/content/data/content-review-helpers"
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+} from "@/components/ui/modal"
+import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import { backendTypeToCanvas } from "@/features/workflow/data/workflow-model"
+import {
+  type OutputKey,
+  cardTitle,
+  outputKeyForNodeType,
+} from "@/features/content/data/content-review-helpers"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
-import { LightboxInner, CARD_ICONS, nodeIconBoxClass } from "./content-detail-review-ui"
+import {
+  LightboxInner,
+  CARD_ICONS,
+  nodeIconBoxClass,
+} from "./content-detail-review-ui"
 
 type WorkflowNodesLite = WorkflowNode[]
 
@@ -34,8 +43,8 @@ type RerunSheetProps = {
   openNodeId: string | null
   workflowNodes: WorkflowNodesLite
   globalRerunning: boolean
-  draft: string
-  onDraftChange: (v: string) => void
+  configDraft: Record<string, unknown>
+  onConfigChange: (next: Record<string, unknown>) => void
   onOpenChange: (open: boolean) => void
   onSubmit: (nodeId: string) => void
 }
@@ -44,8 +53,8 @@ export function ContentDetailRerunSheet({
   openNodeId,
   workflowNodes,
   globalRerunning,
-  draft,
-  onDraftChange,
+  configDraft,
+  onConfigChange,
   onOpenChange,
   onSubmit,
 }: RerunSheetProps) {
@@ -55,23 +64,21 @@ export function ContentDetailRerunSheet({
   const openKey: OutputKey | undefined = openNode
     ? outputKeyForNodeType(openNode.type)
     : undefined
+  const canvasType = openNode ? backendTypeToCanvas(openNode.type) : ""
 
   return (
-    <Sheet
+    <Drawer
       open={!!openNodeId}
       onOpenChange={(open) => onOpenChange(open)}
+      direction="bottom"
     >
-      <SheetContent
-        side="bottom"
-        showCloseButton={true}
-        className="mx-auto max-w-3xl rounded-t-2xl"
+      <DrawerContent
+        variant="panel"
+        showCloseButton
+        className="mx-auto max-h-[85vh] max-w-3xl overflow-y-auto rounded-t-2xl p-5"
       >
-        <div
-          className="mx-auto mb-5 h-1 w-9 shrink-0 rounded-full bg-muted"
-          aria-hidden
-        />
-        <SheetHeader className="text-left">
-          <SheetTitle className="flex items-center gap-2.5 font-heading text-lg">
+        <DrawerHeader className="text-left">
+          <DrawerTitle className="flex items-center gap-2.5 font-heading text-lg">
             {openKey ? (
               <>
                 <span
@@ -87,18 +94,21 @@ export function ContentDetailRerunSheet({
             ) : openNode ? (
               <span>Re-run node</span>
             ) : null}
-          </SheetTitle>
-          <SheetDescription>
-            Adjust the prompt below and re-run. Output replaces this node only —
+          </DrawerTitle>
+          <DrawerDescription>
+            Adjust settings below and re-run. Output replaces this node only —
             other nodes stay untouched.
-          </SheetDescription>
-        </SheetHeader>
-        <Textarea
-          value={draft}
-          onChange={(e) => onDraftChange(e.target.value)}
-          className="mt-3 min-h-[88px] rounded-[10px] border-[#D9D3C7] bg-[color:var(--nt-canvas)] focus-visible:border-[#00C9A7]"
-          placeholder="Add or modify instruction for this node…"
-        />
+          </DrawerDescription>
+        </DrawerHeader>
+        {openNode && canvasType ? (
+          <div className="mt-3 max-h-[50vh] overflow-y-auto pr-1">
+            <WorkflowNodeConfigFields
+              canvasType={canvasType}
+              config={configDraft}
+              onChange={onConfigChange}
+            />
+          </div>
+        ) : null}
         <div className="mt-4 flex justify-end gap-2">
           <Button
             type="button"
@@ -116,8 +126,8 @@ export function ContentDetailRerunSheet({
             Re-run node
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   )
 }
 
@@ -128,14 +138,14 @@ type LightboxProps = {
 
 export function ContentDetailImageLightbox({ url, onClose }: LightboxProps) {
   return (
-    <Dialog open={!!url} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Image</DialogTitle>
-        </DialogHeader>
+    <Modal open={!!url} onOpenChange={(open) => !open && onClose()}>
+      <ModalContent className="max-w-4xl sm:max-w-4xl">
+        <ModalHeader>
+          <ModalTitle>Image</ModalTitle>
+        </ModalHeader>
         {url ? <LightboxInner url={url} /> : null}
-      </DialogContent>
-    </Dialog>
+      </ModalContent>
+    </Modal>
   )
 }
 
@@ -163,8 +173,8 @@ export function ContentDetailConfirmDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Approve content?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to approve this content? It will be sent
-              to the upload screen.
+              Are you sure you want to approve this content? It will be sent to
+              the upload screen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

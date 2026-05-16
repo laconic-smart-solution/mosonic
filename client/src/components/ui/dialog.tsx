@@ -5,8 +5,14 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+const DialogOpenContext = React.createContext<boolean | undefined>(undefined)
+
+function Dialog({ open, ...props }: DialogPrimitive.Root.Props) {
+  return (
+    <DialogOpenContext.Provider value={open}>
+      <DialogPrimitive.Root data-slot="dialog" open={open} {...props} />
+    </DialogOpenContext.Provider>
+  )
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -45,6 +51,9 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const rootOpen = React.useContext(DialogOpenContext)
+  if (rootOpen === false) return null
+
   return (
     <DialogPortal>
       <DialogOverlay />

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { useMemo } from "react"
-import { UserCog, Wallet, GitBranch } from "lucide-react"
+import { UserCog, Wallet, GitBranch, Megaphone } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 
 import {
@@ -153,6 +153,19 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    id: "posts",
+    label: "Posts",
+    path: "/posts",
+    icon: (active) => (
+      <Megaphone
+        className="size-4 shrink-0"
+        strokeWidth={1.65}
+        aria-hidden
+        color={active ? "#fff" : undefined}
+      />
+    ),
+  },
+  {
     id: "analytics",
     label: "Analytics",
     path: "/analytics",
@@ -234,6 +247,9 @@ function navItemActive(item: NavItem, pathname: string): boolean {
   }
   if (item.id === "workflows") {
     return pathname === "/workflows" || pathname.startsWith("/workflows/")
+  }
+  if (item.id === "posts") {
+    return pathname === "/posts" || pathname.startsWith("/posts/")
   }
   if (item.id === "cost") {
     return pathname === "/cost" || pathname.startsWith("/cost/")

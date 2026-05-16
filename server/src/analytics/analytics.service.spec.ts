@@ -5,7 +5,6 @@ jest.mock('../rule/rule.service', () => ({
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserRole } from '../users/schemas/user.schema';
 import { AnalyticsService } from './analytics.service';
-import { UploadChannelStatus } from '../upload/schemas/upload.schema';
 
 describe('AnalyticsService split behavior', () => {
   const config = { get: jest.fn().mockReturnValue(undefined) };
@@ -16,9 +15,26 @@ describe('AnalyticsService split behavior', () => {
     find: jest.fn().mockReturnValue({ lean: jest.fn().mockReturnValue({ exec: jest.fn() }) }),
   };
 
+  const postFindExec = jest.fn();
+  const postModel = {
+    find: jest.fn().mockReturnValue({
+      select: () => ({
+        lean: () => ({
+          exec: postFindExec,
+        }),
+      }),
+    }),
+  };
+
   const uploadFindExec = jest.fn();
   const uploadModel = {
-    find: jest.fn().mockReturnValue({ exec: uploadFindExec }),
+    find: jest.fn().mockReturnValue({
+      select: () => ({
+        lean: () => ({
+          exec: uploadFindExec,
+        }),
+      }),
+    }),
   };
 
   const ruleFindExec = jest.fn();
@@ -46,6 +62,7 @@ describe('AnalyticsService split behavior', () => {
   const service = new AnalyticsService(
     config as never,
     syncLockModel as never,
+    postModel as never,
     contentModel as never,
     uploadModel as never,
     ruleModel as never,
@@ -67,20 +84,15 @@ describe('AnalyticsService split behavior', () => {
 
   it('pull updates metrics in place with empty feedbackSignal and does not call the LLM', async () => {
     const rule = { ruleId: 'rule-1', userId: 'user-1' };
-    uploadFindExec.mockResolvedValue([
+    postFindExec.mockResolvedValue([
       {
-        uploadId: 'u1',
         contentRef: 'c1',
-        workflowRef: 'wf1',
-        channels: [
-          {
-            channel: 'instagram',
-            zernioPostId: 'post_1',
-            status: UploadChannelStatus.Published,
-          },
-        ],
+        uploadRef: 'u1',
+        zernioPostId: 'post_1',
+        channels: ['instagram'],
       },
     ]);
+    uploadFindExec.mockResolvedValue([{ uploadId: 'u1', workflowRef: 'wf1' }]);
     zernioRest.getPostAnalytics.mockResolvedValue({
       views: 100,
       likes: 10,

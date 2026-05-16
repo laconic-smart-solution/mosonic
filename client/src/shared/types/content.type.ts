@@ -72,6 +72,8 @@ export type AvailableNodeTypesResponse = {
 
 export type GenerateNodeBody = {
   type: WorkflowNodeType
+  config?: Record<string, unknown>
+  /** @deprecated Use `config` instead. */
   userPrompt?: string
 }
 

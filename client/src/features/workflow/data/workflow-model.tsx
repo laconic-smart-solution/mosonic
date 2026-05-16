@@ -215,7 +215,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
         quality: "standard",
       }
     case "video":
-      return { model, aspectRatio: "16:9", resolution: "1080p" }
+      return { model, aspectRatio: "16:9", resolution: "720p", duration: 8 }
     case "translation":
       return {
         model,
@@ -233,6 +233,60 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
   }
 }
 
+/** Rule fields used to mirror server `defaultConfigForGenerateMore`. */
+export type GenerateMoreRuleHint = {
+  channels?: { channel?: string }[]
+  audience?: { language?: string }
+}
+
+/**
+ * Defaults for Generate more / re-run config UI (aligned with server content.service).
+ */
+export function buildGenerateMoreDefaultConfig(
+  type: WorkflowNodeType,
+  rule?: GenerateMoreRuleHint | null,
+): Record<string, unknown> {
+  const canvas = backendTypeToCanvas(type)
+  const base = { ...defaultConfigForNewCanvasNode(canvas) }
+
+  const channels = rule?.channels ?? []
+  const hasInstagram = channels.some(
+    (c) => (c.channel ?? "").toLowerCase() === "instagram",
+  )
+  const audienceLang = rule?.audience?.language?.trim()
+
+  switch (type) {
+    case "video_generation":
+      return {
+        ...base,
+        model: "sora-2",
+        duration: 8,
+        resolution: "720p",
+        aspectRatio: hasInstagram ? "9:16" : "16:9",
+      }
+    case "transcription":
+      return {
+        ...base,
+        model: "whisper-1",
+        sourceType: "audio",
+        language: audienceLang && audienceLang.length > 0 ? audienceLang : "auto",
+      }
+    case "summarization":
+      return {
+        ...base,
+        model: "gpt-4o",
+        summaryLength: "medium",
+        sourceNodeRef: "text_generation",
+      }
+    case "translation":
+      return { ...base, model: "gpt-4o" }
+    case "image_generation":
+      return { ...base, model: "gpt-image-1" }
+    default:
+      return base
+  }
+}
+
 /** Short read-only hint for canvas cards (reusable “how”, not run content). */
 export function canvasConfigSummary(wfType: string, config: Record<string, unknown>): string {
   const s = (k: string) => (typeof config[k] === "string" ? (config[k] as string) : undefined)
@@ -242,7 +296,9 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
     case "image":
       return [s("aspectRatio"), s("style"), s("quality")].filter(Boolean).join(" · ") || "Image settings"
     case "video":
-      return [s("aspectRatio"), s("resolution")].filter(Boolean).join(" · ") || "Video settings"
+      return [s("duration") ? `${s("duration")}s` : "", s("aspectRatio"), s("resolution")]
+        .filter(Boolean)
+        .join(" · ") || "Video settings"
     case "translation":
       return s("targetLanguage") ? `→ ${s("targetLanguage")}` : "Translation"
     case "keywords":

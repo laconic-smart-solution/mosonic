@@ -148,7 +148,6 @@ export class Content {
 export const ContentSchema = SchemaFactory.createForClass(Content);
 export type ContentDocument = HydratedDocument<Content>;
 
-ContentSchema.index({ pipelineRef: 1 });
 ContentSchema.index({ workflowRef: 1, status: 1 });
 ContentSchema.index({ ruleRef: 1, updatedAt: -1 });
 ContentSchema.index({ userId: 1, updatedAt: -1 });
