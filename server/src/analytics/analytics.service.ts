@@ -25,7 +25,12 @@ import {
 import { SyncLock, type SyncLockDocument } from '../upload/sync-lock.schema';
 import { ANALYTICS_WEEKLY_PULL_LOCK_ID } from './analytics-sync.constants';
 import { AnalyticsFeedbackService } from './analytics-feedback.service';
-import { aggregateMetrics, normalizeMetrics } from './analytics-metrics.util';
+import {
+  aggregateMetrics,
+  extractPostAnalyticsRows,
+  formatAnalyticsPullSummary,
+  type AnalyticsPullSummary,
+} from './analytics-metrics.util';
 import { AnalyticsRepository } from './analytics.repository';
 import { deriveContentTitle, deriveUploadLabel } from './analytics-display.util';
 import {
@@ -187,10 +192,12 @@ export class AnalyticsService {
           this.logger.error(
             `Analytics pull failed for rule ${ruleRef}: ${msg}`,
           );
-          this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
-            ruleId: ruleRef,
-            message: msg,
-          });
+          if (!(err instanceof BadRequestException)) {
+            this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
+              ruleId: ruleRef,
+              message: msg,
+            });
+          }
         }
         await this.sleep(2000);
       }
@@ -208,7 +215,7 @@ export class AnalyticsService {
   async pullAnalyticsForRule(
     rule: RuleDocument,
     options?: { emitStart?: boolean },
-  ): Promise<AnalyticsDocument | null> {
+  ): Promise<{ doc: AnalyticsDocument; summary: AnalyticsPullSummary } | null> {
     const ruleRef = rule.ruleId;
     if (options?.emitStart !== false) {
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_started', {
@@ -224,7 +231,7 @@ export class AnalyticsService {
       .find({
         ruleRef,
         status: {
-          $in: [PostStatus.Published, PostStatus.Scheduled],
+          $in: [PostStatus.Published, PostStatus.Partial],
         },
         zernioPostId: { $exists: true, $nin: [null, ''] },
       })
@@ -238,10 +245,11 @@ export class AnalyticsService {
       .exec();
 
     if (!posts.length) {
-      this.logger.debug(`No published/scheduled Zernio posts for ${ruleRef}`);
+      this.logger.debug(`No published/partial Zernio posts for ${ruleRef}`);
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
         ruleId: ruleRef,
-        message: 'No published or scheduled posts with Zernio ids found for this rule.',
+        message:
+          'No published or partial posts with Zernio ids found for this rule.',
       });
       return null;
     }
@@ -265,57 +273,73 @@ export class AnalyticsService {
     );
 
     const contentPerformance: ContentPerformanceEntry[] = [];
-    const metricsByPid = new Map<
-      string,
-      ReturnType<typeof normalizeMetrics>
-    >();
+    const pullSummary: AnalyticsPullSummary = {
+      postsQueried: posts.length,
+      platformRowsSynced: 0,
+      pending: 0,
+      failed: 0,
+      noData: 0,
+    };
 
     for (const post of posts) {
       const pid = String(post.zernioPostId ?? '').trim();
       if (!pid) continue;
       const pipelineRef =
         pipelineByUpload.get(String(post.uploadRef)) ?? '';
-      const chans = Array.isArray(post.channels) ? post.channels : [];
+      const chans = Array.isArray(post.channels)
+        ? post.channels.map((c) => String(c ?? '').trim()).filter(Boolean)
+        : [];
 
-      for (const channel of chans) {
-        const ch = String(channel ?? '').trim();
-        if (!ch) continue;
+      if (chans.length === 0) continue;
 
-        let metrics = metricsByPid.get(pid);
-        if (!metrics) {
-          try {
-            const raw = await this.zernioRest.getPostAnalytics(pid, {
-              fromDate: from.toISOString().slice(0, 10),
-              toDate: to.toISOString().slice(0, 10),
-            });
-            metrics = normalizeMetrics(raw);
-            metricsByPid.set(pid, metrics);
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            this.logger.warn(`Failed to get analytics for post ${pid}: ${msg}`);
-            await this.sleep(500);
-            continue;
-          }
-        }
+      let raw: unknown | null;
+      try {
+        raw = await this.zernioRest.getPostAnalytics(pid, {
+          fromDate: from.toISOString().slice(0, 10),
+          toDate: to.toISOString().slice(0, 10),
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to get analytics for post ${pid}: ${msg}`);
+        pullSummary.failed += chans.length;
+        await this.sleep(500);
+        continue;
+      }
 
+      if (raw == null) {
+        pullSummary.pending += chans.length;
+        await this.sleep(500);
+        continue;
+      }
+
+      const extracted = extractPostAnalyticsRows(raw, chans);
+      pullSummary.pending += extracted.pending.length;
+      pullSummary.failed += extracted.failed.length;
+      pullSummary.noData += extracted.noData.length;
+
+      for (const row of extracted.synced) {
         contentPerformance.push({
           contentRef: String(post.contentRef ?? ''),
           pipelineRef,
           uploadRef: String(post.uploadRef ?? ''),
           zernioPostId: pid,
-          channel: ch,
-          metrics,
+          channel: row.channel,
+          metrics: row.metrics,
         });
-        await this.sleep(500);
+        pullSummary.platformRowsSynced += 1;
       }
+
+      await this.sleep(500);
     }
 
     if (!contentPerformance.length) {
+      const message = formatAnalyticsPullSummary(pullSummary);
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
         ruleId: ruleRef,
-        message: 'No analytics data returned from Zernio for this period.',
+        message,
+        summary: pullSummary,
       });
-      return null;
+      throw new BadRequestException(message);
     }
 
     const campaignSummary = aggregateMetrics(contentPerformance);
@@ -333,12 +357,15 @@ export class AnalyticsService {
     const updated =
       (await this.analyticsRepository.findByRuleRef(ruleRef)) ?? doc;
 
+    const message = formatAnalyticsPullSummary(pullSummary);
     this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_completed', {
       analyticsId: updated.analyticsId,
       ruleRef,
+      summary: pullSummary,
+      message,
     });
 
-    return updated;
+    return { doc: updated, summary: pullSummary };
   }
 
   /**
@@ -411,7 +438,11 @@ export class AnalyticsService {
   async manualPull(
     ruleId: string,
     auth: TenancyAuth,
-  ): Promise<{ analyticsId: string }> {
+  ): Promise<{
+    analyticsId: string;
+    message: string;
+    summary: AnalyticsPullSummary;
+  }> {
     const allowed = await this.analyticsRepository.assertUserOwnsRule(
       ruleId,
       auth,
@@ -431,13 +462,17 @@ export class AnalyticsService {
     });
 
     try {
-      const doc = await this.pullAnalyticsForRule(rule, { emitStart: false });
-      if (!doc) {
+      const result = await this.pullAnalyticsForRule(rule, { emitStart: false });
+      if (!result) {
         throw new BadRequestException(
-          'No published or scheduled posts with Zernio ids found for this rule.',
+          'No published or partial posts with Zernio ids found for this rule.',
         );
       }
-      return { analyticsId: doc.analyticsId };
+      return {
+        analyticsId: result.doc.analyticsId,
+        message: formatAnalyticsPullSummary(result.summary),
+        summary: result.summary,
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!(err instanceof BadRequestException)) {
@@ -477,7 +512,7 @@ export class AnalyticsService {
 
     await this.ruleService.applySuggestionFieldPatch(
       doc.ruleRef,
-      suggestion.field,
+      suggestion.field.trim(),
       suggestion.suggestedValue,
       auth,
     );

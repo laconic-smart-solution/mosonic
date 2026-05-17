@@ -2,13 +2,30 @@ import { appConfig } from "@/app/config/app-config"
 import { io, type Socket } from "socket.io-client"
 
 export type AnalyticsPullStartedEvent = { ruleId: string }
-export type AnalyticsPullCompletedEvent = { analyticsId: string; ruleRef: string }
+export type AnalyticsPullSummary = {
+  postsQueried: number
+  platformRowsSynced: number
+  pending: number
+  failed: number
+  noData: number
+}
+
+export type AnalyticsPullCompletedEvent = {
+  analyticsId: string
+  ruleRef: string
+  summary?: AnalyticsPullSummary
+  message?: string
+}
 export type AnalyticsSuggestionReadyEvent = {
   analyticsId: string
   ruleRef: string
   count: number
 }
-export type AnalyticsPullFailedEvent = { ruleId: string; message?: string }
+export type AnalyticsPullFailedEvent = {
+  ruleId: string
+  message?: string
+  summary?: AnalyticsPullSummary
+}
 
 let socketInstance: Socket | null = null
 

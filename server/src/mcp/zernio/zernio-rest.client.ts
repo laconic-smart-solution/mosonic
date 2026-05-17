@@ -78,7 +78,9 @@ export class ZernioRestClient {
       (err) => {
         const status = err.response?.status;
         const data = err.response?.data;
-        this.logger.warn(`Zernio REST error ${status}: ${JSON.stringify(data)}`);
+        this.logger.warn(
+          `Zernio REST error ${status}: ${JSON.stringify(data)}`,
+        );
         return Promise.reject(err);
       },
     );
@@ -126,7 +128,10 @@ export class ZernioRestClient {
         const rawUrls = multiMedia.length
           ? multiMedia
           : singleMedia
-            ? singleMedia.split(',').map((u) => u.trim()).filter(Boolean)
+            ? singleMedia
+                .split(',')
+                .map((u) => u.trim())
+                .filter(Boolean)
             : [];
 
         const customMedia = await this.buildZernioMediaItemsFromUrls(
@@ -169,7 +174,10 @@ export class ZernioRestClient {
     this.logger.log(`[REST] body: ${JSON.stringify(body)}`);
 
     try {
-      const { data } = await this.http.post<Record<string, unknown>>('/posts', body);
+      const { data } = await this.http.post<Record<string, unknown>>(
+        '/posts',
+        body,
+      );
 
       this.logger.log(`[REST] response: ${JSON.stringify(data)}`);
 
@@ -219,13 +227,18 @@ export class ZernioRestClient {
     fileName: string;
     fileType: string;
   }): Promise<ZernioPresignResult> {
-    this.logger.log(`[REST] POST /media/presign → ${input.fileName} (${input.fileType})`);
+    this.logger.log(
+      `[REST] POST /media/presign → ${input.fileName} (${input.fileType})`,
+    );
     try {
       // Live API expects `filename` + `contentType` (not fileName/fileType).
-      const { data } = await this.http.post<Record<string, unknown>>('/media/presign', {
-        filename: input.fileName,
-        contentType: input.fileType,
-      });
+      const { data } = await this.http.post<Record<string, unknown>>(
+        '/media/presign',
+        {
+          filename: input.fileName,
+          contentType: input.fileType,
+        },
+      );
       const norm = normalizePresignResponse(data);
       if (!norm) {
         throw new Error(
@@ -236,7 +249,9 @@ export class ZernioRestClient {
     } catch (err: unknown) {
       const detail = summarizeZernioAxiosError(err);
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Zernio REST presign threw: ${message}${detail ? ` — ${detail}` : ''}`);
+      this.logger.warn(
+        `Zernio REST presign threw: ${message}${detail ? ` — ${detail}` : ''}`,
+      );
       throw new Error(
         detail
           ? `Zernio media presign failed — ${detail}`
@@ -384,11 +399,15 @@ export class ZernioRestClient {
 
     if (fileBase) {
       try {
-        const base = fileBase.startsWith('http') ? fileBase : `http://${fileBase}`;
+        const base = fileBase.startsWith('http')
+          ? fileBase
+          : `http://${fileBase}`;
         return new URL(s, base).href;
       } catch {
         try {
-          const base = fileBase.startsWith('http') ? fileBase : `http://${fileBase}`;
+          const base = fileBase.startsWith('http')
+            ? fileBase
+            : `http://${fileBase}`;
           return new URL(s, new URL(base).origin).href;
         } catch {
           return s;
@@ -452,7 +471,9 @@ export class ZernioRestClient {
     this.logger.log(`[REST] GET /posts/${id}`);
 
     try {
-      const { data } = await this.http.get<Record<string, unknown>>(`/posts/${id}`);
+      const { data } = await this.http.get<Record<string, unknown>>(
+        `/posts/${id}`,
+      );
       const post = data?.post ?? data ?? null;
       return post ?? null;
     } catch (err: unknown) {
@@ -488,6 +509,16 @@ export class ZernioRestClient {
         },
       });
       if (data == null) return null;
+      if (
+        data &&
+        typeof data === 'object' &&
+        String((data as Record<string, unknown>).syncStatus ?? '')
+          .trim()
+          .toLowerCase() === 'pending'
+      ) {
+        this.logger.log(`[REST] Analytics for ${id} sync pending (body)`);
+        return null;
+      }
       return data;
     } catch (err: unknown) {
       if (isAxiosError(err)) {
@@ -501,7 +532,9 @@ export class ZernioRestClient {
           return null;
         }
         if (status === 424) {
-          this.logger.warn(`[REST] Analytics for ${id} failed on all platforms (424)`);
+          this.logger.warn(
+            `[REST] Analytics for ${id} failed on all platforms (424)`,
+          );
           return null;
         }
         if (status === 404) {
@@ -539,7 +572,9 @@ export class ZernioRestClient {
       return { success: true };
     } catch (err: unknown) {
       if (isAxiosError(err) && err.response?.status === 404) {
-        this.logger.warn(`[REST] Post ${id} not found on Zernio (404), treating as success`);
+        this.logger.warn(
+          `[REST] Post ${id} not found on Zernio (404), treating as success`,
+        );
         return { success: true };
       }
       const detail = summarizeZernioAxiosError(err);

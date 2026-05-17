@@ -93,6 +93,7 @@ export default function AnalyticsDetailPage() {
       const res = await analyticsService.latest(ruleId)
       qc.setQueryData(analyticsQueryKeys.latest(ruleId), res)
       void qc.invalidateQueries({ queryKey: analyticsQueryKeys.summary })
+      toast.success(p.message?.trim() || "Analytics synced")
     })
     const off3 = onAnalyticsSuggestionReady((p) => {
       if (p.ruleRef !== ruleId) return
@@ -151,12 +152,12 @@ export default function AnalyticsDetailPage() {
     if (!ruleId) return
     setPullOverlay(true)
     try {
-      await pullMu.mutateAsync(ruleId)
+      const pullRes = await pullMu.mutateAsync(ruleId)
       setPullOverlay(false)
       const res = await analyticsService.latest(ruleId)
       qc.setQueryData(analyticsQueryKeys.latest(ruleId), res)
       void qc.invalidateQueries({ queryKey: analyticsQueryKeys.summary })
-      toast.success("Analytics synced")
+      toast.success(pullRes.message?.trim() || "Analytics synced")
     } catch (e: unknown) {
       setPullOverlay(false)
       const msg = e && typeof e === "object" && "message" in e ? String((e as Error).message) : "Sync failed"
