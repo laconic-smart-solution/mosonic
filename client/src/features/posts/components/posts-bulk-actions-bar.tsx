@@ -64,7 +64,7 @@ export function PostsBulkActionsBar({
       aria-label="Bulk post actions"
       className={cn(
         "flex flex-col gap-3 rounded-xl border border-[color:var(--nt-border)] bg-[color:var(--nt-surface)] px-3 py-3 shadow-[var(--nt-surface-shadow)] sm:flex-row sm:items-center sm:justify-between sm:px-4",
-        className,
+        className
       )}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
@@ -200,7 +200,9 @@ export function PostsBulkActionsBar({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deletePending}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deletePending}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 disabled={deletePending}
                 onClick={() => {
