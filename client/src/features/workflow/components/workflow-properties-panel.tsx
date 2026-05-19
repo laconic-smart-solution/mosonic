@@ -1,12 +1,20 @@
 import { Button } from "@/components/ui/button"
-import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import { workflowConfigsEqual } from "@/features/workflow/lib/config-equality"
+import { cn } from "@/lib/utils"
+import {
+  WORKFLOW_NODE_FIELD_DEFS,
+  WorkflowNodeConfigFields,
+} from "@/features/workflow/components/workflow-node-config-fields"
+import { WorkflowNodeGuideSection } from "@/features/workflow/components/workflow-node-guide-section"
 import { WF_NODE_TYPES, type WFNode } from "@/features/workflow/data/workflow-model"
+import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
 import { T } from "@/lib/tokens"
 
 type WorkflowPropertiesPanelProps = {
   selNode: WFNode
   propConfig: Record<string, unknown>
   setPropConfig: (next: Record<string, unknown>) => void
+  resolvedChannels?: BranchChannelHandle[]
   onClose: () => void
   onApply: () => void
   onReset: () => void
@@ -16,12 +24,18 @@ export function WorkflowPropertiesPanel({
   selNode,
   propConfig,
   setPropConfig,
+  resolvedChannels = [],
   onClose,
   onApply,
   onReset,
 }: WorkflowPropertiesPanelProps) {
   const selType =
     WF_NODE_TYPES.find((t) => t.type === selNode.type) ?? WF_NODE_TYPES[0]
+  const hasConfigFields = (WORKFLOW_NODE_FIELD_DEFS[selNode.type] ?? []).length > 0
+  const hasUnappliedChanges = !workflowConfigsEqual(
+    propConfig,
+    selNode.config ?? {},
+  )
 
   return (
     <div
@@ -71,13 +85,16 @@ export function WorkflowPropertiesPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
-        <div
-          className="rounded-lg border px-2.5 py-2 text-[11px] leading-relaxed"
-          style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
-        >
-          Tune how this step runs using the fields below. The topic or campaign brief is entered when you
-          generate content (pipeline run), not on the node.
-        </div>
+        <WorkflowNodeGuideSection canvasType={selNode.type} />
+
+        {hasConfigFields ? (
+          <p
+            className="text-[10px] font-bold tracking-wide uppercase"
+            style={{ color: T.textSecondary }}
+          >
+            Configuration
+          </p>
+        ) : null}
 
         <WorkflowNodeConfigFields
           canvasType={selNode.type}
@@ -85,30 +102,61 @@ export function WorkflowPropertiesPanel({
           onChange={setPropConfig}
         />
 
+        {selNode.type === "branch" && resolvedChannels.length > 0 ? (
+          <BranchChannelList channels={resolvedChannels} />
+        ) : null}
+
         <div className="rounded-lg bg-gray-100 px-2.5 py-2 text-[11px] leading-relaxed text-gray-400">
           Changes apply to this run only. Save the workflow to persist.
         </div>
       </div>
 
       <div
-        className="flex gap-2 border-t px-4 py-3"
-        style={{ borderColor: T.surfaceBorder }}
+        className={cn(
+          "flex gap-2 border-t px-4 py-3 transition-colors",
+          hasUnappliedChanges &&
+            "border-teal-400/60 bg-teal-50/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]",
+        )}
+        style={{ borderColor: hasUnappliedChanges ? undefined : T.surfaceBorder }}
       >
         <Button
           type="button"
-          className="flex-1"
+          className={cn(
+            "flex-1 font-semibold",
+            hasUnappliedChanges &&
+              "bg-teal-600 text-white shadow-md ring-2 ring-teal-400/50 hover:bg-teal-700",
+          )}
           size="sm"
           onClick={() => {
             onApply()
             onClose()
           }}
         >
-          Apply changes
+          {hasUnappliedChanges ? "Apply changes now" : "Apply changes"}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onReset}>
           Reset
         </Button>
       </div>
+    </div>
+  )
+}
+
+function BranchChannelList({
+  channels,
+}: {
+  channels: BranchChannelHandle[]
+}) {
+  return (
+    <div className="rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-2">
+      <p className="text-[10px] font-bold tracking-wide text-teal-800 uppercase">
+        Channel lanes
+      </p>
+      <ul className="mt-1.5 space-y-0.5 text-[11px] text-teal-900">
+        {channels.map((ch) => (
+          <li key={ch.id}>{ch.label}</li>
+        ))}
+      </ul>
     </div>
   )
 }

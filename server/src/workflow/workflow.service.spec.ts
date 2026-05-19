@@ -2,6 +2,7 @@ jest.mock('../rule/rule.service', () => ({
   RuleService: class RuleService {},
 }));
 
+import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '../users/schemas/user.schema';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -151,5 +152,159 @@ describe('WorkflowService.findPage', () => {
     expect(workflowNodeModel.distinct).not.toHaveBeenCalled();
     expect(out.total).toBe(3);
     expect(out.data[0].workflowId).toBe('wf-2');
+  });
+});
+
+describe('WorkflowService.saveNodesForRule', () => {
+  const auth: TenancyAuth = { userId: 'u1', role: UserRole.CUSTOMER };
+  const ruleId = 'rule-1';
+  const saveBody = {
+    nodes: [
+      {
+        type: WorkflowNodeType.TextGeneration,
+        order: 1,
+        isLocked: false,
+      },
+    ],
+  };
+
+  function makeSaveByRuleService(existingWorkflow: { workflowId: string } | null) {
+    const findOneExec = jest.fn().mockResolvedValue(existingWorkflow);
+    const workflowModel = {
+      findOne: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: findOneExec,
+        }),
+      }),
+      create: jest.fn().mockResolvedValue({
+        workflowId: 'wf-new',
+        ruleRef: ruleId,
+        status: WorkflowStatus.Ready,
+      }),
+      updateOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({}),
+      }),
+    };
+    const workflowNodeModel = {
+      deleteMany: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+      findOneAndUpdate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+    };
+    const ruleService = {
+      getRuleById: jest.fn().mockResolvedValue({ ruleId }),
+    };
+    const service = new WorkflowService(
+      workflowModel as never,
+      workflowNodeModel as never,
+      {} as never,
+      {} as never,
+      ruleService as never,
+      {} as never,
+    );
+    const saveNodesSpy = jest
+      .spyOn(service, 'saveNodes')
+      .mockResolvedValue({ success: true });
+    return { service, workflowModel, ruleService, saveNodesSpy };
+  }
+
+  it('creates a ready workflow when none exists, then saves nodes', async () => {
+    const { service, workflowModel, ruleService, saveNodesSpy } =
+      makeSaveByRuleService(null);
+
+    const out = await service.saveNodesForRule(
+      ruleId,
+      { ...saveBody, name: 'My workflow' },
+      auth,
+    );
+
+    expect(ruleService.getRuleById).toHaveBeenCalledWith(ruleId, auth);
+    expect(workflowModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'My workflow',
+        ruleRef: ruleId,
+        userId: auth.userId,
+        status: WorkflowStatus.Ready,
+      }),
+    );
+    expect(saveNodesSpy).toHaveBeenCalledWith(
+      'wf-new',
+      saveBody,
+      auth,
+    );
+    expect(out).toEqual({ workflowId: 'wf-new', success: true });
+  });
+
+  it('reuses existing workflow for the rule', async () => {
+    const { service, workflowModel, saveNodesSpy } = makeSaveByRuleService({
+      workflowId: 'wf-existing',
+    });
+
+    const out = await service.saveNodesForRule(ruleId, saveBody, auth);
+
+    expect(workflowModel.create).not.toHaveBeenCalled();
+    expect(saveNodesSpy).toHaveBeenCalledWith('wf-existing', saveBody, auth);
+    expect(out).toEqual({ workflowId: 'wf-existing', success: true });
+  });
+});
+
+describe('WorkflowService.updateWorkflow', () => {
+  const auth: TenancyAuth = { userId: 'u1', role: UserRole.CUSTOMER };
+
+  function makeUpdateService(existing: { workflowId: string } | null) {
+    const updateOneExec = jest.fn().mockResolvedValue({});
+    const workflowModel = {
+      findOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(existing),
+      }),
+      updateOne: jest.fn().mockReturnValue({ exec: updateOneExec }),
+    };
+    const service = new WorkflowService(
+      workflowModel as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    return { service, workflowModel, updateOneExec };
+  }
+
+  it('updates workflow name', async () => {
+    const { service, workflowModel } = makeUpdateService({
+      workflowId: 'wf-1',
+    });
+
+    const out = await service.updateWorkflow(
+      'wf-1',
+      { name: '  Renamed  ' },
+      auth,
+    );
+
+    expect(workflowModel.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ workflowId: 'wf-1' }),
+      { $set: { name: 'Renamed' } },
+    );
+    expect(out).toEqual({ workflowId: 'wf-1', name: 'Renamed' });
+  });
+
+  it('uses Untitled Workflow when name is empty after trim', async () => {
+    const { service, workflowModel } = makeUpdateService({
+      workflowId: 'wf-1',
+    });
+
+    const out = await service.updateWorkflow('wf-1', { name: '   ' }, auth);
+
+    expect(workflowModel.updateOne).toHaveBeenCalledWith(
+      expect.anything(),
+      { $set: { name: 'Untitled Workflow' } },
+    );
+    expect(out.name).toBe('Untitled Workflow');
+  });
+
+  it('throws when workflow is not found', async () => {
+    const { service } = makeUpdateService(null);
+
+    await expect(
+      service.updateWorkflow('wf-missing', { name: 'X' }, auth),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

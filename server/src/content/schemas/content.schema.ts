@@ -4,9 +4,50 @@ import { randomUUID } from 'node:crypto';
 
 export enum ContentStatus {
   Draft = 'draft',
+  InReview = 'in_review',
   Approved = 'approved',
   Rejected = 'rejected',
 }
+
+@Schema({ _id: false })
+export class ApprovalStepDef {
+  @Prop({ type: String, required: true })
+  role: string;
+
+  @Prop({ type: Boolean, default: true })
+  required: boolean;
+}
+export const ApprovalStepDefSchema = SchemaFactory.createForClass(ApprovalStepDef);
+
+@Schema({ _id: false })
+export class ApprovalRecord {
+  @Prop({ type: Number, required: true })
+  stepIndex: number;
+
+  @Prop({ type: String, required: true })
+  userId: string;
+
+  @Prop({ type: Date, required: true })
+  at: Date;
+
+  @Prop({ type: String, default: null })
+  comment: string | null;
+}
+export const ApprovalRecordSchema = SchemaFactory.createForClass(ApprovalRecord);
+
+@Schema({ _id: false })
+export class ContentApprovalState {
+  @Prop({ type: [ApprovalStepDefSchema], default: [] })
+  steps: ApprovalStepDef[];
+
+  @Prop({ type: Number, default: 0 })
+  currentStepIndex: number;
+
+  @Prop({ type: [ApprovalRecordSchema], default: [] })
+  records: ApprovalRecord[];
+}
+export const ContentApprovalStateSchema =
+  SchemaFactory.createForClass(ContentApprovalState);
 
 /** AI-generated artifacts for one content version (URLs or inline text). */
 @Schema({ _id: false })
@@ -130,6 +171,10 @@ export class Content {
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
   nodeUserEdits: Record<string, Record<string, unknown>>;
 
+  /** Per lane key → adapt terminal outputs (multi-channel runs). */
+  @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+  laneOutputs: Record<string, Record<string, unknown>>;
+
   /** Legacy version fields kept for backward DB compatibility (unused by new flows). */
   @Prop({ type: Number, min: 1 })
   currentVersion?: number;
@@ -143,6 +188,16 @@ export class Content {
     default: ContentStatus.Draft,
   })
   status: ContentStatus;
+
+  /** Multi-step approval routing; empty steps = single-step approve. */
+  @Prop({ type: ContentApprovalStateSchema, default: () => ({ steps: [] }) })
+  approval: ContentApprovalState;
+
+  @Prop({ type: String, default: null })
+  variantId?: string | null;
+
+  @Prop({ type: String, default: null })
+  experimentId?: string | null;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

@@ -7,7 +7,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@workflow-next-matrix": ["../server/src/workflow/workflow-node-next-matrix.ts"]
     }
   }
 }

@@ -1,4 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
+import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import {
+  PipelineNodeExecutionStatus,
+  type PipelineDocument,
+} from '../pipeline/schemas/pipeline.schema';
+import { CaptionMappingSource } from '../rule/schemas/rule.schema';
 import { UploadService } from './upload.service';
 import { UploadChannelStatus, UploadJobStatus } from './schemas/upload.schema';
 
@@ -1042,6 +1048,65 @@ describe('UploadService', () => {
       ];
       const out = service.mergeChannelsPreservingUserEdits(fresh, previous);
       expect(out[0].caption).toBe('same');
+    });
+  });
+
+  describe('buildChannelEntriesFromPipeline', () => {
+    it('maps per-lane adapt node text into channel captions', () => {
+      const pipeline = {
+        graph: { lanes: ['instagram', 'facebook'] },
+        nodes: [
+          {
+            nodeId: 'adapt_ig',
+            lane: 'instagram',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'IG-specific caption' }),
+          },
+          {
+            nodeId: 'adapt_fb',
+            lane: 'facebook',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'FB-specific caption' }),
+          },
+        ],
+      } as unknown as PipelineDocument;
+
+      const ruleChannels = [
+        {
+          channel: 'instagram',
+          priority: 'high',
+          contentStyle: '',
+          contentMapping: {
+            caption: CaptionMappingSource.Text,
+            media: null,
+          },
+        },
+        {
+          channel: 'facebook',
+          priority: 'medium',
+          contentStyle: '',
+          contentMapping: {
+            caption: CaptionMappingSource.Text,
+            media: null,
+          },
+        },
+      ];
+
+      const entries = service.buildChannelEntriesFromPipeline(
+        ruleChannels as never,
+        pipeline,
+        { text: 'shared trunk text' },
+      );
+
+      expect(entries).toHaveLength(2);
+      expect(entries.find((e) => e.channel === 'instagram')?.caption).toBe(
+        'IG-specific caption',
+      );
+      expect(entries.find((e) => e.channel === 'facebook')?.caption).toBe(
+        'FB-specific caption',
+      );
     });
   });
 });

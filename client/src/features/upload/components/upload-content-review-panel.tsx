@@ -36,6 +36,7 @@ import {
   mergeNodeOutputLayers,
   outputKeyForNodeType,
 } from "@/features/content/data/content-review-helpers"
+import { buildGenerationNodesForContent } from "@/features/upload/lib/upload-generation-nodes"
 import { ContentDetailNodeCard } from "@/features/content/components/content-detail/content-detail-node-card"
 import {
   ContentDetailConfirmDialogs,
@@ -52,15 +53,13 @@ import {
 } from "@/features/content/components/content-detail/content-detail-review-ui"
 import { useGetContentQuery } from "@/shared/queries/content.query"
 import { useRuleByIdQuery } from "@/shared/queries/rule.query"
+import { useGetPipelineQuery } from "@/shared/queries/pipeline.query"
 import { useGetWorkflowQuery } from "@/shared/queries/workflow.query"
 import { contentService } from "@/shared/services/content.service"
 import { uploadService } from "@/shared/services/upload.service"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
 import type { ContentDetail } from "@/shared/types/content.type"
-import type {
-  WorkflowNode,
-  WorkflowNodeType,
-} from "@/shared/types/workflow.type"
+import type { WorkflowNodeType } from "@/shared/types/workflow.type"
 import {
   joinContentRoom,
   leaveContentRoom,
@@ -136,17 +135,13 @@ export function UploadContentReviewPanel({
     [workflowQuery.data?.nodes]
   )
 
+  const pipelineQuery = useGetPipelineQuery(data?.pipelineRef, {
+    refetchInterval: false,
+  })
+
   const sortedWorkflowNodes = useMemo(
     () => [...workflowNodes].sort((a, b) => a.order - b.order),
     [workflowNodes]
-  )
-
-  const generationNodes = useMemo(
-    () =>
-      sortedWorkflowNodes.filter(
-        (n) => n.type !== "keyword_planner"
-      ) as WorkflowNode[],
-    [sortedWorkflowNodes]
   )
 
   const [nodeOutputs, setNodeOutputs] = useState<
@@ -205,6 +200,36 @@ export function UploadContentReviewPanel({
     config: Record<string, unknown>
     nodeId: string
   } | null>(null)
+
+  const generationNodes = useMemo(() => {
+    const merged = buildGenerationNodesForContent(
+      pipelineQuery.data?.nodes,
+      sortedWorkflowNodes,
+      nodeOutputs,
+    )
+    if (
+      generateMorePending &&
+      !merged.some((n) => n.nodeId === generateMorePending.nodeId)
+    ) {
+      const maxOrder = merged.reduce((m, n) => Math.max(m, n.order), 0)
+      return [
+        ...merged,
+        {
+          nodeId: generateMorePending.nodeId,
+          type: generateMorePending.type,
+          order: maxOrder + 1,
+          isLocked: false,
+          config: generateMorePending.config,
+        },
+      ]
+    }
+    return merged
+  }, [
+    generateMorePending,
+    nodeOutputs,
+    pipelineQuery.data?.nodes,
+    sortedWorkflowNodes,
+  ])
 
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
@@ -462,7 +487,7 @@ export function UploadContentReviewPanel({
         generateMoreRetryRef.current = { type, config, nodeId }
         setGenerateMorePending({ nodeId, type, config })
         if (data?.workflowRef) {
-          void queryClient.invalidateQueries({
+          await queryClient.refetchQueries({
             queryKey: ["workflow", data.workflowRef],
           })
         }

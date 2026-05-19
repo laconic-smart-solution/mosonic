@@ -59,7 +59,16 @@ function normalizeTextGenerationConfig(
   };
 }
 
-function buildSystemPrompt(rule: Rule, config: NormalizedTextConfig): string {
+function buildSystemPrompt(
+  rule: Rule,
+  config: NormalizedTextConfig,
+  previousOutputs?: PreviousOutputs,
+): string {
+  const intelligenceBrief =
+    previousOutputs?.intelligenceBrief?.trim() ||
+    previousOutputs?.intelligenceHints?.trim() ||
+    null;
+
   return [
     'You are a professional content writer.',
     'Write content strictly following the brand guidelines below.',
@@ -123,6 +132,17 @@ function buildSystemPrompt(rule: Rule, config: NormalizedTextConfig): string {
     `Maximum length: ${config.maxTokens} tokens.`,
     'Do not include any explanation, preamble, or metadata.',
     'Return only the content itself.',
+    'If this copy may feed AI-generated video: do not include phone numbers, emails, URLs, addresses, QR codes, or instructions to show on-screen text or logos; keep CTAs generic without display-ready contact strings.',
+    intelligenceBrief
+      ? [
+          '',
+          '=== INTELLIGENCE BRIEF (current market context) ===',
+          intelligenceBrief,
+          '',
+          'Use this brief to make the content timely, relevant, and differentiated.',
+          'Prioritize gap opportunities and recommended angles when present.',
+        ].join('\n')
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -195,7 +215,7 @@ export class TextGenerationService {
   }> {
     const { rule, contentPrompt, config, previousOutputs } = input;
     const normalized = normalizeTextGenerationConfig(config);
-    const systemPrompt = buildSystemPrompt(rule, normalized);
+    const systemPrompt = buildSystemPrompt(rule, normalized, previousOutputs);
     const humanPrompt = buildHumanPrompt(contentPrompt, previousOutputs);
 
     const model = this.llm.getChatModelForPlainText({
@@ -227,7 +247,11 @@ export class TextGenerationService {
     }
     const contentPrompt = input.contentPrompt ?? '';
     const normalized = normalizeTextGenerationConfig(input.config ?? {});
-    const systemPrompt = buildSystemPrompt(input.rule, normalized);
+    const systemPrompt = buildSystemPrompt(
+      input.rule,
+      normalized,
+      input.previousOutputs,
+    );
     const humanPrompt = buildHumanPrompt(
       contentPrompt,
       input.previousOutputs,

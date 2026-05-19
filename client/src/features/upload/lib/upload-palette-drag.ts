@@ -22,6 +22,14 @@ export function palettePayloadForNode(
       const t = typeof layer.text === "string" ? layer.text.trim() : ""
       return t ? { kind: "text", source: "text", nodeId } : null
     }
+    case "adapt": {
+      const t =
+        (typeof layer.text === "string" ? layer.text.trim() : "") ||
+        (typeof layer.adaptedCaption === "string"
+          ? layer.adaptedCaption.trim()
+          : "")
+      return t ? { kind: "text", source: "text", nodeId } : null
+    }
     case "translation": {
       const t =
         typeof layer.translatedText === "string"

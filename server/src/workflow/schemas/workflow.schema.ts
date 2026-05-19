@@ -1,6 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { randomUUID } from 'node:crypto';
+import {
+  WorkflowEdgeEntry,
+  WorkflowEdgeEntrySchema,
+} from './workflow-edge.schema';
 
 export enum WorkflowStatus {
   Generating = 'generating',
@@ -16,6 +20,9 @@ export class WorkflowVersionEntry {
 
   @Prop({ type: [String], default: [] })
   nodes: string[];
+
+  @Prop({ type: [WorkflowEdgeEntrySchema], default: [] })
+  edges: WorkflowEdgeEntry[];
 
   @Prop({ type: Date, required: true })
   createdAt: Date;
@@ -49,6 +56,10 @@ export class Workflow {
   /** Ordered list of workflow node definition IDs (`WorkflowNode.nodeId`). */
   @Prop({ type: [String], default: [] })
   nodes: string[];
+
+  /** Directed edges between node definitions (`from` → `to` by nodeId). */
+  @Prop({ type: [WorkflowEdgeEntrySchema], default: [] })
+  edges: WorkflowEdgeEntry[];
 
   /** When true, this workflow is stored as a reusable template. */
   @Prop({ type: Boolean, required: true, default: false })

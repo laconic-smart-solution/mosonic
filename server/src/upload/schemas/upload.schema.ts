@@ -70,6 +70,9 @@ export class UploadChannelEntry {
 
   @Prop({ type: String, default: null })
   failureReason: string | null;
+
+  @Prop({ type: String, default: null })
+  variantId?: string | null;
 }
 export const UploadChannelEntrySchema =
   SchemaFactory.createForClass(UploadChannelEntry);

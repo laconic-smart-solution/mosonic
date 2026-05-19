@@ -3,7 +3,11 @@ import type {
   GenerateWorkflowPayload,
   GenerateWorkflowResponse,
   GetWorkflowResponse,
+  SaveWorkflowNodesByRulePayload,
+  SaveWorkflowNodesByRuleResponse,
   SaveWorkflowNodesPayload,
+  UpdateWorkflowPayload,
+  UpdateWorkflowResponse,
   WorkflowPageQueryPayload,
   WorkflowPageResponse,
 } from "../types/workflow.type"
@@ -42,6 +46,22 @@ export const workflowService = {
     payload: SaveWorkflowNodesPayload,
   ): Promise<{ success: boolean }> => {
     const response = await apiClient.put(`/workflow/${workflowId}/nodes`, payload)
+    return response.data
+  },
+
+  saveNodesByRuleId: async (
+    ruleId: string,
+    payload: SaveWorkflowNodesByRulePayload,
+  ): Promise<SaveWorkflowNodesByRuleResponse> => {
+    const response = await apiClient.put(`/workflow/rule/${ruleId}/nodes`, payload)
+    return response.data
+  },
+
+  patchWorkflow: async (
+    workflowId: string,
+    payload: UpdateWorkflowPayload,
+  ): Promise<UpdateWorkflowResponse> => {
+    const response = await apiClient.patch(`/workflow/${workflowId}`, payload)
     return response.data
   },
 }

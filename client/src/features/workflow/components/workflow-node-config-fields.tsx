@@ -4,12 +4,15 @@ import { cn } from "@/lib/utils"
 
 type FieldOption = { label: string; value: string }
 
+type VisibleWhen = { key: string; value: string }
+
 type ConfigFieldSelect = {
   key: string
   label: string
   control: "select"
   options: FieldOption[]
   defaultValue: string
+  visibleWhen?: VisibleWhen
 }
 
 type ConfigFieldButtons = {
@@ -20,6 +23,7 @@ type ConfigFieldButtons = {
   defaultValue: string
   /** When true, stores option values as numbers (e.g. video duration seconds). */
   valueAsNumber?: boolean
+  visibleWhen?: VisibleWhen
 }
 
 type ConfigFieldToggle = {
@@ -27,6 +31,7 @@ type ConfigFieldToggle = {
   label: string
   control: "toggle"
   defaultValue: boolean
+  visibleWhen?: VisibleWhen
 }
 
 type ConfigFieldTextarea = {
@@ -36,6 +41,7 @@ type ConfigFieldTextarea = {
   defaultValue: string
   rows?: number
   placeholder?: string
+  visibleWhen?: VisibleWhen
 }
 
 export type ConfigField =
@@ -156,6 +162,14 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
       options: [{ label: "720p (Sora 2)", value: "720p" }],
       defaultValue: "720p",
     },
+    {
+      key: "negativePrompt",
+      label: "Negative prompt",
+      control: "textarea",
+      defaultValue: "",
+      rows: 3,
+      placeholder: "Optional — extra things to avoid in the video",
+    },
   ],
   translation: [
     {
@@ -245,6 +259,43 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
       defaultValue: "paragraph",
     },
   ],
+  intelligence: [
+    {
+      key: "searchType",
+      label: "Search type",
+      control: "select",
+      options: [
+        { label: "All (trend + market + competitor)", value: "all" },
+        { label: "Trend — hashtags & formats", value: "trend" },
+        { label: "Market — news & signals", value: "market" },
+        { label: "Competitor — gaps & angles", value: "competitor" },
+        { label: "Custom — your own prompt", value: "custom" },
+      ],
+      defaultValue: "all",
+    },
+    {
+      key: "customPrompt",
+      label: "Custom search prompt",
+      control: "textarea",
+      defaultValue: "",
+      rows: 4,
+      placeholder: "Describe what to search for…",
+      visibleWhen: { key: "searchType", value: "custom" },
+    },
+  ],
+  branch: [
+    {
+      key: "mode",
+      label: "Branch mode",
+      control: "select",
+      options: [
+        { label: "Rule channels", value: "rule_channels" },
+        { label: "Manual channels", value: "manual" },
+        { label: "A/B test", value: "ab_test" },
+      ],
+      defaultValue: "rule_channels",
+    },
+  ],
 }
 
 export type WorkflowNodeConfigFieldsProps = {
@@ -262,7 +313,12 @@ export function WorkflowNodeConfigFields({
   compact = false,
   className,
 }: WorkflowNodeConfigFieldsProps) {
-  const configFields = WORKFLOW_NODE_FIELD_DEFS[canvasType] ?? []
+  const configFields = (WORKFLOW_NODE_FIELD_DEFS[canvasType] ?? []).filter(
+    (field) => {
+      if (!field.visibleWhen) return true
+      return String(config[field.visibleWhen.key] ?? "") === field.visibleWhen.value
+    },
+  )
 
   function updateConfig(key: string, value: string) {
     onChange({ ...config, [key]: value })

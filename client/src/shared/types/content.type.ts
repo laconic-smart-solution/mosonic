@@ -1,6 +1,24 @@
 import type { WorkflowNodeType } from "./workflow.type"
 
-export type ContentStatus = "draft" | "approved" | "rejected"
+export type ContentStatus = "draft" | "in_review" | "approved" | "rejected"
+
+export type ContentApprovalStep = {
+  role: string
+  required: boolean
+}
+
+export type ContentApprovalRecord = {
+  stepIndex: number
+  userId: string
+  at: string
+  comment?: string | null
+}
+
+export type ContentApprovalState = {
+  steps: ContentApprovalStep[]
+  currentStepIndex: number
+  records: ContentApprovalRecord[]
+}
 
 export type ContentPageQueryPayload = {
   page?: number
@@ -62,6 +80,9 @@ export type ContentDetail = {
   workflowRef: string
   ruleRef: string
   status: ContentStatus
+  approval?: ContentApprovalState
+  variantId?: string | null
+  experimentId?: string | null
   createdAt: string
   updatedAt: string
 }

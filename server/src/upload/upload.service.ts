@@ -34,6 +34,11 @@ import {
   type UploadChannelEntry,
   type UploadDocument,
 } from './schemas/upload.schema';
+import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
+import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
+import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
+import { normalizeLaneId } from '../workflow/workflow-graph.util';
 import { normalizedRuleChannelMapping } from '../rule/rule-mapping.util';
 import {
   resolveAutomappedCaption,
@@ -51,6 +56,8 @@ export type CreateUploadParams = {
   ruleRef: string;
   resolvedOutputs: ResolvedContentOutputs;
   ruleChannels: ChannelEntry[];
+  /** When set, used instead of buildChannelEntriesFromRule. */
+  channels?: UploadChannelEntry[];
 };
 
 export type UploadChannelDto = {
@@ -96,6 +103,62 @@ export class UploadService {
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
   ) {}
+
+  buildChannelEntriesFromPipeline(
+    ruleChannels: ChannelEntry[],
+    pipeline: PipelineDocument,
+    resolvedOutputs: ResolvedContentOutputs,
+  ): UploadChannelEntry[] {
+    const lanes = pipeline.graph?.lanes ?? [];
+    if (lanes.length === 0) {
+      return this.buildChannelEntriesFromRule(ruleChannels, resolvedOutputs);
+    }
+
+    return ruleChannels.map((ruleCh) => {
+      const lane = normalizeLaneId(ruleCh.channel);
+      const adaptNode = (pipeline.nodes ?? []).find(
+        (n) =>
+          n.lane === lane &&
+          n.type === WorkflowNodeType.Adapt &&
+          (n.status === PipelineNodeExecutionStatus.Completed ||
+            n.status === PipelineNodeExecutionStatus.Skipped),
+      );
+      const adaptOut = adaptNode
+        ? parsePipelineNodeOutputString(adaptNode.output)
+        : null;
+      const map = normalizedRuleChannelMapping(ruleCh);
+      const laneResolved: ResolvedContentOutputs = {
+        ...resolvedOutputs,
+        text:
+          (typeof adaptOut?.text === 'string' ? adaptOut.text : undefined) ??
+          resolvedOutputs.text,
+        translatedText:
+          (typeof adaptOut?.translatedText === 'string'
+            ? adaptOut.translatedText
+            : undefined) ?? resolvedOutputs.translatedText,
+        summary:
+          (typeof adaptOut?.summary === 'string' ? adaptOut.summary : undefined) ??
+          resolvedOutputs.summary,
+      };
+      const caption = resolveAutomappedCaption(map.caption, laneResolved);
+      const mediaUrl = resolveAutomappedMediaUrl(map.media, laneResolved);
+      const skipped = adaptNode?.status === PipelineNodeExecutionStatus.Skipped;
+      return {
+        channel: ruleCh.channel,
+        included: !skipped,
+        caption,
+        mediaUrl,
+        mediaUrls: [],
+        youtubeTitle: null,
+        status: UploadChannelStatus.Pending,
+        scheduledAt: null,
+        publishedAt: null,
+        retryCount: 0,
+        failureReason: skipped ? 'Lane was skipped during generation' : null,
+        variantId: adaptNode?.variantId ?? null,
+      };
+    });
+  }
 
   buildChannelEntriesFromRule(
     ruleChannels: ChannelEntry[],
@@ -224,10 +287,12 @@ export class UploadService {
   async createUpload(
     params: CreateUploadParams,
   ): Promise<{ uploadId: string }> {
-    const channels = this.buildChannelEntriesFromRule(
-      params.ruleChannels,
-      params.resolvedOutputs ?? {},
-    );
+    const channels =
+      params.channels ??
+      this.buildChannelEntriesFromRule(
+        params.ruleChannels,
+        params.resolvedOutputs ?? {},
+      );
 
     const doc = await this.uploadModel.create({
       userId: params.userId,

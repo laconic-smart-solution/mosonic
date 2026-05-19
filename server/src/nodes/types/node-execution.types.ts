@@ -13,6 +13,12 @@ export interface PreviousOutputs {
   summary?: string;
   transcription?: string;
   video?: string;
+  /** From intelligence node — folded into downstream prompts. */
+  intelligenceHints?: string;
+  /** Web-search intelligence brief from intelligence node(s). */
+  intelligenceBrief?: string;
+  adaptedCaption?: string;
+  channel?: string;
 }
 
 export interface PipelineContext {
@@ -30,6 +36,7 @@ export interface NodeExecutorInput {
     workflowRef?: string;
   };
   context: PipelineContext;
+  intelligenceContext?: NodeExecutionInput['intelligenceContext'];
   pipelineId: string;
   totalNodes: number;
   /** When set, mirrors pipeline node events to `content_${contentId}` for content re-run UX. */
@@ -38,6 +45,10 @@ export interface NodeExecutorInput {
   userId?: string;
   /** Rule id (stored as campaignRef on cost entries). */
   ruleId?: string;
+  /** When 1, NodeExecutor does not retry internally (BullMQ handles retries). */
+  maxAttempts?: number;
+  /** When true, final failure is reported by the queue worker instead. */
+  suppressFailedFinalEmit?: boolean;
 }
 
 export interface NodeExecutorOutput {
@@ -51,10 +62,28 @@ export interface NodeExecutorOutput {
     summary?: string;
     transcription?: string;
     video?: string;
+    intelligenceHints?: string;
+    adaptedCaption?: string;
+    channel?: string;
+    merged?: boolean;
   };
 }
 
 /** Inputs passed from orchestration into a pipeline-node AI service. */
+export type IntelligencePerformanceHint = {
+  channel: string;
+  contentRef: string;
+  engagementRate: number;
+  views: number;
+};
+
+export type IntelligenceSuggestionHint = {
+  field: string;
+  suggestedValue: unknown;
+  reason: string;
+  confidence: string;
+};
+
 export interface NodeExecutionInput {
   pipelineRef: string;
   workflowRef: string;
@@ -71,6 +100,12 @@ export interface NodeExecutionInput {
   previousOutputs?: PreviousOutputs;
   /** Optional chunk callback for streaming-capable text nodes. */
   onChunk?: (chunk: string) => void;
+  /** Analytics-backed context for intelligence nodes. */
+  intelligenceContext?: {
+    topPerformers: IntelligencePerformanceHint[];
+    bottomPerformers: IntelligencePerformanceHint[];
+    pendingSuggestions: IntelligenceSuggestionHint[];
+  };
 }
 
 /** Strongly typed input for {@link TextGenerationService.generateText}. */

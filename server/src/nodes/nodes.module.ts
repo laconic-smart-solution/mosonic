@@ -13,6 +13,9 @@ import { TextGenerationService } from './services/text-generation.service';
 import { TranscriptionService } from './services/transcription.service';
 import { TranslationService } from './services/translation.service';
 import { VideoGenerationService } from './services/video-generation.service';
+import { AdaptNodeService } from './services/adapt-node.service';
+import { IntelligenceNodeService } from './services/intelligence-node.service';
+import { MergeBarrierService } from './services/merge-barrier.service';
 
 const NODE_SERVICES = [
   KeywordPlannerService,
@@ -22,6 +25,9 @@ const NODE_SERVICES = [
   TranslationService,
   TranscriptionService,
   SummarizationService,
+  AdaptNodeService,
+  IntelligenceNodeService,
+  MergeBarrierService,
 ];
 
 @Module({

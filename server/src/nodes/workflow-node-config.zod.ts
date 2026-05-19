@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import {
+  allowedOpenAiImageSizesForModel,
+  aspectRatioToOpenAiImageSize,
+  coerceOpenAiImageSize,
+  isValidOpenAiImageSizeForModel,
+} from './openai-image-size.util';
+import {
   LlmProvider,
   NodeAspectRatio,
   NodeFormalityLevel,
@@ -13,6 +19,13 @@ import {
   type WorkflowNodeConfig,
 } from './schemas/workflow-node.schema';
 
+export {
+  allowedOpenAiImageSizesForModel,
+  aspectRatioToOpenAiImageSize,
+  coerceOpenAiImageSize,
+  isValidOpenAiImageSizeForModel,
+} from './openai-image-size.util';
+
 const llmProvider = z.enum([
   LlmProvider.OpenAI,
   LlmProvider.Anthropic,
@@ -23,26 +36,8 @@ const llmProvider = z.enum([
 
 const imageAspectForUi = z.enum(['1:1', '16:9', '9:16', '4:5']);
 
-/** Maps UI / config aspect presets to OpenAI Images API `size` for DALL·E 3. */
-export function aspectRatioToOpenAiImageSize(
-  aspectRatio: string | undefined,
-  model: string,
-): string {
-  const m = model === 'dall-e-2' ? 'dall-e-2' : 'dall-e-3';
-  if (m === 'dall-e-2') {
-    return '1024x1024';
-  }
-  switch (aspectRatio) {
-    case '16:9':
-      return '1792x1024';
-    case '9:16':
-    case '4:5':
-      return '1024x1792';
-    case '1:1':
-    default:
-      return '1024x1024';
-  }
-}
+/** Branch lane handle (normalized channel id) for lane-scoped subgraph nodes. */
+const laneIdSchema = z.string().min(1).optional();
 
 const textConfigSchema = z
   .object({
@@ -78,6 +73,7 @@ const textConfigSchema = z
 
 const imageConfigSchema = z
   .object({
+    laneId: laneIdSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     size: z.string().min(1).optional(),
@@ -90,10 +86,27 @@ const imageConfigSchema = z
     aspectRatio: imageAspectForUi.optional(),
     negativePrompt: z.string().max(2000).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    const model =
+      typeof data.model === 'string' && data.model.trim()
+        ? data.model.trim()
+        : 'gpt-image-1';
+    if (typeof data.size === 'string' && data.size.trim()) {
+      const s = data.size.trim();
+      if (!isValidOpenAiImageSizeForModel(s, model)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Invalid size "${s}" for model "${model}". Allowed: ${allowedOpenAiImageSizesForModel(model).join(', ')}.`,
+          path: ['size'],
+        });
+      }
+    }
+  });
 
 const translationConfigSchema = z
   .object({
+    laneId: laneIdSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),
@@ -149,11 +162,13 @@ const soraDurationSchema = z.preprocess(
 
 const videoConfigSchema = z
   .object({
+    laneId: laneIdSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     duration: soraDurationSchema,
     resolution: z.string().min(1).optional(),
     aspectRatio: videoAspect.optional(),
+    negativePrompt: z.string().max(2000).optional(),
   })
   .strict();
 
@@ -170,6 +185,7 @@ const transcriptionConfigSchema = z
 
 const summarizationConfigSchema = z
   .object({
+    laneId: laneIdSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     summaryLength: z
@@ -199,6 +215,55 @@ const keywordPlannerConfigSchema = z
   })
   .strict();
 
+const branchConfigSchema = z
+  .object({
+    mode: z.enum(['rule_channels', 'manual']).optional(),
+    channelIds: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
+const adaptConfigSchema = z
+  .object({
+    laneId: laneIdSchema,
+    channel: z.string().min(1).optional(),
+    contentStyle: z.string().optional(),
+    provider: llmProvider.optional(),
+    model: z.string().min(1).optional(),
+  })
+  .strict();
+
+const mergeConfigSchema = z.object({}).strict();
+
+export const IntelligenceSearchType = z.enum([
+  'trend',
+  'market',
+  'competitor',
+  'all',
+  'custom',
+]);
+export type IntelligenceSearchTypeValue = z.infer<typeof IntelligenceSearchType>;
+
+const intelligenceConfigSchema = z
+  .object({
+    provider: llmProvider.optional(),
+    model: z.string().min(1).optional(),
+    searchType: IntelligenceSearchType.default('all'),
+    customPrompt: z.string().nullable().optional(),
+  })
+  .strict()
+  .superRefine((val, ctx) => {
+    if (val.searchType === 'custom') {
+      const p = val.customPrompt?.trim();
+      if (!p) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'customPrompt is required when searchType is custom',
+          path: ['customPrompt'],
+        });
+      }
+    }
+  });
+
 const SCHEMAS: Record<
   WorkflowNodeType,
   z.ZodObject<Record<string, z.ZodTypeAny>>
@@ -210,6 +275,10 @@ const SCHEMAS: Record<
   [WorkflowNodeType.Translation]: translationConfigSchema,
   [WorkflowNodeType.Transcription]: transcriptionConfigSchema,
   [WorkflowNodeType.Summarization]: summarizationConfigSchema,
+  [WorkflowNodeType.Branch]: branchConfigSchema,
+  [WorkflowNodeType.Adapt]: adaptConfigSchema,
+  [WorkflowNodeType.Merge]: mergeConfigSchema,
+  [WorkflowNodeType.Intelligence]: intelligenceConfigSchema,
 };
 
 const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
@@ -257,6 +326,14 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     outputFormat: NodeOutputFormat.Paragraph,
     sourceNodeRef: 'text_generation',
   },
+  [WorkflowNodeType.Branch]: { mode: 'rule_channels' },
+  [WorkflowNodeType.Adapt]: { model: 'gpt-4o' },
+  [WorkflowNodeType.Merge]: {},
+  [WorkflowNodeType.Intelligence]: {
+    model: 'gpt-4o',
+    searchType: 'all',
+    customPrompt: null,
+  },
 } satisfies Record<WorkflowNodeType, WorkflowNodeConfig>;
 
 function mergeWithDefaults(
@@ -268,15 +345,28 @@ function mergeWithDefaults(
 
   if (type === WorkflowNodeType.ImageGeneration) {
     const model = typeof out.model === 'string' ? out.model : 'gpt-image-1';
-    const ar =
-      typeof out.aspectRatio === 'string' && out.aspectRatio
-        ? out.aspectRatio
-        : undefined;
-    if (ar) {
+    const hadAspectInParsed =
+      'aspectRatio' in parsed &&
+      typeof parsed.aspectRatio === 'string' &&
+      parsed.aspectRatio.trim();
+    if (hadAspectInParsed) {
+      const ar = (parsed.aspectRatio as string).trim();
+      out.aspectRatio = ar;
       out.size = aspectRatioToOpenAiImageSize(ar, model);
-    } else if (!out.size || typeof out.size !== 'string') {
-      out.size = aspectRatioToOpenAiImageSize('1:1', model);
+    } else if (
+      'size' in parsed &&
+      typeof parsed.size === 'string' &&
+      parsed.size.trim()
+    ) {
+      out.size = coerceOpenAiImageSize(parsed.size.trim(), model);
+    } else {
+      const fallbackAr =
+        typeof out.aspectRatio === 'string' && out.aspectRatio.trim()
+          ? out.aspectRatio.trim()
+          : '1:1';
+      out.size = aspectRatioToOpenAiImageSize(fallbackAr, model);
     }
+    out.size = coerceOpenAiImageSize(String(out.size), model);
   }
 
   return out as WorkflowNodeConfig;
@@ -305,6 +395,16 @@ export function parseWorkflowNodeConfig(
   for (const [k, v] of Object.entries(obj)) {
     if (allowed.has(k)) {
       picked[k] = v;
+    }
+  }
+
+  if (type === WorkflowNodeType.ImageGeneration) {
+    const model =
+      typeof picked.model === 'string' && picked.model.trim()
+        ? picked.model.trim()
+        : 'gpt-image-1';
+    if (typeof picked.size === 'string' && picked.size.trim()) {
+      picked.size = coerceOpenAiImageSize(picked.size.trim(), model);
     }
   }
 

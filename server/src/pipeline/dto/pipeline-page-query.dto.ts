@@ -8,11 +8,18 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { PipelineStatus } from '../schemas/pipeline.schema';
+
+const PIPELINE_STATUSES = Object.values(PipelineStatus);
 
 export class PipelinePageFilterDto {
   @IsOptional()
   @IsString()
   workflowRef?: string;
+
+  @IsOptional()
+  @IsIn(PIPELINE_STATUSES)
+  status?: PipelineStatus;
 }
 
 export class PipelinePageQueryDto {
@@ -50,6 +57,7 @@ export class PipelinePageItemDto {
   status!: string;
   contentPrompt!: string;
   nodeCount!: number;
+  nodeTypes!: string[];
   startedAt!: string;
   completedAt!: string | null;
 }

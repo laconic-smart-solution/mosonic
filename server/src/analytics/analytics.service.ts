@@ -15,6 +15,7 @@ import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { EventsService } from '../events/events.service';
 import { ZernioRestClient } from '../mcp/zernio/zernio-rest.client';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import { UserRole } from '../users/schemas/user.schema';
 import { RuleService } from '../rule/rule.service';
 import { Content, type ContentDocument } from '../content/schemas/content.schema';
 import { Post, PostStatus, type PostDocument } from '../post/schemas/post.schema';
@@ -264,12 +265,43 @@ export class AnalyticsService {
     const uploadRows = uploadRefs.length
       ? await this.uploadModel
           .find({ uploadId: { $in: uploadRefs } })
-          .select({ uploadId: 1, workflowRef: 1 })
+          .select({ uploadId: 1, workflowRef: 1, contentRef: 1, channels: 1 })
           .lean()
           .exec()
       : [];
+    const contentRefs = [
+      ...new Set(
+        uploadRows
+          .map((u) => String(u.contentRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const contentRows = contentRefs.length
+      ? await this.contentModel
+          .find({ contentId: { $in: contentRefs } })
+          .select({
+            contentId: 1,
+            pipelineRef: 1,
+            variantId: 1,
+            experimentId: 1,
+          })
+          .lean()
+          .exec()
+      : [];
+    const contentById = new Map(
+      contentRows.map((c) => [String(c.contentId), c]),
+    );
+    const uploadById = new Map(
+      uploadRows.map((u) => [String(u.uploadId), u]),
+    );
     const pipelineByUpload = new Map(
-      uploadRows.map((u) => [String(u.uploadId), String(u.workflowRef ?? '')]),
+      uploadRows.map((u) => {
+        const content = contentById.get(String(u.contentRef ?? ''));
+        return [
+          String(u.uploadId),
+          String(content?.pipelineRef ?? u.workflowRef ?? ''),
+        ];
+      }),
     );
 
     const contentPerformance: ContentPerformanceEntry[] = [];
@@ -318,12 +350,21 @@ export class AnalyticsService {
       pullSummary.noData += extracted.noData.length;
 
       for (const row of extracted.synced) {
+        const upload = uploadById.get(String(post.uploadRef ?? ''));
+        const content = contentById.get(String(post.contentRef ?? ''));
+        const channelEntry = (upload?.channels ?? []).find(
+          (ch) =>
+            String(ch.channel ?? '').toLowerCase() ===
+            row.channel.toLowerCase(),
+        );
         contentPerformance.push({
           contentRef: String(post.contentRef ?? ''),
           pipelineRef,
           uploadRef: String(post.uploadRef ?? ''),
           zernioPostId: pid,
           channel: row.channel,
+          variantId: channelEntry?.variantId ?? content?.variantId ?? null,
+          experimentId: content?.experimentId ?? null,
           metrics: row.metrics,
         });
         pullSummary.platformRowsSynced += 1;
@@ -364,6 +405,34 @@ export class AnalyticsService {
       summary: pullSummary,
       message,
     });
+
+    if (
+      this.config.get<string>('ANALYTICS_AUTO_SUGGEST_AFTER_PULL', 'false') ===
+      'true'
+    ) {
+      const minPosts = Number(
+        this.config.get('ANALYTICS_MIN_POSTS_FOR_AUTO_SUGGEST', 3),
+      );
+      const pendingCount = (updated.feedbackSignal?.suggestions ?? []).filter(
+        (s) => s.status === FeedbackSignalStatus.Pending,
+      ).length;
+      if (
+        contentPerformance.length >= minPosts &&
+        pendingCount === 0 &&
+        rule.userId
+      ) {
+        try {
+          await this.generateSuggestions(updated.analyticsId, {
+            userId: rule.userId,
+            role: UserRole.CUSTOMER,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Auto-suggest after pull failed for ${ruleRef}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
 
     return { doc: updated, summary: pullSummary };
   }

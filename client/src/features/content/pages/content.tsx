@@ -95,6 +95,10 @@ export default function ContentPage() {
 
   /** When true, next debouncedSearch change came from URL (?search=), do not reset page. */
   const skipPageResetFromUrlSearch = useRef(false)
+  /** Ignore search-driven page resets until the first debounce cycle completes. */
+  const searchDebounceSettled = useRef(false)
+  const resetToFirstPageRef = useRef(resetToFirstPage)
+  resetToFirstPageRef.current = resetToFirstPage
 
   useEffect(() => {
     const q = new URLSearchParams(location.search).get("search")?.trim()
@@ -102,29 +106,29 @@ export default function ContentPage() {
       return
     }
     skipPageResetFromUrlSearch.current = true
+    searchDebounceSettled.current = true
     setSearchInput(q)
     setDebouncedSearch(q)
   }, [location.search])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
+      searchDebounceSettled.current = true
       setDebouncedSearch(searchInput.trim())
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
   }, [searchInput])
 
-  const searchPageResetSkip = useRef(true)
   useEffect(() => {
-    if (searchPageResetSkip.current) {
-      searchPageResetSkip.current = false
+    if (!searchDebounceSettled.current) {
       return
     }
     if (skipPageResetFromUrlSearch.current) {
       skipPageResetFromUrlSearch.current = false
       return
     }
-    resetToFirstPage()
-  }, [debouncedSearch, resetToFirstPage])
+    resetToFirstPageRef.current()
+  }, [debouncedSearch])
 
   const payload = useMemo(() => {
     const filter: NonNullable<ContentPageQueryPayload["filter"]> = {}
@@ -220,35 +224,12 @@ export default function ContentPage() {
     })
   }
 
-  if (!hydrated) {
-    return (
-      <div className="space-y-6 bg-canvas-100 px-5 py-6 md:px-7 md:py-7">
-        <Skeleton className="h-9 w-56 max-w-full bg-canvas-200" />
-        <div className="flex flex-wrap gap-2.5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton
-              key={i}
-              className="h-[76px] min-w-[130px] flex-1 rounded-xl bg-canvas-200"
-            />
-          ))}
-        </div>
-        <Skeleton className="h-10 max-w-md bg-canvas-200" />
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[340px] rounded-2xl bg-canvas-200" />
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <ContentPageShell>
       <motion.header
         className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        initial={false}
       >
         <div>
           <h1 className="font-heading text-[26px] leading-tight tracking-tight text-navy-700">

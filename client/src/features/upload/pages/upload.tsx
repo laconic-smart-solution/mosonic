@@ -234,7 +234,7 @@ export default function UploadPage() {
     (layers: WorkflowNodeLayersSnapshot) => {
       setWorkflowLayers(layers)
     },
-    [],
+    []
   )
 
   const channels = useMemo(() => {
@@ -548,7 +548,7 @@ export default function UploadPage() {
     return effectiveCaptionForDraft(
       activeDraft,
       upload.resolvedOutputs,
-      workflowLayers,
+      workflowLayers
     )
   }, [activeDraft, upload, workflowLayers])
 
@@ -568,7 +568,7 @@ export default function UploadPage() {
           effectiveCaptionForDraft(
             draft,
             upload.resolvedOutputs,
-            workflowLayers,
+            workflowLayers
           ).trim().length > 0
         out[key] = getTabDotStatus({
           serverStatus: "pending",
@@ -585,7 +585,7 @@ export default function UploadPage() {
         effectiveCaptionForDraft(
           draft,
           upload.resolvedOutputs,
-          workflowLayers,
+          workflowLayers
         ).trim().length > 0
       out[key] = getTabDotStatus({
         serverStatus: ch.status,
@@ -771,7 +771,7 @@ export default function UploadPage() {
       activeRow,
       activeDraft,
       upload.resolvedOutputs,
-      workflowLayers,
+      workflowLayers
     )
     patchMutation.mutate(
       { uploadId, channel: activeRow.channel, body },
@@ -794,7 +794,7 @@ export default function UploadPage() {
     const cap = effectiveCaptionForDraft(
       activeDraft,
       upload.resolvedOutputs,
-      workflowLayers,
+      workflowLayers
     ).trim()
     if (!cap) {
       toast.error("Assign caption text before publishing.")
@@ -804,7 +804,7 @@ export default function UploadPage() {
       activeKey,
       activeDraft,
       activeRow,
-      upload.resolvedOutputs,
+      upload.resolvedOutputs
     )
     if (mediaError) {
       toast.error(mediaError)
@@ -835,7 +835,7 @@ export default function UploadPage() {
           activeRow,
           activeDraft,
           upload.resolvedOutputs,
-          workflowLayers,
+          workflowLayers
         )
         await patchMutation.mutateAsync({
           uploadId,
@@ -884,7 +884,7 @@ export default function UploadPage() {
       includedByKey,
       connectedChannelSet,
       pubNow,
-      globalScheduledLocal,
+      globalScheduledLocal
     )
     const includedChannels = body.channels.filter((c) => c.included)
     if (includedChannels.length === 0) {
@@ -902,7 +902,7 @@ export default function UploadPage() {
       const cap = effectiveCaptionForDraft(
         draft,
         upload.resolvedOutputs,
-        workflowLayers,
+        workflowLayers
       ).trim()
       if (!cap) {
         toast.error(`Assign caption for ${ch.channel} before publishing.`)
@@ -912,7 +912,7 @@ export default function UploadPage() {
         key,
         draft,
         row,
-        upload.resolvedOutputs,
+        upload.resolvedOutputs
       )
       if (mediaError) {
         toast.error(mediaError)
@@ -935,7 +935,7 @@ export default function UploadPage() {
           row,
           draft,
           upload.resolvedOutputs,
-          workflowLayers,
+          workflowLayers
         )
         await patchMutation.mutateAsync({
           uploadId,
@@ -1002,24 +1002,25 @@ export default function UploadPage() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="relative p-6">
+      <div className="relative p-6 pt-20">
+        {workflowRuleId ? (
+          <Button
+            onClick={() => navigate(-1)}
+            variant="outline"
+            className="absolute top-6 left-6 z-70 hover:cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        ) : null}
         <div
           ref={globalSchedulePopoverAnchorRef}
           aria-hidden
-          className="pointer-events-none fixed top-20 right-6 z-[60] size-px"
+          className="pointer-events-none fixed top-20 right-6 z-60 size-px"
         />
+
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <div className="min-w-0 shrink-0 space-y-1 lg:max-w-[280px]">
-            {workflowRuleId ? (
-              <Button
-                onClick={() => navigate(-1)}
-                variant="outline"
-                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-            ) : null}
             <h1 className="text-base font-medium text-foreground">
               Upload content
             </h1>

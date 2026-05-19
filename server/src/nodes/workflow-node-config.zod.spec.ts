@@ -19,6 +19,21 @@ describe('aspectRatioToOpenAiImageSize', () => {
     expect(aspectRatioToOpenAiImageSize('4:5', 'dall-e-3')).toBe('1024x1792');
   });
 
+  it('maps common presets for gpt-image-1', () => {
+    expect(aspectRatioToOpenAiImageSize('1:1', 'gpt-image-1')).toBe(
+      '1024x1024',
+    );
+    expect(aspectRatioToOpenAiImageSize('16:9', 'gpt-image-1')).toBe(
+      '1536x1024',
+    );
+    expect(aspectRatioToOpenAiImageSize('9:16', 'gpt-image-1')).toBe(
+      '1024x1536',
+    );
+    expect(aspectRatioToOpenAiImageSize('4:5', 'gpt-image-1')).toBe(
+      '1024x1536',
+    );
+  });
+
   it('falls back to square for dall-e-2', () => {
     expect(aspectRatioToOpenAiImageSize('16:9', 'dall-e-2')).toBe('1024x1024');
   });
@@ -55,8 +70,18 @@ describe('parseWorkflowNodeConfig', () => {
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.data.size).toBe('1792x1024');
+    expect(r.data.size).toBe('1536x1024');
     expect(r.data.quality).toBe(NodeImageQuality.Hd);
+  });
+
+  it('coerces legacy DALL·E-3-only size when persisting gpt-image-1', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
+      model: 'gpt-image-1',
+      size: '1792x1024',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.size).toBe('1536x1024');
   });
 
   it('parses translation with auto source and preserveFormatting', () => {
@@ -70,6 +95,17 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.sourceLanguage).toBe('auto');
     expect(r.data.targetLanguage).toBe('ja');
     expect(r.data.preserveFormatting).toBe(false);
+  });
+
+  it('preserves translation laneId for branch lane materialization', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.Translation, {
+      laneId: 'linkedin',
+      targetLanguage: 'es',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.data as Record<string, unknown>).laneId).toBe('linkedin');
+    expect(r.data.targetLanguage).toBe('es');
   });
 
   it('parses video aspect 4:5', () => {
@@ -104,5 +140,33 @@ describe('parseWorkflowNodeConfig', () => {
       outputFormat: 'caption',
     });
     expect(r.ok).toBe(false);
+  });
+
+  it('defaults intelligence searchType to all', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.Intelligence, {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.data as Record<string, unknown>).searchType).toBe('all');
+    expect((r.data as Record<string, unknown>).customPrompt).toBeNull();
+  });
+
+  it('requires customPrompt when intelligence searchType is custom', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.Intelligence, {
+      searchType: 'custom',
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it('accepts intelligence custom search with prompt', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.Intelligence, {
+      searchType: 'custom',
+      customPrompt: 'Find competitor reels in skincare',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.data as Record<string, unknown>).searchType).toBe('custom');
+    expect((r.data as Record<string, unknown>).customPrompt).toBe(
+      'Find competitor reels in skincare',
+    );
   });
 });

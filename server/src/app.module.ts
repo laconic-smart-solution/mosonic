@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -23,6 +24,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { CostModule } from './cost/cost.module';
+import { CampaignModule } from './campaign/campaign.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
@@ -46,11 +49,32 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PostModule,
     WebhookModule,
     AnalyticsModule,
+    CampaignModule,
+    IntegrationsModule,
     DashboardModule,
     McpModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', '127.0.0.1'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+        },
+        defaultJobOptions: {
+          attempts: Number(configService.get('QUEUE_MAX_ATTEMPTS', 2)),
+          backoff: {
+            type: 'fixed',
+            delay: Number(configService.get('QUEUE_RETRY_DELAY_MS', 3000)),
+          },
+          removeOnComplete: 100,
+          removeOnFail: 200,
+        },
+      }),
+      inject: [ConfigService],
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

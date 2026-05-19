@@ -68,17 +68,72 @@ export const useSaveWorkflowNodesMutation = () => {
   return useMutation({
     mutationFn: ({
       workflowId,
+      name,
       nodes,
+      edges,
     }: {
       workflowId: string
       ruleId?: string
+      name?: string
       nodes: Parameters<typeof workflowService.saveNodes>[1]["nodes"]
-    }) => workflowService.saveNodes(workflowId, { nodes }),
+      edges?: Parameters<typeof workflowService.saveNodes>[1]["edges"]
+    }) => workflowService.saveNodes(workflowId, { name, nodes, edges }),
     onSuccess: (_, { workflowId, ruleId }) => {
       toast.success("Workflow saved")
       void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
       if (ruleId) void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
       else void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
+    },
+    onError: () => {
+      toast.error("Failed to save. Please try again.")
+    },
+  })
+}
+
+export const usePatchWorkflowMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      workflowId,
+      name,
+    }: {
+      workflowId: string
+      ruleId?: string
+      name: string
+    }) => workflowService.patchWorkflow(workflowId, { name }),
+    onSuccess: (_data, { workflowId, ruleId }) => {
+      toast.success("Workflow name updated")
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+      if (ruleId) {
+        void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
+      }
+    },
+    onError: () => {
+      toast.error("Failed to update workflow name.")
+    },
+  })
+}
+
+export const useSaveWorkflowNodesByRuleMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      ruleId,
+      name,
+      nodes,
+      edges,
+    }: {
+      ruleId: string
+      name?: string
+      nodes: Parameters<typeof workflowService.saveNodesByRuleId>[1]["nodes"]
+      edges?: Parameters<typeof workflowService.saveNodesByRuleId>[1]["edges"]
+    }) => workflowService.saveNodesByRuleId(ruleId, { name, nodes, edges }),
+    onSuccess: (_data, { ruleId }) => {
+      toast.success("Workflow saved")
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
     },
     onError: () => {
       toast.error("Failed to save. Please try again.")

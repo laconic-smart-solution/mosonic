@@ -24,8 +24,10 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@workflow-next-matrix": ["../server/src/workflow/workflow-node-next-matrix.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../server/src/workflow/workflow-node-next-matrix.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

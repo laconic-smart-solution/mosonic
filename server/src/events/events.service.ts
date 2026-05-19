@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Server } from 'socket.io';
+import { publishPipelineEventToRedis } from './pipeline-events-redis.util';
 
 /**
  * Server-side emit API for orchestration, logging streams, etc.
@@ -8,6 +10,8 @@ import type { Server } from 'socket.io';
 @Injectable()
 export class EventsService {
   private server: Server | null = null;
+
+  constructor(private readonly config: ConfigService) {}
 
   setServer(server: Server): void {
     this.server = server;
@@ -27,7 +31,16 @@ export class EventsService {
 
   /** Convenience for pipeline-scoped channels (orchestration logs, node updates). */
   emitToPipeline(pipelineId: string, event: string, payload: unknown): void {
-    this.emitToRoom(`pipeline:${pipelineId}`, event, payload);
+    const bridgeEnabled =
+      this.config.get<string>('PIPELINE_EVENTS_BRIDGE', 'true') !== 'false';
+    const redisUrl = this.config.get<string>('REDIS_URL')?.trim();
+    if (bridgeEnabled && redisUrl && !this.server) {
+      void publishPipelineEventToRedis(redisUrl, pipelineId, event, payload);
+      return;
+    }
+    if (this.server) {
+      this.emitToRoom(`pipeline:${pipelineId}`, event, payload);
+    }
   }
 
   /** Convenience for async rule-extraction progress channels. */

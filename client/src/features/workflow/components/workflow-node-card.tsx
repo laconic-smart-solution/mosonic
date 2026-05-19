@@ -12,6 +12,10 @@ const NODE_TYPE_LABELS: Record<WorkflowNodeType, string> = {
   translation: "Translation",
   transcription: "Transcription",
   summarization: "Summarization",
+  branch: "Branch",
+  adapt: "Adapt",
+  merge: "Merge",
+  intelligence: "Intelligence",
 }
 
 function summarizeNodeConfig(node: WorkflowNode): string {
@@ -60,11 +64,9 @@ type WorkflowNodeCardProps = {
 }
 
 export function WorkflowNodeCard({ node, onRemove }: WorkflowNodeCardProps) {
-  const nonDeletable =
-    node.type === "text_generation" || node.type === "keyword_planner"
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: node.nodeId,
-    disabled: node.isLocked && !nonDeletable,
+    disabled: node.isLocked,
   })
 
   const style = {
@@ -83,7 +85,7 @@ export function WorkflowNodeCard({ node, onRemove }: WorkflowNodeCardProps) {
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
           {node.order}
         </span>
-        {!node.isLocked || nonDeletable ? (
+        {!node.isLocked ? (
           <button
             type="button"
             className="cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
@@ -114,17 +116,15 @@ export function WorkflowNodeCard({ node, onRemove }: WorkflowNodeCardProps) {
         </div>
       </div>
 
-      {!nonDeletable ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="mt-1 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onRemove(node.nodeId)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="mt-1 shrink-0 text-muted-foreground hover:text-destructive"
+        onClick={() => onRemove(node.nodeId)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
     </div>
   )
 }

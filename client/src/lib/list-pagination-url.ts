@@ -14,8 +14,11 @@ export function navigateSearchParams(
   options?: { replace?: boolean },
 ): void {
   const params = new URLSearchParams(location.search)
+  const before = params.toString()
   updater(params)
-  const qs = params.toString()
+  const after = params.toString()
+  if (before === after) return
+  const qs = after
   navigate(
     { pathname: location.pathname, search: qs ? `?${qs}` : "" },
     { replace: options?.replace ?? true },

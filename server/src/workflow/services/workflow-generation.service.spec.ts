@@ -16,6 +16,25 @@ import {
   normalizeWorkflowAiNodes,
 } from './workflow-generation.service';
 
+function twoChannelRule(): Rule {
+  const base = minimalRule('instagram');
+  return {
+    ...base,
+    channels: [
+      {
+        channel: 'instagram',
+        priority: ChannelPriority.High,
+        contentStyle: 'casual',
+      },
+      {
+        channel: 'linkedin',
+        priority: ChannelPriority.Medium,
+        contentStyle: 'professional',
+      },
+    ],
+  };
+}
+
 function minimalRule(channel: string): Rule {
   return {
     ruleId: 'rule-test-1',
@@ -106,7 +125,7 @@ describe('WorkflowGenerationService', () => {
     expect(carouselTypes).not.toContain(WorkflowNodeType.VideoGeneration);
   });
 
-  it('normalizeWorkflowAiNodes salvages duplicate planners and keeps first text node', () => {
+  it('normalizeWorkflowAiNodes dedupes enrichment, sorts trunk, and renumbers order', () => {
     const rule = minimalRule('instagram');
     const logger = { warn: jest.fn() } as unknown as Logger;
     const raw = [
@@ -132,26 +151,79 @@ describe('WorkflowGenerationService', () => {
       },
     ];
     const out = normalizeWorkflowAiNodes(raw, rule, 'test', logger);
+    expect(out).toHaveLength(3);
     expect(out.filter((n) => n.type === WorkflowNodeType.KeywordPlanner)).toHaveLength(
       1,
     );
-    expect(out.filter((n) => n.type === WorkflowNodeType.TextGeneration)).toHaveLength(
-      1,
-    );
+    expect(out.every((n) => n.isLocked === false)).toBe(true);
+    expect(out.map((n) => n.order)).toEqual([1, 2, 3]);
     expect(out[out.length - 1]?.type).toBe(WorkflowNodeType.ImageGeneration);
   });
 
-  it('normalizeWorkflowAiNodes falls back when no text_generation', () => {
+  it('normalizeWorkflowAiNodes injects text_generation when plan is image-only', () => {
     const rule = minimalRule('instagram');
     const logger = { warn: jest.fn() } as unknown as Logger;
     const out = normalizeWorkflowAiNodes(
-      [{ type: 'keyword_planner', order: 1, config: {} }],
+      [{ type: 'image_generation', order: 1, config: { aspectRatio: '1:1' } }],
       rule,
-      'solo planner',
+      'hero image only',
       logger,
     );
-    expect(out.some((n) => n.type === WorkflowNodeType.TextGeneration)).toBe(true);
-    expect(logger.warn).toHaveBeenCalled();
+    expect(out).toHaveLength(2);
+    expect(out[0]?.type).toBe(WorkflowNodeType.TextGeneration);
+    expect(out[1]?.type).toBe(WorkflowNodeType.ImageGeneration);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'validateAndReorderNodes: missing text_generation; injecting default writer node',
+    );
+  });
+
+  it('normalizeWorkflowAiNodes injects graph skeleton when rule is multi-channel but LLM omits branch', () => {
+    const rule = twoChannelRule();
+    const logger = { warn: jest.fn() } as unknown as Logger;
+    const raw = [
+      { type: 'keyword_planner', order: 1, config: {} },
+      {
+        type: 'text_generation',
+        order: 2,
+        config: { outputFormat: 'caption', tone: 'friendly' },
+      },
+      { type: 'image_generation', order: 3, config: { aspectRatio: '1:1' } },
+    ];
+    const out = normalizeWorkflowAiNodes(raw, rule, 'cross-post', logger);
+    expect(out.map((n) => n.type)).toEqual([
+      WorkflowNodeType.KeywordPlanner,
+      WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.ImageGeneration,
+      WorkflowNodeType.Merge,
+    ]);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'validateAndReorderNodes: injecting branch for graph mode',
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      'validateAndReorderNodes: injecting adapt for graph mode',
+    );
+  });
+
+  it('normalizeWorkflowAiNodes canonicalizes linear trunk order after parse', () => {
+    const rule = minimalRule('instagram');
+    const logger = { warn: jest.fn() } as unknown as Logger;
+    const raw = [
+      { type: 'image_generation', order: 1, config: { aspectRatio: '1:1' } },
+      {
+        type: 'text_generation',
+        order: 2,
+        config: { outputFormat: 'caption', tone: 'friendly' },
+      },
+      { type: 'keyword_planner', order: 3, config: {} },
+    ];
+    const out = normalizeWorkflowAiNodes(raw, rule, 'test', logger);
+    expect(out.map((n) => n.type)).toEqual([
+      WorkflowNodeType.KeywordPlanner,
+      WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.ImageGeneration,
+    ]);
   });
 
   it('generate uses LLM and returns normalized nodes', async () => {

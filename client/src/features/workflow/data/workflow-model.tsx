@@ -1,6 +1,17 @@
-import type { ReactNode } from "react"
+import type { MouseEvent, ReactNode } from "react"
 import type { Edge, Node } from "@xyflow/react"
-import type { WorkflowNode, WorkflowNodeType } from "@/shared/types/workflow.type"
+import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import {
+  isPreviewEdgeId,
+  persistedLayoutFromApiNodes,
+  resolveWorkflowLayout,
+} from "@/features/workflow/lib/branch-layout"
+import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
+import type {
+  WorkflowEdge,
+  WorkflowNode,
+  WorkflowNodeType,
+} from "@/shared/types/workflow.type"
 
 export const NODE_W = 240
 export const NODE_H = 108
@@ -105,6 +116,55 @@ export const WF_NODE_TYPES: {
       </svg>
     ),
   },
+  {
+    type: "branch",
+    label: "Branch",
+    color: "#0D9488",
+    bg: "#CCFBF1",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path d="M8 2v4M8 10v4M8 6h4M8 6H4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    type: "adapt",
+    label: "Adapt",
+    color: "#9333EA",
+    bg: "#F3E8FF",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path d="M3 8h10M10 5l3 3-3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    type: "merge",
+    label: "Merge",
+    color: "#64748B",
+    bg: "#F1F5F9",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path d="M4 4v4h8V4M8 8v8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    type: "intelligence",
+    label: "Intelligence",
+    color: "#4F46E5",
+    bg: "#EEF2FF",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ]
 
 // Backend API type ↔ canvas short type
@@ -116,6 +176,10 @@ const BACKEND_TO_CANVAS: Record<WorkflowNodeType, string> = {
   translation: "translation",
   transcription: "transcription",
   summarization: "summarization",
+  branch: "branch",
+  adapt: "adapt",
+  merge: "merge",
+  intelligence: "intelligence",
 }
 
 const CANVAS_TO_BACKEND: Record<string, WorkflowNodeType> = {
@@ -126,6 +190,10 @@ const CANVAS_TO_BACKEND: Record<string, WorkflowNodeType> = {
   translation: "translation",
   transcription: "transcription",
   summarization: "summarization",
+  branch: "branch",
+  adapt: "adapt",
+  merge: "merge",
+  intelligence: "intelligence",
 }
 
 export function backendTypeToCanvas(t: WorkflowNodeType): string {
@@ -165,11 +233,25 @@ export type WfNodeData = {
   errorMessage?: string
   retryAttempt?: number
   retryMaxAttempts?: number
+  lane?: string | null
+  channelHandles?: BranchChannelHandle[]
+  showChannelPreview?: boolean
   onDelete?: () => void
   onRetry?: () => void
+  onSkip?: () => void
+  onOpenAddPopover?: (event: MouseEvent, nodeId: string) => void
+  readOnly?: boolean
 } & Record<string, unknown>
 
-export type WfRfNode = Node<WfNodeData, "wfNode">
+export type PlusPlaceholderNodeData = {
+  onOpenPopover?: (event: React.MouseEvent) => void
+}
+
+export type WfRfNode =
+  | Node<WfNodeData, "wfNode">
+  | Node<WfNodeData, "branchNode">
+  | Node<WfNodeData, "mergeNode">
+  | Node<PlusPlaceholderNodeData, "plus_placeholder">
 
 export interface WFNode {
   id: string
@@ -307,6 +389,25 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
       return [s("summaryLength"), s("outputFormat")].filter(Boolean).join(" · ") || "Summary"
     case "transcription":
       return [s("sourceType"), s("language")].filter(Boolean).join(" · ") || "Transcription"
+    case "branch":
+      return s("mode") === "manual" ? "Manual channels" : "Rule channels"
+    case "adapt":
+      return s("channel") ? `Channel: ${s("channel")}` : "Channel adapt"
+    case "merge":
+      return "Fan-in barrier"
+    case "intelligence": {
+      const st = s("searchType")
+      const labels: Record<string, string> = {
+        all: "All",
+        trend: "Trend",
+        market: "Market",
+        competitor: "Competitor",
+        custom: "Custom",
+      }
+      const typeLabel = st ? (labels[st] ?? st) : "All"
+      const model = s("model")
+      return model ? `${typeLabel} · ${model}` : typeLabel
+    }
     default:
       return "Configured"
   }
@@ -320,7 +421,7 @@ export const INITIAL_NODES: WFNode[] = [
     x: 80,
     y: 140,
     status: "ready",
-    locked: true,
+    locked: false,
     config: { model: "gpt-4o", outputFormat: "paragraph", tone: "professional", textLength: "medium" },
   },
   {
@@ -378,7 +479,9 @@ export function wfNodeToRfNode(n: WFNode): WfRfNode {
   }
 }
 
-export function rfNodeToWfNode(n: WfRfNode): WFNode {
+export function rfNodeToWfNode(
+  n: Node<WfNodeData, "wfNode" | "branchNode" | "mergeNode">,
+): WFNode {
   const d = n.data
   return {
     id: n.id,
@@ -397,95 +500,224 @@ export function connectionsToEdges(connections = CONNECTIONS): Edge[] {
     id: `e-${c.from}-${c.to}`,
     source: c.from,
     target: c.to,
-    type: "smoothstep",
+    type: "plus_edge",
     animated: true,
     style: { stroke: "#00A589", strokeWidth: 2 },
   }))
 }
 
+function apiEdgesToRf(
+  apiNodes: WorkflowNode[],
+  apiEdges?: WorkflowEdge[],
+): Edge[] {
+  if (apiEdges && apiEdges.length > 0) {
+    return apiEdges.map((e) => ({
+      id: laneEdgeId(e.from, e.to, {
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+      }),
+      source: e.from,
+      target: e.to,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
+      type: "plus_edge",
+      animated: true,
+      style: { stroke: "#00A589", strokeWidth: 2 },
+    }))
+  }
+  const sorted = [...apiNodes].sort((a, b) => a.order - b.order)
+  return sorted.slice(0, -1).map((_, i) => ({
+    id: `e-${sorted[i].nodeId}-${sorted[i + 1].nodeId}`,
+    source: sorted[i].nodeId,
+    target: sorted[i + 1].nodeId,
+    type: "plus_edge",
+    animated: true,
+    style: { stroke: "#00A589", strokeWidth: 2 },
+  }))
+}
+
+export type ApiNodesToRfOptions = {
+  channelHandles?: BranchChannelHandle[]
+  /** When true, skip layout (caller runs resolveWorkflowLayout after graph mutations). */
+  skipLayout?: boolean
+}
+
+export function rfNodeTypeForCanvas(
+  canvasType: string,
+): "wfNode" | "branchNode" | "mergeNode" {
+  if (canvasType === "branch") return "branchNode"
+  if (canvasType === "merge") return "mergeNode"
+  return "wfNode"
+}
+
 /** Convert API WorkflowNode[] → RF nodes + edges (positioned horizontally by order). */
-export function apiNodesToRf(apiNodes: WorkflowNode[]): {
+export function apiNodesToRf(
+  apiNodes: WorkflowNode[],
+  apiEdges?: WorkflowEdge[],
+  options?: ApiNodesToRfOptions,
+): {
   nodes: WfRfNode[]
   edges: Edge[]
 } {
   const sorted = [...apiNodes].sort((a, b) => a.order - b.order)
-  const rfNodes = sorted.map((n, i) => {
+  const channelHandles = options?.channelHandles ?? []
+  const rfNodes: WfRfNode[] = sorted.map((n) => {
     const canvasType = backendTypeToCanvas(n.type)
     const meta = WF_NODE_TYPES.find((t) => t.type === canvasType) ?? WF_NODE_TYPES[0]
+    const rfType = rfNodeTypeForCanvas(canvasType)
+    const branchMergeData =
+      rfType === "branchNode" || rfType === "mergeNode"
+        ? { channelHandles }
+        : {}
+    const config = (n.config ?? {}) as Record<string, unknown>
+    const laneFromConfig =
+      typeof config.laneId === "string" ? config.laneId.trim() : ""
+    const laneFromApi =
+      typeof n.lane === "string" && n.lane.trim() ? n.lane.trim() : ""
+    const effectiveLaneKey = laneFromApi || laneFromConfig
+    const laneLabel =
+      effectiveLaneKey && channelHandles.length > 0
+        ? (channelHandles.find((ch) => ch.id === effectiveLaneKey)?.label ??
+          effectiveLaneKey)
+        : effectiveLaneKey || null
+    const hasPosition =
+      typeof n.x === "number" &&
+      Number.isFinite(n.x) &&
+      typeof n.y === "number" &&
+      Number.isFinite(n.y)
     return {
       id: n.nodeId,
-      type: "wfNode" as const,
-      position: { x: 80 + i * (NODE_W + PIPE_GAP), y: 140 },
+      type: rfType,
+      position: hasPosition ? { x: n.x!, y: n.y! } : { x: 80, y: 140 },
       data: {
-        label: meta.label,
+        label: laneLabel ? `${meta.label} (${laneLabel})` : meta.label,
         wfType: canvasType,
         status: "idle" as NodeStatus,
-        locked: n.isLocked,
-        config: n.config ?? {},
+        locked: false,
+        config,
+        lane: effectiveLaneKey || null,
+        ...branchMergeData,
       },
-      draggable: !n.isLocked,
+      draggable: true,
     }
   })
 
-  const edges: Edge[] = sorted.slice(0, -1).map((_, i) => ({
-    id: `e-${sorted[i].nodeId}-${sorted[i + 1].nodeId}`,
-    source: sorted[i].nodeId,
-    target: sorted[i + 1].nodeId,
-    type: "smoothstep",
-    animated: true,
-    style: { stroke: "#00A589", strokeWidth: 2 },
-  }))
-
-  return { nodes: rfNodes, edges }
+  const edges = apiEdgesToRf(sorted, apiEdges)
+  if (options?.skipLayout) {
+    return { nodes: rfNodes, edges }
+  }
+  return resolveWorkflowLayout(
+    rfNodes,
+    edges,
+    channelHandles,
+    persistedLayoutFromApiNodes(apiNodes),
+  )
 }
 
 /** Convert current RF nodes → backend save payload (strips all DB fields). */
 export function rfNodesToApiPayload(
   rfNodes: WfRfNode[],
   edges: Edge[],
-): { type: WorkflowNodeType; order: number; isLocked: boolean; config: Record<string, unknown> }[] {
-  const orderedNodeIds = deriveNodeOrder(rfNodes, edges)
+): {
+  nodes: Array<{
+    nodeId: string
+    type: WorkflowNodeType
+    order: number
+    isLocked: boolean
+    config: Record<string, unknown>
+    x: number
+    y: number
+    lane?: string
+  }>
+  edges: WorkflowEdge[]
+} {
+  const persistableNodes = rfNodes.filter((n) => n.type !== "plus_placeholder")
+  const orderedNodeIds = deriveNodeOrder(persistableNodes, edges)
   const orderLookup = new Map(orderedNodeIds.map((id, index) => [id, index + 1]))
-  return rfNodes.map((n, i) => ({
-    type: canvasTypeToBackend(n.data.wfType),
-    order: orderLookup.get(n.id) ?? i + 1,
-    isLocked: n.data.locked,
-    config: n.data.config ?? {},
-  }))
+  const nodeIdSet = new Set(persistableNodes.map((n) => n.id))
+  const nodes = persistableNodes.map((n, i) => {
+    const lane = n.data.lane?.trim()
+    const config = { ...(n.data.config ?? {}) }
+    if (lane && !config.laneId) {
+      config.laneId = lane
+    }
+    return {
+      nodeId: n.id,
+      type: canvasTypeToBackend(n.data.wfType),
+      order: orderLookup.get(n.id) ?? i + 1,
+      isLocked: false,
+      config,
+      x: n.position.x,
+      y: n.position.y,
+      lane: lane ?? undefined,
+    }
+  })
+  const workflowEdges: WorkflowEdge[] = edges
+    .filter((e) => !isPreviewEdgeId(e.id))
+    .filter(
+      (e) =>
+        e.source &&
+        e.target &&
+        nodeIdSet.has(e.source) &&
+        nodeIdSet.has(e.target),
+    )
+    .map((e) => ({
+      from: e.source,
+      to: e.target,
+      ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+      ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
+    }))
+  return { nodes, edges: workflowEdges }
 }
 
 function deriveNodeOrder(rfNodes: WfRfNode[], edges: Edge[]): string[] {
   if (rfNodes.length <= 1) return rfNodes.map((node) => node.id)
 
+  const nodeIds = rfNodes.map((n) => n.id)
   const nodesById = new Map(rfNodes.map((node) => [node.id, node]))
-  const outgoing = new Map<string, string>()
-  const indegree = new Map<string, number>(rfNodes.map((node) => [node.id, 0]))
+  const indegree = new Map<string, number>(nodeIds.map((id) => [id, 0]))
+  const outgoing = new Map<string, string[]>(nodeIds.map((id) => [id, []]))
 
   for (const edge of edges) {
     if (!nodesById.has(edge.source) || !nodesById.has(edge.target)) continue
-    outgoing.set(edge.source, edge.target)
+    outgoing.get(edge.source)!.push(edge.target)
     indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1)
   }
 
-  const roots = rfNodes
-    .filter((node) => (indegree.get(node.id) ?? 0) === 0)
-    .sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y)
-  let cursor: string | undefined = roots[0]?.id
+  const queue = nodeIds
+    .filter((id) => (indegree.get(id) ?? 0) === 0)
+    .sort((a, b) => {
+      const na = nodesById.get(a)!
+      const nb = nodesById.get(b)!
+      return na.position.x - nb.position.x || na.position.y - nb.position.y
+    })
 
   const ordered: string[] = []
-  const seen = new Set<string>()
-
-  while (cursor && !seen.has(cursor)) {
-    ordered.push(cursor)
-    seen.add(cursor)
-    cursor = outgoing.get(cursor)
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    ordered.push(current)
+    const nexts = outgoing.get(current) ?? []
+    for (const next of nexts) {
+      const deg = (indegree.get(next) ?? 0) - 1
+      indegree.set(next, deg)
+      if (deg === 0) {
+        queue.push(next)
+        queue.sort((a, b) => {
+          const na = nodesById.get(a)!
+          const nb = nodesById.get(b)!
+          return na.position.x - nb.position.x || na.position.y - nb.position.y
+        })
+      }
+    }
   }
 
   if (ordered.length === rfNodes.length) return ordered
 
   const remainder = rfNodes
-    .filter((node) => !seen.has(node.id))
-    .sort((a, b) => (a.position.x === b.position.x ? a.position.y - b.position.y : a.position.x - b.position.x))
+    .filter((node) => !ordered.includes(node.id))
+    .sort((a, b) =>
+      a.position.x === b.position.x ? a.position.y - b.position.y : a.position.x - b.position.x,
+    )
     .map((node) => node.id)
 
   return [...ordered, ...remainder]

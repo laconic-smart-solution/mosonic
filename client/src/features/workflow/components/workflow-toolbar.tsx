@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { T } from "@/lib/tokens"
 
 type WorkflowToolbarProps = {
   wfName: string
   onWfNameChange: (v: string) => void
+  onWfNameCommit?: () => void
   ruleName?: string
   onRuleClick?: () => void
   /** Empty canvas: toggle structure-generation prompt bar */
@@ -16,6 +18,8 @@ type WorkflowToolbarProps = {
   onSave?: () => void
   isSaving?: boolean
   readOnly?: boolean
+  /** Disable run / describe actions while still in edit mode (e.g. unsaved canvas edits). */
+  generationDisabled?: boolean
   showCancel?: boolean
   /** Leave the in-flight pipeline view (running or paused) and return to edit mode. */
   onCancel?: () => void
@@ -24,6 +28,7 @@ type WorkflowToolbarProps = {
 export function WorkflowToolbar({
   wfName,
   onWfNameChange,
+  onWfNameCommit,
   ruleName,
   onRuleClick,
   onToggleStructurePrompt,
@@ -34,6 +39,7 @@ export function WorkflowToolbar({
   onSave,
   isSaving,
   readOnly,
+  generationDisabled = false,
   showCancel,
   onCancel,
 }: WorkflowToolbarProps) {
@@ -43,10 +49,20 @@ export function WorkflowToolbar({
       style={{ background: "white", borderColor: T.surfaceBorder }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <input
+        <Input
           value={wfName}
           onChange={(e) => onWfNameChange(e.target.value)}
-          className="max-w-[240px] truncate border-none bg-transparent text-sm font-bold outline-none"
+          onBlur={() => onWfNameCommit?.()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              e.currentTarget.blur()
+            }
+          }}
+          disabled={readOnly}
+          aria-label="Workflow name"
+          placeholder="Untitled Workflow"
+          className="h-8 max-w-[min(100%,320px)] min-w-[160px] truncate rounded-lg border-transparent bg-muted/40 px-2.5 text-sm font-bold shadow-none focus-visible:border-ring focus-visible:bg-background focus-visible:truncate-none"
           style={{ color: T.textPrimary }}
         />
         {ruleName ? (
@@ -89,7 +105,13 @@ export function WorkflowToolbar({
 
       <div className="flex gap-2">
         {onRebuildWorkflow && !readOnly ? (
-          <Button type="button" variant="outline" size="sm" onClick={onRebuildWorkflow}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRebuildWorkflow}
+            disabled={generationDisabled}
+          >
             Rebuild nodes
           </Button>
         ) : null}
@@ -99,6 +121,7 @@ export function WorkflowToolbar({
             variant={structurePromptOpen ? "default" : "outline"}
             size="sm"
             onClick={onToggleStructurePrompt}
+            disabled={generationDisabled}
           >
             Describe workflow
           </Button>
@@ -115,7 +138,13 @@ export function WorkflowToolbar({
           </Button>
         ) : null}
         {!readOnly ? (
-          <Button type="button" size="sm" onClick={() => onRun()} className="gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => onRun()}
+            disabled={generationDisabled}
+            className="gap-1.5"
+          >
             <svg
               width="12"
               height="12"

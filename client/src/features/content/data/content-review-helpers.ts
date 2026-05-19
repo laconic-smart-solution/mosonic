@@ -20,6 +20,9 @@ export const NODE_TYPE_BY_KEY: Record<OutputKey, WorkflowNodeType> = {
   summary: "summarization",
 }
 
+/** Adapt nodes store caption text under `text` / `adaptedCaption` in nodeOutputs. */
+const ADAPT_OUTPUT_KEY: OutputKey = "text"
+
 export function outputsFromDetail(outputs?: ContentOutputs | null): Partial<Record<OutputKey, string | undefined>> {
   if (!outputs) return {}
   return {
@@ -100,6 +103,11 @@ export function flattenWorkflowNodesToFlatOutputs(
       case "summarization":
         if (typeof layer.summary === "string") out.summary = layer.summary
         break
+      case "adapt":
+        if (typeof layer.text === "string") out.text = layer.text
+        else if (typeof layer.adaptedCaption === "string")
+          out.text = layer.adaptedCaption
+        break
       default:
         break
     }
@@ -108,10 +116,44 @@ export function flattenWorkflowNodesToFlatOutputs(
 }
 
 export function outputKeyForNodeType(type: WorkflowNodeType): OutputKey | undefined {
+  if (type === "adapt") return ADAPT_OUTPUT_KEY
   const pair = (Object.entries(NODE_TYPE_BY_KEY) as [OutputKey, WorkflowNodeType][]).find(
     ([, t]) => t === type,
   )
   return pair?.[0]
+}
+
+export function cardTitle(key: OutputKey): string {
+  switch (key) {
+    case "keywords":
+      return "Keywords"
+    case "text":
+      return "Text"
+    case "translatedText":
+      return "Translation"
+    case "image":
+      return "Image"
+    case "video":
+      return "Video"
+    case "transcription":
+      return "Transcription"
+    case "summary":
+      return "Summary"
+    default:
+      return key
+  }
+}
+
+export function nodeDisplayTitle(
+  type: WorkflowNodeType,
+  lane?: string | null,
+): string {
+  const key = outputKeyForNodeType(type)
+  const base = key ? cardTitle(key) : type
+  if (type === "adapt" && lane?.trim()) {
+    return `${base} (${lane.trim()})`
+  }
+  return base
 }
 
 export function mergeExecutorOutput(
@@ -146,25 +188,4 @@ export function mergeExecutorOutput(
       break
   }
   return next
-}
-
-export function cardTitle(key: OutputKey): string {
-  switch (key) {
-    case "keywords":
-      return "Keywords"
-    case "text":
-      return "Text"
-    case "translatedText":
-      return "Translation"
-    case "image":
-      return "Image"
-    case "video":
-      return "Video"
-    case "transcription":
-      return "Transcription"
-    case "summary":
-      return "Summary"
-    default:
-      return key
-  }
 }

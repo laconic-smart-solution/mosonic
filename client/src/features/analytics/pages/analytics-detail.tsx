@@ -20,7 +20,10 @@ import {
   useAnalyticsRejectMutation,
 } from "@/shared/queries/analytics.query"
 import { analyticsService } from "@/shared/services/analytics.service"
-import type { ContentPerformanceEntry, FeedbackSuggestion } from "@/shared/types/analytics.type"
+import type {
+  ContentPerformanceEntry,
+  FeedbackSuggestion,
+} from "@/shared/types/analytics.type"
 import {
   joinAnalyticsRuleRoom,
   leaveAnalyticsRuleRoom,
@@ -32,7 +35,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -46,7 +55,11 @@ function formatRange(fromIso: string, toIso: string): string {
   try {
     const a = new Date(fromIso)
     const b = new Date(toIso)
-    const o: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }
+    const o: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }
     return `${a.toLocaleDateString(undefined, o)} – ${b.toLocaleDateString(undefined, o)}`
   } catch {
     return `${fromIso} – ${toIso}`
@@ -62,7 +75,7 @@ function relTime(iso: string): string {
 }
 
 function confidenceBadgeVariant(
-  c: FeedbackSuggestion["confidence"],
+  c: FeedbackSuggestion["confidence"]
 ): "default" | "secondary" | "outline" {
   if (c === "high") return "default"
   if (c === "medium") return "secondary"
@@ -142,6 +155,18 @@ export default function AnalyticsDetailPage() {
     return [...m.values()]
   }, [snap])
 
+  const byVariant = useMemo(() => {
+    const m = new Map<string, { views: number; engagement: number }>()
+    for (const row of snap?.contentPerformance ?? []) {
+      const k = row.variantId?.trim() || "control"
+      const cur = m.get(k) ?? { views: 0, engagement: 0 }
+      cur.views += row.metrics.views
+      cur.engagement += row.metrics.engagement
+      m.set(k, cur)
+    }
+    return [...m.entries()].sort((a, b) => b[1].engagement - a[1].engagement)
+  }, [snap])
+
   const bestContentTitle = useMemo(() => {
     const ref = snap?.campaignSummary?.bestPerformingContent
     if (!ref) return "—"
@@ -160,7 +185,10 @@ export default function AnalyticsDetailPage() {
       toast.success(pullRes.message?.trim() || "Analytics synced")
     } catch (e: unknown) {
       setPullOverlay(false)
-      const msg = e && typeof e === "object" && "message" in e ? String((e as Error).message) : "Sync failed"
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? String((e as Error).message)
+          : "Sync failed"
       toast.error(msg)
     }
   }
@@ -173,7 +201,7 @@ export default function AnalyticsDetailPage() {
       void qc.invalidateQueries({ queryKey: analyticsQueryKeys.summary })
       if (res.suggestionCount > 0) {
         toast.success(
-          `${res.suggestionCount} suggestion${res.suggestionCount === 1 ? "" : "s"} ready`,
+          `${res.suggestionCount} suggestion${res.suggestionCount === 1 ? "" : "s"} ready`
         )
       } else {
         toast.success("No new suggestions from the current data")
@@ -192,7 +220,9 @@ export default function AnalyticsDetailPage() {
       <div className="mx-auto w-full max-w-5xl px-6 py-8">
         <Alert variant="destructive">
           <AlertTitle>Missing rule</AlertTitle>
-          <AlertDescription>Open Analytics from the list and select a rule.</AlertDescription>
+          <AlertDescription>
+            Open Analytics from the list and select a rule.
+          </AlertDescription>
         </Alert>
       </div>
     )
@@ -213,18 +243,27 @@ export default function AnalyticsDetailPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <Link to="/analytics" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/analytics"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeftIcon className="h-4 w-4" />
             All analytics
           </Link>
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">{isLoading ? <Skeleton className="h-7 w-60" /> : ruleName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isLoading ? <Skeleton className="h-7 w-60" /> : ruleName}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {isLoading ? (
                 <Skeleton className="h-4 w-56" />
               ) : snap ? (
                 <>
-                  {formatRange(String(snap.period.from), String(snap.period.to))} · Last pulled {relTime(snap.pulledAt)}
+                  {formatRange(
+                    String(snap.period.from),
+                    String(snap.period.to)
+                  )}{" "}
+                  · Last pulled {relTime(snap.pulledAt)}
                 </>
               ) : (
                 "No snapshot yet"
@@ -237,15 +276,27 @@ export default function AnalyticsDetailPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={pullOverlay || (pullMu.isPending && pullMu.variables === ruleId)}
+            disabled={
+              pullOverlay || (pullMu.isPending && pullMu.variables === ruleId)
+            }
             onClick={() => void handleRefresh()}
           >
-            <RefreshCwIcon className={(pullOverlay || (pullMu.isPending && pullMu.variables === ruleId)) ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+            <RefreshCwIcon
+              className={
+                pullOverlay || (pullMu.isPending && pullMu.variables === ruleId)
+                  ? "mr-2 h-4 w-4 animate-spin"
+                  : "mr-2 h-4 w-4"
+              }
+            />
             Sync
           </Button>
           <Button
             type="button"
-            disabled={!analyticsId || !snap?.contentPerformance?.length || generateMu.isPending}
+            disabled={
+              !analyticsId ||
+              !snap?.contentPerformance?.length ||
+              generateMu.isPending
+            }
             onClick={() => void handleGenerateSuggestions()}
           >
             <SparklesIcon className="mr-2 h-4 w-4" />
@@ -259,9 +310,15 @@ export default function AnalyticsDetailPage() {
           <AlertTitle>Suggestions ready</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>
-              {suggestionBanner} new suggestion{suggestionBanner === 1 ? "" : "s"} available for this snapshot.
+              {suggestionBanner} new suggestion
+              {suggestionBanner === 1 ? "" : "s"} available for this snapshot.
             </span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setSuggestionBanner(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSuggestionBanner(null)}
+            >
               Dismiss
             </Button>
           </AlertDescription>
@@ -271,9 +328,12 @@ export default function AnalyticsDetailPage() {
       {!isLoading && !snap ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">No snapshot for this rule</CardTitle>
+            <CardTitle className="text-base">
+              No snapshot for this rule
+            </CardTitle>
             <CardDescription>
-              Publish or schedule posts with Zernio, then sync analytics to generate the first snapshot.
+              Publish or schedule posts with Zernio, then sync analytics to
+              generate the first snapshot.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -296,10 +356,26 @@ export default function AnalyticsDetailPage() {
         <>
           <div className="grid gap-3 sm:grid-cols-4">
             {[
-              { label: "Views", value: snap.campaignSummary.totalViews, icon: EyeIcon },
-              { label: "Likes", value: snap.campaignSummary.totalLikes, icon: HeartIcon },
-              { label: "Comments", value: snap.campaignSummary.totalComments, icon: MessageCircleIcon },
-              { label: "Shares", value: snap.campaignSummary.totalShares, icon: TrendingUpIcon },
+              {
+                label: "Views",
+                value: snap.campaignSummary.totalViews,
+                icon: EyeIcon,
+              },
+              {
+                label: "Likes",
+                value: snap.campaignSummary.totalLikes,
+                icon: HeartIcon,
+              },
+              {
+                label: "Comments",
+                value: snap.campaignSummary.totalComments,
+                icon: MessageCircleIcon,
+              },
+              {
+                label: "Shares",
+                value: snap.campaignSummary.totalShares,
+                icon: TrendingUpIcon,
+              },
             ].map(({ label, value, icon: Icon }) => (
               <Card key={label}>
                 <CardHeader className="pb-2">
@@ -307,7 +383,9 @@ export default function AnalyticsDetailPage() {
                     <Icon className="h-4 w-4" />
                     {label}
                   </CardDescription>
-                  <CardTitle className="text-2xl">{fmtNum(Number(value))}</CardTitle>
+                  <CardTitle className="text-2xl">
+                    {fmtNum(Number(value))}
+                  </CardTitle>
                 </CardHeader>
               </Card>
             ))}
@@ -330,30 +408,76 @@ export default function AnalyticsDetailPage() {
                       {snap.campaignSummary.averageEngagementRate.toFixed(1)}%
                     </span>
                     {" · "}Best channel{" "}
-                    <span className="font-medium capitalize text-foreground">
+                    <span className="font-medium text-foreground capitalize">
                       {snap.campaignSummary.bestPerformingChannel || "—"}
                     </span>
                     {" · "}Best content{" "}
-                    <span className="font-medium text-foreground">{bestContentTitle}</span>
+                    <span className="font-medium text-foreground">
+                      {bestContentTitle}
+                    </span>
                   </CardDescription>
                 </CardHeader>
               </Card>
 
+              {byVariant.length > 1 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">A/B variants</CardTitle>
+                    <CardDescription>
+                      Performance grouped by experiment variant when available.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {byVariant.map(([variant, v]) => (
+                      <div
+                        key={variant}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium">{variant}</span>
+                        <span className="text-muted-foreground">
+                          Views{" "}
+                          <span className="font-medium text-foreground">
+                            {fmtNum(v.views)}
+                          </span>
+                          {" · "}Engagement{" "}
+                          <span className="font-medium text-foreground">
+                            {fmtNum(v.engagement)}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : null}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Per channel</CardTitle>
-                  <CardDescription>Aggregated views and engagement by channel.</CardDescription>
+                  <CardDescription>
+                    Aggregated views and engagement by channel.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {byChannel.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No channel data for this snapshot.</div>
+                    <div className="text-sm text-muted-foreground">
+                      No channel data for this snapshot.
+                    </div>
                   ) : (
                     byChannel.map(([ch, v]) => (
-                      <div key={ch} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                      <div
+                        key={ch}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                      >
                         <span className="font-medium capitalize">{ch}</span>
                         <span className="text-muted-foreground">
-                          Views <span className="font-medium text-foreground">{fmtNum(v.views)}</span>
-                          {" · "}Engagement <span className="font-medium text-foreground">{fmtNum(v.engagement)}</span>
+                          Views{" "}
+                          <span className="font-medium text-foreground">
+                            {fmtNum(v.views)}
+                          </span>
+                          {" · "}Engagement{" "}
+                          <span className="font-medium text-foreground">
+                            {fmtNum(v.engagement)}
+                          </span>
                         </span>
                       </div>
                     ))
@@ -367,43 +491,64 @@ export default function AnalyticsDetailPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">No post entries</CardTitle>
-                    <CardDescription>Sync analytics to populate per-post metrics.</CardDescription>
+                    <CardDescription>
+                      Sync analytics to populate per-post metrics.
+                    </CardDescription>
                   </CardHeader>
                 </Card>
               ) : (
                 byPost.map((rows) => {
                   const first = rows[0]
                   if (!first) return null
-                  const uploadLabel = display.uploadByRef[first.uploadRef]?.label ?? "Upload"
-                  const contentTitle = display.contentByRef[first.contentRef]?.title ?? "Content item"
+                  const uploadLabel =
+                    display.uploadByRef[first.uploadRef]?.label ?? "Upload"
+                  const contentTitle =
+                    display.contentByRef[first.contentRef]?.title ??
+                    "Content item"
                   return (
                     <Card key={first.uploadRef}>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-base">{uploadLabel}</CardTitle>
+                        <CardTitle className="text-base">
+                          {uploadLabel}
+                        </CardTitle>
                         <CardDescription>
-                          <Link className="font-medium text-foreground underline-offset-4 hover:underline" to={`/content/${first.contentRef}`}>
+                          <Link
+                            className="font-medium text-foreground underline-offset-4 hover:underline"
+                            to={`/content/${first.contentRef}`}
+                          >
                             {contentTitle}
                           </Link>
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         {rows.map((r) => (
-                          <div key={`${r.channel}-${r.zernioPostId}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                            <span className="capitalize text-muted-foreground">{r.channel}</span>
+                          <div
+                            key={`${r.channel}-${r.zernioPostId}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                          >
+                            <span className="text-muted-foreground capitalize">
+                              {r.channel}
+                            </span>
                             <span className="text-muted-foreground">
                               <span className="inline-flex items-center gap-1">
                                 <EyeIcon className="h-4 w-4" />
-                                <span className="font-medium text-foreground">{fmtNum(r.metrics.views)}</span>
+                                <span className="font-medium text-foreground">
+                                  {fmtNum(r.metrics.views)}
+                                </span>
                               </span>
                               {" · "}
                               <span className="inline-flex items-center gap-1">
                                 <HeartIcon className="h-4 w-4" />
-                                <span className="font-medium text-foreground">{fmtNum(r.metrics.likes)}</span>
+                                <span className="font-medium text-foreground">
+                                  {fmtNum(r.metrics.likes)}
+                                </span>
                               </span>
                               {" · "}
                               <span className="inline-flex items-center gap-1">
                                 <MessageCircleIcon className="h-4 w-4" />
-                                <span className="font-medium text-foreground">{fmtNum(r.metrics.comments)}</span>
+                                <span className="font-medium text-foreground">
+                                  {fmtNum(r.metrics.comments)}
+                                </span>
                               </span>
                             </span>
                           </div>
@@ -419,7 +564,9 @@ export default function AnalyticsDetailPage() {
               {(snap.feedbackSignal.suggestions ?? []).length === 0 ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">No suggestions yet</CardTitle>
+                    <CardTitle className="text-base">
+                      No suggestions yet
+                    </CardTitle>
                     <CardDescription>
                       {snap.contentPerformance.length === 0
                         ? "Sync analytics first to enable suggestions."
@@ -478,7 +625,10 @@ function SuggestionCard(props: {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">{sug.field}</CardTitle>
-          <Badge variant={confidenceBadgeVariant(sug.confidence)} className="uppercase">
+          <Badge
+            variant={confidenceBadgeVariant(sug.confidence)}
+            className="uppercase"
+          >
             {sug.confidence}
           </Badge>
         </div>
@@ -487,13 +637,17 @@ function SuggestionCard(props: {
       <CardContent className="space-y-3">
         <div className="space-y-2 text-sm">
           <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Current</div>
+            <div className="text-xs font-medium text-muted-foreground">
+              Current
+            </div>
             <pre className="max-h-40 overflow-auto rounded-md border bg-muted/30 p-2 text-xs">
               {JSON.stringify(sug.currentValue, null, 2)}
             </pre>
           </div>
           <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Suggested</div>
+            <div className="text-xs font-medium text-muted-foreground">
+              Suggested
+            </div>
             <pre className="max-h-40 overflow-auto rounded-md border bg-muted/30 p-2 text-xs">
               {JSON.stringify(sug.suggestedValue, null, 2)}
             </pre>
@@ -501,10 +655,14 @@ function SuggestionCard(props: {
         </div>
 
         {sug.status === "applied" ? (
-          <div className="text-sm font-medium text-green-700">Applied to rule</div>
+          <div className="text-sm font-medium text-green-700">
+            Applied to rule
+          </div>
         ) : null}
         {sug.status === "rejected" ? (
-          <div className="text-sm font-medium text-muted-foreground line-through">Rejected</div>
+          <div className="text-sm font-medium text-muted-foreground line-through">
+            Rejected
+          </div>
         ) : null}
 
         {pending ? (

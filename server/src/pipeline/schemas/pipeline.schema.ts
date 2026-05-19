@@ -2,6 +2,10 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
+import {
+  WorkflowEdgeEntry,
+  WorkflowEdgeEntrySchema,
+} from '../../workflow/schemas/workflow-edge.schema';
 
 /** Pipeline-level lifecycle (orchestration run). */
 export enum PipelineStatus {
@@ -17,6 +21,12 @@ export enum PipelineNodeExecutionStatus {
   Running = 'running',
   Completed = 'completed',
   Failed = 'failed',
+  Skipped = 'skipped',
+}
+
+export enum PipelineExecutionMode {
+  Inline = 'inline',
+  Queue = 'queue',
 }
 
 /**
@@ -68,10 +78,79 @@ export class PipelineNodeExecution {
 
   @Prop({ type: Date, default: null })
   executedAt: Date | null;
+
+  /** Channel lane key after branch materialization; null = shared trunk. */
+  @Prop({ type: String, default: null })
+  lane: string | null;
+
+  @Prop({ type: String, default: null })
+  variantId: string | null;
+
+  @Prop({ type: String, default: null })
+  lastError: string | null;
+
+  /** OpenAI Sora (or other provider) job id while async generation is in flight. */
+  @Prop({ type: String, default: null })
+  externalJobId: string | null;
 }
 export const PipelineNodeExecutionSchema = SchemaFactory.createForClass(
   PipelineNodeExecution,
 );
+
+/** Immutable workflow graph captured at pipeline start. */
+@Schema({ _id: false })
+export class PipelineGraphSnapshot {
+  @Prop({ type: [WorkflowEdgeEntrySchema], default: [] })
+  edges: WorkflowEdgeEntry[];
+
+  @Prop({ type: Number })
+  materializedFromWorkflowVersion?: number;
+
+  @Prop({ type: [String], default: [] })
+  lanes: string[];
+
+  /** Materialized nodeId → canvas position from workflow template at pipeline start. */
+  @Prop({ type: Object, default: () => ({}) })
+  layout: Record<string, { x: number; y: number }>;
+}
+
+export const PipelineGraphSnapshotSchema = SchemaFactory.createForClass(
+  PipelineGraphSnapshot,
+);
+
+/** Ephemeral rule tweaks for one pipeline run (analytics learnings). */
+@Schema({ _id: false })
+export class PipelineRuleOverlay {
+  @Prop({ type: Number, required: true })
+  baseRuleVersion: number;
+
+  @Prop({ type: [String], default: [] })
+  appliedSuggestionIds: string[];
+
+  @Prop({ type: [Object], default: [] })
+  patches: Array<{ field: string; suggestedValue: unknown }>;
+
+  @Prop({ type: Date, required: true })
+  analyticsSnapshotAt: Date;
+}
+
+export const PipelineRuleOverlaySchema =
+  SchemaFactory.createForClass(PipelineRuleOverlay);
+
+@Schema({ _id: false })
+export class PipelineMetadata {
+  @Prop({ type: String })
+  source?: 'manual' | 'scheduler' | 'integration';
+
+  @Prop({ type: String })
+  scheduleId?: string;
+
+  @Prop({ type: String })
+  experimentId?: string;
+}
+
+export const PipelineMetadataSchema =
+  SchemaFactory.createForClass(PipelineMetadata);
 
 @Schema({
   collection: 'pipelines',
@@ -115,6 +194,34 @@ export class Pipeline {
 
   @Prop({ type: Date, default: null })
   completedAt: Date | null;
+
+  /** Node that caused the pipeline to pause (awaiting retry/skip). */
+  @Prop({ type: String, default: null })
+  pausedNodeId: string | null;
+
+  /** Lane where failure occurred (for UI); null when shared trunk failed. */
+  @Prop({ type: String, default: null })
+  pausedLaneId: string | null;
+
+  @Prop({
+    type: String,
+    enum: Object.values(PipelineExecutionMode),
+    default: PipelineExecutionMode.Inline,
+  })
+  executionMode: PipelineExecutionMode;
+
+  @Prop({
+    type: PipelineGraphSnapshotSchema,
+    default: () => ({ edges: [], lanes: [], layout: {} }),
+  })
+  graph: PipelineGraphSnapshot;
+
+  /** Merged at execution time only; never auto-persisted to the rule. */
+  @Prop({ type: PipelineRuleOverlaySchema, default: null })
+  ruleOverlay: PipelineRuleOverlay | null;
+
+  @Prop({ type: PipelineMetadataSchema, default: () => ({}) })
+  metadata: PipelineMetadata;
 }
 
 export const PipelineSchema = SchemaFactory.createForClass(Pipeline);

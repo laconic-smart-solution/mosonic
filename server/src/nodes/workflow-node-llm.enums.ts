@@ -11,6 +11,10 @@ export enum WorkflowNodeType {
   Translation = 'translation',
   Transcription = 'transcription',
   Summarization = 'summarization',
+  Branch = 'branch',
+  Adapt = 'adapt',
+  Merge = 'merge',
+  Intelligence = 'intelligence',
 }
 
 export enum LlmProvider {

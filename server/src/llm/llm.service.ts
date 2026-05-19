@@ -12,6 +12,11 @@ import {
   LlmProvider,
   WorkflowNodeType,
 } from '../nodes/workflow-node-llm.enums';
+import {
+  allowedOpenAiImageSizesForModel,
+  coerceOpenAiImageSize,
+  isValidOpenAiImageSizeForModel,
+} from '../nodes/openai-image-size.util';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o';
@@ -144,10 +149,31 @@ export class LlmService {
       [WorkflowNodeType.ImageGeneration]: 'image_generation',
       [WorkflowNodeType.VideoGeneration]: 'video_generation',
       [WorkflowNodeType.Transcription]: 'transcription',
+      [WorkflowNodeType.Adapt]: 'chat',
+      [WorkflowNodeType.Intelligence]: 'chat',
     };
     const capability = capabilityByNodeType[type];
     if (capability) {
       this.assertProviderCapability(provider, capability);
+    }
+    if (type === WorkflowNodeType.ImageGeneration && config) {
+      const rec = config as Record<string, unknown>;
+      const model =
+        typeof rec.model === 'string' && rec.model.trim()
+          ? rec.model.trim()
+          : 'gpt-image-1';
+      const sizeRaw =
+        typeof rec.size === 'string' && rec.size.trim()
+          ? rec.size.trim()
+          : '';
+      if (
+        sizeRaw &&
+        !isValidOpenAiImageSizeForModel(sizeRaw, model)
+      ) {
+        throw new Error(
+          `Invalid image size "${sizeRaw}" for model "${model}". Allowed: ${allowedOpenAiImageSizesForModel(model).join(', ')}.`,
+        );
+      }
     }
   }
 
@@ -366,7 +392,9 @@ export class LlmService {
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
         model,
         prompt: params.prompt,
-        size: params.size,
+        size: coerceOpenAiImageSize(String(params.size), model) as NonNullable<
+          OpenAI.Images.ImageGenerateParams['size']
+        >,
         n: 1,
         response_format: 'b64_json',
       };
@@ -408,7 +436,7 @@ export class LlmService {
           const fallbackBody: OpenAI.Images.ImageGenerateParamsNonStreaming = {
             model: 'gpt-image-1',
             prompt: params.prompt,
-            size: params.size,
+            size: coerceOpenAiImageSize(params.size, 'gpt-image-1'),
             n: 1,
             response_format: 'b64_json',
           };
@@ -540,6 +568,56 @@ export class LlmService {
       response_format: 'text',
     });
     return typeof response === 'string' ? response : String(response);
+  }
+
+  /**
+   * OpenAI Responses API with built-in web_search for intelligence nodes.
+   */
+  async runWebSearchBrief(params: {
+    prompt: string;
+    model?: string;
+    provider?: string;
+  }): Promise<{
+    text: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
+    const provider = this.resolveProvider(params.provider);
+    this.assertProviderCapability(provider, 'chat');
+    if (provider !== LlmProvider.OpenAI) {
+      throw new Error(
+        'Web search intelligence requires OpenAI (Responses API web_search tool)',
+      );
+    }
+    const apiKey = this.requireApiKeyForProvider(provider);
+    const client = new OpenAI({ apiKey });
+    const model =
+      params.model?.trim() ||
+      this.config.get<string>('OPENAI_MODEL')?.trim() ||
+      DEFAULT_OPENAI_MODEL;
+
+    try {
+      const response = await client.responses.create({
+        model,
+        tools: [{ type: 'web_search' }],
+        input: params.prompt,
+      });
+
+      const text = (response.output_text ?? '').trim();
+      const usage = response.usage;
+      return {
+        text,
+        usage: usage
+          ? {
+              inputTokens: usage.input_tokens ?? 0,
+              outputTokens: usage.output_tokens ?? 0,
+            }
+          : undefined,
+      };
+    } catch (error) {
+      throw new Error(
+        `OpenAI web search failed: ${this.formatError(error)}`,
+      );
+    }
   }
 
   private formatError(error: unknown): string {

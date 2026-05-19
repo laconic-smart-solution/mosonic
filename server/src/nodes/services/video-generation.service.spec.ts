@@ -1,62 +1,74 @@
+import type { Rule } from '../../rule/schemas/rule.schema';
 import {
+  buildVideoPrompt,
+  mapOpenAiVideoStatus,
   normalizeSoraDurationSeconds,
-  SORA_VIDEO_DURATIONS,
+  normalizeVideoConfig,
+  VIDEO_OUTPUT_GUARDRAILS,
 } from './video-generation.service';
 
-/**
- * Size mapping for Sora must match OpenAI API constraints:
- * sora-2 → 720x1280 | 1280x720 only.
- */
-
-type VideoSize = '720x1280' | '1280x720' | '1024x1792' | '1792x1024';
-
-function resolveSoraSizeForTest(
-  model: string,
-  aspectRatio: string,
-  resolution: string,
-): VideoSize {
-  const isSoraPro = model.includes('pro');
-  const wantsHd = resolution === '1080p' && isSoraPro;
-  const portrait =
-    aspectRatio === '9:16' ||
-    aspectRatio === '4:5' ||
-    aspectRatio === '1:1';
-  if (portrait) {
-    return wantsHd ? '1024x1792' : '720x1280';
-  }
-  if (aspectRatio === '16:9') {
-    return wantsHd ? '1792x1024' : '1280x720';
-  }
-  return wantsHd ? '1024x1792' : '720x1280';
-}
-
-describe('Sora video size mapping', () => {
-  it('uses 1280x720 for sora-2 landscape even when resolution is 1080p', () => {
-    expect(resolveSoraSizeForTest('sora-2', '16:9', '1080p')).toBe('1280x720');
+describe('VideoGenerationService helpers', () => {
+  it('normalizeSoraDurationSeconds picks nearest allowed duration', () => {
+    expect(normalizeSoraDurationSeconds(7)).toBe(8);
+    expect(normalizeSoraDurationSeconds(11)).toBe(12);
   });
 
-  it('uses 720x1280 for sora-2 portrait even when resolution is 1080p', () => {
-    expect(resolveSoraSizeForTest('sora-2', '9:16', '1080p')).toBe('720x1280');
+  it('normalizeVideoConfig defaults model and aspect ratio', () => {
+    const cfg = normalizeVideoConfig({});
+    expect(cfg.model).toBe('sora-2');
+    expect(cfg.aspectRatio).toBe('16:9');
+    expect(cfg.duration).toBe(8);
   });
 
-  it('allows HD sizes for sora-2-pro at 1080p', () => {
-    expect(resolveSoraSizeForTest('sora-2-pro', '16:9', '1080p')).toBe(
-      '1792x1024',
+  it('mapOpenAiVideoStatus maps terminal states', () => {
+    expect(mapOpenAiVideoStatus('completed')).toBe('completed');
+    expect(mapOpenAiVideoStatus('failed')).toBe('failed');
+    expect(mapOpenAiVideoStatus('in_progress')).toBe('processing');
+    expect(mapOpenAiVideoStatus('queued')).toBe('processing');
+  });
+
+  it('buildVideoPrompt includes mandatory output guardrails', () => {
+    const rule = {
+      brand: {
+        brandName: 'Acme',
+        industry: 'Retail',
+        brandDescription: 'Test brand',
+        brandTone: ['friendly'],
+      },
+      audience: { description: 'Shoppers', location: ['US'] },
+      channels: [{ channel: 'instagram' }],
+      contentGuidelines: { donts: [], requiredElements: [] },
+    } as unknown as Rule;
+    const prompt = buildVideoPrompt(
+      rule,
+      { text: 'Summer sale highlights' },
+      normalizeVideoConfig({}),
     );
-    expect(resolveSoraSizeForTest('sora-2-pro', '9:16', '1080p')).toBe(
-      '1024x1792',
-    );
-  });
-});
-
-describe('normalizeSoraDurationSeconds', () => {
-  it('snaps legacy duration 15 to 16', () => {
-    expect(normalizeSoraDurationSeconds(15)).toBe(16);
-  });
-
-  it('keeps exact allowed values', () => {
-    for (const d of SORA_VIDEO_DURATIONS) {
-      expect(normalizeSoraDurationSeconds(d)).toBe(d);
+    expect(prompt).toContain('VIDEO OUTPUT CONSTRAINTS');
+    for (const line of VIDEO_OUTPUT_GUARDRAILS) {
+      expect(prompt).toContain(line);
     }
+    expect(prompt).toContain('No phone numbers');
+    expect(prompt).toContain('No logos');
+  });
+
+  it('buildVideoPrompt appends node negativePrompt when set', () => {
+    const rule = {
+      brand: {
+        brandName: 'Acme',
+        industry: 'Retail',
+        brandDescription: 'Test',
+        brandTone: ['calm'],
+      },
+      audience: { description: 'All', location: ['TH'] },
+      channels: [],
+      contentGuidelines: { donts: [], requiredElements: [] },
+    } as unknown as Rule;
+    const prompt = buildVideoPrompt(
+      rule,
+      { text: 'Product demo' },
+      normalizeVideoConfig({ negativePrompt: 'crowded scenes' }),
+    );
+    expect(prompt).toContain('Additionally avoid: crowded scenes');
   });
 });

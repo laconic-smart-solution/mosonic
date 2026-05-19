@@ -22,7 +22,22 @@ export default function SettingsAccountsPage() {
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
+  const initialSyncRef = useRef(false)
   const [profileBusy, setProfileBusy] = useState(false)
+
+  useEffect(() => {
+    const connected = searchParams.get("connected")
+    const error = searchParams.get("zernio_error")
+    if (connected || error) {
+      initialSyncRef.current = true
+      return
+    }
+    if (initialSyncRef.current) return
+    initialSyncRef.current = true
+    syncMutation.mutate(undefined, {
+      onError: () => toast.error("Could not sync accounts."),
+    })
+  }, [searchParams, syncMutation])
 
   useEffect(() => {
     if (handledOAuthRef.current) return

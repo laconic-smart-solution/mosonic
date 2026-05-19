@@ -7,7 +7,9 @@ import { McpModule } from '../mcp/mcp.module';
 import { Post, PostSchema } from '../post/schemas/post.schema';
 import { RuleModule } from '../rule/rule.module';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
+import { Content, ContentSchema } from '../content/schemas/content.schema';
 import { ContentModule } from '../content/content.module';
+import { Upload, UploadSchema } from '../upload/schemas/upload.schema';
 import { UploadModule } from '../upload/upload.module';
 import { UsersModule } from '../users/users.module';
 import { SyncLock, SyncLockSchema } from '../upload/sync-lock.schema';
@@ -32,6 +34,8 @@ import { Analytics, AnalyticsSchema } from './schemas/analytics.schema';
       { name: Rule.name, schema: RuleSchema },
       { name: SyncLock.name, schema: SyncLockSchema },
       { name: Post.name, schema: PostSchema },
+      { name: Content.name, schema: ContentSchema },
+      { name: Upload.name, schema: UploadSchema },
     ]),
   ],
   controllers: [AnalyticsController],

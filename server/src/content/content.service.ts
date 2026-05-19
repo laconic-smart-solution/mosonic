@@ -25,7 +25,14 @@ import {
 import { Pipeline } from '../pipeline/schemas/pipeline.schema';
 import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import { EventsService } from '../events/events.service';
 import { UploadService } from '../upload/upload.service';
+import {
+  allRequiredStepsApproved,
+  appendApprovalRecord,
+  buildApprovalStateFromPolicy,
+  nextPendingStepIndex,
+} from './content-approval.util';
 import { WorkflowService } from '../workflow/workflow.service';
 import { parseWorkflowNodeConfigOrThrow } from '../nodes/workflow-node-config.zod';
 import { mergeResolvedOutputs } from './content-output.utils';
@@ -40,6 +47,7 @@ import type { RerunNodeDto } from './dto/rerun-node.dto';
 import type { SaveContentDto } from './dto/save-content.dto';
 import {
   ContentStatus,
+  type ContentApprovalState,
   type ContentDocument,
   type ContentOutputs,
   type ContentUserEdits,
@@ -54,6 +62,9 @@ export type ContentDetailResponse = {
   outputs: ReturnType<typeof mergeResolvedOutputs>;
   nodeOutputs: Record<string, Record<string, unknown>>;
   nodeUserEdits: Record<string, Record<string, unknown>>;
+  approval?: ContentApprovalState;
+  variantId?: string | null;
+  experimentId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -64,6 +75,7 @@ export class ContentService {
 
   constructor(
     private readonly contentRepository: ContentRepository,
+    private readonly events: EventsService,
     @Inject(forwardRef(() => UploadService))
     private readonly uploadService: UploadService,
     private readonly workflowService: WorkflowService,
@@ -125,6 +137,9 @@ export class ContentService {
       outputs,
       nodeOutputs: snapshot.nodeOutputs ?? {},
       nodeUserEdits: snapshot.nodeUserEdits ?? {},
+      approval: doc.approval ?? { steps: [], currentStepIndex: 0, records: [] },
+      variantId: doc.variantId ?? null,
+      experimentId: doc.experimentId ?? null,
       createdAt: this.versionDateToIso(createdAtRaw ?? new Date()),
       updatedAt: this.versionDateToIso(updatedAtRaw ?? new Date()),
     };
@@ -607,16 +622,65 @@ export class ContentService {
     }
   }
 
+  async getContentForAutonomy(contentId: string, auth: TenancyAuth) {
+    const doc = await this.contentRepository.findById(contentId, auth);
+    if (!doc) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+    return doc.toObject();
+  }
+
   async approveContent(
     contentId: string,
     auth: TenancyAuth,
+    comment?: string,
   ): Promise<{ uploadId: string }> {
     const doc = await this.contentRepository.findById(contentId, auth);
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    if (doc.status !== ContentStatus.Draft) {
-      throw new BadRequestException('Only draft content can be approved');
+    if (
+      doc.status !== ContentStatus.Draft &&
+      doc.status !== ContentStatus.InReview
+    ) {
+      throw new BadRequestException(
+        'Only draft or in-review content can be approved',
+      );
+    }
+
+    const steps = doc.approval?.steps ?? [];
+    if (steps.length === 0) {
+      return this.applyDraftApproval(doc, auth);
+    }
+
+    const pendingIndex = nextPendingStepIndex(doc.approval);
+    if (pendingIndex === null) {
+      return this.applyDraftApproval(doc, auth);
+    }
+    const nextApproval = appendApprovalRecord(doc.approval, {
+      stepIndex: pendingIndex,
+      userId: auth.userId,
+      at: new Date(),
+      comment: comment ?? null,
+    });
+    doc.approval = nextApproval;
+
+    if (!allRequiredStepsApproved(doc.approval)) {
+      doc.status = ContentStatus.InReview;
+      await doc.save();
+      this.events.emitToContent(contentId, 'content:step_approved', {
+        contentId,
+        stepIndex: pendingIndex,
+        status: doc.status,
+      });
+      this.events.emitToContent(contentId, 'content:approval_required', {
+        contentId,
+        nextStepIndex: nextApproval.currentStepIndex,
+      });
+      const uploadId = await this.uploadService
+        .findUploadIdByContentRef(contentId, auth)
+        .catch(() => this.ensureUploadForContent(contentId, auth));
+      return uploadId;
     }
 
     return this.applyDraftApproval(doc, auth);
@@ -637,10 +701,16 @@ export class ContentService {
     if (doc.status === ContentStatus.Approved) {
       return;
     }
-    if (doc.status !== ContentStatus.Draft) {
+    if (
+      doc.status !== ContentStatus.Draft &&
+      doc.status !== ContentStatus.InReview
+    ) {
       throw new BadRequestException(
         'This content cannot be published in its current state.',
       );
+    }
+    if (!allRequiredStepsApproved(doc.approval)) {
+      throw new BadRequestException('Approval steps are incomplete');
     }
     await this.applyDraftApproval(doc, auth);
   }
@@ -670,6 +740,10 @@ export class ContentService {
       ContentStatus.Approved,
       auth,
     );
+
+    this.events.emitToContent(doc.contentId, 'content:approved', {
+      contentId: doc.contentId,
+    });
 
     return this.uploadService.refreshUploadForApprove(
       {
@@ -733,7 +807,18 @@ export class ContentService {
       ContentStatus.Rejected,
       auth,
     );
+    this.events.emitToContent(contentId, 'content:rejected', { contentId });
     return { success: true };
+  }
+
+  buildApprovalFromRule(
+    rule: { approvalPolicy?: Array<{ role: string; required: boolean }> },
+  ) {
+    const steps = (rule.approvalPolicy ?? []).map((s) => ({
+      role: s.role,
+      required: s.required !== false,
+    }));
+    return buildApprovalStateFromPolicy(steps);
   }
 
   private versionDateToIso(d: Date | string | undefined): string {
