@@ -678,7 +678,9 @@ export default function PostsPage() {
                 <>
                   {" "}
                   · Page{" "}
-                  <span className="font-medium text-foreground">{page}</span> of{" "}
+                  <span className="font-medium text-foreground">
+                    {page}
+                  </span> of{" "}
                   <span className="font-medium text-foreground">
                     {totalPages}
                   </span>
