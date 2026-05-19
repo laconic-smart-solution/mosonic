@@ -426,10 +426,55 @@ export function PostDetailDrawer({
                   )}
                 </Button>
               ) : null}
+              {local && local.status !== "cancelled" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
+                  disabled={busy || !postId}
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  {deleteMu.isPending ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden />
+                  )}
+                  {deleteActionLabel}
+                </Button>
+              ) : null}
             </div>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isUnpublishAction
+                ? "Unpublish this post?"
+                : "Delete this post?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isUnpublishAction
+                ? "Removes the post from supported platforms and resets those upload channels to pending. Instagram, TikTok, and Snapchat cannot be unpublished via Zernio."
+                : "Permanently removes this post and resets its upload channels to pending so you can publish again."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMu.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMu.isPending}
+              onClick={() => void handleDeleteConfirm()}
+              className="hover:bg-destructive/10"
+            >
+              {deleteActionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
