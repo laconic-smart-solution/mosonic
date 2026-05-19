@@ -22,6 +22,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/run": "Live Run",
   "/content": "Content",
   "/upload": "Upload",
+  "/posts": "Posts",
   "/analytics": "Analytics",
   "/logs": "Logs",
   "/components": "Components",

@@ -35,6 +35,7 @@ export interface PromptAreaProps {
   enableImages?: boolean
   acceptFileTypes?: string
   className?: string
+  disabled?: boolean
 }
 
 export function PromptArea({
@@ -51,6 +52,7 @@ export function PromptArea({
   enableImages = true,
   acceptFileTypes = ".pdf,.docx,.txt,.md",
   className,
+  disabled = false,
 }: PromptAreaProps) {
   const [expanded, setExpanded] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState("")
@@ -104,12 +106,12 @@ export function PromptArea({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      submit()
+      if (!disabled) submit()
     }
   }
 
   function submit() {
-    if (!hasContent) return
+    if (disabled || !hasContent) return
     onSubmit?.(value, attachments)
     setValue("")
     setAttachments([])
@@ -157,13 +159,17 @@ export function PromptArea({
     <div
       ref={containerRef}
       className={cn(
-        "w-full cursor-text overflow-hidden border bg-white transition-[border-radius,border-color] duration-200 ease-out",
+        "w-full overflow-hidden border bg-white transition-[border-radius,border-color] duration-200 ease-out",
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-text",
         expanded
           ? "rounded-2xl border-teal-400"
           : "rounded-full border-canvas-300 hover:border-canvas-500",
         className
       )}
       onClick={() => {
+        if (disabled) return
         if (!expanded) {
           setExpanded(true)
           requestAnimationFrame(() => textareaRef.current?.focus())
@@ -296,7 +302,8 @@ export function PromptArea({
           value={value}
           onChange={(e) => setValue(e.target.value.slice(0, maxLength))}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          disabled={disabled}
+          placeholder={disabled ? "Save workflow changes or exit run view first" : placeholder}
           rows={1}
           className={cn(
             "flex-1 resize-none border-none bg-transparent text-sm leading-6 text-navy-700 outline-none placeholder:text-canvas-500 placeholder:line-clamp-1",
@@ -317,11 +324,11 @@ export function PromptArea({
             e.stopPropagation()
             submit()
           }}
-          disabled={!hasContent}
+          disabled={disabled || !hasContent}
           className={cn(
             "ml-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-[0.92]",
             "disabled:cursor-not-allowed",
-            !hasContent
+            disabled || !hasContent
               ? "bg-canvas-300 text-canvas-500"
               : expanded
                 ? "bg-teal-400 text-white hover:bg-teal-500"

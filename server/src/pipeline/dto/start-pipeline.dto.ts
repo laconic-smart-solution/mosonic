@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class StartPipelineDto {
   @IsString()
@@ -12,4 +12,9 @@ export class StartPipelineDto {
   @IsString()
   @IsNotEmpty()
   contentPrompt: string;
+
+  /** When true, merge applied analytics suggestions into an ephemeral rule overlay. */
+  @IsOptional()
+  @IsBoolean()
+  useLearnings?: boolean;
 }

@@ -3,7 +3,7 @@ import { LlmService } from './llm.service';
 import {
   LlmProvider,
   WorkflowNodeType,
-} from '../nodes/schemas/workflow-node.schema';
+} from '../nodes/workflow-node-llm.enums';
 
 describe('LlmService', () => {
   const config = {
@@ -28,6 +28,15 @@ describe('LlmService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new LlmService(config);
+  });
+
+  it('rejects invalid explicit image size for gpt-image-1 (schema)', () => {
+    expect(() =>
+      service.validateWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
+        model: 'gpt-image-1',
+        size: '1792x1024',
+      }),
+    ).toThrow('Invalid image size');
   });
 
   it('resolves chat provider from env by default', () => {

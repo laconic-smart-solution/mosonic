@@ -6,6 +6,17 @@ export type WorkflowNodeType =
   | "translation"
   | "transcription"
   | "summarization"
+  | "branch"
+  | "adapt"
+  | "merge"
+  | "intelligence"
+
+export type WorkflowEdge = {
+  from: string
+  to: string
+  sourceHandle?: string
+  targetHandle?: string
+}
 
 export type WorkflowNode = {
   nodeId: string
@@ -15,6 +26,11 @@ export type WorkflowNode = {
   config?: Record<string, unknown>
   /** Optional; may still appear on API payloads for re-run context. */
   userPrompt?: string
+  /** Canvas coordinates for workflow editor layout. */
+  x?: number
+  y?: number
+  /** Authoring lane (channel handle id); mirrors config.laneId for lane subgraph nodes. */
+  lane?: string
 }
 
 export type GenerateWorkflowPayload = {
@@ -32,10 +48,31 @@ export type WorkflowStatus = "generating" | "ready" | "failed" | "archived"
 export type GetWorkflowResponse = {
   workflow: { workflowId: string; name: string; status: WorkflowStatus; ruleRef: string }
   nodes: WorkflowNode[]
+  edges?: WorkflowEdge[]
 }
 
 export type SaveWorkflowNodesPayload = {
-  nodes: Omit<WorkflowNode, "nodeId">[]
+  name?: string
+  nodes: Array<Omit<WorkflowNode, "nodeId"> & { nodeId?: string }>
+  edges?: WorkflowEdge[]
+}
+
+export type UpdateWorkflowPayload = {
+  name: string
+}
+
+export type UpdateWorkflowResponse = {
+  workflowId: string
+  name: string
+}
+
+export type SaveWorkflowNodesByRulePayload = SaveWorkflowNodesPayload & {
+  name?: string
+}
+
+export type SaveWorkflowNodesByRuleResponse = {
+  workflowId: string
+  success: boolean
 }
 
 export type WorkflowPageFilter = {

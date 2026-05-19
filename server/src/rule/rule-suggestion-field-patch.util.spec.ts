@@ -1,4 +1,7 @@
-import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
+import {
+  buildSuggestionUpdateDto,
+  isSupportedSuggestionField,
+} from './rule-suggestion-field-patch.util';
 import { ChannelPriority, PostingFrequency } from './schemas/rule.schema';
 import type { RuleDocument } from './schemas/rule.schema';
 
@@ -44,5 +47,21 @@ describe('buildSuggestionUpdateDto', () => {
     );
     expect(dto.channels?.[0]?.priority).toBe(ChannelPriority.High);
     expect(dto.channels?.[0]?.channel).toBe('instagram');
+  });
+
+  it('remaps brand.keywords to campaign.keywords', () => {
+    const dto = buildSuggestionUpdateDto(base, 'brand.keywords', [
+      'summer',
+      'sale',
+    ]);
+    expect(dto.campaign?.keywords).toEqual(['summer', 'sale']);
+    expect(dto.brand).toBeUndefined();
+  });
+
+  it('isSupportedSuggestionField accepts campaign and brand paths', () => {
+    expect(isSupportedSuggestionField('campaign.keywords')).toBe(true);
+    expect(isSupportedSuggestionField('brand.keywords')).toBe(true);
+    expect(isSupportedSuggestionField('brand.brandVoice')).toBe(false);
+    expect(isSupportedSuggestionField('audience.interests')).toBe(false);
   });
 });

@@ -2,10 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
-import type { Types } from 'mongoose';
 import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
 import { McpService } from '../mcp/mcp.service';
+import {
+  PlatformPostStatus,
+  Post,
+  PostStatus,
+  type PostDocument,
+} from '../post/schemas/post.schema';
 import {
   SyncLock,
   SyncLockDocument,
@@ -19,10 +24,8 @@ import {
   type UploadDocument,
 } from './schemas/upload.schema';
 import {
-  accumulateScheduledZernioPostWork,
   interpretZernioPostForSync,
   mapWithConcurrencyLimit,
-  type ScheduledLeanUpload,
   type SyncPostDecision,
 } from './upload-scheduled-sync.helpers';
 import {
@@ -38,6 +41,8 @@ export class UploadScheduledSyncService {
     private readonly config: ConfigService,
     @InjectModel(Upload.name)
     private readonly uploadModel: Model<UploadDocument>,
+    @InjectModel(Post.name)
+    private readonly postModel: Model<PostDocument>,
     @InjectModel(SyncLock.name)
     private readonly syncLockModel: Model<SyncLockDocument>,
     private readonly mcpService: McpService,
@@ -45,7 +50,7 @@ export class UploadScheduledSyncService {
   ) {}
 
   /**
-   * Reconciles `scheduled` channel rows against Zernio (webhook may be missed).
+   * Reconciles scheduled `posts` rows against Zernio (webhook may be missed).
    *
    * **Multi-instance:** With `ZERNIO_SYNC_INSTANCE_ID` set, we take a short Mongo lease in
    * `sync_locks` so only one replica runs per window. With it unset, every API replica runs
@@ -65,85 +70,58 @@ export class UploadScheduledSyncService {
       if (!acquired) return;
     }
 
-    const batchSize = Math.max(
-      1,
-      Number(this.config.get('ZERNIO_SCHEDULED_SYNC_UPLOAD_BATCH')) || 300,
-    );
     const concurrency = Math.max(
       1,
       Number(this.config.get('ZERNIO_SCHEDULED_SYNC_MCP_CONCURRENCY')) || 5,
     );
 
-    const postIdToUploadIds = new Map<string, Set<string>>();
-    let lastId: Types.ObjectId | undefined;
-
-    const baseFilter = {
-      channels: {
-        $elemMatch: {
-          status: UploadChannelStatus.Scheduled,
-          zernioPostId: { $exists: true, $nin: [null, ''] },
-        },
-      },
-    } as const;
+    const postIdsWithZernio: string[] = [];
 
     try {
-      for (;;) {
-        const q: Record<string, unknown> = { ...baseFilter };
-        if (lastId) q._id = { $gt: lastId };
+      const docs = await this.postModel
+        .find({
+          status: PostStatus.Scheduled,
+          zernioPostId: { $exists: true, $nin: [null, ''] },
+        })
+        .select({ zernioPostId: 1 })
+        .lean()
+        .exec();
 
-        const batch = await this.uploadModel
-          .find(q)
-          .select({ uploadId: 1, channels: 1 })
-          .sort({ _id: 1 })
-          .limit(batchSize)
-          .lean()
-          .exec();
-
-        if (batch.length === 0) break;
-
-        for (const doc of batch) {
-          accumulateScheduledZernioPostWork(postIdToUploadIds, {
-            uploadId: String(doc.uploadId),
-            channels: (doc.channels ?? []) as ScheduledLeanUpload['channels'],
-          });
+      for (const p of docs) {
+        const id = typeof p.zernioPostId === 'string' ? p.zernioPostId.trim() : '';
+        if (id && !postIdsWithZernio.includes(id)) {
+          postIdsWithZernio.push(id);
         }
-
-        lastId = batch[batch.length - 1]._id as Types.ObjectId;
       }
+      if (postIdsWithZernio.length === 0) return;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`scheduled sync: upload batch query failed: ${msg}`);
+      this.logger.warn(`scheduled sync: post batch query failed: ${msg}`);
       return;
     }
 
-    const postIds = Array.from(postIdToUploadIds.keys());
-    if (postIds.length === 0) return;
-
-    await mapWithConcurrencyLimit(postIds, concurrency, async (postId) => {
+    await mapWithConcurrencyLimit(postIdsWithZernio, concurrency, async (zPid) => {
       let parsed: unknown | null;
       try {
-        parsed = await this.mcpService.getZernioPost(postId);
+        parsed = await this.mcpService.getZernioPost(zPid);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(
-          `scheduled sync: getZernioPost ${postId} threw (will retry next run): ${msg}`,
+          `scheduled sync: getZernioPost ${zPid} threw (will retry next run): ${msg}`,
         );
         return;
       }
 
       const decision = interpretZernioPostForSync(parsed);
-      const uploadIds = postIdToUploadIds.get(postId);
-      if (!uploadIds) return;
 
-      for (const uploadId of uploadIds) {
-        try {
-          await this.applyDecisionForUpload(uploadId, postId, decision);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `scheduled sync: apply ${uploadId} post ${postId} failed: ${msg}`,
-          );
+      try {
+        const posts = await this.postModel.find({ zernioPostId: zPid }).exec();
+        for (const post of posts) {
+          await this.applyDecisionForPost(post, zPid, decision);
         }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`scheduled sync: apply posts ${zPid} failed: ${msg}`);
       }
     });
   }
@@ -176,12 +154,25 @@ export class UploadScheduledSyncService {
     return ch.channel.trim().toLowerCase();
   }
 
+  private platformKeys(postDoc: PostDocument): Set<string> {
+    return new Set(
+      (postDoc.channels ?? []).map((c) => String(c).trim().toLowerCase()),
+    );
+  }
+
   private emitUpload(
     uploadId: string,
     event: string,
     body: Record<string, unknown>,
   ): void {
     this.events.emitToRoom(`upload_${uploadId}`, event, body);
+  }
+
+  private remainingScheduledHint(doc: UploadDocument): string | null {
+    const remaining = doc.channels.find(
+      (c) => c.status === UploadChannelStatus.Scheduled && c.scheduledAt,
+    );
+    return remaining?.scheduledAt ? remaining.scheduledAt.toISOString() : null;
   }
 
   private async saveUploadEmitAll(
@@ -206,45 +197,80 @@ export class UploadScheduledSyncService {
     }
   }
 
-  private async applyDecisionForUpload(
-    uploadId: string,
-    postId: string,
+  private async applyDecisionForPost(
+    post: PostDocument,
+    zPid: string,
     decision: SyncPostDecision,
   ): Promise<void> {
-    const doc = await this.uploadModel.findOne({ uploadId }).exec();
-    if (!doc) return;
+    if (post.status !== PostStatus.Scheduled) return;
+    if ((post.zernioPostId?.trim() ?? '') !== zPid) return;
 
     if (decision.kind === 'noop_scheduled') return;
 
-    let touched = false;
     let publishNowHint = true;
     let scheduledAtHint: string | null = null;
+    let uploadTouched = false;
+
+    const keys = this.platformKeys(post);
+
+    if (decision.kind === 'not_found') {
+      post.status = PostStatus.Cancelled;
+      post.failureReason = 'Post not found in Zernio.';
+      publishNowHint = false;
+    } else if (decision.kind === 'mark_published') {
+      post.status = PostStatus.Published;
+      post.publishedAt = decision.at;
+      post.scheduledAt = null;
+      post.failureReason = null;
+      post.publishedNow = false;
+      post.platformResults = [...keys].map((platform) => ({
+        platform,
+        status: PlatformPostStatus.Published,
+        platformUrl: null,
+        publishedAt: decision.at,
+        failureReason: null,
+      }));
+    } else if (decision.kind === 'mark_failed') {
+      post.status = PostStatus.Failed;
+      post.failureReason = decision.message;
+      publishNowHint = false;
+      post.platformResults = [...keys].map((platform) => ({
+        platform,
+        status: PlatformPostStatus.Failed,
+        platformUrl: null,
+        publishedAt: null,
+        failureReason: decision.message,
+      }));
+    }
+
+    await post.save();
+
+    const doc = await this.uploadModel.findOne({ uploadId: post.uploadRef }).exec();
+    if (!doc) return;
 
     for (const ch of doc.channels) {
-      if (ch.status !== UploadChannelStatus.Scheduled) continue;
-      if ((ch.zernioPostId?.trim() ?? '') !== postId) continue;
+      if (!keys.has(this.rowKey(ch))) continue;
 
-      touched = true;
+      uploadTouched = true;
 
       if (decision.kind === 'not_found') {
         ch.status = UploadChannelStatus.Failed;
         ch.failureReason = 'Post not found in Zernio.';
+        ch.scheduledAt = null;
         this.emitUpload(doc.uploadId, 'upload:failed', {
           uploadId: doc.uploadId,
           channel: this.rowKey(ch),
           message: 'Publishing failed. Please retry.',
         });
-        publishNowHint = false;
       } else if (decision.kind === 'mark_published') {
         ch.status = UploadChannelStatus.Published;
         ch.publishedAt = decision.at;
         ch.scheduledAt = null;
         ch.failureReason = null;
-        ch.zernioPostId = postId;
         this.emitUpload(doc.uploadId, 'upload:completed', {
           uploadId: doc.uploadId,
           channel: this.rowKey(ch),
-          postId,
+          postId: zPid,
         });
       } else if (decision.kind === 'mark_failed') {
         ch.status = UploadChannelStatus.Failed;
@@ -254,20 +280,12 @@ export class UploadScheduledSyncService {
           channel: this.rowKey(ch),
           message: decision.message,
         });
-        publishNowHint = false;
       }
     }
 
-    if (!touched) return;
+    if (!uploadTouched) return;
 
-    if (scheduledAtHint === null) {
-      const remainingScheduled = doc.channels.find(
-        (c) => c.status === UploadChannelStatus.Scheduled && c.scheduledAt,
-      );
-      scheduledAtHint = remainingScheduled?.scheduledAt
-        ? remainingScheduled.scheduledAt.toISOString()
-        : null;
-    }
+    scheduledAtHint = this.remainingScheduledHint(doc);
 
     doc.markModified('channels');
     await this.saveUploadEmitAll(doc, {

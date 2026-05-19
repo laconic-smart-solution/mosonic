@@ -28,7 +28,6 @@ export type UploadChannelRow = {
   youtubeTitle: string | null
   scheduledAt: string | null
   publishedAt: string | null
-  zernioPostId: string | null
   failureReason: string | null
 }
 
@@ -73,6 +72,7 @@ export type PatchUploadChannelBody = {
 export type PatchUploadChannelSuccess = { success: true }
 
 export type UpdateUploadBody = {
+  channel?: string | null
   caption?: string | null
   scheduledAt?: string | null
   youtubeTitle?: string | null

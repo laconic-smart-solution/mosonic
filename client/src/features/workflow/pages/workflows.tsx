@@ -39,11 +39,11 @@ import type {
 } from "@/shared/types/workflow.type"
 
 const SEARCH_DEBOUNCE_MS = 300
-const PAGE_LIMITS = [10, 20, 50] as const
+const PAGE_LIMITS = [9, 18, 27] as const
 
 const WORKFLOW_PAGINATION_DEFAULTS: ListPaginationDefaults = {
   defaultPage: 1,
-  defaultLimit: 10,
+  defaultLimit: 9,
   allowedLimits: PAGE_LIMITS,
 }
 
@@ -380,8 +380,11 @@ export default function WorkflowsPage() {
       {!isPending && !isError && meta && totalPages > 1 ? (
         <div className="mt-8 flex flex-col items-center gap-4 border-t border-border pt-6 sm:flex-row sm:justify-between">
           <p className="text-[13px] text-muted-foreground">
-            Page <span className="font-medium text-foreground">{meta.page}</span> of{" "}
-            <span className="font-medium text-foreground">{meta.totalPages}</span>
+            Page{" "}
+            <span className="font-medium text-foreground">{meta.page}</span> of{" "}
+            <span className="font-medium text-foreground">
+              {meta.totalPages}
+            </span>
           </p>
           <PersistedShadcnPagination
             page={page}

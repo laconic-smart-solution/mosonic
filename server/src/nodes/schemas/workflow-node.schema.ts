@@ -2,20 +2,17 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 
+import {
+  LlmProvider,
+  WorkflowNodeType,
+} from '../workflow-node-llm.enums';
+
+export { WorkflowNodeType, LlmProvider } from '../workflow-node-llm.enums';
 /**
  * Node **definition** only (template + provider defaults).
  * Per-run execution (input, output, status, retryCount) lives in
  * `Pipeline.nodes[]`, not on this document.
  */
-export enum WorkflowNodeType {
-  KeywordPlanner = 'keyword_planner',
-  TextGeneration = 'text_generation',
-  ImageGeneration = 'image_generation',
-  VideoGeneration = 'video_generation',
-  Translation = 'translation',
-  Transcription = 'transcription',
-  Summarization = 'summarization',
-}
 
 export enum NodeOutputFormat {
   Paragraph = 'paragraph',
@@ -66,14 +63,6 @@ export enum NodeSummaryLength {
   Short = 'short',
   Medium = 'medium',
   Long = 'long',
-}
-
-export enum LlmProvider {
-  OpenAI = 'openai',
-  Anthropic = 'anthropic',
-  Google = 'google',
-  Groq = 'groq',
-  Ollama = 'ollama',
 }
 
 /**
@@ -156,6 +145,30 @@ export class WorkflowNodeConfig {
   /** Upstream node id for chained steps */
   @Prop({ type: String })
   sourceNodeRef?: string;
+
+  /** branch node: rule_channels | manual */
+  @Prop({ type: String })
+  mode?: string;
+
+  /** adapt node: target channel name */
+  @Prop({ type: String })
+  channel?: string;
+
+  /** adapt node: channel content style hint */
+  @Prop({ type: String })
+  contentStyle?: string;
+
+  /** intelligence node: web search scope */
+  @Prop({ type: String })
+  searchType?: string;
+
+  /** intelligence node: prompt when searchType is custom */
+  @Prop({ type: String, default: null })
+  customPrompt?: string | null;
+
+  /** Lane-scoped subgraph: normalized channel handle (matches Branch sourceHandle ids). */
+  @Prop({ type: String })
+  laneId?: string;
 }
 export const WorkflowNodeConfigSchema =
   SchemaFactory.createForClass(WorkflowNodeConfig);
@@ -198,6 +211,18 @@ export class WorkflowNode {
 
   @Prop({ type: WorkflowNodeConfigSchema, default: {} })
   config: WorkflowNodeConfig;
+
+  /** Authoring lane hint; materialized runs set lane on pipeline nodes. */
+  @Prop({ type: String })
+  lane?: string;
+
+  /** Canvas X coordinate for workflow editor layout. */
+  @Prop({ type: Number })
+  x?: number;
+
+  /** Canvas Y coordinate for workflow editor layout. */
+  @Prop({ type: Number })
+  y?: number;
 }
 
 export const WorkflowNodeSchema = SchemaFactory.createForClass(WorkflowNode);

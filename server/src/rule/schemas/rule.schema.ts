@@ -306,6 +306,16 @@ export class Rule {
 
   @Prop({ type: [RuleVersionSchema], default: [] })
   versions: RuleVersion[];
+
+  /** Optional multi-step content approval policy. */
+  @Prop({
+    type: [{ role: String, required: { type: Boolean, default: true } }],
+    default: [],
+  })
+  approvalPolicy: Array<{ role: string; required: boolean }>;
+
+  @Prop({ type: MongooseSchema.Types.Mixed, default: null })
+  autonomyPolicy: Record<string, unknown> | null;
 }
 
 export const RuleSchema = SchemaFactory.createForClass(Rule);

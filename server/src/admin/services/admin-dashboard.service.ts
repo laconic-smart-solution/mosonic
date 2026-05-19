@@ -140,6 +140,47 @@ export class AdminDashboardService {
     }));
   }
 
+  async getPipelineSlo(days = 7) {
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    const pipelines = await this.pipelineModel
+      .find({ startedAt: { $gte: from } })
+      .select({ status: 1, startedAt: 1, completedAt: 1 })
+      .lean()
+      .exec();
+
+    const durations: number[] = [];
+    let failed = 0;
+    let completed = 0;
+    for (const p of pipelines) {
+      if (p.status === 'failed') failed += 1;
+      if (p.status === 'completed') {
+        completed += 1;
+        if (p.completedAt && p.startedAt) {
+          durations.push(
+            new Date(p.completedAt).getTime() - new Date(p.startedAt).getTime(),
+          );
+        }
+      }
+    }
+    durations.sort((a, b) => a - b);
+    const p50 =
+      durations.length > 0
+        ? durations[Math.floor(durations.length * 0.5)]!
+        : 0;
+    const p95 =
+      durations.length > 0
+        ? durations[Math.floor(durations.length * 0.95)]!
+        : 0;
+  return {
+      total: pipelines.length,
+      completed,
+      failed,
+      failureRate: pipelines.length ? failed / pipelines.length : 0,
+      durationMs: { p50, p95 },
+    };
+  }
+
   async getChannelBreakdown() {
     const mStart = monthStart();
 

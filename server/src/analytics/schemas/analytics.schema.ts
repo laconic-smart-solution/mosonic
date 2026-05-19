@@ -75,6 +75,12 @@ export class ContentPerformanceEntry {
   @Prop({ required: true })
   channel: string;
 
+  @Prop({ type: String, default: null })
+  variantId?: string | null;
+
+  @Prop({ type: String, default: null })
+  experimentId?: string | null;
+
   @Prop({ type: ChannelMetricsSchema, required: true })
   metrics: ChannelMetrics;
 }

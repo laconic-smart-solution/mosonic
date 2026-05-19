@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { RuleDocument } from '../rule/schemas/rule.schema';
+import {
+  isSupportedSuggestionField,
+  normalizeSuggestionFieldPath,
+} from '../rule/rule-suggestion-field-patch.util';
 import { LlmService } from '../llm/llm.service';
 import type { CampaignSummary, ContentPerformanceEntry } from './schemas/analytics.schema';
 import {
@@ -48,9 +52,13 @@ export class AnalyticsFeedbackService {
       '=== SUGGESTION RULES ===',
       'Only suggest changes that are clearly supported by the data.',
       'Each suggestion must have a specific measurable reason.',
-      'Do NOT suggest changes to: brandRestrictions, brandVoice (too sensitive).',
-      'Safe to suggest: brandTone, keywords, hashtagStrategy, channels priority, contentFormats.',
-      'Auto-apply safe: postingFrequency, customSchedule (based on best performing times).',
+      'Do NOT suggest changes to: brandVoice, brandRestrictions, audience fields, contentGuidelines.',
+      'Use EXACT field paths (required for apply):',
+      '  brand.brandTone (string[]), brand.brandName, brand.industry, brand.brandDescription, brand.callToAction',
+      '  campaign.keywords (string[]), campaign.hashtagStrategy (string[]), campaign.contentFormats (string[]), campaign.goals (string[])',
+      '  campaign.postingFrequency (daily|weekly|custom), campaign.customSchedule (string[])',
+      '  channels[<platform>].priority (low|medium|high), channels[<platform>].contentStyle (string)',
+      'Never use brand.keywords — keywords belong under campaign.keywords.',
       '',
       '=== CONFIDENCE LEVELS ===',
       'high   → clear pattern in data, consistent across multiple posts',
@@ -80,26 +88,36 @@ export class AnalyticsFeedbackService {
         ? parsed.suggestions
         : [];
 
-      return {
-        suggestions: suggestions
-          .filter((s: Record<string, unknown>) => String(s.field ?? '').trim())
-          .map((s: Record<string, unknown>) => {
-            const confRaw =
-              typeof s.confidence === 'string' ? s.confidence.toLowerCase() : '';
-            let confidence = SuggestionConfidence.Medium;
-            if (confRaw === 'high') confidence = SuggestionConfidence.High;
-            else if (confRaw === 'low') confidence = SuggestionConfidence.Low;
+      const mapped = suggestions
+        .filter((s: Record<string, unknown>) => String(s.field ?? '').trim())
+        .map((s: Record<string, unknown>) => {
+          const confRaw =
+            typeof s.confidence === 'string' ? s.confidence.toLowerCase() : '';
+          let confidence = SuggestionConfidence.Medium;
+          if (confRaw === 'high') confidence = SuggestionConfidence.High;
+          else if (confRaw === 'low') confidence = SuggestionConfidence.Low;
 
-            return {
-              field: String(s.field ?? ''),
-              currentValue: s.currentValue ?? null,
-              suggestedValue: s.suggestedValue ?? null,
-              reason: String(s.reason ?? ''),
-              confidence,
-              status: FeedbackSignalStatus.Pending,
-            };
-          }),
-      };
+          const field = normalizeSuggestionFieldPath(String(s.field ?? ''));
+
+          return {
+            field,
+            currentValue: s.currentValue ?? null,
+            suggestedValue: s.suggestedValue ?? null,
+            reason: String(s.reason ?? ''),
+            confidence,
+            status: FeedbackSignalStatus.Pending,
+          };
+        })
+        .filter((s) => isSupportedSuggestionField(s.field));
+
+      const dropped = suggestions.length - mapped.length;
+      if (dropped > 0) {
+        this.logger.warn(
+          `Dropped ${dropped} suggestion(s) with unsupported field paths`,
+        );
+      }
+
+      return { suggestions: mapped };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`AI feedback analysis failed: ${message}`);

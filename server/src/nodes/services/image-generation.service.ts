@@ -8,7 +8,10 @@ import {
   NodeImageStyle,
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
-import { aspectRatioToOpenAiImageSize } from '../workflow-node-config.zod';
+import {
+  aspectRatioToOpenAiImageSize,
+  coerceOpenAiImageSize,
+} from '../openai-image-size.util';
 import type {
   ImageGenerationInput,
   NodeExecutionInput,
@@ -36,10 +39,7 @@ function normalizeImageGenerationConfig(
     c.provider && Object.values(LlmProvider).includes(c.provider)
       ? c.provider
       : undefined;
-  const model = typeof c.model === 'string' ? c.model : 'dall-e-3';
-  const dalle3Sizes = new Set(['1024x1024', '1792x1024', '1024x1792']);
-  const dalle2Sizes = new Set(['256x256', '512x512', '1024x1024']);
-
+  const model = typeof c.model === 'string' ? c.model : 'gpt-image-1';
   const aspect =
     typeof c.aspectRatio === 'string' && c.aspectRatio.trim()
       ? c.aspectRatio.trim()
@@ -50,24 +50,13 @@ function normalizeImageGenerationConfig(
   let sizeRaw: string;
   if (aspect) {
     sizeRaw = aspectRatioToOpenAiImageSize(aspect, model);
-  } else if (model === 'dall-e-2') {
-    sizeRaw =
-      explicitSize && dalle2Sizes.has(explicitSize)
-        ? explicitSize
-        : '1024x1024';
+  } else if (explicitSize) {
+    sizeRaw = explicitSize;
   } else {
-    sizeRaw =
-      explicitSize && dalle3Sizes.has(explicitSize)
-        ? explicitSize
-        : '1024x1024';
+    sizeRaw = aspectRatioToOpenAiImageSize('1:1', model);
   }
 
-  let size: NormalizedImageConfig['size'];
-  if (model === 'dall-e-2') {
-    size = dalle2Sizes.has(sizeRaw) ? sizeRaw : '1024x1024';
-  } else {
-    size = dalle3Sizes.has(sizeRaw) ? sizeRaw : '1024x1024';
-  }
+  const size = coerceOpenAiImageSize(sizeRaw, model) as NormalizedImageConfig['size'];
 
   const quality =
     c.quality === NodeImageQuality.Hd ? ('hd' as const) : ('standard' as const);
@@ -157,7 +146,7 @@ export class ImageGenerationService {
       base64: generated.base64,
       mimeType: generated.mimeType,
       fileName: `workflow-${workflowRef}-image-${timePart}.png`,
-      folderPath: `workflow-images/${workflowRef}`,
+      folderPath: `neural-tex/workflow-images/${workflowRef}`,
     });
 
     return { image };

@@ -7,10 +7,12 @@ export const RulesPage        = PageLoader(lazy(() => import("@/features/rules/p
 export const WorkflowPromptPage = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-prompt")))
 export const WorkflowPage       = PageLoader(lazy(() => import("@/features/workflow/pages/workflow")))
 export const WorkflowsListPage  = PageLoader(lazy(() => import("@/features/workflow/pages/workflows")))
+export const PipelinesPage      = PageLoader(lazy(() => import("@/features/pipeline/pages/pipelines")))
 export const RunPage          = PageLoader(lazy(() => import("@/features/run/pages/run")))
 export const ContentPage      = PageLoader(lazy(() => import("@/features/content/pages/content")))
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
+export const PostsPage        = PageLoader(lazy(() => import("@/features/posts/pages/posts-page")))
 export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
 )

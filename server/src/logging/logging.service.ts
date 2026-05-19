@@ -30,6 +30,17 @@ export class LoggingService {
     private readonly logModel: Model<PipelineLogDocument>,
   ) {}
 
+  async findByPipelineRef(
+    pipelineRef: string,
+    limit = 500,
+  ): Promise<PipelineLogDocument[]> {
+    return this.logModel
+      .find({ pipelineRef })
+      .sort({ timestamp: 1 })
+      .limit(limit)
+      .exec();
+  }
+
   async appendLog(dto: AppendPipelineLogDto): Promise<PipelineLogDocument> {
     return this.logModel.create({
       pipelineRef: dto.pipelineRef,

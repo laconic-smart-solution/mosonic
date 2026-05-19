@@ -29,6 +29,13 @@ export const TOPBAR_SEARCH_ROUTES: TopbarSearchRouteEntry[] = [
     keywords: ["content", "library", "posts", "items"],
   },
   {
+    id: "pipelines",
+    path: "/pipelines",
+    title: "Pipelines",
+    subtitle: "Pipeline runs",
+    keywords: ["pipelines", "runs", "executions", "workflow runs"],
+  },
+  {
     id: "settings-accounts",
     path: "/settings/accounts",
     title: "Account settings",

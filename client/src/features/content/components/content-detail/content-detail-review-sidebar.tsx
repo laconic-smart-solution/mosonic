@@ -75,11 +75,49 @@ export function ContentDetailReviewSidebar({
           <p className="text-sm font-semibold text-[#0F1F3D]">
             {data.status === "draft"
               ? "Draft — pending review"
-              : data.status === "approved"
-                ? "Approved — ready for upload"
-                : "Rejected"}
+              : data.status === "in_review"
+                ? "In review — approval routing"
+                : data.status === "approved"
+                  ? "Approved — ready for upload"
+                  : "Rejected"}
           </p>
         </div>
+        {(data.approval?.steps?.length ?? 0) > 0 ? (
+          <div className="mb-3 space-y-2 rounded-xl border border-[#EDE9E1] bg-white px-3 py-3">
+            <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
+              Approval steps
+            </p>
+            {data.approval!.steps.map((step, index) => {
+              const done = data.approval!.records.some(
+                (r) => r.stepIndex === index,
+              )
+              const nextIndex = data.approval!.records.length
+              const isNext = !done && index === nextIndex
+              return (
+                <div
+                  key={`${step.role}-${index}`}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="capitalize text-[#62594E]">
+                    {step.role.replace(/_/g, " ")}
+                    {step.required ? "" : " (optional)"}
+                  </span>
+                  <span
+                    className={
+                      done
+                        ? "font-medium text-emerald-700"
+                        : isNext
+                          ? "font-medium text-amber-700"
+                          : "text-[#A89D8E]"
+                    }
+                  >
+                    {done ? "Approved" : isNext ? "Pending" : "Waiting"}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
         {data.status === "approved" ? (
           hideContinueToUpload ? (
             <p className="mb-2 rounded-lg border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2 text-xs leading-snug text-[#857A6C]">
@@ -109,7 +147,9 @@ export function ContentDetailReviewSidebar({
                       >
                         {approveLoading
                           ? "Approving…"
-                          : "Approve & send to upload"}
+                          : (data.approval?.steps?.length ?? 0) > 0
+                            ? "Approve step"
+                            : "Approve & send to upload"}
                       </Button>
                     </span>
                   }

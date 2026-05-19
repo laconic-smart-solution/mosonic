@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resolvePublicApiBase } from '../upload/file-service-local-mirror.util';
+import { uploadBufferToFileService } from '../upload/file-service-upload.util';
 
 export type ImageFileUploadResult = {
   originalFileName: string;
@@ -46,46 +47,20 @@ export class ImageFileService {
     folderPath?: string,
   ): Promise<ImageFileUploadResult> {
     const base = this.requireFileServiceBase();
-    const endpoint = `${base}/upload`;
-    const blob = new Blob([new Uint8Array(file.buffer)], {
-      type: file.mimetype,
+    const uploaded = await uploadBufferToFileService({
+      fileServiceBase: base,
+      buffer: new Uint8Array(file.buffer),
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      folderPath: folderPath?.trim(),
     });
-    const form = new FormData();
-    form.append('file', blob, file.originalname);
-    const fp = folderPath?.trim();
-    if (fp) {
-      form.append('folderPath', fp);
-    }
 
-    const response = await fetch(endpoint, { method: 'POST', body: form });
-    if (response.status !== 201) {
-      const bodyText = await response.text().catch(() => '');
-      throw new BadRequestException(
-        `File service upload failed (${response.status}): ${bodyText || response.statusText}`,
-      );
-    }
-
-    const payload = (await response.json()) as {
-      success?: boolean;
-      data?: {
-        originalFileName?: string;
-        storedFileName?: string;
-        fileUrl?: string;
-        relativePath?: string;
-      };
-    };
-    const data = payload?.data;
-    if (!payload?.success || !data) {
-      throw new BadRequestException(
-        'File service returned an invalid response',
-      );
-    }
-
-    const originalFileName = (data.originalFileName ?? file.originalname).trim();
-    const storedFileName = (data.storedFileName ?? '').trim();
-    const relativePath = (data.relativePath ?? '').trim();
-    const fileUrl =
-      (data.fileUrl ?? '').trim() || relativePath;
+    const originalFileName = (
+      uploaded.originalFileName ?? file.originalname
+    ).trim();
+    const storedFileName = (uploaded.storedFileName ?? '').trim();
+    const relativePath = uploaded.relativePath.trim();
+    const fileUrl = uploaded.fileUrl.trim() || relativePath;
     if (!relativePath) {
       throw new BadRequestException(
         'File service did not return a relativePath',

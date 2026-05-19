@@ -12,24 +12,84 @@ import type {
 } from '../types/node-execution.types';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
 
-const POLL_INTERVAL_MS = 5000;
-const MAX_POLL_ATTEMPTS = 60;
+/** Inline execution poll (deprecated path when queue is off). */
+const INLINE_POLL_INTERVAL_MS = 5000;
+const INLINE_VIDEO_TIMEOUT_MS = 30 * 60 * 1000;
 
-type NormalizedVideoConfig = {
+export type VideoJobStatus = 'processing' | 'completed' | 'failed';
+
+export interface VideoSubmitResult {
+  externalJobId: string;
+  estimatedSeconds: number;
+  normalized: NormalizedVideoConfig;
+}
+
+export interface VideoCheckResult {
+  status: VideoJobStatus;
+  error?: string;
+}
+
+export interface VideoCompleteResult {
+  video: string;
+  storage: NonNullable<NodeExecutionResult['video']>;
+  videoCost: NonNullable<NodeExecutionResult['videoCost']>;
+}
+
+/** OpenAI Sora `seconds` parameter — only these values are valid. */
+export const SORA_VIDEO_DURATIONS = [4, 8, 12, 16, 20] as const;
+export type SoraVideoDuration = (typeof SORA_VIDEO_DURATIONS)[number];
+
+export function normalizeSoraDurationSeconds(
+  raw: number | undefined,
+): SoraVideoDuration {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 8;
+  let best: SoraVideoDuration = SORA_VIDEO_DURATIONS[0];
+  let bestDiff = Math.abs(n - best);
+  for (const s of SORA_VIDEO_DURATIONS) {
+    const d = Math.abs(n - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
+
+/** Global Sora prompt constraints — no on-screen text, logos, or contact details. */
+export const VIDEO_OUTPUT_GUARDRAILS = [
+  'No on-screen text of any kind: no captions, subtitles, titles, labels, typography, or readable words.',
+  'No logos, brand marks, watermarks, app UI, or end cards unless explicitly provided as a reference asset.',
+  'No phone numbers, email addresses, physical addresses, URLs, QR codes, social handles, or other contact information.',
+  'Do not invent or display prices, dates, legal claims, or contact details that are not in the brief.',
+  'No spoken words, voiceover, or lip-synced dialogue.',
+  'Visual storytelling only; contact and CTA belong in post copy, not burned into the video.',
+] as const;
+
+export type NormalizedVideoConfig = {
   provider?: LlmProvider;
   model: string;
   duration: number;
   resolution: string;
   aspectRatio: string;
+  negativePrompt?: string;
   secondsForApi: OpenAI.Videos.VideoCreateParams['seconds'];
   sizeForApi: OpenAI.Videos.VideoCreateParams['size'];
 };
 
-function normalizeVideoConfig(
+export function normalizeVideoConfig(
   config: NodeExecutionInput['config'],
 ): NormalizedVideoConfig {
   const c = config ?? {};
-  const durationRaw = typeof c.duration === 'number' ? c.duration : 10;
+  const durationVal = (c as Record<string, unknown>).duration;
+  const durationRaw =
+    typeof durationVal === 'number'
+      ? durationVal
+      : typeof durationVal === 'string' && durationVal.trim()
+        ? Number(durationVal)
+        : 8;
+  const duration = normalizeSoraDurationSeconds(
+    Number.isFinite(durationRaw) ? durationRaw : undefined,
+  );
   const resolution = typeof c.resolution === 'string' ? c.resolution : '720p';
   const aspectRatio =
     typeof c.aspectRatio === 'string' ? c.aspectRatio : '16:9';
@@ -46,33 +106,46 @@ function normalizeVideoConfig(
     'sora-2-2025-12-08',
   ]);
   const model = allowedModels.has(requestedModel) ? requestedModel : 'sora-2';
+  const isSoraPro = model.includes('pro');
 
-  const secondsForApi: OpenAI.Videos.VideoCreateParams['seconds'] =
-    durationRaw <= 5 ? '4' : durationRaw <= 10 ? '8' : '12';
+  const secondsForApi = String(
+    duration,
+  ) as OpenAI.Videos.VideoCreateParams['seconds'];
 
+  /** sora-2 (non-pro) only accepts 720x1280 and 1280x720 per OpenAI API. */
   const sizeForApi: OpenAI.Videos.VideoCreateParams['size'] = (() => {
-    if (aspectRatio === '9:16' || aspectRatio === '4:5') {
-      return resolution === '1080p' ? '1024x1792' : '720x1280';
+    const wantsHd = resolution === '1080p' && isSoraPro;
+    const portrait =
+      aspectRatio === '9:16' ||
+      aspectRatio === '4:5' ||
+      aspectRatio === '1:1';
+    if (portrait) {
+      return wantsHd ? '1024x1792' : '720x1280';
     }
     if (aspectRatio === '16:9') {
-      return resolution === '1080p' ? '1792x1024' : '1280x720';
+      return wantsHd ? '1792x1024' : '1280x720';
     }
-    // Sora API does not expose true 1:1 size. Use portrait fallback and reinforce square feel in prompt.
-    return resolution === '1080p' ? '1024x1792' : '720x1280';
+    return wantsHd ? '1024x1792' : '720x1280';
   })();
+
+  const negativePrompt =
+    typeof c.negativePrompt === 'string' && c.negativePrompt.trim()
+      ? c.negativePrompt.trim()
+      : undefined;
 
   return {
     provider,
     model,
-    duration: durationRaw,
+    duration,
     resolution,
     aspectRatio,
+    negativePrompt,
     secondsForApi,
     sizeForApi,
   };
 }
 
-function buildVideoPrompt(
+export function buildVideoPrompt(
   rule: Rule,
   previousOutputs: { text?: string; image?: string },
   config: NormalizedVideoConfig,
@@ -113,12 +186,28 @@ function buildVideoPrompt(
     rule.contentGuidelines.requiredElements.length
       ? `Must include feel of: ${rule.contentGuidelines.requiredElements.join(', ')}`
       : '',
-    'No text overlays or watermarks.',
-    'No spoken words or voiceover.',
+    '',
+    '=== VIDEO OUTPUT CONSTRAINTS (mandatory) ===',
+    ...VIDEO_OUTPUT_GUARDRAILS,
+    config.negativePrompt
+      ? `Additionally avoid: ${config.negativePrompt}`
+      : '',
     'Professional marketing video quality.',
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+export function mapOpenAiVideoStatus(
+  status: OpenAI.Videos.Video['status'],
+): VideoJobStatus {
+  if (status === 'completed') {
+    return 'completed';
+  }
+  if (status === 'failed') {
+    return 'failed';
+  }
+  return 'processing';
 }
 
 @Injectable()
@@ -156,12 +245,11 @@ export class VideoGenerationService {
     return `${baseUrl.replace(/\/+$/, '')}/upload`;
   }
 
-  private async emitProcessing(
+  async emitProcessing(
     pipelineId: string,
     nodeId: string,
     message: string,
   ): Promise<void> {
-    // Progress emits should not fail generation when websocket is temporarily unavailable.
     try {
       this.events.emitToPipeline(pipelineId, 'node:processing', {
         pipelineId,
@@ -227,7 +315,6 @@ export class VideoGenerationService {
       const result = await attemptUpload('video/mp4');
       return await this.maybeMirrorVideoUploadToPublicUploads(result, 'video/mp4');
     } catch (error) {
-      // Some file services validate MIME strictly; fallback can unblock storage.
       if (error instanceof Error && error.message.includes('status 400')) {
         const result = await attemptUpload('application/octet-stream');
         return await this.maybeMirrorVideoUploadToPublicUploads(
@@ -272,10 +359,11 @@ export class VideoGenerationService {
     return result;
   }
 
-  async generateVideo(
+  /** Phase 1: submit Sora job and return external id (no polling). */
+  async submitVideoJob(
     input: VideoGenerationInput & { pipelineId: string; nodeId: string },
-  ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
-    const { rule, previousOutputs, config, pipelineId, nodeId } = input;
+  ): Promise<VideoSubmitResult> {
+    const { rule, previousOutputs, config } = input;
     const sourceText = previousOutputs.text?.trim();
     if (!sourceText) {
       throw new UnprocessableEntityException(
@@ -290,12 +378,82 @@ export class VideoGenerationService {
     );
 
     const client = this.getOpenAiClient(normalized.provider);
-    let result = await client.videos.create({
+    const created = await client.videos.create({
       model: normalized.model,
       prompt,
       size: normalized.sizeForApi,
       seconds: normalized.secondsForApi,
     });
+
+    return {
+      externalJobId: created.id,
+      estimatedSeconds: normalized.duration,
+      normalized,
+    };
+  }
+
+  /** Phase 2: single status poll. */
+  async checkVideoJob(
+    externalJobId: string,
+    provider?: LlmProvider,
+  ): Promise<VideoCheckResult> {
+    const client = this.getOpenAiClient(provider);
+    const result = await client.videos.retrieve(externalJobId);
+    const status = mapOpenAiVideoStatus(result.status);
+    if (status === 'failed') {
+      return {
+        status,
+        error:
+          result.error?.message || 'Sora video generation failed. Please retry.',
+      };
+    }
+    return { status };
+  }
+
+  /** Phase 2 completion: download from provider and upload to file service. */
+  async completeVideoJob(
+    externalJobId: string,
+    input: VideoGenerationInput & {
+      pipelineId: string;
+      nodeId: string;
+      normalized: NormalizedVideoConfig;
+    },
+  ): Promise<VideoCompleteResult> {
+    const client = this.getOpenAiClient(input.normalized.provider);
+    const videoResponse = await client.videos.downloadContent(externalJobId);
+    if (!videoResponse.ok) {
+      throw new Error(
+        `Failed to download generated video (${videoResponse.status} ${videoResponse.statusText})`,
+      );
+    }
+    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+    const fileName = `${input.nodeId}.mp4`;
+    const storage = await this.uploadVideoBuffer({
+      videoBuffer,
+      fileName,
+      folderPath: `neural-tex/videos/${input.pipelineId}`,
+    });
+
+    return {
+      video: storage.fileUrl,
+      storage,
+      videoCost: {
+        model: input.normalized.model,
+        videoSeconds: input.normalized.duration,
+        videoResolution: input.normalized.resolution,
+      },
+    };
+  }
+
+  /**
+   * Blocking path for inline orchestration (ORCHESTRATION_USE_QUEUE=false).
+   */
+  async generateVideo(
+    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
+  ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
+    const { pipelineId, nodeId } = input;
+    const { externalJobId, estimatedSeconds, normalized } =
+      await this.submitVideoJob(input);
 
     await this.emitProcessing(
       pipelineId,
@@ -303,42 +461,35 @@ export class VideoGenerationService {
       'Video generation started...',
     );
 
+    const maxAttempts = INLINE_VIDEO_TIMEOUT_MS / INLINE_POLL_INTERVAL_MS;
     let attempts = 0;
-    while (result.status !== 'completed' && result.status !== 'failed') {
-      if (attempts >= MAX_POLL_ATTEMPTS) {
-        throw new Error('Video generation timed out after 5 minutes.');
+    let check = await this.checkVideoJob(externalJobId, normalized.provider);
+
+    while (check.status === 'processing') {
+      if (attempts >= maxAttempts) {
+        throw new Error('Video generation timed out after 30 minutes.');
       }
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-      result = await client.videos.retrieve(result.id);
+      await new Promise((resolve) =>
+        setTimeout(resolve, INLINE_POLL_INTERVAL_MS),
+      );
+      check = await this.checkVideoJob(externalJobId, normalized.provider);
       attempts += 1;
       await this.emitProcessing(
         pipelineId,
         nodeId,
-        `Generating video... (${attempts * 5}s)`,
+        `Generating video... (~${attempts * (INLINE_POLL_INTERVAL_MS / 1000)}s, est. ${estimatedSeconds}s)`,
       );
     }
 
-    if (result.status === 'failed') {
-      throw new Error(
-        result.error?.message || 'Sora video generation failed. Please retry.',
-      );
+    if (check.status === 'failed') {
+      throw new Error(check.error ?? 'Sora video generation failed. Please retry.');
     }
 
-    const videoResponse = await client.videos.downloadContent(result.id);
-    if (!videoResponse.ok) {
-      throw new Error(
-        `Failed to download generated video (${videoResponse.status} ${videoResponse.statusText})`,
-      );
-    }
-    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
-    const fileName = `${nodeId}.mp4`;
-    const storage = await this.uploadVideoBuffer({
-      videoBuffer,
-      fileName,
-      folderPath: `videos/${pipelineId}`,
+    const completed = await this.completeVideoJob(externalJobId, {
+      ...input,
+      normalized,
     });
-
-    return { video: storage.fileUrl, storage };
+    return { video: completed.video, storage: completed.storage };
   }
 
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {

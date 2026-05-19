@@ -3,9 +3,9 @@ jest.mock('../rule/rule.service', () => ({
 }));
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { PostStatus } from '../post/schemas/post.schema';
 import { UserRole } from '../users/schemas/user.schema';
 import { AnalyticsService } from './analytics.service';
-import { UploadChannelStatus } from '../upload/schemas/upload.schema';
 
 describe('AnalyticsService split behavior', () => {
   const config = { get: jest.fn().mockReturnValue(undefined) };
@@ -16,9 +16,25 @@ describe('AnalyticsService split behavior', () => {
     find: jest.fn().mockReturnValue({ lean: jest.fn().mockReturnValue({ exec: jest.fn() }) }),
   };
 
+  const postFindExec = jest.fn();
+  const postFindMock = jest.fn().mockReturnValue({
+    select: () => ({
+      lean: () => ({
+        exec: postFindExec,
+      }),
+    }),
+  });
+  const postModel = { find: postFindMock };
+
   const uploadFindExec = jest.fn();
   const uploadModel = {
-    find: jest.fn().mockReturnValue({ exec: uploadFindExec }),
+    find: jest.fn().mockReturnValue({
+      select: () => ({
+        lean: () => ({
+          exec: uploadFindExec,
+        }),
+      }),
+    }),
   };
 
   const ruleFindExec = jest.fn();
@@ -46,6 +62,7 @@ describe('AnalyticsService split behavior', () => {
   const service = new AnalyticsService(
     config as never,
     syncLockModel as never,
+    postModel as never,
     contentModel as never,
     uploadModel as never,
     ruleModel as never,
@@ -56,7 +73,6 @@ describe('AnalyticsService split behavior', () => {
     ruleService as never,
   );
 
-  // pullAnalyticsForRule pauses 500ms per post; skip those waits in tests.
   jest
     .spyOn(service as unknown as { sleep: (ms: number) => Promise<void> }, 'sleep')
     .mockResolvedValue(undefined);
@@ -65,31 +81,56 @@ describe('AnalyticsService split behavior', () => {
     jest.clearAllMocks();
   });
 
-  it('pull updates metrics in place with empty feedbackSignal and does not call the LLM', async () => {
-    const rule = { ruleId: 'rule-1', userId: 'user-1' };
-    uploadFindExec.mockResolvedValue([
-      {
-        uploadId: 'u1',
-        contentRef: 'c1',
-        workflowRef: 'wf1',
-        channels: [
-          {
-            channel: 'instagram',
-            zernioPostId: 'post_1',
-            status: UploadChannelStatus.Published,
-          },
-        ],
-      },
-    ]);
-    zernioRest.getPostAnalytics.mockResolvedValue({
-      views: 100,
+  const zernioInstagramResponse = {
+    syncStatus: 'synced',
+    analytics: {
+      impressions: 100,
+      reach: 80,
       likes: 10,
       comments: 1,
       shares: 1,
-      reach: 100,
-      engagement: 12,
-      conversions: 0,
-    });
+      clicks: 5,
+    },
+    platformAnalytics: [
+      {
+        platform: 'instagram',
+        syncStatus: 'synced',
+        analytics: {
+          impressions: 100,
+          reach: 80,
+          likes: 10,
+          comments: 1,
+          shares: 1,
+          clicks: 5,
+        },
+      },
+    ],
+  };
+
+  it('pull queries published and partial posts only', async () => {
+    postFindExec.mockResolvedValue([]);
+    const rule = { ruleId: 'rule-1', userId: 'user-1' };
+    const out = await service.pullAnalyticsForRule(rule as never);
+    expect(out).toBeNull();
+    expect(postFindMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: { $in: [PostStatus.Published, PostStatus.Partial] },
+      }),
+    );
+  });
+
+  it('pull updates metrics with per-platform rows from Zernio', async () => {
+    const rule = { ruleId: 'rule-1', userId: 'user-1' };
+    postFindExec.mockResolvedValue([
+      {
+        contentRef: 'c1',
+        uploadRef: 'u1',
+        zernioPostId: 'post_1',
+        channels: ['instagram'],
+      },
+    ]);
+    uploadFindExec.mockResolvedValue([{ uploadId: 'u1', workflowRef: 'wf1' }]);
+    zernioRest.getPostAnalytics.mockResolvedValue(zernioInstagramResponse);
     analyticsRepository.ensureForRule.mockResolvedValue({
       analyticsId: 'a1',
       ruleRef: 'rule-1',
@@ -103,21 +144,90 @@ describe('AnalyticsService split behavior', () => {
     const out = await service.pullAnalyticsForRule(rule as never);
 
     expect(out).not.toBeNull();
+    expect(out!.summary.platformRowsSynced).toBe(1);
     expect(analyticsFeedback.analyze).not.toHaveBeenCalled();
-    expect(analyticsRepository.ensureForRule).toHaveBeenCalledWith('rule-1');
     expect(analyticsRepository.updateMetrics).toHaveBeenCalledTimes(1);
     const updateArg = analyticsRepository.updateMetrics.mock.calls[0];
-    expect(updateArg[0]).toBe('rule-1');
     expect(updateArg[1].contentPerformance).toHaveLength(1);
+    expect(updateArg[1].contentPerformance[0].metrics.views).toBe(100);
     expect(events.emitToAnalyticsRule).toHaveBeenCalledWith(
       'rule-1',
       'analytics:pull_completed',
-      expect.any(Object),
+      expect.objectContaining({
+        summary: expect.objectContaining({ platformRowsSynced: 1 }),
+      }),
     );
-    expect(events.emitToAnalyticsRule).not.toHaveBeenCalledWith(
+  });
+
+  it('pull creates one row per platform for multi-channel posts', async () => {
+    const rule = { ruleId: 'rule-1', userId: 'user-1' };
+    postFindExec.mockResolvedValue([
+      {
+        contentRef: 'c1',
+        uploadRef: 'u1',
+        zernioPostId: 'post_multi',
+        channels: ['twitter', 'facebook'],
+      },
+    ]);
+    uploadFindExec.mockResolvedValue([{ uploadId: 'u1', workflowRef: 'wf1' }]);
+    zernioRest.getPostAnalytics.mockResolvedValue({
+      syncStatus: 'synced',
+      platformAnalytics: [
+        {
+          platform: 'twitter',
+          syncStatus: 'synced',
+          analytics: { impressions: 600, likes: 6, reach: 500 },
+        },
+        {
+          platform: 'facebook',
+          syncStatus: 'synced',
+          analytics: { impressions: 400, likes: 4, reach: 300 },
+        },
+      ],
+    });
+    analyticsRepository.ensureForRule.mockResolvedValue({
+      analyticsId: 'a1',
+      ruleRef: 'rule-1',
+    });
+    analyticsRepository.updateMetrics.mockResolvedValue(true);
+    analyticsRepository.findByRuleRef.mockResolvedValue({
+      analyticsId: 'a1',
+      ruleRef: 'rule-1',
+    });
+
+    const out = await service.pullAnalyticsForRule(rule as never);
+
+    expect(zernioRest.getPostAnalytics).toHaveBeenCalledTimes(1);
+    const updateArg = analyticsRepository.updateMetrics.mock.calls[0];
+    expect(updateArg[1].contentPerformance).toHaveLength(2);
+    expect(updateArg[1].contentPerformance[0].metrics.views).toBe(600);
+    expect(updateArg[1].contentPerformance[1].metrics.views).toBe(400);
+    expect(out!.summary.platformRowsSynced).toBe(2);
+  });
+
+  it('pull throws when Zernio returns sync pending with no metrics', async () => {
+    const rule = { ruleId: 'rule-1', userId: 'user-1' };
+    postFindExec.mockResolvedValue([
+      {
+        contentRef: 'c1',
+        uploadRef: 'u1',
+        zernioPostId: 'post_pending',
+        channels: ['instagram'],
+      },
+    ]);
+    uploadFindExec.mockResolvedValue([{ uploadId: 'u1', workflowRef: 'wf1' }]);
+    zernioRest.getPostAnalytics.mockResolvedValue(null);
+
+    await expect(
+      service.pullAnalyticsForRule(rule as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(analyticsRepository.updateMetrics).not.toHaveBeenCalled();
+    expect(events.emitToAnalyticsRule).toHaveBeenCalledWith(
       'rule-1',
-      'analytics:suggestion_ready',
-      expect.any(Object),
+      'analytics:pull_failed',
+      expect.objectContaining({
+        summary: expect.objectContaining({ pending: 1 }),
+      }),
     );
   });
 
@@ -159,9 +269,6 @@ describe('AnalyticsService split behavior', () => {
     });
 
     expect(analyticsFeedback.analyze).toHaveBeenCalledTimes(1);
-    expect(analyticsRepository.updateFeedbackSignal).toHaveBeenCalledWith('a1', {
-      suggestions: [{ field: 'brand.brandTone' }],
-    });
     expect(events.emitToAnalyticsRule).toHaveBeenCalledWith(
       'rule-1',
       'analytics:suggestion_ready',

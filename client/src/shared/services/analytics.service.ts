@@ -17,8 +17,18 @@ export const analyticsService = {
     return data
   },
 
-  async pull(ruleId: string): Promise<{ analyticsId: string }> {
-    const { data } = await apiClient.post<{ analyticsId: string }>(`/analytics/pull/${ruleId}`)
+  async pull(ruleId: string): Promise<{
+    analyticsId: string
+    message?: string
+    summary?: {
+      postsQueried: number
+      platformRowsSynced: number
+      pending: number
+      failed: number
+      noData: number
+    }
+  }> {
+    const { data } = await apiClient.post(`/analytics/pull/${ruleId}`)
     return data
   },
 

@@ -135,6 +135,7 @@ export class McpService {
         accountId: string;
         content: string;
         mediaUrl: string | null;
+        mediaUrls?: string[] | null;
         title?: string | null;
       }>;
       publishNow: boolean;
@@ -153,10 +154,22 @@ export class McpService {
   async updatePost(payload: {
     postId: string;
     content?: string;
-    scheduledFor?: string;
+    scheduledFor?: string | null;
     title?: string;
+    publishNow?: boolean;
   }): Promise<{ success: boolean }> {
     return await this.zernioRest.updatePost(payload);
+  }
+
+  async deleteZernioPost(zernioPostId: string): Promise<{ success: boolean }> {
+    return await this.zernioRest.deletePost(zernioPostId);
+  }
+
+  async unpublishZernioPost(
+    zernioPostId: string,
+    platform: string,
+  ): Promise<{ success: boolean; notSupported?: boolean }> {
+    return await this.zernioRest.unpublishPost(zernioPostId, platform);
   }
 
   async publishContent(

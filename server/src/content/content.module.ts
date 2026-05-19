@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
+import { EventsModule } from '../events/events.module';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
 import {
   WorkflowNode,
@@ -23,6 +24,7 @@ import { Content, ContentSchema } from './schemas/content.schema';
 @Module({
   imports: [
     AuthModule,
+    EventsModule,
     ConfigModule,
     forwardRef(() => OrchestrationModule),
     forwardRef(() => UploadModule),

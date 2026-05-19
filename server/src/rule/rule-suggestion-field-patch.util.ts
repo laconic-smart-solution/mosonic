@@ -24,6 +24,39 @@ const CAMPAIGN_KEYS = new Set([
   'customSchedule',
 ]);
 
+/** LLM often prefixes campaign fields with `brand.` — remap to patchable paths. */
+const SUGGESTION_FIELD_ALIASES: Record<string, string> = {
+  'brand.keywords': 'campaign.keywords',
+  'brand.hashtagStrategy': 'campaign.hashtagStrategy',
+  'brand.contentFormats': 'campaign.contentFormats',
+  'brand.goals': 'campaign.goals',
+  'brand.postingFrequency': 'campaign.postingFrequency',
+  'brand.customSchedule': 'campaign.customSchedule',
+};
+
+export function normalizeSuggestionFieldPath(field: string): string {
+  const raw = field.trim();
+  if (!raw) return raw;
+  return SUGGESTION_FIELD_ALIASES[raw] ?? raw;
+}
+
+export function isSupportedSuggestionField(field: string): boolean {
+  const raw = normalizeSuggestionFieldPath(field);
+  if (!raw) return false;
+  if (parseChannelField(raw)) return true;
+  const brandMatch = /^brand\.([a-zA-Z]+)$/.exec(raw);
+  if (brandMatch) {
+    const key = brandMatch[1];
+    if (key === 'brandVoice' || key === 'brandRestrictions') return false;
+    return BRAND_KEYS.has(key);
+  }
+  const campaignMatch = /^campaign\.([a-zA-Z]+)$/.exec(raw);
+  if (campaignMatch) {
+    return CAMPAIGN_KEYS.has(campaignMatch[1]);
+  }
+  return false;
+}
+
 function asStringArray(v: unknown): string[] | null {
   if (Array.isArray(v)) {
     const out = v.filter((x) => typeof x === 'string') as string[];
@@ -75,7 +108,7 @@ export function buildSuggestionUpdateDto(
   field: string,
   suggestedValue: unknown,
 ): UpdateRuleDto {
-  const raw = field.trim();
+  const raw = normalizeSuggestionFieldPath(field);
   if (!raw) {
     throw new BadRequestException('Empty suggestion field');
   }

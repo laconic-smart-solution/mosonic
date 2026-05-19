@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { Content, ContentSchema } from '../content/schemas/content.schema';
@@ -10,7 +10,9 @@ import { Workflow, WorkflowSchema } from '../workflow/schemas/workflow.schema';
 import { AdminContentController } from './controllers/admin-content.controller';
 import { AdminCostController } from './controllers/admin-cost.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
+import { AdminPipelineJobsController } from './controllers/admin-pipeline-jobs.controller';
 import { AdminUsersController } from './controllers/admin-users.controller';
+import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { AdminContentService } from './services/admin-content.service';
 import { AdminCostService } from './services/admin-cost.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
@@ -20,6 +22,7 @@ import { AdminUsersService } from './services/admin-users.service';
 @Module({
   imports: [
     AuthModule,
+    forwardRef(() => OrchestrationModule),
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Pipeline.name, schema: PipelineSchema },
@@ -34,6 +37,7 @@ import { AdminUsersService } from './services/admin-users.service';
     AdminUsersController,
     AdminCostController,
     AdminContentController,
+    AdminPipelineJobsController,
   ],
   providers: [
     AdminDashboardService,

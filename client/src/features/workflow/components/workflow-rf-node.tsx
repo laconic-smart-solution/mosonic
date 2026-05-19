@@ -1,27 +1,58 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react"
+import {
+  Handle,
+  Position,
+  useEdges,
+  useNodeId,
+  useNodes,
+  type NodeProps,
+} from "@xyflow/react"
 
 import {
   NODE_W,
   WF_NODE_TYPES,
   canvasConfigSummary,
   statusStyle,
-  type WfRfNode,
+  type WfNodeData,
 } from "@/features/workflow/data/workflow-model"
+import type { Node } from "@xyflow/react"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import { T } from "@/lib/tokens"
 
-export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
+import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
+
+import { WorkflowNodeAddButton } from "./workflow-node-add-button"
+
+export function WorkflowRfNode({
+  data,
+  selected,
+}: NodeProps<Node<WfNodeData, "wfNode">>) {
+  const nodeId = useNodeId()
+  const edges = useEdges()
+  const allNodes = useNodes()
+  const validationNodes = allNodes
+    .filter((n) => n.type !== "plus_placeholder")
+    .map((n) => ({
+      id: n.id,
+      data: { wfType: (n.data as WfNodeData).wfType },
+    }))
+  const blockingOutgoing = nodeId
+    ? hasBlockingOutgoingEdge(nodeId, edges, validationNodes)
+    : true
+  const showAddButton =
+    Boolean(data.onOpenAddPopover) &&
+    !data.readOnly &&
+    !blockingOutgoing &&
+    data.wfType !== "merge"
   const nt =
     WF_NODE_TYPES.find((t) => t.type === data.wfType) ?? WF_NODE_TYPES[0]
   const sc = statusStyle(data.status)
   const isSel = selected
-  const nonDeletable = data.wfType === "text" || data.wfType === "keywords"
   const previewImageSrc = useFileObjectUrl(data.previewImage)
   const previewVideoSrc = useFileObjectUrl(data.previewVideo)
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-xl border-[1.5px] bg-white transition-[border-color,box-shadow] duration-150 select-none"
+      className="group relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-white transition-[border-color,box-shadow] duration-150 select-none"
       style={{
         width: NODE_W,
         // height: NODE_H,
@@ -29,7 +60,7 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
         boxShadow: isSel
           ? `0 0 0 3px ${nt.color}20, 0 4px 20px ${nt.color}18, 0 2px 6px rgba(0,0,0,0.06)`
           : "0 2px 8px rgba(0,0,0,0.06)",
-        cursor: nonDeletable ? "grab" : data.locked ? "pointer" : "grab",
+        cursor: data.locked ? "pointer" : "grab",
       }}
     >
       {data.wfType !== "keywords" ? (
@@ -67,6 +98,18 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
         >
           {data.label}
         </span>
+        {data.lane ? (
+          <span
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{
+              background: `${nt.color}18`,
+              color: nt.color,
+              border: `1px solid ${nt.color}40`,
+            }}
+          >
+            {data.lane}
+          </span>
+        ) : null}
         {data.locked ? (
           <svg
             width="12"
@@ -152,44 +195,42 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
             </span>
           ) : null}
           {data.status === "failed_final" ? (
-            <button
-              type="button"
-              onClick={() => data.onRetry?.()}
-              className="rounded border border-[#DC2626] bg-[#FEE2E2] px-1.5 py-0.5 text-[10px] text-[#DC2626]"
-            >
-              Retry
-            </button>
+            <span className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => data.onRetry?.()}
+                className="rounded border border-[#DC2626] bg-[#FEE2E2] px-1.5 py-0.5 text-[10px] text-[#DC2626]"
+              >
+                Retry
+              </button>
+              {data.onSkip ? (
+                <button
+                  type="button"
+                  onClick={() => data.onSkip?.()}
+                  className="rounded border border-amber-500 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
+                >
+                  Skip
+                </button>
+              ) : null}
+            </span>
           ) : null}
           {isSel ? (
             <div className="flex gap-0.5">
-              {!nonDeletable ? (
-                <>
-                  <button
-                    type="button"
-                    title="Drag to reorder"
-                    className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
-                    style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
-                  >
-                    ::
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => data.onDelete?.()}
-                    className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border border-[#FCA5A5] bg-[#FEE2E2] text-[11px] text-[#DC2626]"
-                  >
-                    ✕
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  title="Drag to reorder"
-                  className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
-                  style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
-                >
-                  ::
-                </button>
-              )}
+              <button
+                type="button"
+                title="Drag to reorder"
+                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
+                style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
+              >
+                ::
+              </button>
+              <button
+                type="button"
+                onClick={() => data.onDelete?.()}
+                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border border-[#FCA5A5] bg-[#FEE2E2] text-[11px] text-[#DC2626]"
+              >
+                ✕
+              </button>
             </div>
           ) : null}
         </div>
@@ -203,6 +244,11 @@ export function WorkflowRfNode({ data, selected }: NodeProps<WfRfNode>) {
           background: nt.color,
           boxShadow: `0 0 0 3px ${nt.color}30, 0 2px 4px ${nt.color}40`,
         }}
+      />
+
+      <WorkflowNodeAddButton
+        visible={showAddButton}
+        onOpen={(event) => data.onOpenAddPopover?.(event, nodeId!)}
       />
     </div>
   )

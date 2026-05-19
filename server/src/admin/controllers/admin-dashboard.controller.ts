@@ -40,4 +40,9 @@ export class AdminDashboardController {
   getChannels() {
     return this.service.getChannelBreakdown();
   }
+
+  @Get('pipeline-slo')
+  getPipelineSlo(@Query('days') days?: string) {
+    return this.service.getPipelineSlo(days ? Number(days) : 7);
+  }
 }

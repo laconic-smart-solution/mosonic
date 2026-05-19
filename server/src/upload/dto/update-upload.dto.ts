@@ -7,6 +7,10 @@ import { IsOptional, IsString } from 'class-validator';
 export class UpdateUploadDto {
   @IsString()
   @IsOptional()
+  channel?: string | null;
+
+  @IsString()
+  @IsOptional()
   caption?: string | null;
 
   @IsString()

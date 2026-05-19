@@ -15,17 +15,23 @@ import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { EventsService } from '../events/events.service';
 import { ZernioRestClient } from '../mcp/zernio/zernio-rest.client';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import { UserRole } from '../users/schemas/user.schema';
 import { RuleService } from '../rule/rule.service';
 import { Content, type ContentDocument } from '../content/schemas/content.schema';
+import { Post, PostStatus, type PostDocument } from '../post/schemas/post.schema';
 import {
   Upload,
-  UploadChannelStatus,
   type UploadDocument,
 } from '../upload/schemas/upload.schema';
 import { SyncLock, type SyncLockDocument } from '../upload/sync-lock.schema';
 import { ANALYTICS_WEEKLY_PULL_LOCK_ID } from './analytics-sync.constants';
 import { AnalyticsFeedbackService } from './analytics-feedback.service';
-import { aggregateMetrics, normalizeMetrics } from './analytics-metrics.util';
+import {
+  aggregateMetrics,
+  extractPostAnalyticsRows,
+  formatAnalyticsPullSummary,
+  type AnalyticsPullSummary,
+} from './analytics-metrics.util';
 import { AnalyticsRepository } from './analytics.repository';
 import { deriveContentTitle, deriveUploadLabel } from './analytics-display.util';
 import {
@@ -42,6 +48,8 @@ export class AnalyticsService {
     private readonly config: ConfigService,
     @InjectModel(SyncLock.name)
     private readonly syncLockModel: Model<SyncLockDocument>,
+    @InjectModel(Post.name)
+    private readonly postModel: Model<PostDocument>,
     @InjectModel(Content.name)
     private readonly contentModel: Model<ContentDocument>,
     @InjectModel(Upload.name) private readonly uploadModel: Model<UploadDocument>,
@@ -185,10 +193,12 @@ export class AnalyticsService {
           this.logger.error(
             `Analytics pull failed for rule ${ruleRef}: ${msg}`,
           );
-          this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
-            ruleId: ruleRef,
-            message: msg,
-          });
+          if (!(err instanceof BadRequestException)) {
+            this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
+              ruleId: ruleRef,
+              message: msg,
+            });
+          }
         }
         await this.sleep(2000);
       }
@@ -206,7 +216,7 @@ export class AnalyticsService {
   async pullAnalyticsForRule(
     rule: RuleDocument,
     options?: { emitStart?: boolean },
-  ): Promise<AnalyticsDocument | null> {
+  ): Promise<{ doc: AnalyticsDocument; summary: AnalyticsPullSummary } | null> {
     const ruleRef = rule.ruleId;
     if (options?.emitStart !== false) {
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_started', {
@@ -218,75 +228,159 @@ export class AnalyticsService {
     // Zernio defaults to 90 days when omitted; keep our stored period consistent.
     const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
-    const uploads = await this.uploadModel
+    const posts = await this.postModel
       .find({
         ruleRef,
-        channels: {
-          $elemMatch: {
-            zernioPostId: { $exists: true, $nin: [null, ''] },
-            status: {
-              $in: [
-                UploadChannelStatus.Published,
-                UploadChannelStatus.Scheduled,
-              ],
-            },
-          },
+        status: {
+          $in: [PostStatus.Published, PostStatus.Partial],
         },
+        zernioPostId: { $exists: true, $nin: [null, ''] },
       })
+      .select({
+        contentRef: 1,
+        uploadRef: 1,
+        zernioPostId: 1,
+        channels: 1,
+      })
+      .lean()
       .exec();
 
-    if (!uploads.length) {
-      this.logger.debug(`No published/scheduled Zernio uploads for ${ruleRef}`);
+    if (!posts.length) {
+      this.logger.debug(`No published/partial Zernio posts for ${ruleRef}`);
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
         ruleId: ruleRef,
-        message: 'No published or scheduled posts with Zernio ids found for this rule.',
+        message:
+          'No published or partial posts with Zernio ids found for this rule.',
       });
       return null;
     }
 
+    const uploadRefs = [
+      ...new Set(
+        posts
+          .map((p) => String(p.uploadRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const uploadRows = uploadRefs.length
+      ? await this.uploadModel
+          .find({ uploadId: { $in: uploadRefs } })
+          .select({ uploadId: 1, workflowRef: 1, contentRef: 1, channels: 1 })
+          .lean()
+          .exec()
+      : [];
+    const contentRefs = [
+      ...new Set(
+        uploadRows
+          .map((u) => String(u.contentRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const contentRows = contentRefs.length
+      ? await this.contentModel
+          .find({ contentId: { $in: contentRefs } })
+          .select({
+            contentId: 1,
+            pipelineRef: 1,
+            variantId: 1,
+            experimentId: 1,
+          })
+          .lean()
+          .exec()
+      : [];
+    const contentById = new Map(
+      contentRows.map((c) => [String(c.contentId), c]),
+    );
+    const uploadById = new Map(
+      uploadRows.map((u) => [String(u.uploadId), u]),
+    );
+    const pipelineByUpload = new Map(
+      uploadRows.map((u) => {
+        const content = contentById.get(String(u.contentRef ?? ''));
+        return [
+          String(u.uploadId),
+          String(content?.pipelineRef ?? u.workflowRef ?? ''),
+        ];
+      }),
+    );
+
     const contentPerformance: ContentPerformanceEntry[] = [];
+    const pullSummary: AnalyticsPullSummary = {
+      postsQueried: posts.length,
+      platformRowsSynced: 0,
+      pending: 0,
+      failed: 0,
+      noData: 0,
+    };
 
-    for (const upload of uploads) {
-      for (const ch of upload.channels) {
-        const pid = ch.zernioPostId?.trim();
-        if (!pid) continue;
-        if (
-          ch.status !== UploadChannelStatus.Published &&
-          ch.status !== UploadChannelStatus.Scheduled
-        ) {
-          continue;
-        }
+    for (const post of posts) {
+      const pid = String(post.zernioPostId ?? '').trim();
+      if (!pid) continue;
+      const pipelineRef =
+        pipelineByUpload.get(String(post.uploadRef)) ?? '';
+      const chans = Array.isArray(post.channels)
+        ? post.channels.map((c) => String(c ?? '').trim()).filter(Boolean)
+        : [];
 
-        try {
-          const raw = await this.zernioRest.getPostAnalytics(pid, {
-            fromDate: from.toISOString().slice(0, 10),
-            toDate: to.toISOString().slice(0, 10),
-          });
-          const metrics = normalizeMetrics(raw);
-          contentPerformance.push({
-            contentRef: upload.contentRef,
-            pipelineRef: upload.workflowRef,
-            uploadRef: upload.uploadId,
-            zernioPostId: pid,
-            channel: ch.channel,
-            metrics,
-          });
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Failed to get analytics for post ${pid}: ${msg}`,
-          );
-        }
+      if (chans.length === 0) continue;
+
+      let raw: unknown | null;
+      try {
+        raw = await this.zernioRest.getPostAnalytics(pid, {
+          fromDate: from.toISOString().slice(0, 10),
+          toDate: to.toISOString().slice(0, 10),
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to get analytics for post ${pid}: ${msg}`);
+        pullSummary.failed += chans.length;
         await this.sleep(500);
+        continue;
       }
+
+      if (raw == null) {
+        pullSummary.pending += chans.length;
+        await this.sleep(500);
+        continue;
+      }
+
+      const extracted = extractPostAnalyticsRows(raw, chans);
+      pullSummary.pending += extracted.pending.length;
+      pullSummary.failed += extracted.failed.length;
+      pullSummary.noData += extracted.noData.length;
+
+      for (const row of extracted.synced) {
+        const upload = uploadById.get(String(post.uploadRef ?? ''));
+        const content = contentById.get(String(post.contentRef ?? ''));
+        const channelEntry = (upload?.channels ?? []).find(
+          (ch) =>
+            String(ch.channel ?? '').toLowerCase() ===
+            row.channel.toLowerCase(),
+        );
+        contentPerformance.push({
+          contentRef: String(post.contentRef ?? ''),
+          pipelineRef,
+          uploadRef: String(post.uploadRef ?? ''),
+          zernioPostId: pid,
+          channel: row.channel,
+          variantId: channelEntry?.variantId ?? content?.variantId ?? null,
+          experimentId: content?.experimentId ?? null,
+          metrics: row.metrics,
+        });
+        pullSummary.platformRowsSynced += 1;
+      }
+
+      await this.sleep(500);
     }
 
     if (!contentPerformance.length) {
+      const message = formatAnalyticsPullSummary(pullSummary);
       this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_failed', {
         ruleId: ruleRef,
-        message: 'No analytics data returned from Zernio for this period.',
+        message,
+        summary: pullSummary,
       });
-      return null;
+      throw new BadRequestException(message);
     }
 
     const campaignSummary = aggregateMetrics(contentPerformance);
@@ -304,12 +398,43 @@ export class AnalyticsService {
     const updated =
       (await this.analyticsRepository.findByRuleRef(ruleRef)) ?? doc;
 
+    const message = formatAnalyticsPullSummary(pullSummary);
     this.events.emitToAnalyticsRule(ruleRef, 'analytics:pull_completed', {
       analyticsId: updated.analyticsId,
       ruleRef,
+      summary: pullSummary,
+      message,
     });
 
-    return updated;
+    if (
+      this.config.get<string>('ANALYTICS_AUTO_SUGGEST_AFTER_PULL', 'false') ===
+      'true'
+    ) {
+      const minPosts = Number(
+        this.config.get('ANALYTICS_MIN_POSTS_FOR_AUTO_SUGGEST', 3),
+      );
+      const pendingCount = (updated.feedbackSignal?.suggestions ?? []).filter(
+        (s) => s.status === FeedbackSignalStatus.Pending,
+      ).length;
+      if (
+        contentPerformance.length >= minPosts &&
+        pendingCount === 0 &&
+        rule.userId
+      ) {
+        try {
+          await this.generateSuggestions(updated.analyticsId, {
+            userId: rule.userId,
+            role: UserRole.CUSTOMER,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Auto-suggest after pull failed for ${ruleRef}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
+
+    return { doc: updated, summary: pullSummary };
   }
 
   /**
@@ -382,7 +507,11 @@ export class AnalyticsService {
   async manualPull(
     ruleId: string,
     auth: TenancyAuth,
-  ): Promise<{ analyticsId: string }> {
+  ): Promise<{
+    analyticsId: string;
+    message: string;
+    summary: AnalyticsPullSummary;
+  }> {
     const allowed = await this.analyticsRepository.assertUserOwnsRule(
       ruleId,
       auth,
@@ -402,13 +531,17 @@ export class AnalyticsService {
     });
 
     try {
-      const doc = await this.pullAnalyticsForRule(rule, { emitStart: false });
-      if (!doc) {
+      const result = await this.pullAnalyticsForRule(rule, { emitStart: false });
+      if (!result) {
         throw new BadRequestException(
-          'No published or scheduled posts with Zernio ids found for this rule.',
+          'No published or partial posts with Zernio ids found for this rule.',
         );
       }
-      return { analyticsId: doc.analyticsId };
+      return {
+        analyticsId: result.doc.analyticsId,
+        message: formatAnalyticsPullSummary(result.summary),
+        summary: result.summary,
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!(err instanceof BadRequestException)) {
@@ -448,7 +581,7 @@ export class AnalyticsService {
 
     await this.ruleService.applySuggestionFieldPatch(
       doc.ruleRef,
-      suggestion.field,
+      suggestion.field.trim(),
       suggestion.suggestedValue,
       auth,
     );

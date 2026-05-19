@@ -78,7 +78,9 @@ export class ZernioRestClient {
       (err) => {
         const status = err.response?.status;
         const data = err.response?.data;
-        this.logger.warn(`Zernio REST error ${status}: ${JSON.stringify(data)}`);
+        this.logger.warn(
+          `Zernio REST error ${status}: ${JSON.stringify(data)}`,
+        );
         return Promise.reject(err);
       },
     );
@@ -126,7 +128,10 @@ export class ZernioRestClient {
         const rawUrls = multiMedia.length
           ? multiMedia
           : singleMedia
-            ? singleMedia.split(',').map((u) => u.trim()).filter(Boolean)
+            ? singleMedia
+                .split(',')
+                .map((u) => u.trim())
+                .filter(Boolean)
             : [];
 
         const customMedia = await this.buildZernioMediaItemsFromUrls(
@@ -169,7 +174,10 @@ export class ZernioRestClient {
     this.logger.log(`[REST] body: ${JSON.stringify(body)}`);
 
     try {
-      const { data } = await this.http.post<Record<string, unknown>>('/posts', body);
+      const { data } = await this.http.post<Record<string, unknown>>(
+        '/posts',
+        body,
+      );
 
       this.logger.log(`[REST] response: ${JSON.stringify(data)}`);
 
@@ -219,13 +227,18 @@ export class ZernioRestClient {
     fileName: string;
     fileType: string;
   }): Promise<ZernioPresignResult> {
-    this.logger.log(`[REST] POST /media/presign → ${input.fileName} (${input.fileType})`);
+    this.logger.log(
+      `[REST] POST /media/presign → ${input.fileName} (${input.fileType})`,
+    );
     try {
       // Live API expects `filename` + `contentType` (not fileName/fileType).
-      const { data } = await this.http.post<Record<string, unknown>>('/media/presign', {
-        filename: input.fileName,
-        contentType: input.fileType,
-      });
+      const { data } = await this.http.post<Record<string, unknown>>(
+        '/media/presign',
+        {
+          filename: input.fileName,
+          contentType: input.fileType,
+        },
+      );
       const norm = normalizePresignResponse(data);
       if (!norm) {
         throw new Error(
@@ -236,7 +249,9 @@ export class ZernioRestClient {
     } catch (err: unknown) {
       const detail = summarizeZernioAxiosError(err);
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Zernio REST presign threw: ${message}${detail ? ` — ${detail}` : ''}`);
+      this.logger.warn(
+        `Zernio REST presign threw: ${message}${detail ? ` — ${detail}` : ''}`,
+      );
       throw new Error(
         detail
           ? `Zernio media presign failed — ${detail}`
@@ -384,11 +399,15 @@ export class ZernioRestClient {
 
     if (fileBase) {
       try {
-        const base = fileBase.startsWith('http') ? fileBase : `http://${fileBase}`;
+        const base = fileBase.startsWith('http')
+          ? fileBase
+          : `http://${fileBase}`;
         return new URL(s, base).href;
       } catch {
         try {
-          const base = fileBase.startsWith('http') ? fileBase : `http://${fileBase}`;
+          const base = fileBase.startsWith('http')
+            ? fileBase
+            : `http://${fileBase}`;
           return new URL(s, new URL(base).origin).href;
         } catch {
           return s;
@@ -402,8 +421,9 @@ export class ZernioRestClient {
   async updatePost(payload: {
     postId: string;
     content?: string;
-    scheduledFor?: string;
+    scheduledFor?: string | null;
     title?: string;
+    publishNow?: boolean;
   }): Promise<{ success: boolean }> {
     const postId = payload.postId.trim();
     if (!postId) {
@@ -414,9 +434,12 @@ export class ZernioRestClient {
 
     const body: Record<string, unknown> = {};
     if (payload.content !== undefined) body.content = payload.content;
+    if (payload.publishNow === true) body.publishNow = true;
     if (payload.scheduledFor !== undefined) {
-      body.scheduledFor = payload.scheduledFor;
-      body.timezone = 'UTC';
+      if (payload.scheduledFor !== null) {
+        body.scheduledFor = payload.scheduledFor;
+        body.timezone = 'UTC';
+      }
     }
     if (payload.title !== undefined) body.title = payload.title;
 
@@ -448,7 +471,9 @@ export class ZernioRestClient {
     this.logger.log(`[REST] GET /posts/${id}`);
 
     try {
-      const { data } = await this.http.get<Record<string, unknown>>(`/posts/${id}`);
+      const { data } = await this.http.get<Record<string, unknown>>(
+        `/posts/${id}`,
+      );
       const post = data?.post ?? data ?? null;
       return post ?? null;
     } catch (err: unknown) {
@@ -484,6 +509,16 @@ export class ZernioRestClient {
         },
       });
       if (data == null) return null;
+      if (
+        data &&
+        typeof data === 'object' &&
+        String((data as Record<string, unknown>).syncStatus ?? '')
+          .trim()
+          .toLowerCase() === 'pending'
+      ) {
+        this.logger.log(`[REST] Analytics for ${id} sync pending (body)`);
+        return null;
+      }
       return data;
     } catch (err: unknown) {
       if (isAxiosError(err)) {
@@ -497,7 +532,9 @@ export class ZernioRestClient {
           return null;
         }
         if (status === 424) {
-          this.logger.warn(`[REST] Analytics for ${id} failed on all platforms (424)`);
+          this.logger.warn(
+            `[REST] Analytics for ${id} failed on all platforms (424)`,
+          );
           return null;
         }
         if (status === 404) {
@@ -511,6 +548,90 @@ export class ZernioRestClient {
         `Zernio REST getPostAnalytics(${id}) threw: ${detail ? `${message} (${detail})` : message}`,
       );
       throw err;
+    }
+  }
+
+  /** Platforms where Zernio does not support POST /posts/:id/unpublish. */
+  private static readonly UNPUBLISH_UNSUPPORTED = new Set([
+    'instagram',
+    'tiktok',
+    'snapchat',
+  ]);
+
+  /**
+   * DELETE /v1/posts/{postId} — draft/scheduled posts only (not published).
+   */
+  async deletePost(zernioPostId: string): Promise<{ success: boolean }> {
+    const id = zernioPostId.trim();
+    if (!id) {
+      throw new Error('Zernio delete failed: missing postId');
+    }
+    this.logger.log(`[REST] DELETE /posts/${id}`);
+    try {
+      await this.http.delete(`/posts/${encodeURIComponent(id)}`);
+      return { success: true };
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        this.logger.warn(
+          `[REST] Post ${id} not found on Zernio (404), treating as success`,
+        );
+        return { success: true };
+      }
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Zernio REST deletePost(${id}) threw: ${message}`);
+      throw new Error(
+        detail
+          ? `Could not delete post on Zernio — ${detail}`
+          : message || 'Zernio delete failed',
+      );
+    }
+  }
+
+  /**
+   * POST /v1/posts/{postId}/unpublish — removes published content from a platform.
+   */
+  async unpublishPost(
+    zernioPostId: string,
+    platform: string,
+  ): Promise<{ success: boolean; notSupported?: boolean }> {
+    const id = zernioPostId.trim();
+    const plat = platform.trim().toLowerCase();
+    if (!id) {
+      throw new Error('Zernio unpublish failed: missing postId');
+    }
+    if (!plat) {
+      throw new Error('Zernio unpublish failed: missing platform');
+    }
+
+    if (ZernioRestClient.UNPUBLISH_UNSUPPORTED.has(plat)) {
+      this.logger.warn(`[REST] Unpublish not supported on ${platform}`);
+      return { success: false, notSupported: true };
+    }
+
+    this.logger.log(`[REST] POST /posts/${id}/unpublish (${platform})`);
+    try {
+      await this.http.post(`/posts/${encodeURIComponent(id)}/unpublish`, {
+        platform: plat,
+      });
+      return { success: true };
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        this.logger.warn(
+          `[REST] Post ${id} not found on Zernio for unpublish (404), treating as success`,
+        );
+        return { success: true };
+      }
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Zernio REST unpublishPost(${id}, ${plat}) threw: ${message}`,
+      );
+      throw new Error(
+        detail
+          ? `Could not unpublish on ${platform} — ${detail}`
+          : message || 'Zernio unpublish failed',
+      );
     }
   }
 

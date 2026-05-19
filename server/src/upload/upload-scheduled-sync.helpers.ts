@@ -1,31 +1,3 @@
-import { UploadChannelStatus } from './schemas/upload.schema';
-
-export type ScheduledLeanUpload = {
-  uploadId: string;
-  channels: Array<{
-    status: UploadChannelStatus | string;
-    zernioPostId: string | null;
-  }>;
-};
-
-/** Merge scheduled-channel work into postId → uploadIds (deduped) for the cron run. */
-export function accumulateScheduledZernioPostWork(
-  postIdToUploadIds: Map<string, Set<string>>,
-  doc: ScheduledLeanUpload,
-): void {
-  for (const ch of doc.channels) {
-    if (ch.status !== UploadChannelStatus.Scheduled) continue;
-    const pid = ch.zernioPostId?.trim();
-    if (!pid) continue;
-    let set = postIdToUploadIds.get(pid);
-    if (!set) {
-      set = new Set<string>();
-      postIdToUploadIds.set(pid, set);
-    }
-    set.add(doc.uploadId);
-  }
-}
-
 export type SyncPostDecision =
   | { kind: 'noop_scheduled' }
   | { kind: 'mark_published'; at: Date }

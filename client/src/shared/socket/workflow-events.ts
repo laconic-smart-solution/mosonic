@@ -1,10 +1,14 @@
 import { appConfig } from "@/app/config/app-config"
 import { io, type Socket } from "socket.io-client"
-import type { WorkflowNode } from "../types/workflow.type"
+import type { WorkflowEdge, WorkflowNode } from "../types/workflow.type"
 
 export type WorkflowStartedEvent = { workflowId: string }
 export type WorkflowGeneratingEvent = { workflowId: string }
-export type WorkflowCompletedEvent = { workflowId: string; nodes: WorkflowNode[] }
+export type WorkflowCompletedEvent = {
+  workflowId: string
+  nodes: WorkflowNode[]
+  edges?: WorkflowEdge[]
+}
 export type WorkflowFailedEvent = { workflowId: string; message?: string }
 
 let socketInstance: Socket | null = null

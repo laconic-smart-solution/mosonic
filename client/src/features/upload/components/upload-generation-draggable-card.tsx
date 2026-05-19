@@ -4,8 +4,8 @@ import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
-  cardTitle,
   mergeNodeOutputLayers,
+  nodeDisplayTitle,
   outputKeyForNodeType,
   type OutputKey,
 } from "@/features/content/data/content-review-helpers"
@@ -96,6 +96,11 @@ export function UploadGenerationDraggableCard(props: Props) {
     if (key === "keywords" && typeof layer.keywords === "string")
       scoped.keywords = layer.keywords
     if (key === "text" && typeof layer.text === "string") scoped.text = layer.text
+    if (
+      wfNode.type === "adapt" &&
+      typeof layer.adaptedCaption === "string"
+    )
+      scoped.text = layer.adaptedCaption
     if (key === "image" && typeof layer.image === "string")
       scoped.image = layer.image
     if (key === "translatedText" && typeof layer.translatedText === "string")
@@ -151,7 +156,9 @@ export function UploadGenerationDraggableCard(props: Props) {
     run.phase === "processing" ||
     run.phase === "retrying"
 
-  const title = key ? cardTitle(key) : wfNode.type
+  const lane =
+    typeof wfNode.config?.laneId === "string" ? wfNode.config.laneId : null
+  const title = nodeDisplayTitle(wfNode.type, lane)
 
   const thumbImage =
     typeof layer.image === "string" ? layer.image : undefined

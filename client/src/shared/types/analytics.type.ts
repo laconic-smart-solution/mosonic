@@ -18,6 +18,8 @@ export type ContentPerformanceEntry = {
   uploadRef: string
   zernioPostId: string
   channel: string
+  variantId?: string | null
+  experimentId?: string | null
   metrics: ChannelMetrics
 }
 

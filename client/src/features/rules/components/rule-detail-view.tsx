@@ -6,6 +6,7 @@ import { BrandSectionForm } from "@/features/rules/components/form/brand-section
 import { CampaignSectionForm } from "@/features/rules/components/form/campaign-section-form"
 import { ChannelsSectionForm } from "@/features/rules/components/form/channels-section-form"
 import { GuidelinesSectionForm } from "@/features/rules/components/form/guidelines-section-form"
+import { AutonomySectionForm } from "@/features/rules/components/form/autonomy-section-form"
 import { RuleChip, type RuleChipTone } from "./rule-chip"
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
   { id: "detail-campaign", label: "Campaign" },
   { id: "detail-channels", label: "Channels" },
   { id: "detail-guidelines", label: "Guidelines" },
+  { id: "detail-autonomy", label: "Autonomy" },
 ] as const
 
 function statusToChipTone(status: RuleStatus): RuleChipTone {
@@ -101,6 +103,7 @@ export function RuleDetailView({ form, ruleId }: RuleDetailViewProps) {
             <CampaignSectionForm />
             <ChannelsSectionForm />
             <GuidelinesSectionForm />
+            <AutonomySectionForm />
           </div>
         </div>
       </div>

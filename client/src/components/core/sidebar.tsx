@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { useMemo } from "react"
-import { UserCog, Wallet, GitBranch } from "lucide-react"
+import { UserCog, Wallet, GitBranch, Megaphone, Play } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 
 import {
@@ -128,6 +128,19 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    id: "pipelines",
+    label: "Pipelines",
+    path: "/pipelines",
+    icon: (active) => (
+      <Play
+        className="size-4 shrink-0"
+        strokeWidth={1.65}
+        aria-hidden
+        color={active ? "#fff" : undefined}
+      />
+    ),
+  },
+  {
     id: "content",
     label: "Content",
     path: "/content",
@@ -150,6 +163,19 @@ const NAV: NavItem[] = [
           strokeLinecap="round"
         />
       </svg>
+    ),
+  },
+  {
+    id: "posts",
+    label: "Posts",
+    path: "/posts",
+    icon: (active) => (
+      <Megaphone
+        className="size-4 shrink-0"
+        strokeWidth={1.65}
+        aria-hidden
+        color={active ? "#fff" : undefined}
+      />
     ),
   },
   {
@@ -234,6 +260,12 @@ function navItemActive(item: NavItem, pathname: string): boolean {
   }
   if (item.id === "workflows") {
     return pathname === "/workflows" || pathname.startsWith("/workflows/")
+  }
+  if (item.id === "pipelines") {
+    return pathname === "/pipelines" || pathname.startsWith("/pipelines/")
+  }
+  if (item.id === "posts") {
+    return pathname === "/posts" || pathname.startsWith("/posts/")
   }
   if (item.id === "cost") {
     return pathname === "/cost" || pathname.startsWith("/cost/")

@@ -8,10 +8,15 @@ import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import OpenAI from 'openai';
 import {
+  type WorkflowNodeLlmConfigSubset,
   LlmProvider,
-  type WorkflowNodeConfig,
   WorkflowNodeType,
-} from '../nodes/schemas/workflow-node.schema';
+} from '../nodes/workflow-node-llm.enums';
+import {
+  allowedOpenAiImageSizesForModel,
+  coerceOpenAiImageSize,
+  isValidOpenAiImageSizeForModel,
+} from '../nodes/openai-image-size.util';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o';
@@ -131,7 +136,7 @@ export class LlmService {
 
   validateWorkflowNodeConfig(
     type: WorkflowNodeType,
-    config: WorkflowNodeConfig | undefined,
+    config: WorkflowNodeLlmConfigSubset | undefined,
   ): void {
     const provider = this.resolveProvider(config?.provider);
     const capabilityByNodeType: Partial<
@@ -144,10 +149,31 @@ export class LlmService {
       [WorkflowNodeType.ImageGeneration]: 'image_generation',
       [WorkflowNodeType.VideoGeneration]: 'video_generation',
       [WorkflowNodeType.Transcription]: 'transcription',
+      [WorkflowNodeType.Adapt]: 'chat',
+      [WorkflowNodeType.Intelligence]: 'chat',
     };
     const capability = capabilityByNodeType[type];
     if (capability) {
       this.assertProviderCapability(provider, capability);
+    }
+    if (type === WorkflowNodeType.ImageGeneration && config) {
+      const rec = config as Record<string, unknown>;
+      const model =
+        typeof rec.model === 'string' && rec.model.trim()
+          ? rec.model.trim()
+          : 'gpt-image-1';
+      const sizeRaw =
+        typeof rec.size === 'string' && rec.size.trim()
+          ? rec.size.trim()
+          : '';
+      if (
+        sizeRaw &&
+        !isValidOpenAiImageSizeForModel(sizeRaw, model)
+      ) {
+        throw new Error(
+          `Invalid image size "${sizeRaw}" for model "${model}". Allowed: ${allowedOpenAiImageSizesForModel(model).join(', ')}.`,
+        );
+      }
     }
   }
 
@@ -168,9 +194,16 @@ export class LlmService {
    * Model resolution: `options.model` (e.g. workflow node `config.model`) →
    * `OPENAI_MODEL` env → built-in default.
    */
-  getChatModel(options?: { provider?: string; model?: string }): BaseChatModel {
+  getChatModel(options?: {
+    provider?: string;
+    model?: string;
+    /** Default 0.3. Use ~0.55 for workflow planning for more varied JSON plans. */
+    temperature?: number;
+  }): BaseChatModel {
     const provider = this.resolveProvider(options?.provider);
     this.assertProviderCapability(provider, 'chat');
+    const temperature =
+      typeof options?.temperature === 'number' ? options.temperature : 0.3;
 
     if (provider === LlmProvider.OpenAI) {
       const apiKey = this.requireApiKeyForProvider(provider);
@@ -179,7 +212,7 @@ export class LlmService {
       return new ChatOpenAI({
         apiKey,
         model,
-        temperature: 0.3,
+        temperature,
         modelKwargs: {
           response_format: { type: 'json_object' },
         },
@@ -190,13 +223,13 @@ export class LlmService {
       const model =
         this.config.get<string>('ANTHROPIC_MODEL')?.trim() ||
         DEFAULT_ANTHROPIC_MODEL;
-      return new ChatAnthropic({ apiKey, model, temperature: 0.3 });
+      return new ChatAnthropic({ apiKey, model, temperature });
     }
     if (provider === LlmProvider.Google) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
         this.config.get<string>('GOOGLE_MODEL')?.trim() || DEFAULT_GOOGLE_MODEL;
-      return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0.3 });
+      return new ChatGoogleGenerativeAI({ apiKey, model, temperature });
     }
     if (provider === LlmProvider.Groq) {
       const apiKey = this.requireApiKeyForProvider(provider);
@@ -206,7 +239,7 @@ export class LlmService {
         apiKey,
         model,
         configuration: { baseURL: 'https://api.groq.com/openai/v1' },
-        temperature: 0.3,
+        temperature,
       });
     }
 
@@ -214,7 +247,7 @@ export class LlmService {
       this.config.get<string>('OLLAMA_MODEL')?.trim() || DEFAULT_OLLAMA_MODEL;
     return new ChatOllama({
       model,
-      temperature: 0.3,
+      temperature,
       baseUrl: this.config.get<string>('OLLAMA_BASE_URL')?.trim() || undefined,
       format: 'json',
     });
@@ -359,13 +392,16 @@ export class LlmService {
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
         model,
         prompt: params.prompt,
-        size: params.size,
+        size: coerceOpenAiImageSize(String(params.size), model) as NonNullable<
+          OpenAI.Images.ImageGenerateParams['size']
+        >,
         n: 1,
         response_format: 'b64_json',
       };
+      // DALL·E 3 historically accepted `style`; current Images API rejects it
+      // ("Unknown parameter: 'style'"). Style is already reflected in the prompt text.
       if (isDalle3) {
         body.quality = params.quality;
-        body.style = params.style;
       }
 
       const callWithCompat = async (
@@ -400,7 +436,7 @@ export class LlmService {
           const fallbackBody: OpenAI.Images.ImageGenerateParamsNonStreaming = {
             model: 'gpt-image-1',
             prompt: params.prompt,
-            size: params.size,
+            size: coerceOpenAiImageSize(params.size, 'gpt-image-1'),
             n: 1,
             response_format: 'b64_json',
           };
@@ -532,6 +568,56 @@ export class LlmService {
       response_format: 'text',
     });
     return typeof response === 'string' ? response : String(response);
+  }
+
+  /**
+   * OpenAI Responses API with built-in web_search for intelligence nodes.
+   */
+  async runWebSearchBrief(params: {
+    prompt: string;
+    model?: string;
+    provider?: string;
+  }): Promise<{
+    text: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
+    const provider = this.resolveProvider(params.provider);
+    this.assertProviderCapability(provider, 'chat');
+    if (provider !== LlmProvider.OpenAI) {
+      throw new Error(
+        'Web search intelligence requires OpenAI (Responses API web_search tool)',
+      );
+    }
+    const apiKey = this.requireApiKeyForProvider(provider);
+    const client = new OpenAI({ apiKey });
+    const model =
+      params.model?.trim() ||
+      this.config.get<string>('OPENAI_MODEL')?.trim() ||
+      DEFAULT_OPENAI_MODEL;
+
+    try {
+      const response = await client.responses.create({
+        model,
+        tools: [{ type: 'web_search' }],
+        input: params.prompt,
+      });
+
+      const text = (response.output_text ?? '').trim();
+      const usage = response.usage;
+      return {
+        text,
+        usage: usage
+          ? {
+              inputTokens: usage.input_tokens ?? 0,
+              outputTokens: usage.output_tokens ?? 0,
+            }
+          : undefined,
+      };
+    } catch (error) {
+      throw new Error(
+        `OpenAI web search failed: ${this.formatError(error)}`,
+      );
+    }
   }
 
   private formatError(error: unknown): string {

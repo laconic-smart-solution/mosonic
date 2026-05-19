@@ -59,9 +59,6 @@ export class UploadChannelEntry {
   })
   status: UploadChannelStatus;
 
-  @Prop({ type: String, default: null })
-  zernioPostId: string | null;
-
   @Prop({ type: Date, default: null })
   scheduledAt: Date | null;
 
@@ -73,6 +70,9 @@ export class UploadChannelEntry {
 
   @Prop({ type: String, default: null })
   failureReason: string | null;
+
+  @Prop({ type: String, default: null })
+  variantId?: string | null;
 }
 export const UploadChannelEntrySchema =
   SchemaFactory.createForClass(UploadChannelEntry);
@@ -123,10 +123,4 @@ export const UploadSchema = SchemaFactory.createForClass(Upload);
 
 UploadSchema.index({ contentRef: 1, status: 1 });
 UploadSchema.index({ userId: 1, createdAt: -1 });
-UploadSchema.index({ 'channels.zernioPostId': 1 });
-/** Supports cron scans for embedded scheduled channels with Zernio ids (multikey compound). */
-UploadSchema.index({
-  'channels.status': 1,
-  'channels.zernioPostId': 1,
-});
 export type UploadDocument = HydratedDocument<Upload>;

@@ -10,6 +10,9 @@ import {
 } from '../nodes/schemas/workflow-node.schema';
 import { ImageGenerationService } from '../nodes/services/image-generation.service';
 import { KeywordPlannerService } from '../nodes/services/keyword-planner.service';
+import { AdaptNodeService } from '../nodes/services/adapt-node.service';
+import { IntelligenceNodeService } from '../nodes/services/intelligence-node.service';
+import { MergeBarrierService } from '../nodes/services/merge-barrier.service';
 import { SummarizationService } from '../nodes/services/summarization.service';
 import { TextGenerationService } from '../nodes/services/text-generation.service';
 import { TranscriptionService } from '../nodes/services/transcription.service';
@@ -39,14 +42,22 @@ export class NodeExecutor {
     private readonly translation: TranslationService,
     private readonly transcription: TranscriptionService,
     private readonly summarization: SummarizationService,
+    private readonly adaptNode: AdaptNodeService,
+    private readonly intelligenceNode: IntelligenceNodeService,
+    private readonly mergeBarrier: MergeBarrierService,
     private readonly costService: CostService,
   ) {}
 
+  getFriendlyError(error: unknown): string {
+    return this.getFriendlyErrorMessage(error);
+  }
+
   async execute(input: NodeExecutorInput): Promise<NodeExecutorOutput> {
+    const maxAttempts = input.maxAttempts ?? NodeExecutor.MAX_ATTEMPTS;
     let attempt = 0;
     let lastError: unknown;
 
-    while (attempt < NodeExecutor.MAX_ATTEMPTS) {
+    while (attempt < maxAttempts) {
       attempt += 1;
       if (attempt > 1) {
         this.emitDual(input, 'node:retrying', {
@@ -54,7 +65,7 @@ export class NodeExecutor {
           nodeId: input.node.nodeId,
           nodeType: input.node.type,
           attempt,
-          maxAttempts: NodeExecutor.MAX_ATTEMPTS,
+          maxAttempts,
         });
       }
       try {
@@ -70,22 +81,24 @@ export class NodeExecutor {
             `pipelineId=${input.pipelineId}`,
             `nodeId=${input.node.nodeId}`,
             `nodeType=${input.node.type}`,
-            `attempt=${attempt}/${NodeExecutor.MAX_ATTEMPTS}`,
+            `attempt=${attempt}/${maxAttempts}`,
             `details=${this.formatErrorDetails(error)}`,
           ].join(' | '),
         );
-        if (attempt >= NodeExecutor.MAX_ATTEMPTS) {
+        if (attempt >= maxAttempts) {
           break;
         }
       }
     }
 
-    this.emitDual(input, 'node:failed_final', {
-      pipelineId: input.pipelineId,
-      nodeId: input.node.nodeId,
-      nodeType: input.node.type,
-      message: this.getFriendlyError(lastError),
-    });
+    if (!input.suppressFailedFinalEmit) {
+      this.emitDual(input, 'node:failed_final', {
+        pipelineId: input.pipelineId,
+        nodeId: input.node.nodeId,
+        nodeType: input.node.type,
+        message: this.getFriendlyErrorMessage(lastError),
+      });
+    }
     throw lastError instanceof Error
       ? lastError
       : new Error('Node execution failed');
@@ -111,6 +124,7 @@ export class NodeExecutor {
       rule: input.context.rule,
       contentPrompt: input.context.contentPrompt,
       previousOutputs: input.context.previousOutputs,
+      intelligenceContext: input.intelligenceContext,
       onChunk: (chunk) => {
         this.emitDual(input, 'node:streaming', {
           pipelineId: input.pipelineId,
@@ -177,6 +191,14 @@ export class NodeExecutor {
         return this.transcription.execute(input);
       case WorkflowNodeType.Summarization:
         return this.summarization.execute(input);
+      case WorkflowNodeType.Adapt:
+        return this.adaptNode.execute(input);
+      case WorkflowNodeType.Intelligence:
+        return this.intelligenceNode.execute(input);
+      case WorkflowNodeType.Merge:
+        return this.mergeBarrier.execute(input);
+      case WorkflowNodeType.Branch:
+        throw new Error('branch nodes are expanded before execution');
     }
     throw new Error(`Unsupported node type: ${type as string}`);
   }
@@ -200,8 +222,49 @@ export class NodeExecutor {
         return { transcription: result.output ?? undefined };
       case WorkflowNodeType.VideoGeneration:
         return { video: result.output ?? undefined };
+      case WorkflowNodeType.Adapt:
+      case WorkflowNodeType.Intelligence:
+      case WorkflowNodeType.Merge:
+        return this.parseStructuredNodeOutput(result.output);
       default:
         return {};
+    }
+  }
+
+  private parseStructuredNodeOutput(
+    raw: string | null,
+  ): NodeExecutorOutput['output'] {
+    if (!raw?.trim()) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const out: NodeExecutorOutput['output'] = {};
+      const stringKeys = [
+        'keywords',
+        'text',
+        'image',
+        'translatedText',
+        'summary',
+        'transcription',
+        'video',
+        'intelligenceHints',
+        'intelligenceBrief',
+        'adaptedCaption',
+        'channel',
+      ] as const;
+      for (const key of stringKeys) {
+        const val = parsed[key];
+        if (typeof val === 'string' && val.trim()) {
+          out[key] = val;
+        }
+      }
+      if (parsed.merged === true) {
+        out.merged = true;
+      }
+      return out;
+    } catch {
+      return { text: raw };
     }
   }
 
@@ -257,7 +320,8 @@ export class NodeExecutor {
       case WorkflowNodeType.KeywordPlanner:
       case WorkflowNodeType.TextGeneration:
       case WorkflowNodeType.Translation:
-      case WorkflowNodeType.Summarization: {
+      case WorkflowNodeType.Summarization:
+      case WorkflowNodeType.Intelligence: {
         const model =
           typeof cfg.model === 'string' && cfg.model.trim()
             ? cfg.model.trim()
@@ -322,7 +386,7 @@ export class NodeExecutor {
     return LlmProvider.OpenAI;
   }
 
-  private getFriendlyError(error: unknown): string {
+  private getFriendlyErrorMessage(error: unknown): string {
     const raw = error instanceof Error ? error.message : String(error ?? '');
     const message = raw.toLowerCase();
     if (message.includes('rate limit')) {
