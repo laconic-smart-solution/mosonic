@@ -58,10 +58,10 @@ export function PostListCard({
     <motion.article
       whileHover={{ y: -2 }}
       className={cn(
-        "group relative flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-canvas-200 bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
+        "group relative flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
         selected
           ? "border-navy-500/40 ring-2 ring-navy-500/15"
-          : "hover:border-canvas-300 hover:shadow-lg"
+          : "hover:border-muted-foreground/30 hover:shadow-lg"
       )}
     >
       <button
@@ -97,7 +97,7 @@ export function PostListCard({
 
           <div className="relative z-10 flex h-full flex-col justify-end p-3">
             {!showMediaHero ? (
-              <p className="line-clamp-5 text-left text-[13px] leading-snug text-navy-800/90">
+              <p className="line-clamp-5 text-left text-[13px] leading-snug text-foreground/90">
                 {caption}
               </p>
             ) : (
@@ -145,7 +145,7 @@ export function PostListCard({
           <ChannelStack channels={post.channels ?? []} sizeClass="size-7" />
 
           {post.youtubeTitlePreview?.trim() ? (
-            <p className="line-clamp-2 font-heading text-sm leading-snug font-medium text-navy-700">
+            <p className="line-clamp-2 font-heading text-sm leading-snug font-medium text-foreground">
               {post.youtubeTitlePreview}
             </p>
           ) : null}
@@ -178,7 +178,7 @@ export function PostListCard({
         </div>
       </button>
 
-      <div className="flex items-center justify-between gap-2 border-t border-canvas-200 bg-canvas-100/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/80 px-3 py-2">
         <Link
           to={`/content/${encodeURIComponent(post.contentRef)}`}
           className="text-[11px] font-medium text-primary hover:underline"

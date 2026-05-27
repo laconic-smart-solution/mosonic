@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ContentModule } from '../content/content.module';
 import { Content, ContentSchema } from '../content/schemas/content.schema';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { CampaignModule } from '../campaign/campaign.module';
@@ -25,6 +26,7 @@ import { GraphReplanService } from './graph-replan.service';
 import { RuleOverlayBuilderService } from './rule-overlay-builder.service';
 import { NodeExecutor } from './node-executor.service';
 import { OrchestrationService } from './orchestration.service';
+import { HeygenWebhookService } from './heygen-webhook.service';
 import { MediaNodeCompletionService } from './media-node-completion.service';
 import { PipelineNodeProcessor } from './processors/pipeline-node.processor';
 import { VideoCheckProcessor } from './processors/video-check.processor';
@@ -48,6 +50,7 @@ import {
     LoggingModule,
     EventsModule,
     forwardRef(() => UploadModule),
+    forwardRef(() => ContentModule),
     BullModule.registerQueueAsync({
       name: PIPELINE_NODES_QUEUE,
       imports: [ConfigModule],
@@ -126,6 +129,7 @@ import {
     NodeExecutor,
     PipelineNodeRunnerService,
     MediaNodeCompletionService,
+    HeygenWebhookService,
     OrchestrationService,
     DependencyResolverService,
     ...(process.env.RUN_WORKERS_IN_API !== 'false'
@@ -136,6 +140,8 @@ import {
     NodeExecutor,
     OrchestrationService,
     PipelineRepository,
+    MediaNodeCompletionService,
+    HeygenWebhookService,
     BullModule,
   ],
 })

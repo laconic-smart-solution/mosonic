@@ -19,6 +19,12 @@ import {
   type ContentDocument,
 } from '../content/schemas/content.schema';
 import { EventsService } from '../events/events.service';
+import { ContentService } from '../content/content.service';
+import {
+  newsContentReadyNotification,
+  pipelineCompletedNotification,
+  pipelineStartedNotification,
+} from '../events/notification.util';
 import { LoggingService } from '../logging/logging.service';
 import {
   WorkflowNode,
@@ -35,6 +41,7 @@ import {
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import { UserRole } from '../users/schemas/user.schema';
 import {
   Workflow,
   type WorkflowDocument,
@@ -90,6 +97,8 @@ export class OrchestrationService {
     private readonly graphReplan: GraphReplanService,
     private readonly campaignAutonomy: CampaignAutonomyService,
     private readonly outboundWebhooks: OutboundWebhookService,
+    @Inject(forwardRef(() => ContentService))
+    private readonly contentService: ContentService,
   ) {
     this.useQueue =
       config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
@@ -101,7 +110,18 @@ export class OrchestrationService {
     ruleId: string;
     contentPrompt: string;
     useLearnings?: boolean;
-    metadata?: { source?: 'manual' | 'scheduler' | 'integration'; scheduleId?: string };
+    metadata?: {
+      source?: 'manual' | 'scheduler' | 'integration' | 'news';
+      scheduleId?: string;
+      newsMeta?: {
+        title: string;
+        url: string;
+        sourceId: string;
+        publishedAt: string;
+        relevanceScore: number;
+        suggestedAngle: string;
+      };
+    };
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     const contentPrompt = input.contentPrompt.trim();
@@ -230,6 +250,7 @@ export class OrchestrationService {
         source: input.metadata?.source ?? 'manual',
         scheduleId: input.metadata?.scheduleId,
         experimentId,
+        newsMeta: input.metadata?.newsMeta ?? null,
       },
     });
 
@@ -239,6 +260,12 @@ export class OrchestrationService {
     if (this.useQueue) {
       this.events.emitToPipeline(pipelineId, 'pipeline:started', {
         pipelineId,
+        totalNodes,
+      });
+      this.notifyPipelineStarted(input.auth.userId, {
+        pipelineId,
+        ruleRef: rule.ruleId,
+        workflowRef: workflow.workflowId,
         totalNodes,
       });
       try {
@@ -408,6 +435,13 @@ export class OrchestrationService {
         contentId: primaryContentId,
         uploadId: primaryUploadId,
       });
+      this.notifyPipelineCompleted(pipeline.userId, {
+        pipelineId,
+        contentId: primaryContentId,
+        uploadId: primaryUploadId,
+        ruleRef: pipeline.ruleRef,
+        workflowRef: pipeline.workflowRef,
+      });
 
       if (pipeline.userId) {
         void this.outboundWebhooks.emit(pipeline.userId, 'pipeline.completed', {
@@ -423,6 +457,10 @@ export class OrchestrationService {
           pipeline: pipelineFresh,
           contentId: primaryContentId,
           uploadId: primaryUploadId,
+        });
+        void this.handleNewsPipelineCompleted({
+          pipeline: pipelineFresh,
+          contentId: primaryContentId,
         });
       }
     } catch (error) {
@@ -660,6 +698,8 @@ export class OrchestrationService {
         edges: (pipeline.graph?.edges ?? []).map((e) => ({
           from: e.from,
           to: e.to,
+          ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+          ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
         })),
         lanes: pipeline.graph?.lanes ?? [],
         layout:
@@ -865,6 +905,12 @@ export class OrchestrationService {
       pipelineId,
       totalNodes,
     });
+    this.notifyPipelineStarted(userId, {
+      pipelineId,
+      ruleRef: rule.ruleId,
+      workflowRef: workflowId,
+      totalNodes,
+    });
 
     const context: PipelineContext = {
       rule,
@@ -915,6 +961,100 @@ export class OrchestrationService {
       pipelineId,
       contentId,
       uploadId,
+    });
+    this.notifyPipelineCompleted(userId, {
+      pipelineId,
+      contentId,
+      uploadId,
+      ruleRef: ruleId,
+      workflowRef: workflowId,
+    });
+  }
+
+  private notifyPipelineStarted(
+    userId: string | undefined | null,
+    args: {
+      pipelineId: string;
+      ruleRef?: string;
+      workflowRef?: string;
+      totalNodes: number;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = pipelineStartedNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'pipeline',
+      type: 'pipeline.started',
+      ...body,
+    });
+  }
+
+  private async handleNewsPipelineCompleted(args: {
+    pipeline: PipelineDocument;
+    contentId: string;
+  }): Promise<void> {
+    if (args.pipeline.metadata?.source !== 'news') return;
+
+    const userId = args.pipeline.userId?.trim();
+    const newsMeta = args.pipeline.metadata?.newsMeta;
+    if (userId && newsMeta?.title) {
+      const body = newsContentReadyNotification({
+        pipelineId: args.pipeline.pipelineId,
+        contentId: args.contentId,
+        ruleRef: args.pipeline.ruleRef,
+        newsTitle: newsMeta.title,
+        newsUrl: newsMeta.url,
+      });
+      this.events.emitUserNotification({
+        userId,
+        sector: 'news',
+        type: 'news.content_ready',
+        title: body.title,
+        message: body.message,
+        data: body.data,
+        action: body.action,
+      });
+    }
+
+    if (!userId) return;
+
+    const rule = await this.ruleModel
+      .findOne({ ruleId: args.pipeline.ruleRef })
+      .exec();
+    if (!rule?.newsTrigger?.autoApprove) return;
+
+    try {
+      await this.contentService.approveContent(args.contentId, {
+        userId,
+        role: UserRole.CUSTOMER,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `News auto-approve failed for content ${args.contentId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  private notifyPipelineCompleted(
+    userId: string | undefined | null,
+    args: {
+      pipelineId: string;
+      contentId: string;
+      uploadId?: string;
+      ruleRef?: string;
+      workflowRef?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = pipelineCompletedNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'pipeline',
+      type: 'pipeline.completed',
+      ...body,
     });
   }
 

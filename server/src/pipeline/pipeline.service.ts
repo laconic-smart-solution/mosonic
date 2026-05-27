@@ -92,6 +92,8 @@ export class PipelineService {
       completedAt: doc.completedAt
         ? new Date(doc.completedAt).toISOString()
         : null,
+      metadataSource: doc.metadata?.source,
+      newsTitle: doc.metadata?.newsMeta?.title,
     }));
 
     return { data, total };

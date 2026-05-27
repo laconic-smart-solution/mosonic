@@ -22,14 +22,6 @@ export function palettePayloadForNode(
       const t = typeof layer.text === "string" ? layer.text.trim() : ""
       return t ? { kind: "text", source: "text", nodeId } : null
     }
-    case "adapt": {
-      const t =
-        (typeof layer.text === "string" ? layer.text.trim() : "") ||
-        (typeof layer.adaptedCaption === "string"
-          ? layer.adaptedCaption.trim()
-          : "")
-      return t ? { kind: "text", source: "text", nodeId } : null
-    }
     case "translation": {
       const t =
         typeof layer.translatedText === "string"
@@ -40,6 +32,14 @@ export function palettePayloadForNode(
     case "summarization": {
       const t = typeof layer.summary === "string" ? layer.summary.trim() : ""
       return t ? { kind: "text", source: "summary", nodeId } : null
+    }
+    case "adapt": {
+      const t =
+        (typeof layer.text === "string" ? layer.text.trim() : "") ||
+        (typeof layer.adaptedCaption === "string"
+          ? layer.adaptedCaption.trim()
+          : "")
+      return t ? { kind: "text", source: "text", nodeId } : null
     }
     case "image_generation": {
       const url = typeof layer.image === "string" ? layer.image.trim() : ""

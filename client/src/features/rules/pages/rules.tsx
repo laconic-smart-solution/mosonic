@@ -601,6 +601,16 @@ export default function RulesPage() {
             variant="outline"
             disabled={!selectedRuleId}
             onClick={() =>
+              selectedRuleId &&
+              navigate(`/rules/${selectedRuleId}/news-trigger`)
+            }
+          >
+            News auto-generate
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!selectedRuleId}
+            onClick={() =>
               navigate(`/workflow/${selectedRuleId}`, {
                 state: {
                   ruleName: selectedRule?.name,

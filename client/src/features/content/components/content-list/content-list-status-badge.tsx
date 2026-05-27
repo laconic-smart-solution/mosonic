@@ -9,10 +9,22 @@ export function ContentListStatusBadge({ status }: { status: ContentStatus }) {
       <span
         className={cn(
           base,
-          "border-amber-200 bg-amber-50 text-amber-700",
+          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
         )}
       >
         Draft
+      </span>
+    )
+  }
+  if (status === "in_review") {
+    return (
+      <span
+        className={cn(
+          base,
+          "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+        )}
+      >
+        In review
       </span>
     )
   }
@@ -21,7 +33,7 @@ export function ContentListStatusBadge({ status }: { status: ContentStatus }) {
       <span
         className={cn(
           base,
-          "border-teal-400/25 bg-teal-50 text-teal-700",
+          "border-teal-400/25 bg-teal-50 text-teal-700 dark:border-teal-700/40 dark:bg-teal-950/60 dark:text-teal-300",
         )}
       >
         Approved

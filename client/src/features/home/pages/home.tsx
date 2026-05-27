@@ -17,8 +17,6 @@ import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
-import { T } from "@/lib/tokens"
-
 export default function HomePage() {
   const navigate = useNavigate()
   useSessionBootstrap()
@@ -129,10 +127,7 @@ export default function HomePage() {
   }
 
   return (
-    <div
-      className="relative flex min-h-screen flex-col overflow-hidden"
-      style={{ background: T.canvasBg, fontFamily: "'Inter Variable', Inter, sans-serif" }}
-    >
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background font-sans">
       <HomeBackdrop />
       <HomeUserStrip />
 

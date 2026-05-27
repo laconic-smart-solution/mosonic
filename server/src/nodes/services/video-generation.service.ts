@@ -11,6 +11,14 @@ import type {
   VideoGenerationInput,
 } from '../types/node-execution.types';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
+import { fetchUrlToBuffer } from '../../upload/fetch-url-to-buffer.util';
+import { uploadBufferToFileService } from '../../upload/file-service-upload.util';
+import type { WorkflowNodeConfig } from '../schemas/workflow-node.schema';
+import {
+  HeygenAssetsService,
+  heygenCallbackId,
+  type HeygenVideoStatus,
+} from './heygen-assets.service';
 
 /** Inline execution poll (deprecated path when queue is off). */
 const INLINE_POLL_INTERVAL_MS = 5000;
@@ -18,10 +26,13 @@ const INLINE_VIDEO_TIMEOUT_MS = 30 * 60 * 1000;
 
 export type VideoJobStatus = 'processing' | 'completed' | 'failed';
 
+export type VideoJobProvider = 'sora' | 'heygen';
+
 export interface VideoSubmitResult {
   externalJobId: string;
   estimatedSeconds: number;
   normalized: NormalizedVideoConfig;
+  videoProvider?: VideoJobProvider;
 }
 
 export interface VideoCheckResult {
@@ -198,6 +209,38 @@ export function buildVideoPrompt(
     .join('\n');
 }
 
+export type VideoGenerationMode = 'cinematic' | 'presenter';
+
+export function getVideoGenerationMode(
+  config: WorkflowNodeConfig | undefined,
+): VideoGenerationMode {
+  const mode = config?.mode?.trim();
+  return mode === 'presenter' ? 'presenter' : 'cinematic';
+}
+
+export function buildPresenterScript(
+  previousOutputs: VideoGenerationInput['previousOutputs'],
+  contentPrompt: string,
+): string {
+  const script =
+    previousOutputs.adaptedCaption?.trim() ??
+    previousOutputs.text?.trim() ??
+    contentPrompt?.trim() ??
+    '';
+  if (!script) {
+    throw new UnprocessableEntityException(
+      'Presenter video requires upstream text (adapt or text generation) or a content prompt',
+    );
+  }
+  return script;
+}
+
+export function mapHeygenVideoStatus(status: HeygenVideoStatus): VideoJobStatus {
+  if (status === 'completed') return 'completed';
+  if (status === 'failed') return 'failed';
+  return 'processing';
+}
+
 export function mapOpenAiVideoStatus(
   status: OpenAI.Videos.Video['status'],
 ): VideoJobStatus {
@@ -216,6 +259,7 @@ export class VideoGenerationService {
     private readonly configService: ConfigService,
     private readonly llm: LlmService,
     private readonly events: EventsService,
+    private readonly heygen: HeygenAssetsService,
   ) {}
 
   private getOpenAiClient(provider?: LlmProvider): OpenAI {
@@ -359,6 +403,187 @@ export class VideoGenerationService {
     return result;
   }
 
+  private assertPresenterConfig(
+    config: WorkflowNodeConfig,
+  ): {
+    avatarId: string;
+    voiceId: string;
+    orientation: 'landscape' | 'portrait';
+    expressiveness: 'low' | 'medium' | 'high';
+    motionPrompt?: string;
+    removeBackground: boolean;
+    backgroundAssetId?: string;
+    durationSeconds: number;
+  } {
+    const avatarId = config.heygenAvatarId?.trim();
+    const voiceId = config.heygenVoiceId?.trim();
+    if (!avatarId) {
+      throw new UnprocessableEntityException(
+        'Presenter mode requires an avatar photo. Upload one in node settings.',
+      );
+    }
+    if (!voiceId) {
+      throw new UnprocessableEntityException(
+        'Presenter mode requires a voice. Select one in node settings.',
+      );
+    }
+    const orientation =
+      config.heygenOrientation === 'portrait' ? 'portrait' : 'landscape';
+    const expressiveness =
+      config.heygenExpressiveness === 'low' ||
+      config.heygenExpressiveness === 'high'
+        ? config.heygenExpressiveness
+        : 'medium';
+    const normalized = normalizeVideoConfig(config);
+    return {
+      avatarId,
+      voiceId,
+      orientation,
+      expressiveness,
+      motionPrompt: config.heygenMotionPrompt?.trim() || undefined,
+      removeBackground: config.removeBackground !== false,
+      backgroundAssetId: config.heygenBackgroundAssetId?.trim() || undefined,
+      durationSeconds: normalized.duration,
+    };
+  }
+
+  /** Phase 1: submit HeyGen presenter video (webhook + poll fallback). */
+  async submitPresenterVideoJob(
+    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
+  ): Promise<VideoSubmitResult> {
+    const config = (input.config ?? {}) as WorkflowNodeConfig;
+    const presenter = this.assertPresenterConfig(config);
+    const script = buildPresenterScript(
+      input.previousOutputs ?? {},
+      input.contentPrompt ?? '',
+    );
+
+    const { videoId } = await this.heygen.submitPresenterVideo({
+      avatarId: presenter.avatarId,
+      script,
+      voiceId: presenter.voiceId,
+      durationSeconds: presenter.durationSeconds,
+      orientation: presenter.orientation,
+      expressiveness: presenter.expressiveness,
+      motionPrompt: presenter.motionPrompt,
+      removeBackground: presenter.removeBackground,
+      backgroundAssetId: presenter.backgroundAssetId,
+      callbackUrl: this.heygen.resolveCallbackUrl(),
+      callbackId: heygenCallbackId(input.pipelineId, input.nodeId),
+    });
+
+    return {
+      externalJobId: videoId,
+      estimatedSeconds: presenter.durationSeconds,
+      normalized: normalizeVideoConfig(config),
+      videoProvider: 'heygen',
+    };
+  }
+
+  async checkHeyGenVideoJob(externalJobId: string): Promise<VideoCheckResult> {
+    const result = await this.heygen.getVideoStatus(externalJobId);
+    return {
+      status: mapHeygenVideoStatus(result.status),
+      error: result.error,
+    };
+  }
+
+  async completeHeyGenVideoJob(
+    externalJobId: string,
+    input: VideoGenerationInput & {
+      pipelineId: string;
+      nodeId: string;
+    },
+  ): Promise<VideoCompleteResult> {
+    const status = await this.heygen.getVideoStatus(externalJobId);
+    if (status.status !== 'completed' || !status.videoUrl?.trim()) {
+      throw new Error(
+        status.error ?? 'HeyGen video is not ready or missing video_url',
+      );
+    }
+
+    const { buffer } = await fetchUrlToBuffer(status.videoUrl.trim());
+    const fileName = `${input.nodeId}.mp4`;
+    const base = this.configService.get<string>('FILE_SERVICE_URL')?.trim();
+    if (!base) {
+      throw new UnprocessableEntityException(
+        'FILE_SERVICE_URL is not set; required for video storage upload',
+      );
+    }
+    const uploaded = await uploadBufferToFileService({
+      fileServiceBase: base,
+      buffer: new Uint8Array(buffer),
+      originalName: fileName,
+      mimeType: 'video/mp4',
+      folderPath: `neural-tex/videos/${input.pipelineId}`,
+    });
+    const storage = await this.maybeMirrorVideoUploadToPublicUploads(
+      {
+        fileUrl: uploaded.fileUrl,
+        relativePath: uploaded.relativePath,
+        storedFileName: uploaded.storedFileName ?? fileName,
+        originalFileName: uploaded.originalFileName,
+      },
+      'video/mp4',
+    );
+
+    const normalized = normalizeVideoConfig(input.config ?? {});
+    return {
+      video: storage.fileUrl,
+      storage,
+      videoCost: {
+        model: 'heygen-presenter',
+        videoSeconds: status.duration ?? normalized.duration,
+        videoResolution: presenterResolutionLabel(
+          (input.config ?? {}) as WorkflowNodeConfig,
+        ),
+      },
+    };
+  }
+
+  async generatePresenterVideo(
+    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
+  ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
+    const { pipelineId, nodeId } = input;
+    const { externalJobId, estimatedSeconds } =
+      await this.submitPresenterVideoJob(input);
+
+    await this.emitProcessing(
+      pipelineId,
+      nodeId,
+      'Presenter video generation started...',
+    );
+
+    const maxAttempts = INLINE_VIDEO_TIMEOUT_MS / INLINE_POLL_INTERVAL_MS;
+    let attempts = 0;
+    let check = await this.checkHeyGenVideoJob(externalJobId);
+
+    while (check.status === 'processing') {
+      if (attempts >= maxAttempts) {
+        throw new Error('Presenter video generation timed out after 30 minutes.');
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, INLINE_POLL_INTERVAL_MS),
+      );
+      check = await this.checkHeyGenVideoJob(externalJobId);
+      attempts += 1;
+      await this.emitProcessing(
+        pipelineId,
+        nodeId,
+        `Generating presenter video... (~${attempts * (INLINE_POLL_INTERVAL_MS / 1000)}s, est. ${estimatedSeconds}s)`,
+      );
+    }
+
+    if (check.status === 'failed') {
+      throw new Error(
+        check.error ?? 'HeyGen presenter video failed. Please retry.',
+      );
+    }
+
+    const completed = await this.completeHeyGenVideoJob(externalJobId, input);
+    return { video: completed.video, storage: completed.storage };
+  }
+
   /** Phase 1: submit Sora job and return external id (no polling). */
   async submitVideoJob(
     input: VideoGenerationInput & { pipelineId: string; nodeId: string },
@@ -389,6 +614,7 @@ export class VideoGenerationService {
       externalJobId: created.id,
       estimatedSeconds: normalized.duration,
       normalized,
+      videoProvider: 'sora',
     };
   }
 
@@ -498,15 +724,31 @@ export class VideoGenerationService {
         'Video generation requires `rule` on NodeExecutionInput',
       );
     }
-    const normalized = normalizeVideoConfig(input.config ?? {});
-    const { video, storage } = await this.generateVideo({
+    const config = (input.config ?? {}) as WorkflowNodeConfig;
+    const execInput = {
       rule: input.rule,
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
-      config: input.config ?? {},
+      config,
       pipelineId: input.pipelineRef,
       nodeId: input.nodeId,
-    });
+    };
+
+    if (getVideoGenerationMode(config) === 'presenter') {
+      const { video, storage } = await this.generatePresenterVideo(execInput);
+      return {
+        output: video,
+        video: storage,
+        videoCost: {
+          model: 'heygen-presenter',
+          videoSeconds: config.duration ?? 8,
+          videoResolution: presenterResolutionLabel(config),
+        },
+      };
+    }
+
+    const normalized = normalizeVideoConfig(config);
+    const { video, storage } = await this.generateVideo(execInput);
     return {
       output: video,
       video: storage,
@@ -517,4 +759,8 @@ export class VideoGenerationService {
       },
     };
   }
+}
+
+function presenterResolutionLabel(config: WorkflowNodeConfig): string {
+  return config.heygenOrientation === 'portrait' ? '1080p-9:16' : '1080p-16:9';
 }

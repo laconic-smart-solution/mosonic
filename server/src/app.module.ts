@@ -27,6 +27,11 @@ import { CostModule } from './cost/cost.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { NewsTriggerModule } from './news-trigger/news-trigger.module';
+import {
+  buildRedisConnectionOptions,
+  redisEnvFromConfig,
+} from './config/redis-connection.util';
 
 @Module({
   imports: [
@@ -50,6 +55,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WebhookModule,
     AnalyticsModule,
     CampaignModule,
+    NewsTriggerModule,
     IntegrationsModule,
     DashboardModule,
     McpModule,
@@ -60,10 +66,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST', '127.0.0.1'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
+        connection: buildRedisConnectionOptions(
+          redisEnvFromConfig(configService),
+        ),
         defaultJobOptions: {
           attempts: Number(configService.get('QUEUE_MAX_ATTEMPTS', 2)),
           backoff: {

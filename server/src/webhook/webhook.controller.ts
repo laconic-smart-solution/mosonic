@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Headers,
   HttpCode,
@@ -9,13 +10,17 @@ import {
   type RawBodyRequest,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { HeygenWebhookService } from '../orchestration/heygen-webhook.service';
 import { WebhookService } from './webhook.service';
 
 @Controller('webhooks')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
 
-  constructor(private readonly webhookService: WebhookService) {}
+  constructor(
+    private readonly webhookService: WebhookService,
+    private readonly heygenWebhook: HeygenWebhookService,
+  ) {}
 
   @Post('zernio')
   @HttpCode(200)
@@ -41,5 +46,18 @@ export class WebhookController {
       );
     });
     return { received: true };
+  }
+
+  @Post('heygen')
+  @HttpCode(200)
+  async handleHeygen(@Body() body: Record<string, unknown>): Promise<{ ok: boolean }> {
+    try {
+      return await this.heygenWebhook.handlePayload(body ?? {});
+    } catch (err) {
+      this.logger.error(
+        err instanceof Error ? (err.stack ?? err.message) : String(err),
+      );
+      return { ok: false };
+    }
   }
 }

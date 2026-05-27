@@ -1,6 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom"
 
 import { TopbarSearch } from "@/components/core/topbar-search"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationBell } from "@/features/notifications/components/notification-bell"
+import { useNotificationStore } from "@/features/notifications/notification.store"
+import { disconnectSharedSocket } from "@/shared/socket/socket-client"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -48,6 +52,8 @@ export function Topbar() {
         : ROUTE_LABELS[location.pathname] ?? "Dashboard"
 
   function handleLogout() {
+    disconnectSharedSocket()
+    useNotificationStore.getState().clearAll()
     clearSession()
     clearUser()
     navigate("/login", { replace: true })
@@ -65,7 +71,7 @@ export function Topbar() {
     >
       <SidebarTrigger
         className={cn(
-          "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-white hover:bg-[#F7F9FC] md:size-9",
+          "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-card hover:bg-muted md:size-9",
         )}
         style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
       />
@@ -94,12 +100,14 @@ export function Topbar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <ThemeToggle />
+        <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger
             type="button"
             className={cn(
-              "flex cursor-pointer items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-xs transition-colors outline-none",
-              "focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+              "flex cursor-pointer items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-xs transition-colors outline-none hover:bg-muted",
+              "focus-visible:ring-2 focus-visible:ring-ring/25",
             )}
             style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
             aria-label="Account menu"

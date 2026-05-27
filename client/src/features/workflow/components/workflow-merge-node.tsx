@@ -36,7 +36,7 @@ export function WorkflowMergeNode({
 
   return (
     <div
-      className="relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-white transition-[border-color,box-shadow] duration-150 select-none"
+      className="relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-card transition-[border-color,box-shadow] duration-150 select-none"
       style={{
         width: NODE_W,
         minHeight: 88,
@@ -107,7 +107,7 @@ export function WorkflowMergeNode({
           <Handle
             type="target"
             position={Position.Left}
-            className="size-3! border-2! bg-white!"
+            className="size-3! border-2! bg-card!"
             style={{
               borderColor: MERGE_COLOR,
               boxShadow: `0 0 0 2px ${MERGE_COLOR}30`,

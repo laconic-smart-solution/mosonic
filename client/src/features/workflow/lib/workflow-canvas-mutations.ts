@@ -2,6 +2,7 @@ import type { Edge } from "@xyflow/react"
 import type { Dispatch, SetStateAction } from "react"
 
 import {
+  NODE_H,
   NODE_W,
   PIPE_GAP,
   WF_NODE_TYPES,
@@ -16,17 +17,20 @@ function workflowNodeData(node: WfRfNode): WfNodeData | null {
   return node.data
 }
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
 import {
   adaptNodesByLane,
   buildLaneEdge,
   channelsMissingAdapt,
   collectBranchCascadeDeleteIds,
+  findBranchNode,
   findMergeNode,
   laneAdaptPosition,
   mergeNodePosition,
 } from "@/features/workflow/lib/workflow-lane-layout"
 import { randomUuid } from "@/lib/random-uuid"
 
+import type { PaletteDropTarget } from "@/features/workflow/lib/workflow-palette-dnd"
 import {
   getBranchSubgraphLaneErrors,
   wouldCreateCycle,
@@ -59,7 +63,9 @@ export function createRfNode(
     rfType === "branchNode" || rfType === "mergeNode"
       ? { channelHandles: options?.branchChannels ?? [] }
       : {}
-  const laneLabel = lane ? ` (${lane.label})` : ""
+  const displayLabel = lane
+    ? formatLaneNodeLabel(wfType, lane.label)
+    : meta.label
   const laneConfig =
     lane && wfType === "adapt"
       ? {
@@ -74,7 +80,7 @@ export function createRfNode(
     type: rfType,
     position,
     data: {
-      label: `${meta.label}${laneLabel}`,
+      label: displayLabel,
       wfType,
       status: "idle",
       locked: meta.locked,
@@ -90,6 +96,17 @@ function positionAfterSource(source: WfRfNode): { x: number; y: number } {
   return {
     x: source.position.x + NODE_W + PIPE_GAP,
     y: source.position.y,
+  }
+}
+
+/** Top-left node position when drop point is the cursor center in flow coords. */
+export function nodePositionFromDropCenter(flowPosition: {
+  x: number
+  y: number
+}): { x: number; y: number } {
+  return {
+    x: flowPosition.x - NODE_W / 2,
+    y: flowPosition.y - NODE_H / 2,
   }
 }
 
@@ -335,6 +352,137 @@ export function repairOrphanLaneAdapts(
   return { nodes: nextNodes, edges: nextEdges, repaired: true }
 }
 
+function laneIdFromNode(node: WfRfNode): string {
+  const data = workflowNodeData(node)
+  if (!data) return ""
+  const fromLane = data.lane?.trim()
+  if (fromLane) return fromLane
+  const config = data.config as { laneId?: string } | undefined
+  return typeof config?.laneId === "string" ? config.laneId.trim() : ""
+}
+
+function relabelLaneNode(
+  node: WfRfNode,
+  branchChannels: BranchChannelHandle[],
+): WfRfNode {
+  const data = workflowNodeData(node)
+  if (!data) return node
+  const laneKey = laneIdFromNode(node)
+  const handle = branchChannels.find((ch) => ch.id === laneKey)
+  if (!handle) return node
+  const label = formatLaneNodeLabel(data.wfType, handle.label)
+  const config =
+    data.wfType === "adapt"
+      ? { ...(data.config ?? {}), laneId: handle.id, channel: handle.label }
+      : { ...(data.config ?? {}), laneId: handle.id }
+  return {
+    ...node,
+    data: {
+      ...data,
+      label,
+      lane: handle.id,
+      config,
+    },
+  } as WfRfNode
+}
+
+export type SyncBranchLanesResult = {
+  nodes: WfRfNode[]
+  edges: Edge[]
+  removedLaneLabels: string[]
+}
+
+/**
+ * Align branch subgraph with selected channels: drop deselected lanes, spawn missing adapts, relabel.
+ */
+export function syncBranchLanesToChannels(
+  nodes: WfRfNode[],
+  edges: Edge[],
+  branchChannels: BranchChannelHandle[],
+): SyncBranchLanesResult {
+  const branch = findBranchNode(nodes)
+  if (!branch) {
+    return { nodes, edges, removedLaneLabels: [] }
+  }
+
+  const selected = new Set(branchChannels.map((ch) => ch.id))
+  const channelLabelById = new Map(
+    branchChannels.map((ch) => [ch.id, ch.label] as const),
+  )
+
+  const removedLaneLabels: string[] = []
+  const removeIds = new Set<string>()
+
+  for (const node of nodes) {
+    if (node.type === "plus_placeholder") continue
+    if (node.id === branch.id) continue
+    if (node.type === "mergeNode" || workflowNodeData(node)?.wfType === "merge") {
+      continue
+    }
+    const laneKey = laneIdFromNode(node)
+    if (!laneKey) continue
+    if (!selected.has(laneKey)) {
+      removeIds.add(node.id)
+      const prev =
+        channelLabelById.get(laneKey) ??
+        laneKey.charAt(0).toUpperCase() + laneKey.slice(1)
+      if (!removedLaneLabels.includes(prev)) {
+        removedLaneLabels.push(prev)
+      }
+    }
+  }
+
+  let workingNodes = nodes.filter(
+    (n) => n.type === "plus_placeholder" || !removeIds.has(n.id),
+  )
+  let workingEdges = edges.filter(
+    (e) => !removeIds.has(e.source) && !removeIds.has(e.target),
+  )
+
+  if (branchChannels.length >= 2) {
+    const spawned = applySpawnLaneAdapts(
+      workingNodes,
+      workingEdges,
+      branch.id,
+      branchChannels,
+    )
+    workingNodes = spawned.nodes
+    workingEdges = spawned.edges
+  }
+
+  const relabeled = workingNodes.map((n) => {
+    if (n.type === "plus_placeholder") return n
+    if (n.id === branch.id) {
+      const data = workflowNodeData(n)
+      if (!data) return n
+      return {
+        ...n,
+        data: {
+          ...data,
+          channelHandles: branchChannels,
+          config: {
+            ...(data.config ?? {}),
+            mode: "rule_channels",
+          },
+        },
+      } as WfRfNode
+    }
+    if (n.type === "mergeNode" || workflowNodeData(n)?.wfType === "merge") {
+      const data = workflowNodeData(n)
+      if (!data) return n
+      return {
+        ...n,
+        data: { ...data, channelHandles: branchChannels },
+      } as WfRfNode
+    }
+    const laneKey = laneIdFromNode(n)
+    if (!laneKey || !selected.has(laneKey)) return n
+    return relabelLaneNode(n, branchChannels)
+  })
+
+  return { nodes: relabeled, edges: workingEdges, removedLaneLabels }
+}
+
 /** Create one adapt node per channel lane with branch→adapt→merge edges. */
 export function spawnLaneAdapts({
   branchId,
@@ -365,6 +513,8 @@ export type AddNodeAfterArgs = {
   setNodes: Dispatch<SetStateAction<WfRfNode[]>>
   setEdges: Dispatch<SetStateAction<Edge[]>>
   branchChannels?: BranchChannelHandle[]
+  /** When set (e.g. palette drop), place the new node here instead of after source. */
+  position?: { x: number; y: number }
 }
 
 export function addNodeAfter({
@@ -375,6 +525,7 @@ export function addNodeAfter({
   setNodes,
   setEdges,
   branchChannels = [],
+  position: positionOverride,
 }: AddNodeAfterArgs): WfRfNode | null {
   const source = nodes.find((n) => n.id === sourceId)
   if (!source) return null
@@ -411,11 +562,11 @@ export function addNodeAfter({
     ? branchChannels.find((ch) => ch.id === sourceData.lane)
     : undefined
 
-  const newNode = createRfNode(
-    wfType,
-    positionAfterSource(source),
-    { branchChannels, lane: laneHandle },
-  )
+  const placeAt = positionOverride ?? positionAfterSource(source)
+  const newNode = createRfNode(wfType, placeAt, {
+    branchChannels,
+    lane: laneHandle,
+  })
 
   if (
     wouldCreateCycle(validationNodes, validationEdges, sourceId, newNode.id)
@@ -459,6 +610,7 @@ export type InsertNodeBetweenArgs = {
   setNodes: Dispatch<SetStateAction<WfRfNode[]>>
   setEdges: Dispatch<SetStateAction<Edge[]>>
   branchChannels?: BranchChannelHandle[]
+  position?: { x: number; y: number }
 }
 
 export function insertNodeBetween({
@@ -469,6 +621,7 @@ export function insertNodeBetween({
   setNodes,
   setEdges,
   branchChannels,
+  position: positionOverride,
 }: InsertNodeBetweenArgs): WfRfNode | null {
   const edge = edges.find((e) => e.id === edgeId)
   if (!edge?.source || !edge.target) return null
@@ -493,19 +646,20 @@ export function insertNodeBetween({
     .filter((e) => e.id !== edgeId)
     .map((e) => ({ source: e.source, target: e.target }))
 
-  const insertX = (source.position.x + target.position.x) / 2
-  const insertY = (source.position.y + target.position.y) / 2
+  const insertPos = positionOverride ?? {
+    x: (source.position.x + target.position.x) / 2,
+    y: (source.position.y + target.position.y) / 2,
+  }
 
   const laneId = sourceData.lane?.trim() || targetData?.lane?.trim()
   const laneHandle = laneId
     ? branchChannels?.find((ch) => ch.id === laneId)
     : undefined
 
-  const newNode = createRfNode(
-    wfType,
-    { x: insertX, y: insertY },
-    { branchChannels, lane: laneHandle },
-  )
+  const newNode = createRfNode(wfType, insertPos, {
+    branchChannels,
+    lane: laneHandle,
+  })
 
   if (
     wouldCreateCycle(validationNodes, validationEdges, edge.source, newNode.id) ||
@@ -543,4 +697,69 @@ export function insertNodeBetween({
   })
 
   return newNode
+}
+
+export type AddNodeFromPaletteDropArgs = {
+  wfType: string
+  flowPosition: { x: number; y: number }
+  target: PaletteDropTarget
+  nodes: WfRfNode[]
+  edges: Edge[]
+  setNodes: Dispatch<SetStateAction<WfRfNode[]>>
+  setEdges: Dispatch<SetStateAction<Edge[]>>
+  branchChannels?: BranchChannelHandle[]
+}
+
+export function addNodeFromPaletteDrop({
+  wfType,
+  flowPosition,
+  target,
+  nodes,
+  edges,
+  setNodes,
+  setEdges,
+  branchChannels = [],
+}: AddNodeFromPaletteDropArgs): WfRfNode | null {
+  const nodePos = nodePositionFromDropCenter(flowPosition)
+
+  if (target.mode === "initial") {
+    const created = replaceInitialPlaceholder({
+      wfType,
+      setNodes,
+      branchChannels,
+    })
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === created.id ? { ...n, position: nodePos } : n,
+      ),
+    )
+    return created
+  }
+
+  if (target.mode === "between") {
+    return insertNodeBetween({
+      edgeId: target.edgeId,
+      wfType,
+      nodes,
+      edges,
+      setNodes,
+      setEdges,
+      branchChannels,
+      position: nodePos,
+    })
+  }
+
+  const sourceId =
+    target.mode === "after" ? target.sourceId : target.sourceId
+
+  return addNodeAfter({
+    sourceId,
+    wfType,
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    branchChannels,
+    position: nodePos,
+  })
 }

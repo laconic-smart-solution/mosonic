@@ -404,7 +404,7 @@ export default function PostsPage() {
     >
       <motion.div className="flex w-full flex-col gap-5">
         <header className="space-y-1">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-navy-700">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             Posts
           </h1>
           <p className="text-sm text-muted-foreground">

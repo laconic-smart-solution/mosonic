@@ -1,19 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { AxiosError } from "axios"
-import { ExternalLink, Loader2, Pencil, Send, Trash2 } from "lucide-react"
+import { ExternalLink, Loader2, Pencil, Send } from "lucide-react"
 import { toast } from "sonner"
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Drawer,
   DrawerContent,
@@ -37,12 +27,10 @@ import {
   isoFromDatetimeLocal,
   type PostDrawerDraft,
 } from "@/features/posts/lib/post-drawer-form"
-import { toastDeletePostResult } from "@/features/posts/lib/post-delete-toast"
 import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { buttonVariants } from "@/lib/button-variants"
 import { cn } from "@/lib/utils"
 import {
-  useDeletePostMutation,
   usePatchPostMutation,
   usePostDetailQuery,
   usePublishPostMutation,
@@ -95,7 +83,6 @@ export function PostDetailDrawer({
   })
   const patchMu = usePatchPostMutation()
   const publishMu = usePublishPostMutation()
-  const deleteMu = useDeletePostMutation()
 
   const { local, remote } = useMemo(
     () => pullLocalAndRemote(detailQuery.data),
@@ -112,7 +99,6 @@ export function PostDetailDrawer({
   })
 
   const [editing, setEditing] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
     if (!open) setEditing(false)
@@ -128,23 +114,7 @@ export function PostDetailDrawer({
     setDraft(hydrated)
   }, [open, local, remote])
 
-  const busy = patchMu.isPending || publishMu.isPending || deleteMu.isPending
-
-  const isUnpublishAction =
-    local?.status === "published" || local?.status === "partial"
-  const deleteActionLabel = isUnpublishAction ? "Unpublish" : "Delete"
-
-  async function handleDeleteConfirm() {
-    if (!postId) return
-    try {
-      const result = await deleteMu.mutateAsync(postId)
-      toastDeletePostResult(result)
-      setDeleteOpen(false)
-      onOpenChange(false)
-    } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
-    }
-  }
+  const busy = patchMu.isPending || publishMu.isPending
 
   async function handlePublishNow() {
     if (!postId || !local) return
@@ -426,55 +396,10 @@ export function PostDetailDrawer({
                   )}
                 </Button>
               ) : null}
-              {local && local.status !== "cancelled" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
-                  disabled={busy || !postId}
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  {deleteMu.isPending ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : (
-                    <Trash2 className="size-4" aria-hidden />
-                  )}
-                  {deleteActionLabel}
-                </Button>
-              ) : null}
             </div>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isUnpublishAction
-                ? "Unpublish this post?"
-                : "Delete this post?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isUnpublishAction
-                ? "Removes the post from supported platforms and resets those upload channels to pending. Instagram, TikTok, and Snapchat cannot be unpublished via Zernio."
-                : "Permanently removes this post and resets its upload channels to pending so you can publish again."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMu.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMu.isPending}
-              onClick={() => void handleDeleteConfirm()}
-              className="hover:bg-destructive/10"
-            >
-              {deleteActionLabel}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }

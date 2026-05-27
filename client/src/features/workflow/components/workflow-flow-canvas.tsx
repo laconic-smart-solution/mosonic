@@ -1,6 +1,16 @@
 import "@xyflow/react/dist/style.css"
 
-import type { MouseEvent } from "react"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import type { MouseEvent, ReactNode } from "react"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import {
   Background,
@@ -25,17 +35,23 @@ import {
 import {
   normalizeLaneId,
   type BranchChannelHandle,
-  type BranchNodeConfig,
 } from "@/features/workflow/lib/branch-channels"
 import {
   addNodeAfter,
+  addNodeFromPaletteDrop,
   buildPlusEdge,
   deleteBranchCascade,
   insertNodeBetween,
   PLACEHOLDER_NODE_ID,
   repairOrphanLaneAdapts,
+  syncBranchLanesToChannels,
   replaceInitialPlaceholder,
 } from "@/features/workflow/lib/workflow-canvas-mutations"
+import {
+  WORKFLOW_CANVAS_DROP_ID,
+  parsePaletteDragId,
+  resolvePaletteDropTarget,
+} from "@/features/workflow/lib/workflow-palette-dnd"
 import {
   isPreviewEdgeId,
   persistedLayoutFromApiNodes,
@@ -56,6 +72,7 @@ import {
 } from "@/features/workflow/lib/workflow-node-validation"
 
 import type { WorkflowEdge, WorkflowNode } from "@/shared/types/workflow.type"
+import { heygenService } from "@/shared/services/heygen.service"
 import { toast } from "sonner"
 import { NodeSelectPopover } from "./node-select-popover"
 import { PlusEdge } from "./plus-edge"
@@ -63,6 +80,10 @@ import { PlusPlaceholderNode } from "./plus-placeholder-node"
 import { WorkflowBranchNode } from "./workflow-branch-node"
 import { WorkflowMergeNode } from "./workflow-merge-node"
 import { WorkflowPropertiesPanel } from "./workflow-properties-panel"
+import {
+  WorkflowNodePalette,
+  WorkflowPaletteDragPreview,
+} from "./workflow-node-palette"
 import { WorkflowRfNode } from "./workflow-rf-node"
 
 const nodeTypes = {
@@ -74,6 +95,49 @@ const nodeTypes = {
 
 const edgeTypes = {
   plus_edge: PlusEdge,
+}
+
+function flowPositionFromDragEnd(
+  event: DragEndEvent,
+  screenToFlow: (pos: { x: number; y: number }) => { x: number; y: number },
+): { x: number; y: number } | null {
+  const activator = event.activatorEvent
+  if (!(activator instanceof MouseEvent) && !(activator instanceof TouchEvent)) {
+    return null
+  }
+  let clientX: number
+  let clientY: number
+  if (activator instanceof MouseEvent) {
+    clientX = activator.clientX + event.delta.x
+    clientY = activator.clientY + event.delta.y
+  } else {
+    const touch = activator.changedTouches[0]
+    if (!touch) return null
+    clientX = touch.clientX + event.delta.x
+    clientY = touch.clientY + event.delta.y
+  }
+  return screenToFlow({ x: clientX, y: clientY })
+}
+
+function WorkflowCanvasDropZone({
+  children,
+  disabled,
+}: {
+  children: ReactNode
+  disabled?: boolean
+}) {
+  const { setNodeRef } = useDroppable({
+    id: WORKFLOW_CANVAS_DROP_ID,
+    disabled,
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+    >
+      {children}
+    </div>
+  )
 }
 
 type PopoverState = {
@@ -149,6 +213,8 @@ export type WorkflowFlowCanvasHandle = {
   getRfEdges: () => Edge[]
   /** Removes unassigned Adapt nodes and spawns one per channel from Branch. */
   repairOrphanLaneAdapts: () => boolean
+  /** Closes the properties panel and clears unapplied config drafts. */
+  dismissPropertiesPanel: () => void
 }
 
 type WorkflowFlowCanvasProps = {
@@ -164,10 +230,10 @@ type WorkflowFlowCanvasProps = {
   runtimeById?: Record<string, Record<string, unknown>>
   onRetryNode?: (nodeId: string) => void
   onSkipNode?: (nodeId: string) => void
-  onBranchConfigApplied?: (config: BranchNodeConfig) => void
   /** Fired when nodes/edges change in edit mode (not selection-only). */
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
+  workflowId?: string
 }
 
 export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowFlowCanvasProps>(
@@ -185,9 +251,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       runtimeById = {},
       onRetryNode,
       onSkipNode,
-      onBranchConfigApplied,
       onCanvasEdited,
       onConfigDraftChange,
+      workflowId,
     },
     ref,
   ) {
@@ -199,10 +265,17 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [propConfig, setPropConfig] = useState<Record<string, unknown>>({})
     const [popover, setPopover] = useState<PopoverState | null>(null)
+    const [paletteDragType, setPaletteDragType] =
+      useState<PlusPopoverType | null>(null)
+
+    const paletteSensors = useSensors(
+      useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    )
 
     const rf = useRef<ReactFlowInstance<WfRfNode> | null>(null)
     const nodesRef = useRef(nodes)
     const edgesRef = useRef(edges)
+    const suppressEditNotifyRef = useRef(false)
     nodesRef.current = nodes
     edgesRef.current = edges
 
@@ -238,13 +311,27 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       return []
     }, [edges, popover, validationContext])
 
+    const beginApiGraphSync = useCallback(() => {
+      suppressEditNotifyRef.current = true
+    }, [])
+
+    const endApiGraphSync = useCallback(() => {
+      queueMicrotask(() => {
+        queueMicrotask(() => {
+          suppressEditNotifyRef.current = false
+        })
+      })
+    }, [])
+
     useEffect(() => {
       if (rfNodesOverride && rfNodesOverride.length > 0) {
+        beginApiGraphSync()
         setNodes(rfNodesOverride)
         setEdges(rfEdgesOverride ?? [])
         setSelectedId(null)
         setPropConfig({})
         setPopover(null)
+        endApiGraphSync()
         queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
         return
       }
@@ -260,11 +347,13 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         branchChannels,
         persistedLayoutFromApiNodes(apiNodes),
       )
+      beginApiGraphSync()
       setNodes(laidOut.nodes)
       setEdges(laidOut.edges)
       setSelectedId(null)
       setPropConfig({})
       setPopover(null)
+      endApiGraphSync()
       queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
     }, [
       apiNodes,
@@ -315,6 +404,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     useEffect(() => {
       if (isMaterializedView || branchChannels.length === 0) return
+      beginApiGraphSync()
       setNodes((nds) =>
         nds.map((node) => {
           if (node.type !== "branchNode" && node.type !== "mergeNode") return node
@@ -327,7 +417,20 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           }
         }),
       )
-    }, [branchChannels, isMaterializedView, setNodes])
+      endApiGraphSync()
+    }, [
+      beginApiGraphSync,
+      branchChannels,
+      endApiGraphSync,
+      isMaterializedView,
+      setNodes,
+    ])
+
+    const closePanel = useCallback(() => {
+      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })))
+      setSelectedId(null)
+      setPropConfig({})
+    }, [setNodes])
 
     useImperativeHandle(
       ref,
@@ -346,8 +449,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           setEdges(result.edges)
           return true
         },
+        dismissPropertiesPanel: closePanel,
       }),
-      [branchChannels, setEdges, setNodes],
+      [branchChannels, closePanel, setEdges, setNodes],
     )
 
     const closePopover = useCallback(() => setPopover(null), [])
@@ -372,6 +476,74 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         setPopover({ mode: "between", anchor, edgeId })
       },
       [],
+    )
+
+    const handlePaletteDragStart = useCallback((event: DragStartEvent) => {
+      const wfType = parsePaletteDragId(event.active.id)
+      if (wfType) setPaletteDragType(wfType)
+    }, [])
+
+    const handlePaletteDragEnd = useCallback(
+      (event: DragEndEvent) => {
+        setPaletteDragType(null)
+        if (readOnly || isMaterializedView) return
+        const { active, over } = event
+        if (!over || over.id !== WORKFLOW_CANVAS_DROP_ID) return
+
+        const wfType = parsePaletteDragId(active.id)
+        if (!wfType) return
+
+        const inst = rf.current
+        if (!inst) return
+
+        const flowPosition = flowPositionFromDragEnd(event, (pos) =>
+          inst.screenToFlowPosition(pos),
+        )
+        if (!flowPosition) return
+
+        const target = resolvePaletteDropTarget(
+          flowPosition,
+          wfType,
+          nodesRef.current,
+          edgesRef.current,
+          channelCount,
+        )
+        if (!target) {
+          toast.error("Cannot add this node here")
+          return
+        }
+
+        const created = addNodeFromPaletteDrop({
+          wfType,
+          flowPosition,
+          target,
+          nodes: nodesRef.current,
+          edges: edgesRef.current,
+          setNodes,
+          setEdges,
+          branchChannels,
+        })
+        if (!created) {
+          toast.error("Cannot add this node here")
+          return
+        }
+
+        notifyCanvasEdited()
+        if (target.mode === "initial") {
+          queueMicrotask(() => void inst.fitView({ padding: 0.15 }))
+        }
+        queueMicrotask(() => syncEmptyPlaceholder())
+      },
+      [
+        branchChannels,
+        channelCount,
+        isMaterializedView,
+        notifyCanvasEdited,
+        readOnly,
+        setEdges,
+        setNodes,
+        syncEmptyPlaceholder,
+      ],
     )
 
     const handlePopoverSelect = useCallback(
@@ -533,12 +705,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       queueMicrotask(() => void inst.fitView({ padding: 0.15 }))
     }, [])
 
-    const closePanel = useCallback(() => {
-      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })))
-      setSelectedId(null)
-      setPropConfig({})
-    }, [setNodes])
-
     const deleteNode = useCallback(
       (nodeId: string) => {
         if (readOnly) return
@@ -676,10 +842,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       if (!selectedId) return
       const selected = nodes.find((n) => n.id === selectedId)
       if (selected?.type === "plus_placeholder") return
-      if (selected?.data.wfType === "branch") {
-        onBranchConfigApplied?.(propConfig as BranchNodeConfig)
-      }
       let configToApply: Record<string, unknown> = propConfig
+      if (selected?.data.wfType === "branch") {
+        configToApply = { mode: "rule_channels" }
+      }
       if (selected?.type === "wfNode" && selected.data.wfType === "image") {
         const { config: normalized, sizeAdjusted } =
           normalizeImageCanvasConfig(propConfig)
@@ -690,8 +856,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           )
         }
       }
-      setNodes((nds) =>
-        nds.map((n) => {
+      let nextNodes = nodes
+      let nextEdges = edgesRef.current
+      if (selected?.data.wfType === "branch") {
+        const synced = syncBranchLanesToChannels(nodes, nextEdges, branchChannels)
+        nextNodes = synced.nodes.map((n) => {
           if (n.id !== selectedId || n.type === "plus_placeholder") return n
           return {
             ...n,
@@ -700,25 +869,67 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               config: configToApply,
             },
           } as WfRfNode
-        }),
-      )
-      if (selected?.data.wfType !== "branch") {
-        setPropConfig(configToApply)
+        })
+        nextEdges = synced.edges
+        if (synced.removedLaneLabels.length > 0) {
+          toast.info(
+            `Removed lanes: ${synced.removedLaneLabels.join(", ")}`,
+          )
+        }
+        setEdges(nextEdges)
+      } else {
+        nextNodes = nodes.map((n) => {
+          if (n.id !== selectedId || n.type === "plus_placeholder") return n
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              config: configToApply,
+            },
+          } as WfRfNode
+        })
+      }
+      setNodes(nextNodes)
+      setPropConfig(configToApply)
+      onConfigDraftChange?.(false)
+      if (
+        workflowId?.trim() &&
+        selected?.type === "wfNode" &&
+        selected.data.wfType === "video"
+      ) {
+        void heygenService
+          .patchPresenterConfig(workflowId, selectedId, configToApply)
+          .catch(() => {
+            toast.error(
+              "Could not save video settings to the server. Use Save workflow before running.",
+            )
+          })
       }
     }, [
+      edges,
       nodes,
-      onBranchConfigApplied,
+      onConfigDraftChange,
       propConfig,
       readOnly,
       selectedId,
+      setEdges,
       setNodes,
       setPropConfig,
+      workflowId,
     ])
 
+    const showPalette = !readOnly && !isMaterializedView
+
     return (
-      <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <ReactFlow<WfRfNode>
+      <DndContext
+        sensors={paletteSensors}
+        onDragStart={showPalette ? handlePaletteDragStart : undefined}
+        onDragEnd={showPalette ? handlePaletteDragEnd : undefined}
+      >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
+          {showPalette ? <WorkflowNodePalette /> : null}
+          <WorkflowCanvasDropZone disabled={!showPalette}>
+            <ReactFlow<WfRfNode>
             nodes={nodesWithActions}
             edges={displayEdges}
             onNodesChange={readOnly ? onNodesChange : handleNodesChange}
@@ -742,37 +953,45 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               showInteractive={false}
             />
             <MiniMap
-              className="rounded-lg! border! border-(--nt-border)! bg-white! shadow-md!"
+              className="rounded-lg! border! border-(--nt-border)! bg-card! shadow-md!"
               maskColor="rgba(247, 244, 239, 0.72)"
               nodeStrokeWidth={2}
               zoomable
               pannable
             />
           </ReactFlow>
+          </WorkflowCanvasDropZone>
+
+          {selNode && !readOnly ? (
+            <WorkflowPropertiesPanel
+              selNode={selNode}
+              propConfig={propConfig}
+              setPropConfig={setPropConfig}
+              resolvedChannels={resolvedChannels}
+              workflowId={workflowId}
+              onClose={closePanel}
+              onApply={applyChanges}
+              onReset={() => {
+                setPropConfig(selNode.config ?? {})
+              }}
+            />
+          ) : null}
+
+          <NodeSelectPopover
+            open={popover != null}
+            anchorPosition={popover?.anchor ?? { x: 0, y: 0 }}
+            validNodeTypes={validPopoverTypes}
+            onSelect={handlePopoverSelect}
+            onClose={closePopover}
+          />
         </div>
 
-        {selNode && !readOnly ? (
-          <WorkflowPropertiesPanel
-            selNode={selNode}
-            propConfig={propConfig}
-            setPropConfig={setPropConfig}
-            resolvedChannels={resolvedChannels}
-            onClose={closePanel}
-            onApply={applyChanges}
-            onReset={() => {
-              setPropConfig(selNode.config ?? {})
-            }}
-          />
+        {showPalette && paletteDragType ? (
+          <DragOverlay dropAnimation={null}>
+            <WorkflowPaletteDragPreview wfType={paletteDragType} />
+          </DragOverlay>
         ) : null}
-
-        <NodeSelectPopover
-          open={popover != null}
-          anchorPosition={popover?.anchor ?? { x: 0, y: 0 }}
-          validNodeTypes={validPopoverTypes}
-          onSelect={handlePopoverSelect}
-          onClose={closePopover}
-        />
-      </div>
+      </DndContext>
     )
   },
 )

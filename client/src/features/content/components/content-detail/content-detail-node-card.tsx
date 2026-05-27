@@ -115,7 +115,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                   })
                 }
               }}
-              className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-[#0F1F3D] shadow-none placeholder:text-[#C4BBAC] focus-visible:bg-[color:var(--nt-canvas)] focus-visible:ring-2 focus-visible:ring-[#00C9A7]/40"
+              className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:bg-[color:var(--nt-canvas)] focus-visible:ring-2 focus-visible:ring-[#00C9A7]/40"
             />
             <p className="flex items-center gap-1 text-[11px] text-[#C4BBAC]">
               <Pencil className="size-3 shrink-0" />
@@ -155,7 +155,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
         {key === "video" && (
           <div className="space-y-2">
             {editedOutputs.video ? (
-              <div className="overflow-hidden rounded-[10px] border border-[#EDE9E1]">
+              <div className="overflow-hidden rounded-[10px] border border-border">
                 <MediaVideoBlock url={editedOutputs.video} />
               </div>
             ) : (
@@ -177,12 +177,12 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
           </div>
         )}
 
-        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[#EDE9E1] pt-3.5">
+        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 border-[#EDE9E1] bg-transparent text-xs text-[#62594E] hover:bg-[#F7F4EF]"
+            className="h-8 border-border bg-transparent text-xs text-muted-foreground hover:bg-muted"
             disabled={!nodeId || globalRerunning}
             onClick={() => onOpenRerun(key)}
           >
@@ -195,7 +195,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 border-[#EDE9E1] bg-transparent text-xs text-[#62594E] hover:bg-[#F7F4EF]"
+                className="h-8 border-border bg-transparent text-xs text-muted-foreground hover:bg-muted"
                 disabled={!displayText.trim()}
                 onClick={() => onCopyOutput(displayText)}
               >

@@ -16,8 +16,8 @@ type HomeRecentRailProps = {
 
 function RecentSkeletonRow() {
   return (
-    <div className="flex size-[52px] items-center justify-center rounded-xl border border-[#EDE9E1] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-      <div className="size-[30px] animate-pulse rounded-lg bg-[#EDE9E1]" />
+    <div className="flex size-[52px] items-center justify-center rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <div className="size-[30px] animate-pulse rounded-lg bg-muted" />
     </div>
   )
 }
@@ -36,7 +36,7 @@ export function HomeRecentRail({
         <RecentSkeletonRow />
         <RecentSkeletonRow />
         <RecentSkeletonRow />
-        <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-[#718096] uppercase">Recent</div>
+        <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">Recent</div>
       </div>
     )
   }
@@ -46,7 +46,7 @@ export function HomeRecentRail({
       {slots.map((slot, i) => {
         const key = slot.kind === "content" ? slot.contentId : `empty-${i}`
         const item = slot.kind === "content" ? slot : null
-        const borderColor = item && hovRight === i ? `${item.color}50` : "#EDE9E1"
+        const borderColor = item && hovRight === i ? `${item.color}50` : undefined
         const shadow =
           item && hovRight === i
             ? `0 4px 16px ${item.color}20, 0 1px 3px rgba(0,0,0,0.06)`
@@ -69,9 +69,12 @@ export function HomeRecentRail({
               }
               onMouseEnter={() => onHover(i)}
               onMouseLeave={() => onHover(null)}
-              className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
+              className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border border-border bg-card transition-all duration-150"
               style={{
-                borderColor: slot.kind === "empty" && hovRight === i ? "#A0AEC0" : borderColor,
+                borderColor:
+                  slot.kind === "empty" && hovRight === i
+                    ? "var(--muted-foreground)"
+                    : borderColor,
                 boxShadow:
                   slot.kind === "empty" && hovRight === i
                     ? "0 4px 12px rgba(0,0,0,0.08)"
@@ -91,7 +94,7 @@ export function HomeRecentRail({
                   {slot.initial}
                 </div>
               ) : (
-                <div className="text-lg leading-none font-semibold text-[#A0AEC0]">+</div>
+                <div className="text-lg leading-none font-semibold text-muted-foreground">+</div>
               )}
             </TooltipTrigger>
             <TooltipContent
@@ -106,7 +109,7 @@ export function HomeRecentRail({
           </Tooltip>
         )
       })}
-      <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-[#718096] uppercase">Recent</div>
+      <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">Recent</div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EventsModule } from '../events/events.module';
 import { Post, PostSchema } from '../post/schemas/post.schema';
@@ -10,6 +11,7 @@ import { WebhookService } from './webhook.service';
 
 @Module({
   imports: [
+    OrchestrationModule,
     MongooseModule.forFeature([
       { name: WebhookEvent.name, schema: WebhookEventSchema },
       { name: Upload.name, schema: UploadSchema },

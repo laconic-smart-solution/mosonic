@@ -5,13 +5,22 @@ import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
+import { LoggingService } from '../logging/logging.service';
+import {
+  LogLevel,
+  PipelineLogStatus,
+} from '../logging/schemas/pipeline-log.schema';
 import {
   LlmProvider,
   WorkflowNodeType,
   type WorkflowNodeConfig,
 } from '../nodes/schemas/workflow-node.schema';
 import type { VideoGenerationInput } from '../nodes/types/node-execution.types';
-import type { VideoCompleteResult } from '../nodes/services/video-generation.service';
+import type {
+  VideoCompleteResult,
+  VideoJobProvider,
+} from '../nodes/services/video-generation.service';
+import { getVideoGenerationMode } from '../nodes/services/video-generation.service';
 import { PipelineRepository } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
@@ -21,6 +30,13 @@ import { DependencyResolverService } from './dependency-resolver.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
+
+const PIPELINE_LOG_RETENTION_DAYS = 90;
+
+export type VideoFailureContext = {
+  videoProvider?: VideoJobProvider;
+  stage?: 'submit' | 'poll' | 'complete' | 'webhook' | 'timeout';
+};
 
 @Injectable()
 export class MediaNodeCompletionService {
@@ -32,6 +48,7 @@ export class MediaNodeCompletionService {
     private readonly pipelineNodeRunner: PipelineNodeRunnerService,
     private readonly events: EventsService,
     private readonly costService: CostService,
+    private readonly loggingService: LoggingService,
     @InjectModel(Rule.name)
     private readonly ruleModel: Model<RuleDocument>,
   ) {}
@@ -113,12 +130,105 @@ export class MediaNodeCompletionService {
     );
   }
 
-  async failVideoNode(payload: NodeJobPayload, error: Error): Promise<void> {
+  async failVideoNode(
+    payload: NodeJobPayload,
+    error: Error,
+    context?: VideoFailureContext,
+  ): Promise<void> {
+    const pipeline = await this.pipelineRepo.findById(payload.pipelineId);
+    const node = pipeline
+      ? this.pipelineRepo.getNode(pipeline, payload.nodeId)
+      : undefined;
+    const nodeConfig = (node?.config ?? {}) as WorkflowNodeConfig;
+    const mode = getVideoGenerationMode(nodeConfig);
+    const videoProvider =
+      context?.videoProvider ??
+      (mode === 'presenter' ? 'heygen' : 'sora');
+
+    const logMessage = this.formatVideoFailureMessage(error, videoProvider);
+    const errorDetail = {
+      pipelineId: payload.pipelineId,
+      workflowId: payload.workflowId,
+      ruleId: payload.ruleId,
+      nodeId: payload.nodeId,
+      lane: payload.lane ?? node?.lane ?? null,
+      stage: context?.stage ?? 'unknown',
+      mode,
+      videoProvider,
+      externalJobId: node?.externalJobId ?? null,
+      message: error.message,
+    };
+
+    this.logger.error(
+      `[video:failed] ${logMessage} | ${JSON.stringify(errorDetail)}`,
+      error.stack,
+    );
+
+    await this.pipelineRepo.setNodeLastError(
+      payload.pipelineId,
+      payload.nodeId,
+      logMessage,
+    );
+
+    try {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + PIPELINE_LOG_RETENTION_DAYS);
+      const doc = await this.loggingService.appendLog({
+        pipelineRef: payload.pipelineId,
+        workflowRef: payload.workflowId,
+        nodeId: payload.nodeId,
+        nodeType: WorkflowNodeType.VideoGeneration,
+        order: payload.order,
+        level: LogLevel.Error,
+        status: PipelineLogStatus.Failed,
+        message: logMessage,
+        retryCount: node?.retryCount ?? 0,
+        expiresAt,
+      });
+      this.events.emitToPipeline(payload.pipelineId, 'pipeline:log', {
+        pipelineId: payload.pipelineId,
+        log: {
+          logId: doc.logId,
+          pipelineRef: doc.pipelineRef,
+          nodeId: doc.nodeId,
+          nodeType: doc.nodeType,
+          order: doc.order,
+          level: doc.level,
+          status: doc.status,
+          message: doc.message,
+          retryCount: doc.retryCount,
+          timestamp: doc.timestamp,
+        },
+      });
+    } catch (logErr) {
+      this.logger.warn(
+        `Failed to persist video error log pipeline=${payload.pipelineId}: ${
+          logErr instanceof Error ? logErr.message : String(logErr)
+        }`,
+      );
+    }
+
     await this.pipelineRepo.clearExternalJobId(
       payload.pipelineId,
       payload.nodeId,
     );
     await this.pipelineNodeRunner.handleFinalFailure(payload, error);
+  }
+
+  private formatVideoFailureMessage(
+    error: Error,
+    videoProvider: VideoJobProvider,
+  ): string {
+    const label =
+      videoProvider === 'heygen' ? 'Presenter video' : 'Cinematic video';
+    const raw = error.message?.trim();
+    if (!raw) {
+      return `${label} generation failed. Please retry or skip.`;
+    }
+    if (raw.length <= 240) {
+      return `${label} — ${raw}`;
+    }
+    return `${label} — ${raw.slice(0, 237)}…`;
   }
 
   private async recordVideoCost(

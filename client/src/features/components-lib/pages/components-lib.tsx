@@ -3,7 +3,7 @@ import { T } from "@/lib/tokens"
 function Btn({ children, variant = "primary", size = "md", style: ex = {} }: { children: React.ReactNode; variant?: string; size?: string; style?: React.CSSProperties }) {
   const vs: Record<string, React.CSSProperties> = {
     primary:     { background: T.accent, color: "white" },
-    secondary:   { background: "white", color: T.textPrimary, border: `1px solid ${T.surfaceBorder}` },
+    secondary:   { background: T.surfaceBg, color: T.textPrimary, border: `1px solid ${T.surfaceBorder}` },
     ghost:       { background: "transparent", color: T.textSecondary, border: `1px solid ${T.surfaceBorder}` },
     destructive: { background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` },
     accent:      { background: T.accentLight, color: T.accent, border: `1px solid ${T.accentBorder}` },
@@ -38,7 +38,7 @@ function Chip({ label, color = "gray", dot = false }: { label: string; color?: s
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "white", border: `1px solid ${T.surfaceBorder}`, borderRadius: 10, overflow: "hidden", boxShadow: T.surfaceShadow }}>
+    <div style={{ background: T.surfaceBg, border: `1px solid ${T.surfaceBorder}`, borderRadius: 10, overflow: "hidden", boxShadow: T.surfaceShadow }}>
       <div style={{ padding: "12px 18px", borderBottom: `1px solid ${T.surfaceBorder}`, background: "#F9F8F5" }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary, textTransform: "uppercase", letterSpacing: "0.7px" }}>{title}</span>
       </div>
@@ -97,7 +97,7 @@ export default function ComponentsLibPage() {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {NODE_VARIANTS.map((n) => (
             <div key={n.status} style={{
-              width: 210, border: `1.5px solid ${n.borderColor}`, borderRadius: 12, background: "white",
+              width: 210, border: `1.5px solid ${n.borderColor}`, borderRadius: 12, background: T.surfaceBg,
               overflow: "hidden", boxShadow: n.glowColor ? `0 0 0 3px ${n.glowColor}, 0 2px 8px rgba(0,0,0,0.06)` : "0 2px 6px rgba(0,0,0,0.05)",
             }}>
               <div style={{ height: 3, background: `linear-gradient(90deg,${n.nodeColor},${n.nodeColor}80)` }} />

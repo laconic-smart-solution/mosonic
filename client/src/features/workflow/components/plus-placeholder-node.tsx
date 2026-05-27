@@ -13,7 +13,7 @@ export function PlusPlaceholderNode({
   return (
     <button
       type="button"
-      className="nodrag nopan pointer-events-auto flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-white/80 px-6 py-10 transition-colors hover:border-[#00A589] hover:bg-[#E0FAF5]/40"
+      className="nodrag nopan pointer-events-auto flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-card/80 px-6 py-10 transition-colors hover:border-[#00A589] hover:bg-[#E0FAF5]/40"
       style={{
         width: NODE_W,
         borderColor: T.surfaceBorder,

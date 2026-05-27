@@ -19,8 +19,15 @@ import type { RulePageQueryDto } from './dto/rule-page-query.dto';
 import type { RulePageItemDto } from './dto/rule-page-query.dto';
 import type { CampaignDto } from './dto/rule-body.dto';
 import type { UpdateRuleDto } from './dto/update-rule.dto';
+import type {
+  NewsTriggerSettingsResponseDto,
+  UpdateNewsTriggerSettingsDto,
+} from './dto/news-trigger-settings.dto';
 import {
   GenderOption,
+  NewsTriggerCategory,
+  NewsTriggerConfig,
+  NewsTriggerSchedule,
   OriginalInputType,
   PostingFrequency,
   Rule,
@@ -548,5 +555,100 @@ export class RuleService {
         message,
       });
     }
+  }
+
+  private defaultNewsTrigger(): NewsTriggerConfig {
+    return {
+      enabled: false,
+      schedule: NewsTriggerSchedule.Daily,
+      country: 'us',
+      language: 'en',
+      category: NewsTriggerCategory.Business,
+      keywords: [],
+      minRelevanceScore: 70,
+      maxPostsPerDay: 1,
+      autoApprove: false,
+      lastTriggeredAt: null,
+      totalTriggeredCount: 0,
+    };
+  }
+
+  private toNewsTriggerResponse(
+    nt: NewsTriggerConfig | undefined,
+  ): NewsTriggerSettingsResponseDto {
+    const base = nt ?? this.defaultNewsTrigger();
+    return {
+      enabled: base.enabled ?? false,
+      schedule: base.schedule ?? NewsTriggerSchedule.Daily,
+      country: base.country ?? 'us',
+      language: base.language ?? 'en',
+      category: base.category ?? NewsTriggerCategory.Business,
+      keywords: (base.keywords ?? []).map((k) => k.toLowerCase()),
+      minRelevanceScore: base.minRelevanceScore ?? 70,
+      maxPostsPerDay: base.maxPostsPerDay ?? 1,
+      autoApprove: base.autoApprove ?? false,
+      lastTriggeredAt: base.lastTriggeredAt
+        ? new Date(base.lastTriggeredAt).toISOString()
+        : null,
+      totalTriggeredCount: base.totalTriggeredCount ?? 0,
+    };
+  }
+
+  async getNewsTriggerSettings(
+    ruleId: string,
+    auth: TenancyAuth,
+  ): Promise<NewsTriggerSettingsResponseDto> {
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId }, auth))
+      .exec();
+    if (!rule) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    return this.toNewsTriggerResponse(rule.newsTrigger);
+  }
+
+  async updateNewsTriggerSettings(
+    ruleId: string,
+    body: UpdateNewsTriggerSettingsDto,
+    auth: TenancyAuth,
+  ): Promise<NewsTriggerSettingsResponseDto> {
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId }, auth))
+      .exec();
+    if (!rule) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+
+    const existing = rule.newsTrigger
+      ? (JSON.parse(JSON.stringify(rule.newsTrigger)) as NewsTriggerConfig)
+      : {};
+    const current: NewsTriggerConfig = {
+      ...this.defaultNewsTrigger(),
+      ...existing,
+    };
+
+    if (body.enabled !== undefined) current.enabled = body.enabled;
+    if (body.schedule !== undefined) current.schedule = body.schedule;
+    if (body.country !== undefined) current.country = body.country.trim();
+    if (body.language !== undefined) current.language = body.language.trim();
+    if (body.category !== undefined) current.category = body.category;
+    if (body.keywords !== undefined) {
+      current.keywords = body.keywords
+        .map((k) => k.trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+    if (body.minRelevanceScore !== undefined) {
+      current.minRelevanceScore = body.minRelevanceScore;
+    }
+    if (body.maxPostsPerDay !== undefined) {
+      current.maxPostsPerDay = body.maxPostsPerDay;
+    }
+    if (body.autoApprove !== undefined) current.autoApprove = body.autoApprove;
+
+    rule.newsTrigger = current;
+    await rule.save();
+
+    return this.toNewsTriggerResponse(rule.newsTrigger);
   }
 }

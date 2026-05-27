@@ -42,7 +42,20 @@ function summarizeNodeConfig(node: WorkflowNode): string {
     case "image_generation":
       return [c.aspectRatio, c.quality, c.style].filter(Boolean).join(" · ") || "Default image settings"
     case "video_generation":
+      if (c.mode === "presenter") {
+        return [
+          "Presenter",
+          c.duration !== undefined && c.duration !== null
+            ? `${String(c.duration)}s`
+            : "",
+          c.heygenOrientation === "portrait" ? "9:16" : "16:9",
+          c.heygenExpressiveness,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      }
       return [
+        "Cinematic",
         c.duration !== undefined && c.duration !== null
           ? `${String(c.duration)}s`
           : "",

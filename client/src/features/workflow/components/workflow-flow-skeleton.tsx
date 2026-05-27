@@ -30,7 +30,7 @@ const edges: Edge[] = [
 
 function SkeletonNode({ data }: { data: SkeletonNodeData }) {
   return (
-    <div className="w-[240px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="w-[240px] rounded-xl border border-slate-200 bg-card p-3 shadow-sm">
       <div className="mb-2 h-2.5 w-24 animate-pulse rounded bg-slate-200" />
       <div className="mb-2 h-2 w-full animate-pulse rounded bg-slate-100" />
       <div className="h-2 w-5/6 animate-pulse rounded bg-slate-100" />

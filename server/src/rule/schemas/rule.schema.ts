@@ -259,6 +259,68 @@ export class RuleVersion {
 }
 export const RuleVersionSchema = SchemaFactory.createForClass(RuleVersion);
 
+export enum NewsTriggerSchedule {
+  Daily = 'daily',
+  TwiceDaily = 'twice_daily',
+}
+
+export enum NewsTriggerCategory {
+  All = '',
+  Business = 'business',
+  Technology = 'technology',
+  Entertainment = 'entertainment',
+  Health = 'health',
+  Science = 'science',
+  Sports = 'sports',
+  General = 'general',
+}
+
+@Schema({ _id: false })
+export class NewsTriggerConfig {
+  @Prop({ type: Boolean, default: false })
+  enabled: boolean;
+
+  @Prop({
+    type: String,
+    enum: Object.values(NewsTriggerSchedule),
+    default: NewsTriggerSchedule.Daily,
+  })
+  schedule: NewsTriggerSchedule;
+
+  @Prop({ type: String, default: 'us' })
+  country: string;
+
+  @Prop({ type: String, default: 'en' })
+  language: string;
+
+  @Prop({
+    type: String,
+    enum: Object.values(NewsTriggerCategory),
+    default: NewsTriggerCategory.Business,
+  })
+  category: NewsTriggerCategory;
+
+  @Prop({ type: [String], default: [] })
+  keywords: string[];
+
+  @Prop({ type: Number, default: 70, min: 50, max: 100 })
+  minRelevanceScore: number;
+
+  @Prop({ type: Number, default: 1, min: 1, max: 3 })
+  maxPostsPerDay: number;
+
+  @Prop({ type: Boolean, default: false })
+  autoApprove: boolean;
+
+  @Prop({ type: Date, default: null })
+  lastTriggeredAt: Date | null;
+
+  @Prop({ type: Number, default: 0 })
+  totalTriggeredCount: number;
+}
+export const NewsTriggerConfigSchema =
+  SchemaFactory.createForClass(NewsTriggerConfig);
+
 @Schema({
   collection: 'rules',
   timestamps: true,
@@ -316,6 +378,9 @@ export class Rule {
 
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   autonomyPolicy: Record<string, unknown> | null;
+
+  @Prop({ type: NewsTriggerConfigSchema, default: () => ({}) })
+  newsTrigger: NewsTriggerConfig;
 }
 
 export const RuleSchema = SchemaFactory.createForClass(Rule);
@@ -324,3 +389,9 @@ export type RuleDocument = HydratedDocument<Rule>;
 RuleSchema.index({ name: 1 });
 RuleSchema.index({ status: 1, updatedAt: -1 });
 RuleSchema.index({ userId: 1, updatedAt: -1 });
+RuleSchema.index({
+  'newsTrigger.enabled': 1,
+  'newsTrigger.country': 1,
+  'newsTrigger.language': 1,
+  'newsTrigger.category': 1,
+});

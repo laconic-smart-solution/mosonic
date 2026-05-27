@@ -138,15 +138,41 @@ export const PipelineRuleOverlaySchema =
   SchemaFactory.createForClass(PipelineRuleOverlay);
 
 @Schema({ _id: false })
+export class PipelineNewsMeta {
+  @Prop({ type: String, required: true })
+  title: string;
+
+  @Prop({ type: String, required: true })
+  url: string;
+
+  @Prop({ type: String, required: true })
+  sourceId: string;
+
+  @Prop({ type: String, required: true })
+  publishedAt: string;
+
+  @Prop({ type: Number, required: true })
+  relevanceScore: number;
+
+  @Prop({ type: String, default: '' })
+  suggestedAngle: string;
+}
+export const PipelineNewsMetaSchema =
+  SchemaFactory.createForClass(PipelineNewsMeta);
+
+@Schema({ _id: false })
 export class PipelineMetadata {
   @Prop({ type: String })
-  source?: 'manual' | 'scheduler' | 'integration';
+  source?: 'manual' | 'scheduler' | 'integration' | 'news';
 
   @Prop({ type: String })
   scheduleId?: string;
 
   @Prop({ type: String })
   experimentId?: string;
+
+  @Prop({ type: PipelineNewsMetaSchema, default: null })
+  newsMeta: PipelineNewsMeta | null;
 }
 
 export const PipelineMetadataSchema =

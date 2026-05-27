@@ -9,12 +9,18 @@ import { cn } from "@/lib/utils"
 /** Set `direction` on `<Drawer>`: `bottom` | `top` | `left` | `right`. */
 function Drawer({
   shouldScaleBackground = false,
+  modal = true,
+  noBodyStyles = false,
+  disablePreventScroll = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   return (
     <DrawerPrimitive.Root
       data-slot="drawer"
       shouldScaleBackground={shouldScaleBackground}
+      modal={modal}
+      noBodyStyles={noBodyStyles}
+      disablePreventScroll={disablePreventScroll}
       {...props}
     />
   )
@@ -65,17 +71,23 @@ function DrawerContent({
   children,
   variant = "sheet",
   showCloseButton = false,
+  overlay = true,
+  portal = true,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Content> & {
   /** `sheet` = bottom-style chrome + drag handle; `panel` = solid side/full-height panel. */
   variant?: "sheet" | "panel"
   showCloseButton?: boolean
+  /** When false, no dimmed backdrop (e.g. inline workflow sidebar). */
+  overlay?: boolean
+  /** When false, content stays in the DOM tree (in-flow sidebar). */
+  portal?: boolean
 }) {
   const isSheet = variant === "sheet"
 
-  return (
-    <DrawerPortal data-slot="drawer-portal">
-      <DrawerOverlay />
+  const content = (
+    <>
+      {overlay ? <DrawerOverlay /> : null}
       <DrawerPrimitive.Content
         data-slot="drawer-content"
         data-variant={variant}
@@ -97,8 +109,14 @@ function DrawerContent({
           </DrawerPrimitive.Close>
         ) : null}
       </DrawerPrimitive.Content>
-    </DrawerPortal>
+    </>
   )
+
+  if (!portal) {
+    return content
+  }
+
+  return <DrawerPortal data-slot="drawer-portal">{content}</DrawerPortal>
 }
 
 function DrawerBottomHandle() {

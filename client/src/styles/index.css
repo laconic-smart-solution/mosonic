@@ -184,6 +184,81 @@
   --nt-sidebar-border: #0F1F3D;
   --nt-topbar-bg: rgba(255, 255, 255, 0.92);
   --nt-topbar-border: #EDE9E1;
+  --nt-accent-light: #E0FAF5;
+  --nt-accent-border: #80E5D1;
+  --nt-blue: #2563EB;
+  --nt-blue-bg: #DBEAFE;
+  --nt-blue-border: #93C5FD;
+}
+
+.dark {
+  --background: #090C11;
+  --foreground: #F7F8FA;
+  --card: #171D26;
+  --card-foreground: #F7F8FA;
+  --popover: #171D26;
+  --popover-foreground: #F7F8FA;
+
+  --primary: #00C9A7;
+  --primary-foreground: #040B15;
+
+  --secondary: #252D3B;
+  --secondary-foreground: #F7F8FA;
+
+  --muted: #252D3B;
+  --muted-foreground: #A0AEC0;
+
+  --accent: #003830;
+  --accent-foreground: #3FD8BA;
+
+  --destructive: oklch(62% 0.22 27.3);
+
+  --border: #252D3B;
+  --input: #252D3B;
+  --ring: #00C9A7;
+
+  --chart-1: #00C9A7;
+  --chart-2: #6C88C3;
+  --chart-3: #F5A623;
+  --chart-4: #3FD8BA;
+  --chart-5: #9AAED9;
+
+  --sidebar: #040B15;
+  --sidebar-foreground: #A0AEC0;
+  --sidebar-primary: #00C9A7;
+  --sidebar-primary-foreground: #040B15;
+  --sidebar-accent: #091528;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #0F1F3D;
+  --sidebar-ring: #00C9A7;
+
+  --nt-canvas: #090C11;
+  --nt-surface: #171D26;
+  --nt-border: #252D3B;
+  --nt-surface-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --nt-text-primary: #F7F8FA;
+  --nt-text-secondary: #A0AEC0;
+  --nt-text-muted: #718096;
+  --nt-muted-bg: #252D3B;
+  --nt-accent: #00C9A7;
+  --nt-green: #4ade80;
+  --nt-green-bg: #14532d;
+  --nt-green-border: #166534;
+  --nt-amber: #F5A623;
+  --nt-amber-bg: #422006;
+  --nt-amber-border: #78350f;
+  --nt-red: #f87171;
+  --nt-red-bg: #450a0a;
+  --nt-red-border: #7f1d1d;
+  --nt-sidebar: #040B15;
+  --nt-sidebar-border: #0F1F3D;
+  --nt-topbar-bg: rgba(9, 12, 17, 0.92);
+  --nt-topbar-border: #252D3B;
+  --nt-accent-light: #003830;
+  --nt-accent-border: #005C4D;
+  --nt-blue: #60a5fa;
+  --nt-blue-bg: #1e3a5f;
+  --nt-blue-border: #1d4ed8;
 }
 
 /* NeuralTex animations */
@@ -215,12 +290,22 @@
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+@keyframes ntOrbRipple {
+  0%   { transform: scale(0.92); opacity: 0.45; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+@keyframes ntOrbSpinFast {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D9D3C7; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #C4BBAC; }
+.dark ::-webkit-scrollbar-thumb { background: #374151; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4A5568; }
 
 @layer base {
   * {

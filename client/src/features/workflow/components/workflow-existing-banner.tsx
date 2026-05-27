@@ -45,7 +45,7 @@ function WorkflowExistingBanner({
             type="button"
             variant="outline"
             size="sm"
-            className="w-full justify-center gap-1.5 rounded-full border-slate-200 bg-white"
+            className="w-full justify-center gap-1.5 rounded-full border-slate-200 bg-card"
             onClick={onOpenExisting}
           >
             <motion.span

@@ -1,3 +1,9 @@
+import {
+  channelIdsToHandles,
+  normalizeChannelId,
+  ruleChannelNamesToIds,
+} from "@/shared/constants/distribution-channels"
+
 export type BranchChannelHandle = {
   id: string
   label: string
@@ -9,63 +15,35 @@ export type RuleChannelEntry = {
 }
 
 export type BranchNodeConfig = {
-  mode?: "rule_channels" | "manual" | "ab_test"
-  channelIds?: string[]
-  variants?: Array<{ id: string; weight?: number; channel?: string }>
+  mode?: "rule_channels"
 }
 
-export function normalizeLaneId(channel: string): string {
-  return channel.trim().toLowerCase()
+export const RULE_CHANNELS_BRANCH_CONFIG: BranchNodeConfig = {
+  mode: "rule_channels",
 }
 
-function toHandle(entry: RuleChannelEntry): BranchChannelHandle {
-  const label = entry.channel.trim()
-  return { id: normalizeLaneId(label), label }
-}
-
-function resolveRuleChannels(
-  branchConfig: BranchNodeConfig,
-  ruleChannels: RuleChannelEntry[],
-): RuleChannelEntry[] {
-  if (branchConfig.mode === "manual" && branchConfig.channelIds?.length) {
-    const wanted = new Set(
-      branchConfig.channelIds.map((c) => normalizeLaneId(c)),
-    )
-    return ruleChannels.filter((ch) => wanted.has(normalizeLaneId(ch.channel)))
-  }
-  return ruleChannels
+/** Canonical lane / merge-handle id (matches server `normalizeLaneId`). */
+export function normalizeLaneId(lane: string): string {
+  return normalizeChannelId(lane)
 }
 
 /**
- * Resolves channel handles for Branch/Merge preview UI (mirrors server materialization).
+ * Resolves channel handles for Branch/Merge UI from the campaign rule channels.
  */
 export function resolveBranchChannels(
-  ruleChannels: RuleChannelEntry[] | undefined | null,
-  branchConfig: BranchNodeConfig | undefined | null,
+  _branchConfig: BranchNodeConfig | undefined | null,
+  ruleChannels?: RuleChannelEntry[] | null,
 ): BranchChannelHandle[] {
-  const channels = ruleChannels ?? []
-  const config = branchConfig ?? { mode: "rule_channels" as const }
+  if (!ruleChannels?.length) return []
+  return channelIdsToHandles(ruleChannelNamesToIds(ruleChannels))
+}
 
-  if (config.mode === "ab_test" && config.variants?.length) {
-    const seen = new Set<string>()
-    const handles: BranchChannelHandle[] = []
-    for (const variant of config.variants) {
-      const match =
-        channels.find(
-          (ch) =>
-            normalizeLaneId(ch.channel) ===
-            normalizeLaneId(variant.channel ?? ch.channel),
-        ) ?? channels[0]
-      if (!match) continue
-      const handle = toHandle(match)
-      if (seen.has(handle.id)) continue
-      seen.add(handle.id)
-      handles.push(handle)
-    }
-    return handles
-  }
-
-  return resolveRuleChannels(config, channels).map(toHandle)
+/** Normalizes persisted branch config to rule-driven mode. */
+export function migrateBranchConfigFromRule(
+  _config: BranchNodeConfig,
+  _ruleChannels: RuleChannelEntry[] | undefined | null,
+): BranchNodeConfig {
+  return { mode: "rule_channels" }
 }
 
 export function findBranchNodeConfig(
@@ -75,5 +53,5 @@ export function findBranchNodeConfig(
     (n) => n.type === "branch" || n.type === "branchNode",
   )
   if (!branch) return null
-  return (branch.config ?? {}) as BranchNodeConfig
+  return { mode: "rule_channels" }
 }

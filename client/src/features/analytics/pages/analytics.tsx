@@ -126,7 +126,7 @@ export default function AnalyticsListPage() {
               Insights
             </span>
           </div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-navy-700">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             Analytics
           </h1>
           <p className="text-sm text-muted-foreground">

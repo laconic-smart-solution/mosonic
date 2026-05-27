@@ -46,7 +46,7 @@ export function WorkflowToolbar({
   return (
     <div
       className="flex h-[52px] min-h-[52px] shrink-0 items-center gap-3 border-b px-4 shadow-[0_1px_0_var(--nt-border)]"
-      style={{ background: "white", borderColor: T.surfaceBorder }}
+      style={{ background: T.surfaceBg, borderColor: T.surfaceBorder }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Input

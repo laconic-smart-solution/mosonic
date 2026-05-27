@@ -1,5 +1,4 @@
-import { appConfig } from "@/app/config/app-config"
-import { io, type Socket } from "socket.io-client"
+import { getSharedSocket } from "./socket-client"
 
 export type UploadStartedEvent = { uploadId: string; channel: string }
 export type UploadCompletedEvent = {
@@ -43,32 +42,21 @@ export type UploadUpdatedEvent = {
   }>
 }
 
-let socketInstance: Socket | null = null
-
-function getSocket() {
-  if (socketInstance) return socketInstance
-  socketInstance = io(appConfig.apiBaseUrl, {
-    withCredentials: true,
-    transports: ["websocket", "polling"],
-  })
-  return socketInstance
-}
-
 export function joinUploadRoom(uploadId: string) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.emit("join", { room: `upload_${uploadId}` })
   return socket
 }
 
 export function leaveUploadRoom(uploadId: string) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.emit("leave", { room: `upload_${uploadId}` })
 }
 
 export function onUploadStarted(
   handler: (payload: UploadStartedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:started", handler)
   return () => socket.off("upload:started", handler)
 }
@@ -76,13 +64,13 @@ export function onUploadStarted(
 export function onUploadCompleted(
   handler: (payload: UploadCompletedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:completed", handler)
   return () => socket.off("upload:completed", handler)
 }
 
 export function onUploadFailed(handler: (payload: UploadFailedEvent) => void) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:failed", handler)
   return () => socket.off("upload:failed", handler)
 }
@@ -90,7 +78,7 @@ export function onUploadFailed(handler: (payload: UploadFailedEvent) => void) {
 export function onUploadScheduled(
   handler: (payload: UploadScheduledEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:scheduled", handler)
   return () => socket.off("upload:scheduled", handler)
 }
@@ -98,7 +86,7 @@ export function onUploadScheduled(
 export function onUploadAllCompleted(
   handler: (payload: UploadAllCompletedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:all_completed", handler)
   return () => socket.off("upload:all_completed", handler)
 }
@@ -106,7 +94,7 @@ export function onUploadAllCompleted(
 export function onUploadUpdated(
   handler: (payload: UploadUpdatedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("upload:updated", handler)
   return () => socket.off("upload:updated", handler)
 }

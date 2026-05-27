@@ -138,13 +138,13 @@ export function PreviewImageWithOverlay({
   const src = useFileObjectUrl(url)
   if (!src) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-[10px] border border-[#EDE9E1] bg-[color:var(--nt-canvas)] text-xs text-muted-foreground">
+      <div className="flex aspect-video w-full items-center justify-center rounded-[10px] border border-border bg-[color:var(--nt-canvas)] text-xs text-muted-foreground">
         Loading image…
       </div>
     )
   }
   return (
-    <div className="group relative aspect-video overflow-hidden rounded-[10px] border border-[#EDE9E1] bg-[color:var(--nt-canvas)]">
+    <div className="group relative aspect-video overflow-hidden rounded-[10px] border border-border bg-[color:var(--nt-canvas)]">
       <button
         type="button"
         className="block h-full w-full overflow-hidden border-0 p-0"
@@ -152,12 +152,12 @@ export function PreviewImageWithOverlay({
       >
         <img src={src} alt={title} className="h-full w-full object-cover" />
       </button>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[#0F1F3D]/40 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
           type="button"
           size="sm"
           variant="secondary"
-          className="pointer-events-auto bg-white/90 text-foreground shadow-sm hover:bg-white"
+          className="pointer-events-auto bg-card/90 text-foreground shadow-sm hover:bg-card"
           onClick={(e) => {
             e.stopPropagation()
             onRemove()

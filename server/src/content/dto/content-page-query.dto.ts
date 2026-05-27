@@ -108,6 +108,8 @@ export class ContentPageItemDto {
   createdAt!: string;
   /** Merged userEdits over outputs (same as content detail). */
   outputs!: ResolvedContentOutputs;
+  /** Per-channel adapt outputs (multi-lane runs). */
+  laneOutputs?: Record<string, Record<string, unknown>>;
   /** Present when an upload sidecar exists for this content. */
   uploadId?: string;
 }

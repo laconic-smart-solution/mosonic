@@ -44,6 +44,7 @@ import {
   resolveAutomappedCaption,
   resolveAutomappedMediaUrl,
 } from './upload-channel-publish.util';
+import { laneMediaFromPipelineNodes } from './upload-lane-media.util';
 import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
@@ -127,6 +128,10 @@ export class UploadService {
         ? parsePipelineNodeOutputString(adaptNode.output)
         : null;
       const map = normalizedRuleChannelMapping(ruleCh);
+      const laneMedia = laneMediaFromPipelineNodes(
+        pipeline.nodes ?? [],
+        lane,
+      );
       const laneResolved: ResolvedContentOutputs = {
         ...resolvedOutputs,
         text:
@@ -139,6 +144,8 @@ export class UploadService {
         summary:
           (typeof adaptOut?.summary === 'string' ? adaptOut.summary : undefined) ??
           resolvedOutputs.summary,
+        image: laneMedia.image ?? resolvedOutputs.image,
+        video: laneMedia.video ?? resolvedOutputs.video,
       };
       const caption = resolveAutomappedCaption(map.caption, laneResolved);
       const mediaUrl = resolveAutomappedMediaUrl(map.media, laneResolved);
@@ -320,10 +327,12 @@ export class UploadService {
       .findOne(filter)
       .sort({ createdAt: -1 })
       .exec();
-    const channels = this.buildChannelEntriesFromRule(
-      params.ruleChannels,
-      params.resolvedOutputs ?? {},
-    );
+    const channels =
+      params.channels ??
+      this.buildChannelEntriesFromRule(
+        params.ruleChannels,
+        params.resolvedOutputs ?? {},
+      );
     if (doc) {
       doc.resolvedOutputs = params.resolvedOutputs;
       doc.workflowRef = params.workflowRef;

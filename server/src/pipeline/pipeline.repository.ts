@@ -88,6 +88,19 @@ export class PipelineRepository {
       .exec();
   }
 
+  async setNodeLastError(
+    pipelineId: string,
+    nodeId: string,
+    lastError: string,
+  ): Promise<void> {
+    await this.pipelineModel
+      .updateOne(
+        { pipelineId, 'nodes.nodeId': nodeId },
+        { $set: { 'nodes.$.lastError': lastError.slice(0, 2000) } },
+      )
+      .exec();
+  }
+
   async markNodeSkipped(pipelineId: string, nodeId: string): Promise<void> {
     await this.pipelineModel
       .updateOne(

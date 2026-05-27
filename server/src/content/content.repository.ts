@@ -3,6 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
+import {
+  Pipeline,
+  type PipelineDocument,
+} from '../pipeline/schemas/pipeline.schema';
 import { mergeResolvedOutputs } from './content-output.utils';
 import type {
   ContentPageItemDto,
@@ -16,11 +20,28 @@ import {
   type ContentUserEdits,
 } from './schemas/content.schema';
 
+type PageDocLean = {
+  contentId: string;
+  pipelineRef: string;
+  workflowRef: string;
+  ruleRef: string;
+  status: ContentStatus;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  outputs?: ContentOutputs;
+  userEdits?: ContentUserEdits;
+  nodeOutputs?: Record<string, Record<string, unknown>>;
+  nodeUserEdits?: Record<string, Record<string, unknown>>;
+  laneOutputs?: Record<string, Record<string, unknown>>;
+};
+
 @Injectable()
 export class ContentRepository {
   constructor(
     @InjectModel(Content.name)
     private readonly contentModel: Model<ContentDocument>,
+    @InjectModel(Pipeline.name)
+    private readonly pipelineModel: Model<PipelineDocument>,
   ) {}
 
   async findById(
@@ -98,30 +119,65 @@ export class ContentRepository {
         .skip(skip)
         .limit(limit)
         .select(
-          'contentId pipelineRef workflowRef ruleRef status createdAt updatedAt outputs userEdits',
+          'contentId pipelineRef workflowRef ruleRef status createdAt updatedAt outputs userEdits nodeOutputs nodeUserEdits laneOutputs',
         )
         .lean()
         .exec(),
       this.contentModel.countDocuments(filter).exec(),
     ]);
 
+    const pageDocs = docs as PageDocLean[];
+    const pipelineRefs = [
+      ...new Set(pageDocs.map((d) => d.pipelineRef).filter(Boolean)),
+    ];
+    const pipelineById = new Map<
+      string,
+      { nodes: Array<{ nodeId: string; type: string; order: number }> }
+    >();
+    if (pipelineRefs.length > 0) {
+      const pipelines = await this.pipelineModel
+        .find(mergeUserIdFilter({ pipelineId: { $in: pipelineRefs } }, auth))
+        .select('pipelineId nodes.nodeId nodes.type nodes.order')
+        .lean()
+        .exec();
+      for (const p of pipelines) {
+        pipelineById.set(p.pipelineId, {
+          nodes: (p.nodes ?? []).map((n) => ({
+            nodeId: n.nodeId,
+            type: String(n.type),
+            order: n.order,
+          })),
+        });
+      }
+    }
+
     return {
-      data: docs.map((doc) => {
-        const withDates = doc as {
-          createdAt?: Date | string;
-          updatedAt?: Date | string;
-          outputs?: ContentOutputs;
-          userEdits?: ContentUserEdits;
-        };
+      data: pageDocs.map((doc) => {
+        const pipeline = pipelineById.get(doc.pipelineRef);
+        const pipelineNodesOrdered = pipeline?.nodes ?? [];
+        const laneOutputs = doc.laneOutputs ?? {};
+        const hasLaneOutputs = Object.keys(laneOutputs).length > 0;
+
         return {
           contentId: doc.contentId,
           pipelineRef: doc.pipelineRef,
           workflowRef: doc.workflowRef,
           ruleRef: doc.ruleRef,
           status: doc.status,
-          createdAt: new Date(withDates.createdAt ?? new Date()).toISOString(),
-          updatedAt: new Date(withDates.updatedAt ?? new Date()).toISOString(),
-          outputs: mergeResolvedOutputs(withDates),
+          createdAt: new Date(doc.createdAt ?? new Date()).toISOString(),
+          updatedAt: new Date(doc.updatedAt ?? new Date()).toISOString(),
+          outputs: mergeResolvedOutputs(
+            {
+              outputs: doc.outputs,
+              userEdits: doc.userEdits,
+              nodeOutputs: doc.nodeOutputs,
+              nodeUserEdits: doc.nodeUserEdits,
+            },
+            pipelineNodesOrdered.length > 0
+              ? { pipelineNodesOrdered }
+              : undefined,
+          ),
+          ...(hasLaneOutputs ? { laneOutputs } : {}),
         };
       }),
       total,

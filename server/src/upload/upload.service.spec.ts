@@ -4,7 +4,10 @@ import {
   PipelineNodeExecutionStatus,
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
-import { CaptionMappingSource } from '../rule/schemas/rule.schema';
+import {
+  CaptionMappingSource,
+  ChannelMediaMapping,
+} from '../rule/schemas/rule.schema';
 import { UploadService } from './upload.service';
 import { UploadChannelStatus, UploadJobStatus } from './schemas/upload.schema';
 
@@ -1107,6 +1110,113 @@ describe('UploadService', () => {
       expect(entries.find((e) => e.channel === 'facebook')?.caption).toBe(
         'FB-specific caption',
       );
+    });
+
+    it('maps per-lane image nodes into channel mediaUrl', () => {
+      const pipeline = {
+        graph: { lanes: ['instagram', 'facebook'] },
+        nodes: [
+          {
+            nodeId: 'img_ig',
+            lane: 'instagram',
+            type: WorkflowNodeType.ImageGeneration,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ image: 'https://cdn.example/ig.jpg' }),
+          },
+          {
+            nodeId: 'img_fb',
+            lane: 'facebook',
+            type: WorkflowNodeType.ImageGeneration,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ image: 'https://cdn.example/fb.jpg' }),
+          },
+        ],
+      } as unknown as PipelineDocument;
+
+      const ruleChannels = [
+        {
+          channel: 'instagram',
+          priority: 'high',
+          contentStyle: '',
+          contentMapping: {
+            caption: CaptionMappingSource.Text,
+            media: ChannelMediaMapping.Image,
+          },
+        },
+        {
+          channel: 'facebook',
+          priority: 'medium',
+          contentStyle: '',
+          contentMapping: {
+            caption: CaptionMappingSource.Text,
+            media: ChannelMediaMapping.Image,
+          },
+        },
+      ];
+
+      const entries = service.buildChannelEntriesFromPipeline(
+        ruleChannels as never,
+        pipeline,
+        {
+          text: 'trunk',
+          image: 'https://cdn.example/trunk.jpg',
+        },
+      );
+
+      expect(entries.find((e) => e.channel === 'instagram')?.mediaUrl).toBe(
+        'https://cdn.example/ig.jpg',
+      );
+      expect(entries.find((e) => e.channel === 'facebook')?.mediaUrl).toBe(
+        'https://cdn.example/fb.jpg',
+      );
+    });
+  });
+
+  describe('refreshUploadForApprove', () => {
+    it('uses prebuilt channels when provided', async () => {
+      const save = jest.fn().mockResolvedValue(undefined);
+      const doc = {
+        uploadId: 'u1',
+        contentRef: 'c1',
+        workflowRef: 'wf-1',
+        ruleRef: 'rule-1',
+        userId: 'user-1',
+        channels: [],
+        resolvedOutputs: { text: 'trunk only' },
+        status: UploadJobStatus.Pending,
+        save,
+      };
+      findOne.mockReturnValue({
+        sort: () => ({
+          exec: () => Promise.resolve(doc),
+        }),
+      });
+      mcpService.getConnectedAccounts.mockResolvedValue({ accounts: [] });
+      const customChannels = [
+        mockChannel({ channel: 'instagram', caption: 'IG from adapt' }),
+        mockChannel({ channel: 'facebook', caption: 'FB from adapt' }),
+      ];
+
+      await service.refreshUploadForApprove(
+        {
+          userId: 'user-1',
+          contentRef: 'c1',
+          workflowRef: 'wf-1',
+          ruleRef: 'rule-1',
+          resolvedOutputs: { text: 'trunk only' },
+          ruleChannels: [],
+          channels: customChannels,
+        },
+        { userId: 'user-1' },
+      );
+
+      expect(doc.channels).toHaveLength(2);
+      expect(
+        doc.channels.find((c) => c.channel === 'instagram')?.caption,
+      ).toBe('IG from adapt');
+      expect(
+        doc.channels.find((c) => c.channel === 'facebook')?.caption,
+      ).toBe('FB from adapt');
     });
   });
 });

@@ -30,7 +30,7 @@ function Chip({ label, color = "gray", dot = false }: { label: string; color?: C
 function Btn({ children, variant = "primary", size = "sm", onClick }: { children: React.ReactNode; variant?: string; size?: string; onClick?: () => void }) {
   const vs: Record<string, React.CSSProperties> = {
     primary:     { background: T.accent, color: "white" },
-    secondary:   { background: "white", color: T.textPrimary, border: `1px solid ${T.surfaceBorder}` },
+    secondary:   { background: T.surfaceBg, color: T.textPrimary, border: `1px solid ${T.surfaceBorder}` },
     ghost:       { background: "transparent", color: T.textSecondary, border: "1px solid transparent" },
     destructive: { background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` },
   }
@@ -63,7 +63,7 @@ export default function RunPage() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
 
       {/* Top bar */}
-      <div style={{ padding: "12px 24px", background: "white", borderBottom: `1px solid ${T.surfaceBorder}`, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ padding: "12px 24px", background: T.surfaceBg, borderBottom: `1px solid ${T.surfaceBorder}`, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary }}>Songkran Promo 2026</div>
           <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>Run #4821 · Started 10:42:01 · 2 nodes completed</div>
@@ -92,7 +92,7 @@ export default function RunPage() {
                     padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12,
                     boxShadow: `0 1px 3px ${sc.border}40`,
                   }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 9, background: "white", border: `1px solid ${sc.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 9, background: T.surfaceBg, border: `1px solid ${sc.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
                       {i === 0 ? "✎" : i === 1 ? "⬜" : "⇄"}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -103,7 +103,7 @@ export default function RunPage() {
                         {node.time !== "—" && <span style={{ fontSize: 10, color: T.textMuted }}>⏱ {node.time}</span>}
                       </div>
                       {node.preview && (
-                        <div style={{ fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 11, color: T.textPrimary, background: "white", border: `1px solid ${sc.border}`, borderRadius: 6, padding: "7px 10px", lineHeight: 1.5 }}>
+                        <div style={{ fontFamily: "'JetBrains Mono',ui-monospace,monospace", fontSize: 11, color: T.textPrimary, background: T.surfaceBg, border: `1px solid ${sc.border}`, borderRadius: 6, padding: "7px 10px", lineHeight: 1.5 }}>
                           {node.preview}
                         </div>
                       )}

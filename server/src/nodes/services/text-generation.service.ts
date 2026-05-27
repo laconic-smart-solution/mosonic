@@ -13,6 +13,7 @@ import {
   extractUsageFromAiMessage,
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
+import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
 import type {
   NodeExecutionInput,
   NodeExecutionResult,
@@ -230,7 +231,9 @@ export class TextGenerationService {
       new HumanMessage(humanPrompt),
     ]);
 
-    const text = messageContentToString(res.content).trim();
+    const text = sanitizeGeneratedPostText(
+      messageContentToString(res.content).trim(),
+    );
     const usage = extractUsageFromAiMessage(res);
     return usage ? { text, usage } : { text };
   }
@@ -280,7 +283,7 @@ export class TextGenerationService {
           usage = u;
         }
       }
-      text = text.trim();
+      text = sanitizeGeneratedPostText(text.trim());
     } else {
       const generated = await this.generateText({
         rule: input.rule,

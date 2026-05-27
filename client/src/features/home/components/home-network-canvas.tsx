@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react"
 
-import { T } from "@/lib/tokens"
+import {
+  homeNetworkCanvasColors,
+  readCssColorRgb,
+} from "@/features/home/lib/home-canvas-colors"
 
 const NB = 100
 const LINK_DISTANCE = 200
@@ -12,12 +15,6 @@ type Dot = {
   vx: number
   vy: number
   radius: number
-}
-
-function parseAccentRgb(): { r: number; g: number; b: number } {
-  const hex = T.accent.replace("#", "")
-  const n = parseInt(hex, 16)
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
 
 function buildDots(w: number, h: number): Dot[] {
@@ -51,6 +48,7 @@ export function HomeNetworkCanvas() {
   const mouseRef = useRef({ x: 0, y: 0 })
   const dotsRef = useRef<Dot[]>([])
   const rafRef = useRef<number>(0)
+  const colorsRef = useRef(homeNetworkCanvasColors())
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -59,9 +57,19 @@ export function HomeNetworkCanvas() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    const { r, g, b } = parseAccentRgb()
-    const lineColor = `rgba(${r},${g},${b},0.22)`
-    const dotFill = `rgba(${r},${g},${b},0.35)`
+    const refreshColors = () => {
+      colorsRef.current = homeNetworkCanvasColors()
+    }
+
+    refreshColors()
+
+    const themeObserver = new MutationObserver(() => {
+      refreshColors()
+    })
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
 
     const syncSize = () => {
       const dpr = Math.min(window.devicePixelRatio ?? 1, 2)
@@ -74,6 +82,7 @@ export function HomeNetworkCanvas() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       dotsRef.current = buildDots(w, h)
       mouseRef.current = { x: w * 0.3, y: h * 0.3 }
+      refreshColors()
     }
 
     syncSize()
@@ -94,8 +103,14 @@ export function HomeNetworkCanvas() {
       const h = window.innerHeight
       const dots = dotsRef.current
       const mouse = mouseRef.current
+      const { lineColor, dotFill } = colorsRef.current
 
       ctx.clearRect(0, 0, w, h)
+
+      const bg = readCssColorRgb("--background", { r: 247, g: 244, b: 239 })
+      ctx.fillStyle = `rgb(${bg.r},${bg.g},${bg.b})`
+      ctx.fillRect(0, 0, w, h)
+
       ctx.fillStyle = dotFill
       ctx.strokeStyle = lineColor
       ctx.lineWidth = 0.35
@@ -106,10 +121,20 @@ export function HomeNetworkCanvas() {
           const b = dots[j]!
           const dx = a.x - b.x
           const dy = a.y - b.y
-          if (dx < LINK_DISTANCE && dy < LINK_DISTANCE && dx > -LINK_DISTANCE && dy > -LINK_DISTANCE) {
+          if (
+            dx < LINK_DISTANCE &&
+            dy < LINK_DISTANCE &&
+            dx > -LINK_DISTANCE &&
+            dy > -LINK_DISTANCE
+          ) {
             const mx = a.x - mouse.x
             const my = a.y - mouse.y
-            if (mx < MOUSE_RADIUS && my < MOUSE_RADIUS && mx > -MOUSE_RADIUS && my > -MOUSE_RADIUS) {
+            if (
+              mx < MOUSE_RADIUS &&
+              my < MOUSE_RADIUS &&
+              mx > -MOUSE_RADIUS &&
+              my > -MOUSE_RADIUS
+            ) {
               ctx.beginPath()
               ctx.moveTo(a.x, a.y)
               ctx.lineTo(b.x, b.y)
@@ -137,6 +162,7 @@ export function HomeNetworkCanvas() {
 
     return () => {
       cancelAnimationFrame(rafRef.current)
+      themeObserver.disconnect()
       window.removeEventListener("resize", syncSize)
       window.removeEventListener("pointermove", onPointerMove)
       document.removeEventListener("pointerleave", onPointerLeave)

@@ -298,14 +298,47 @@ export default function UploadPage() {
             next[k] = draftFromUploadRow(
               normalizeRow(ch),
               k,
-              upload.resolvedOutputs
+              upload.resolvedOutputs,
+              workflowLayers
             )
           }
         }
         return next
       })
     })
-  }, [upload])
+  }, [upload, workflowLayers])
+
+  useEffect(() => {
+    if (!upload || !workflowLayers) return
+    setDraftsByChannel((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const ch of upload.channels) {
+        const k = ch.channel.toLowerCase()
+        const existing = prev[k]
+        if (existing?.dirty) continue
+        const hasMedia =
+          (existing?.imageUrls.length ?? 0) > 0 ||
+          Boolean(existing?.videoUrl?.trim())
+        if (hasMedia) continue
+        const refreshed = draftFromUploadRow(
+          normalizeRow(ch),
+          k,
+          upload.resolvedOutputs,
+          workflowLayers
+        )
+        if (
+          refreshed.imageUrls.length === 0 &&
+          !refreshed.videoUrl?.trim()
+        ) {
+          continue
+        }
+        next[k] = refreshed
+        changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [upload, workflowLayers])
 
   useEffect(() => {
     if (!uploadId) return
@@ -389,7 +422,8 @@ export default function UploadPage() {
               next[k] = draftFromUploadRow(
                 normalizeRow(row),
                 k,
-                currentUpload.resolvedOutputs
+                currentUpload.resolvedOutputs,
+                workflowLayers
               )
             }
             return next
@@ -580,7 +614,7 @@ export default function UploadPage() {
       }
       const draft =
         draftsByChannel[key] ??
-        draftFromUploadRow(ch, key, upload.resolvedOutputs)
+        draftFromUploadRow(ch, key, upload.resolvedOutputs, workflowLayers)
       const hasText =
         effectiveCaptionForDraft(
           draft,
@@ -804,7 +838,8 @@ export default function UploadPage() {
       activeKey,
       activeDraft,
       activeRow,
-      upload.resolvedOutputs
+      upload.resolvedOutputs,
+      workflowLayers
     )
     if (mediaError) {
       toast.error(mediaError)
@@ -898,7 +933,7 @@ export default function UploadPage() {
       if (!row) continue
       const draft =
         draftsByChannel[key] ??
-        draftFromUploadRow(row, key, upload.resolvedOutputs)
+        draftFromUploadRow(row, key, upload.resolvedOutputs, workflowLayers)
       const cap = effectiveCaptionForDraft(
         draft,
         upload.resolvedOutputs,
@@ -912,7 +947,8 @@ export default function UploadPage() {
         key,
         draft,
         row,
-        upload.resolvedOutputs
+        upload.resolvedOutputs,
+        workflowLayers
       )
       if (mediaError) {
         toast.error(mediaError)
@@ -1064,6 +1100,7 @@ export default function UploadPage() {
             contentId={upload.contentRef}
             uploadId={uploadId}
             embedInUpload
+            generationChannelKeys={channelTabs.map((t) => t.channel)}
             onWorkflowLayersChange={handleWorkflowLayersChange}
             channelPreview={
               activeRow && mediaCfg ? (

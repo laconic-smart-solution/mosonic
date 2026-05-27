@@ -1,5 +1,4 @@
-import { appConfig } from "@/app/config/app-config"
-import { io, type Socket } from "socket.io-client"
+import { getSharedSocket } from "./socket-client"
 
 export type ContentNodeStartedEvent = {
   contentId: string
@@ -43,32 +42,21 @@ export type ContentNodeRerunCompletedEvent = {
   output: Record<string, unknown>
 }
 
-let socketInstance: Socket | null = null
-
-function getSocket() {
-  if (socketInstance) return socketInstance
-  socketInstance = io(appConfig.apiBaseUrl, {
-    withCredentials: true,
-    transports: ["websocket", "polling"],
-  })
-  return socketInstance
-}
-
 export function joinContentRoom(contentId: string) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.emit("join", { room: `content_${contentId}` })
   return socket
 }
 
 export function leaveContentRoom(contentId: string) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.emit("leave", { room: `content_${contentId}` })
 }
 
 export function onContentNodeStarted(
   handler: (payload: ContentNodeStartedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:started", handler)
   return () => socket.off("node:started", handler)
 }
@@ -76,7 +64,7 @@ export function onContentNodeStarted(
 export function onContentNodeStreaming(
   handler: (payload: ContentNodeStreamingEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:streaming", handler)
   return () => socket.off("node:streaming", handler)
 }
@@ -84,7 +72,7 @@ export function onContentNodeStreaming(
 export function onContentNodeProcessing(
   handler: (payload: ContentNodeProcessingEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:processing", handler)
   return () => socket.off("node:processing", handler)
 }
@@ -92,7 +80,7 @@ export function onContentNodeProcessing(
 export function onContentNodeRetrying(
   handler: (payload: ContentNodeRetryingEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:retrying", handler)
   return () => socket.off("node:retrying", handler)
 }
@@ -100,7 +88,7 @@ export function onContentNodeRetrying(
 export function onContentNodeFailedFinal(
   handler: (payload: ContentNodeFailedFinalEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:failed_final", handler)
   return () => socket.off("node:failed_final", handler)
 }
@@ -108,7 +96,7 @@ export function onContentNodeFailedFinal(
 export function onContentNodeRerunCompleted(
   handler: (payload: ContentNodeRerunCompletedEvent) => void
 ) {
-  const socket = getSocket()
+  const socket = getSharedSocket()
   socket.on("node:rerun_completed", handler)
   return () => socket.off("node:rerun_completed", handler)
 }

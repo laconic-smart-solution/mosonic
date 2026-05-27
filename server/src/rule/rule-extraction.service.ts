@@ -70,22 +70,35 @@ export class RuleExtractionService {
           'If a value is not found in the input, use a sensible realistic default — never return null or empty strings.',
           '(Exception: channel contentMapping.media may be null for text-only channels.)',
           '',
-          'caption is one of: text | translatedText | summary:',
-          '- text → English-forward primary copy;',
-          '- translatedText → non-English / localized audiences;',
-          '- summary → concise professional copy (LinkedIn-style).',
-          'media is one of: image | video | null:',
-          '- image → attach image asset when publishing;',
-          '- video → attach video when workflow can produce video;',
-          '- null → text-only posts.',
+          // ── FIELD DEFINITIONS ──────────────────────────────────────────────
+          'FIELD DEFINITIONS',
           '',
-          'contentMapping decision hints (adapt to input):',
-          '- instagram: prefer translatedText if targetLanguages imply non-English, else text; media usually image.',
-          '- facebook: text or translatedText per audience; media often video when video campaigns exist.',
-          '- linkedin: prefer summary; media often null.',
-          '- twitter/x: concise summary-like caption; optional image;',
-          '- Use media "video" only when the brief implies video-heavy delivery.',
+          'caption — how to write the post copy:',
+          '  text           → primary English copy, conversational, full length allowed',
+          '  translatedText → localized copy; use when audience.language is non-English OR targetLanguages contains a non-English code',
+          '  summary        → short professional copy; use for LinkedIn or any B2B/professional context',
           '',
+          'media — what asset to attach:',
+          '  image → attach image; use for visual platforms (instagram, facebook, tiktok, twitter)',
+          '  video → attach video; use ONLY when input explicitly mentions video content or a video campaign',
+          '  null  → text only; default for linkedin unless input mentions visuals',
+          '',
+          // ── CHANNEL DECISION TABLE ─────────────────────────────────────────
+          'CHANNEL DECISION TABLE (use as defaults, override only if input explicitly states otherwise):',
+          '  instagram → caption: translatedText if non-English audience, else text | media: image',
+          '  facebook  → caption: translatedText if non-English audience, else text | media: image (video if input mentions video campaign)',
+          '  twitter   → caption: text                                              | media: image (null if no visual mentioned)',
+          '  linkedin  → caption: summary                                           | media: null (image only if input explicitly mentions a visual post)',
+          '  tiktok    → caption: translatedText if non-English audience, else text | media: video (image if input mentions photo carousel)',
+          '  youtube   → caption: summary                                           | media: video',
+          '',
+          'Rule: default to the table above. Only deviate if the user input explicitly states otherwise.',
+          '',
+          // ── customSchedule ─────────────────────────────────────────────────
+          'customSchedule must be an array of day name strings, e.g. ["monday", "wednesday", "friday"].',
+          'Only populate it when postingFrequency is "custom". Otherwise return an empty array [].',
+          '',
+          // ── OUTPUT SCHEMA ──────────────────────────────────────────────────
           'Return exactly this JSON structure:',
           JSON.stringify(
             {
@@ -106,8 +119,8 @@ export class RuleExtractionService {
                 location: ['string'],
                 interests: ['string'],
                 painPoints: ['string'],
-                language: 'string',
-                targetLanguages: ['string'],
+                language: 'string (ISO 639-1 code, e.g. "en", "th")',
+                targetLanguages: ['string (ISO 639-1 codes)'],
               },
               campaign: {
                 goals: ['string'],
@@ -119,14 +132,11 @@ export class RuleExtractionService {
                   endDate: 'YYYY-MM-DD',
                 },
                 postingFrequency: 'daily | weekly | custom',
-                customSchedule: [
-                  'monday | tuesday | wednesday | thursday | friday | saturday | sunday',
-                ],
+                customSchedule: ['monday | tuesday | wednesday | thursday | friday | saturday | sunday'],
               },
               channels: [
                 {
-                  channel:
-                    'facebook | instagram | twitter | linkedin | youtube | tiktok',
+                  channel: 'facebook | instagram | twitter | linkedin | youtube | tiktok',
                   priority: 'high | medium | low',
                   contentStyle: 'string',
                   contentMapping: {

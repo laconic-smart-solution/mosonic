@@ -28,6 +28,7 @@ import {
   RulePageQueryDto,
   RulePageResponseDto,
 } from './dto/rule-page-query.dto';
+import { UpdateNewsTriggerSettingsDto } from './dto/news-trigger-settings.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
 import { RuleService } from './rule.service';
 
@@ -111,6 +112,33 @@ export class RuleController {
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.ruleService.replaceRule(ruleId, body, auth);
+  }
+
+  @Get(':ruleId/news-trigger')
+  getNewsTriggerSettings(
+    @Req() req: Request,
+    @Param('ruleId') ruleId: string,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.ruleService.getNewsTriggerSettings(ruleId, auth);
+  }
+
+  @Put(':ruleId/news-trigger')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  )
+  updateNewsTriggerSettings(
+    @Req() req: Request,
+    @Param('ruleId') ruleId: string,
+    @Body() body: UpdateNewsTriggerSettingsDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.ruleService.updateNewsTriggerSettings(ruleId, body, auth);
   }
 
   @Get(':ruleId')

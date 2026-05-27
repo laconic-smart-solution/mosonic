@@ -60,6 +60,8 @@ export class PipelinePageItemDto {
   nodeTypes!: string[];
   startedAt!: string;
   completedAt!: string | null;
+  metadataSource?: string;
+  newsTitle?: string;
 }
 
 export class PipelinePageResponseDto {

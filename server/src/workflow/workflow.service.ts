@@ -17,6 +17,7 @@ import {
 } from '../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
 import { EventsService } from '../events/events.service';
+import { workflowCompletedNotification } from '../events/notification.util';
 import { RuleService } from '../rule/rule.service';
 import {
   GenerateWorkflowRequestDto,
@@ -767,6 +768,17 @@ export class WorkflowService {
         workflowId,
         nodes,
         edges: persistedEdges,
+      });
+
+      const notif = workflowCompletedNotification({
+        workflowId,
+        ruleRef: ruleId,
+      });
+      this.events.emitUserNotification({
+        userId: auth.userId,
+        sector: 'workflow',
+        type: 'workflow.completed',
+        ...notif,
       });
     } catch (error) {
       this.logger.error(

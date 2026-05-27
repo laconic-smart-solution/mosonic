@@ -85,7 +85,7 @@ export const POST_STATUS_THEME: Record<PostStatus, PostStatusTheme> = {
 export const ALL_STAT_TILE_THEME = {
   tileIdle:
     "border-[color:var(--nt-border)] bg-[color:var(--nt-surface)] hover:bg-muted/40",
-  tileActive: "border-navy-700 bg-navy-50 shadow-sm",
-  tileLabelActive: "text-navy-700",
-  tileCountActive: "text-navy-700",
+  tileActive: "border-primary bg-accent shadow-sm",
+  tileLabelActive: "text-accent-foreground",
+  tileCountActive: "text-accent-foreground",
 } as const

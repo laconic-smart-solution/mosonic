@@ -4,6 +4,10 @@ import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { Rule } from '../rule/schemas/rule.schema';
 import type { ChannelEntry } from '../rule/schemas/rule.schema';
 import {
+  channelIdsToChannelEntries,
+  ruleChannelNamesToIds,
+} from '../workflow/distribution-channels.util';
+import {
   buildLinearEdgesFromOrder,
   getIncoming,
   getOutgoing,
@@ -54,8 +58,7 @@ export type MaterializedPipeline = {
 };
 
 type BranchConfig = {
-  mode?: 'rule_channels' | 'manual' | 'ab_test';
-  channelIds?: string[];
+  mode?: 'rule_channels' | 'ab_test';
   variants?: Array<{ id: string; weight: number; channel?: string }>;
 };
 
@@ -171,9 +174,9 @@ export class GraphMaterializationService {
     const branchConfig = branchNode.config as BranchConfig;
     const abTargets = this.resolveAbTargets(branchConfig, rule.channels ?? []);
     const channels = abTargets.map((t) => t.channel);
-    if (channels.length === 0) {
+    if (channels.length < 2) {
       throw new BadRequestException(
-        'Branch node requires at least one channel from the rule',
+        'Branch node requires at least two selected channels',
       );
     }
     if (channels.length > this.maxLanes) {
@@ -397,16 +400,12 @@ export class GraphMaterializationService {
   }
 
   private resolveChannels(
-    branchConfig: BranchConfig,
+    _branchConfig: BranchConfig,
     ruleChannels: ChannelEntry[],
   ): ChannelEntry[] {
-    if (branchConfig.mode === 'manual' && branchConfig.channelIds?.length) {
-      const wanted = new Set(
-        branchConfig.channelIds.map((c) => normalizeLaneId(c)),
-      );
-      return ruleChannels.filter((ch) =>
-        wanted.has(normalizeLaneId(ch.channel)),
-      );
+    const ids = ruleChannelNamesToIds(ruleChannels);
+    if (ids.length > 0) {
+      return channelIdsToChannelEntries(ids, ruleChannels);
     }
     return ruleChannels;
   }

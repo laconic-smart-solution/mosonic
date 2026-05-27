@@ -35,7 +35,10 @@ export interface PromptAreaProps {
   enableImages?: boolean
   acceptFileTypes?: string
   className?: string
+  /** Disables typing and submit. */
   disabled?: boolean
+  /** Disables submit only; typing stays enabled when `disabled` is false. */
+  submitDisabled?: boolean
 }
 
 export function PromptArea({
@@ -53,7 +56,9 @@ export function PromptArea({
   acceptFileTypes = ".pdf,.docx,.txt,.md",
   className,
   disabled = false,
+  submitDisabled,
 }: PromptAreaProps) {
+  const submitLocked = disabled || (submitDisabled ?? false)
   const [expanded, setExpanded] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState("")
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
@@ -66,6 +71,16 @@ export function PromptArea({
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const hasContent = value.trim().length > 0 || attachments.length > 0
+
+  const focusTextarea = React.useCallback(() => {
+    if (disabled) return
+    setExpanded(true)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [disabled])
+
+  React.useEffect(() => {
+    if (value.trim().length > 0) setExpanded(true)
+  }, [value])
 
   const setValue = (v: string) => {
     if (onChange) onChange(v)
@@ -106,12 +121,12 @@ export function PromptArea({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      if (!disabled) submit()
+      if (!submitLocked) submit()
     }
   }
 
   function submit() {
-    if (disabled || !hasContent) return
+    if (submitLocked || !hasContent) return
     onSubmit?.(value, attachments)
     setValue("")
     setAttachments([])
@@ -159,21 +174,19 @@ export function PromptArea({
     <div
       ref={containerRef}
       className={cn(
-        "w-full overflow-hidden border bg-white transition-[border-radius,border-color] duration-200 ease-out",
+        "w-full overflow-hidden border bg-card transition-[border-radius,border-color] duration-200 ease-out",
         disabled
           ? "cursor-not-allowed opacity-60"
           : "cursor-text",
         expanded
           ? "rounded-2xl border-teal-400"
-          : "rounded-full border-canvas-300 hover:border-canvas-500",
+          : "rounded-full border-border hover:border-muted-foreground/40",
         className
       )}
-      onClick={() => {
+      onPointerDownCapture={(e) => {
         if (disabled) return
-        if (!expanded) {
-          setExpanded(true)
-          requestAnimationFrame(() => textareaRef.current?.focus())
-        }
+        e.stopPropagation()
+        focusTextarea()
       }}
     >
       <input
@@ -209,7 +222,7 @@ export function PromptArea({
                     "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
                     att.type === "file"
                       ? "border-teal-700/20 bg-teal-50 text-teal-700"
-                      : "border-navy-700/20 bg-navy-100/40 text-navy-700"
+                      : "border-navy-700/20 bg-navy-100/40 text-foreground"
                   )}
                 >
                   {att.type === "file" ? (
@@ -250,7 +263,7 @@ export function PromptArea({
               className="flex items-center gap-1.5 px-4 pt-3"
               onClick={(e) => e.stopPropagation()}
             >
-              <LinkIcon className="h-4 w-4 shrink-0 text-canvas-500" />
+              <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input
                 type="text"
                 value={urlValue}
@@ -267,7 +280,7 @@ export function PromptArea({
                 }}
                 placeholder="https://example.com"
                 autoFocus
-                className="flex-1 rounded-md border border-canvas-300 bg-white px-2.5 py-1.5 text-sm outline-none transition-colors focus:border-teal-400"
+                className="flex-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm outline-none transition-colors focus:border-teal-400"
               />
               <button
                 type="button"
@@ -282,7 +295,7 @@ export function PromptArea({
                   setUrlOpen(false)
                   setUrlValue("")
                 }}
-                className="rounded-md border border-canvas-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-canvas-100"
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-muted"
               >
                 Cancel
               </button>
@@ -306,12 +319,13 @@ export function PromptArea({
           placeholder={disabled ? "Save workflow changes or exit run view first" : placeholder}
           rows={1}
           className={cn(
-            "flex-1 resize-none border-none bg-transparent text-sm leading-6 text-navy-700 outline-none placeholder:text-canvas-500 placeholder:line-clamp-1",
+            "min-w-0 flex-1 resize-none border-none bg-transparent text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground placeholder:line-clamp-1",
+            disabled && "pointer-events-none",
             expanded
               ? "max-h-[200px] min-h-[24px]"
               : "h-6 overflow-hidden"
           )}
-          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           onFocus={() => {
             onFocus?.()
             setExpanded(true)
@@ -324,12 +338,12 @@ export function PromptArea({
             e.stopPropagation()
             submit()
           }}
-          disabled={disabled || !hasContent}
+          disabled={submitLocked || !hasContent}
           className={cn(
             "ml-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-[0.92]",
             "disabled:cursor-not-allowed",
-            disabled || !hasContent
-              ? "bg-canvas-300 text-canvas-500"
+            submitLocked || !hasContent
+              ? "bg-muted text-muted-foreground"
               : expanded
                 ? "bg-teal-400 text-white hover:bg-teal-500"
                 : "bg-navy-700 text-white hover:bg-navy-500"
@@ -355,7 +369,7 @@ export function PromptArea({
             className="overflow-hidden"
           >
             <div
-              className="flex items-center gap-0.5 border-t border-canvas-200 px-3 py-2"
+              className="flex items-center gap-0.5 border-t border-border px-3 py-2"
               onClick={(e) => e.stopPropagation()}
             >
               {enableFiles && (
@@ -382,7 +396,7 @@ export function PromptArea({
                 />
               )}
               <div className="flex-1" />
-              <span className="mr-2 tabular-nums text-[11px] text-canvas-500">
+              <span className="mr-2 tabular-nums text-[11px] text-muted-foreground">
                 {value.length} / {maxLength}
               </span>
             </div>
@@ -414,7 +428,7 @@ function ToolButton({
         "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
         active
           ? "bg-teal-50 text-teal-700"
-          : "text-canvas-500 hover:bg-canvas-100 hover:text-gray-700"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       <Icon className="h-4 w-4" />

@@ -135,6 +135,34 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.duration).toBe(20);
   });
 
+  it('defaults video mode to cinematic', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.mode).toBe('cinematic');
+  });
+
+  it('requires heygenAvatarId when mode is presenter', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      mode: 'presenter',
+      heygenVoiceId: 'voice-1',
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it('accepts presenter config with avatar and voice', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      mode: 'presenter',
+      heygenAvatarId: 'avatar-1',
+      heygenVoiceId: 'voice-1',
+      heygenOrientation: 'portrait',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.mode).toBe('presenter');
+    expect(r.data.heygenAvatarId).toBe('avatar-1');
+  });
+
   it('fails summarization with invalid outputFormat', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.Summarization, {
       outputFormat: 'caption',

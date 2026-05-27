@@ -40,7 +40,7 @@ export function WorkflowBranchNode({
 
   return (
     <div
-      className="group relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-white transition-[border-color,box-shadow] duration-150 select-none"
+      className="group relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-card transition-[border-color,box-shadow] duration-150 select-none"
       style={{
         width: NODE_W,
         minHeight: 88,
@@ -60,7 +60,7 @@ export function WorkflowBranchNode({
       <Handle
         type="target"
         position={Position.Left}
-        className="size-3! border-2! bg-white!"
+        className="size-3! border-2! bg-card!"
         style={{
           borderColor: BRANCH_COLOR,
           boxShadow: `0 0 0 2px ${BRANCH_COLOR}20`,
@@ -94,7 +94,7 @@ export function WorkflowBranchNode({
       <div className="px-2.5 py-2 text-[10px] leading-snug text-gray-500">
         {showHandles
           ? `${handles.length} channel lane${handles.length === 1 ? "" : "s"}`
-          : "Fan-out by rule channels"}
+          : "Channels come from campaign rule"}
       </div>
       {showHandles
         ? handles.map((ch, index) => {

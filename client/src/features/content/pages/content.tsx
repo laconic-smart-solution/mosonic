@@ -232,10 +232,10 @@ export default function ContentPage() {
         initial={false}
       >
         <div>
-          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-navy-700">
+          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
             Content library
           </h1>
-          <p className="mt-1 text-[13px] text-canvas-500">
+          <p className="mt-1 text-[13px] text-muted-foreground">
             All generated content across campaigns
           </p>
         </div>
@@ -262,7 +262,7 @@ export default function ContentPage() {
         </div>
       ) : null}
       {meta && meta.totalPages > 1 ? (
-        <p className="mb-4 text-xs text-canvas-500">
+        <p className="mb-4 text-xs text-muted-foreground">
           Draft, approved, and rejected counts reflect items on the current page
           only.
         </p>
@@ -276,7 +276,7 @@ export default function ContentPage() {
             resetToFirstPage()
           }}
         >
-          <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[160px]">
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-border bg-card sm:w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -293,7 +293,7 @@ export default function ContentPage() {
             setLimitFromUrl(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number])
           }}
         >
-          <SelectTrigger className="h-[38px] w-full rounded-lg border-canvas-300 bg-card sm:w-[140px]">
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-border bg-card sm:w-[140px]">
             <SelectValue placeholder="Per page" />
           </SelectTrigger>
           <SelectContent>
@@ -309,7 +309,7 @@ export default function ContentPage() {
           <Button
             type="button"
             variant="outline"
-            className="h-[38px] rounded-lg border-canvas-300 bg-card px-3.5 text-[13px] text-canvas-600 hover:border-canvas-500 hover:text-navy-700"
+            className="h-[38px] rounded-lg border-border bg-card px-3.5 text-[13px] text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
             onClick={clearFilters}
           >
             <X className="mr-1 size-3.5" />
@@ -318,8 +318,8 @@ export default function ContentPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-canvas-200 pb-5">
-        <span className="text-[11px] font-semibold tracking-wider text-canvas-500 uppercase">
+      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-5">
+        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
           Outputs
         </span>
         <Label className="flex cursor-pointer items-center gap-2 font-normal">
@@ -330,7 +330,7 @@ export default function ContentPage() {
               resetToFirstPage()
             }}
           />
-          <span className="text-[13px] text-navy-700">Has image</span>
+          <span className="text-[13px] text-foreground">Has image</span>
         </Label>
         <Label className="flex cursor-pointer items-center gap-2 font-normal">
           <Checkbox
@@ -340,7 +340,7 @@ export default function ContentPage() {
               resetToFirstPage()
             }}
           />
-          <span className="text-[13px] text-navy-700">Has video</span>
+          <span className="text-[13px] text-foreground">Has video</span>
         </Label>
         <Label className="flex cursor-pointer items-center gap-2 font-normal">
           <Checkbox
@@ -350,7 +350,7 @@ export default function ContentPage() {
               resetToFirstPage()
             }}
           />
-          <span className="text-[13px] text-navy-700">Has summary</span>
+          <span className="text-[13px] text-foreground">Has summary</span>
         </Label>
       </div>
 
@@ -373,14 +373,14 @@ export default function ContentPage() {
       ) : null}
 
       {!isPending && !isError && meta ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-canvas-500">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-muted-foreground">
           <span>
             Showing{" "}
-            <strong className="font-medium text-navy-700">
+            <strong className="font-medium text-foreground">
               {sortedItems.length}
             </strong>{" "}
             of{" "}
-            <strong className="font-medium text-navy-700">
+            <strong className="font-medium text-foreground">
               {items.length}
             </strong>{" "}
             on this page
@@ -388,7 +388,7 @@ export default function ContentPage() {
               <>
                 {" "}
                 ·{" "}
-                <strong className="font-medium text-navy-700">
+                <strong className="font-medium text-foreground">
                   {meta.total}
                 </strong>{" "}
                 total
@@ -402,7 +402,7 @@ export default function ContentPage() {
               resetToFirstPage()
             }}
           >
-            <SelectTrigger className="h-auto w-fit min-w-[140px] border-0 bg-transparent text-[13px] text-canvas-600 shadow-none focus:ring-0">
+            <SelectTrigger className="h-auto w-fit min-w-[140px] border-0 bg-transparent text-[13px] text-muted-foreground shadow-none focus:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -416,9 +416,9 @@ export default function ContentPage() {
       ) : null}
 
       {empty ? (
-        <div className="flex flex-col items-center py-20 text-center text-canvas-500">
-          <InboxIcon className="mb-4 size-12 text-canvas-300" aria-hidden />
-          <h3 className="mb-1.5 text-base font-semibold text-navy-700">
+        <div className="flex flex-col items-center py-20 text-center text-muted-foreground">
+          <InboxIcon className="mb-4 size-12 text-muted-foreground/50" aria-hidden />
+          <h3 className="mb-1.5 text-base font-semibold text-foreground">
             No content yet
           </h3>
           <p className="max-w-sm text-[13px]">
@@ -440,13 +440,13 @@ export default function ContentPage() {
             ? Array.from({ length: Math.min(limit, 6) }).map((_, i) => (
                 <div
                   key={i}
-                  className="overflow-hidden rounded-2xl border border-canvas-200 bg-card"
+                  className="overflow-hidden rounded-2xl border border-border bg-card"
                 >
-                  <Skeleton className="h-40 rounded-none bg-canvas-200" />
+                  <Skeleton className="h-40 rounded-none bg-muted" />
                   <div className="space-y-2 p-4">
-                    <Skeleton className="h-3 w-24 bg-canvas-200" />
-                    <Skeleton className="h-5 w-full bg-canvas-200" />
-                    <Skeleton className="h-8 w-full bg-canvas-200" />
+                    <Skeleton className="h-3 w-24 bg-muted" />
+                    <Skeleton className="h-5 w-full bg-muted" />
+                    <Skeleton className="h-8 w-full bg-muted" />
                   </div>
                 </div>
               ))
@@ -464,10 +464,10 @@ export default function ContentPage() {
       ) : null}
 
       {!isPending && !isError && meta && totalPages > 1 ? (
-        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-canvas-200 pt-6 sm:flex-row">
-          <p className="text-[13px] text-canvas-500">
-            Page <strong className="text-navy-700">{meta.page}</strong> of{" "}
-            <strong className="text-navy-700">{meta.totalPages}</strong>
+        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
+          <p className="text-[13px] text-muted-foreground">
+            Page <strong className="text-foreground">{meta.page}</strong> of{" "}
+            <strong className="text-foreground">{meta.totalPages}</strong>
           </p>
           <PersistedShadcnPagination
             page={page}

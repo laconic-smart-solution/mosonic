@@ -38,7 +38,7 @@ export function ContentDetailReviewHeader({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, delay: 0.05 }}
       >
-        <h1 className="font-heading text-2xl leading-tight font-medium tracking-tight text-[#0F1F3D] sm:text-[26px]">
+        <h1 className="font-heading text-2xl leading-tight font-medium tracking-tight text-foreground sm:text-[26px]">
           {workflowTitle}
         </h1>
         <div className="flex flex-wrap items-center gap-2">

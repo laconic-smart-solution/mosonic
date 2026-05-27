@@ -28,9 +28,9 @@ export function HomeTemplateRail({
               onClick={() => onNavigate(item.path)}
               onMouseEnter={() => onHover(i)}
               onMouseLeave={() => onHover(null)}
-              className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border bg-white transition-all duration-150"
+              className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border border-border bg-card transition-all duration-150"
               style={{
-                borderColor: hovLeft === i ? `${item.color}60` : "#EDE9E1",
+                borderColor: hovLeft === i ? `${item.color}60` : undefined,
                 color: item.color,
                 boxShadow:
                   hovLeft === i
@@ -53,7 +53,7 @@ export function HomeTemplateRail({
           </TooltipContent>
         </Tooltip>
       ))}
-      <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-[#718096] uppercase">
+      <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">
         Templates
       </div>
     </div>

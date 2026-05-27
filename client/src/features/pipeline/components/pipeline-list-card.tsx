@@ -1,5 +1,11 @@
 import { motion } from "framer-motion"
-import { ChevronRight, GitBranch } from "lucide-react"
+import {
+  ArrowRight,
+  Clock,
+  GitBranch,
+  Layers,
+  Newspaper,
+} from "lucide-react"
 
 import { PipelineStatusBadge } from "@/features/pipeline/components/pipeline-status-badge"
 import {
@@ -10,9 +16,12 @@ import {
   pipelineNodeTypeMeta,
   sortPipelineNodeTypes,
 } from "@/features/pipeline/lib/pipeline-node-icons"
+import { pipelineStatusIconMeta } from "@/features/pipeline/lib/pipeline-status-icon"
 import { PIPELINE_STATUS_THEME } from "@/features/pipeline/lib/pipeline-status-theme"
 import { cn } from "@/lib/utils"
 import type { PipelinePageItem } from "@/shared/types/pipeline.type"
+
+const MAX_NODE_CHIPS = 5
 
 type Props = {
   item: PipelinePageItem
@@ -28,7 +37,11 @@ export function PipelineListCard({
   onOpen,
 }: Props) {
   const theme = PIPELINE_STATUS_THEME[item.status]
+  const statusIcon = pipelineStatusIconMeta(item.status)
+  const StatusIcon = statusIcon.Icon
   const nodeTypes = sortPipelineNodeTypes(item.nodeTypes ?? [])
+  const visibleTypes = nodeTypes.slice(0, MAX_NODE_CHIPS)
+  const hiddenTypeCount = nodeTypes.length - visibleTypes.length
 
   return (
     <motion.button
@@ -38,84 +51,129 @@ export function PipelineListCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.22, delay: index * 0.04 }}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -2 }}
       onClick={() => onOpen(item)}
       className={cn(
-        "group flex h-full w-full flex-col rounded-2xl border border-[color:var(--nt-border)] bg-[color:var(--nt-surface)] p-4 text-left shadow-[var(--nt-surface-shadow)]",
-        "transition-colors hover:border-primary/25 hover:shadow-md",
+        "group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border/80 bg-card text-left shadow-sm",
+        "transition-[border-color,box-shadow,background-color] duration-200",
+        "hover:border-primary/30 hover:shadow-md",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
         theme.rowHover,
       )}
     >
-      <motion.div
-        className="mb-3 flex items-start justify-between gap-2"
-        initial={false}
-      >
-        <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/80 text-base"
-          aria-hidden
-        >
-          {theme.emoji}
-        </span>
-        <PipelineStatusBadge status={item.status} />
-      </motion.div>
-
-      <p className="mb-3 line-clamp-3 min-h-[3.75rem] flex-1 text-[15px] leading-snug font-semibold text-foreground">
-        {truncatePrompt(item.contentPrompt || "No prompt", 120)}
-      </p>
-
-      <motion.div
-        className="mb-3 flex min-h-[36px] flex-wrap gap-1.5"
-        initial={false}
-      >
-        {nodeTypes.length > 0 ? (
-          nodeTypes.map((type) => {
-            const meta = pipelineNodeTypeMeta(type)
-            const Icon = meta.Icon
-            return (
-              <span
-                key={type}
-                title={meta.label}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5",
-                  meta.chipClass,
-                )}
-              >
-                <Icon className={cn("size-3.5 shrink-0", meta.iconClass)} aria-hidden />
-                <span className="text-[10px] font-medium">{meta.label}</span>
-              </span>
-            )
-          })
-        ) : (
-          <span className="text-[11px] text-muted-foreground">No steps yet</span>
+      <span
+        className={cn(
+          "absolute inset-y-0 left-0 w-1 rounded-l-2xl",
+          item.status === "completed" && "bg-emerald-500",
+          item.status === "running" && "bg-sky-500",
+          item.status === "paused" && "bg-amber-500",
+          item.status === "failed" && "bg-red-500",
         )}
-      </motion.div>
+        aria-hidden
+      />
 
-      <motion.div
-        className="mt-auto space-y-2 border-t border-border/50 pt-3 text-[11px] text-muted-foreground"
-        initial={false}
-      >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="rounded-md bg-muted/60 px-1.5 py-0.5 font-medium tabular-nums">
-            {item.nodeCount} nodes
+      <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
+        <div className="flex items-start justify-between gap-3">
+          <span
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset",
+              statusIcon.ringClass,
+              item.status === "running" && "animate-pulse",
+            )}
+          >
+            <StatusIcon
+              className={cn("size-4", statusIcon.iconClass)}
+              aria-hidden
+            />
           </span>
-          <span>Started {formatRelativeTime(item.startedAt)}</span>
+          <div className="flex min-w-0 flex-col items-end gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {item.metadataSource === "news" ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200/90 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-800">
+                  <Newspaper className="size-3 shrink-0" aria-hidden />
+                  News
+                </span>
+              ) : null}
+              <PipelineStatusBadge status={item.status} />
+            </div>
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Clock className="size-3 shrink-0" aria-hidden />
+              {formatRelativeTime(item.startedAt)}
+            </span>
+          </div>
         </div>
-        {workflowName ? (
-          <p className="inline-flex max-w-full items-center gap-1 truncate text-foreground/70">
-            <GitBranch className="size-3 shrink-0" aria-hidden />
-            <span className="truncate">{workflowName}</span>
+
+        <div className="min-w-0 space-y-1">
+          {item.newsTitle ? (
+            <p className="line-clamp-1 text-[11px] font-medium text-sky-800">
+              {item.newsTitle}
+            </p>
+          ) : null}
+          <p className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight text-foreground">
+            {truncatePrompt(item.contentPrompt || "No prompt", 140)}
           </p>
-        ) : null}
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <span className="text-[11px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-            Open run
-          </span>
-          <ChevronRight
-            className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-            aria-hidden
-          />
         </div>
-      </motion.div>
+
+        <div className="min-h-[1.75rem]">
+          {visibleTypes.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {visibleTypes.map((type) => {
+                const meta = pipelineNodeTypeMeta(type)
+                const Icon = meta.Icon
+                return (
+                  <span
+                    key={type}
+                    title={meta.label}
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5",
+                      meta.chipClass,
+                    )}
+                  >
+                    <Icon
+                      className={cn("size-3 shrink-0", meta.iconClass)}
+                      aria-hidden
+                    />
+                    <span className="truncate text-[10px] font-medium leading-none">
+                      {meta.label}
+                    </span>
+                  </span>
+                )
+              })}
+              {hiddenTypeCount > 0 ? (
+                <span className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  +{hiddenTypeCount}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">No steps recorded</span>
+          )}
+        </div>
+
+        <div className="mt-auto space-y-2 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+              <Layers className="size-3.5 shrink-0" aria-hidden />
+              {item.nodeCount} {item.nodeCount === 1 ? "node" : "nodes"}
+            </span>
+          </div>
+          {workflowName ? (
+            <p className="inline-flex max-w-full items-center gap-1.5 text-[11px] text-muted-foreground">
+              <GitBranch className="size-3.5 shrink-0 text-muted-foreground/80" aria-hidden />
+              <span className="truncate">{workflowName}</span>
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+              Open run
+            </span>
+            <ArrowRight
+              className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+              aria-hidden
+            />
+          </div>
+        </div>
+      </div>
     </motion.button>
   )
 }

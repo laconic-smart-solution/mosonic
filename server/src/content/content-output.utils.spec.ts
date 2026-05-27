@@ -47,4 +47,25 @@ describe('mergeResolvedOutputs', () => {
     expect(merged.image).toBe('second.png');
     expect(merged.text).toBe('t');
   });
+
+  it('prefers pipelineNodesOrdered over workflow when both are set', () => {
+    const merged = mergeResolvedOutputs(
+      {
+        outputs: { text: 'legacy-flat' },
+        userEdits: {},
+        nodeOutputs: {
+          adapt__facebook: { text: 'FB from pipeline node' },
+        },
+      },
+      {
+        workflowNodesOrdered: [
+          { nodeId: 'adapt_tpl', type: 'adapt' },
+        ],
+        pipelineNodesOrdered: [
+          { nodeId: 'adapt__facebook', type: 'adapt', order: 1 },
+        ],
+      },
+    );
+    expect(merged.text).toBe('FB from pipeline node');
+  });
 });

@@ -62,17 +62,17 @@ export function ContentDetailReviewSidebar({
   return (
     <aside
       className={cn(
-        "flex max-h-[min(100%,520px)] w-full shrink-0 flex-col gap-0 overflow-y-auto border-t border-[#EDE9E1] bg-card lg:max-h-none lg:w-[320px] lg:border-t-0 lg:border-l",
+        "flex max-h-[min(100%,520px)] w-full shrink-0 flex-col gap-0 overflow-y-auto border-t border-border bg-card lg:max-h-none lg:w-[320px] lg:border-t-0 lg:border-l",
         className,
       )}
     >
-      <div className="border-b border-[#EDE9E1] px-5 py-4">
+      <div className="border-b border-border px-5 py-4">
         <p className="mb-3 text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
           Review decision
         </p>
-        <div className="mb-3 rounded-xl border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-4 py-3">
+        <div className="mb-3 rounded-xl border border-border bg-[color:var(--nt-canvas)] px-4 py-3">
           <p className="text-[11px] text-[#A89D8E]">Current status</p>
-          <p className="text-sm font-semibold text-[#0F1F3D]">
+          <p className="text-sm font-semibold text-foreground">
             {data.status === "draft"
               ? "Draft — pending review"
               : data.status === "in_review"
@@ -83,7 +83,7 @@ export function ContentDetailReviewSidebar({
           </p>
         </div>
         {(data.approval?.steps?.length ?? 0) > 0 ? (
-          <div className="mb-3 space-y-2 rounded-xl border border-[#EDE9E1] bg-white px-3 py-3">
+          <div className="mb-3 space-y-2 rounded-xl border border-border bg-card px-3 py-3">
             <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
               Approval steps
             </p>
@@ -98,7 +98,7 @@ export function ContentDetailReviewSidebar({
                   key={`${step.role}-${index}`}
                   className="flex items-center justify-between gap-2 text-xs"
                 >
-                  <span className="capitalize text-[#62594E]">
+                  <span className="capitalize text-muted-foreground">
                     {step.role.replace(/_/g, " ")}
                     {step.required ? "" : " (optional)"}
                   </span>
@@ -120,7 +120,7 @@ export function ContentDetailReviewSidebar({
         ) : null}
         {data.status === "approved" ? (
           hideContinueToUpload ? (
-            <p className="mb-2 rounded-lg border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2 text-xs leading-snug text-[#857A6C]">
+            <p className="mb-2 rounded-lg border border-border bg-[color:var(--nt-canvas)] px-3 py-2 text-xs leading-snug text-muted-foreground">
               Use the preview column to assign captions and publish.
             </p>
           ) : (
@@ -180,7 +180,7 @@ export function ContentDetailReviewSidebar({
           <Button
             type="button"
             variant="outline"
-            className="relative h-9 w-full border-[#EDE9E1] text-[#62594E] hover:bg-[#F7F4EF]"
+            className="relative h-9 w-full border-border text-muted-foreground hover:bg-muted"
             disabled={saveLoading || globalRerunning}
             onClick={() => void onSave()}
           >
@@ -196,18 +196,18 @@ export function ContentDetailReviewSidebar({
       </div>
 
       {omitContentInfo ? null : (
-        <div className="border-b border-[#EDE9E1] px-5 py-4">
+        <div className="border-b border-border px-5 py-4">
           <p className="mb-3 text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
             Content info
           </p>
           <div className="space-y-2.5 text-[13px]">
             <div>
               <p className="mb-0.5 text-[11px] text-[#A89D8E]">Workflow</p>
-              <p className="text-[#62594E]">{wfLabel}</p>
+              <p className="text-muted-foreground">{wfLabel}</p>
             </div>
             <div>
               <p className="mb-0.5 text-[11px] text-[#A89D8E]">Updated</p>
-              <p className="text-[12px] text-[#857A6C]">
+              <p className="text-[12px] text-muted-foreground">
                 {new Date(data.updatedAt).toLocaleString(undefined, {
                   dateStyle: "medium",
                   timeStyle: "short",

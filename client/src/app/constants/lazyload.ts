@@ -4,6 +4,7 @@ import { lazy } from "react"
 export const HomePage         = PageLoader(lazy(() => import("@/features/home/pages/home")))
 export const DashboardPage    = PageLoader(lazy(() => import("@/features/dashboard/pages/dashboard")))
 export const RulesPage        = PageLoader(lazy(() => import("@/features/rules/pages/rules")))
+export const NewsTriggerPage  = PageLoader(lazy(() => import("@/features/rules/pages/news-trigger")))
 export const WorkflowPromptPage = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-prompt")))
 export const WorkflowPage       = PageLoader(lazy(() => import("@/features/workflow/pages/workflow")))
 export const WorkflowsListPage  = PageLoader(lazy(() => import("@/features/workflow/pages/workflows")))

@@ -14,11 +14,14 @@
 RUN_WORKERS_IN_API=false
 
 # Worker: always processes jobs (set in worker/main.ts)
-# REDIS_HOST / REDIS_PORT or REDIS_URL
+# REDIS_HOST / REDIS_PORT / REDIS_PASSWORD (or REDIS_URL override)
 
 # WebSocket log bridge (required when workers are separate)
 PIPELINE_EVENTS_BRIDGE=true
-REDIS_URL=redis://127.0.0.1:6379
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=
+# REDIS_URL=redis://:password@127.0.0.1:6379
 
 # Optional tenant queue buckets (requires matching worker registration)
 QUEUE_TENANT_ISOLATION=false

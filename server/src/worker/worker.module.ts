@@ -4,6 +4,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { BullModule } from '@nestjs/bullmq';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { EventsModule } from '../events/events.module';
+import { NewsTriggerModule } from '../news-trigger/news-trigger.module';
+import {
+  buildRedisConnectionOptions,
+  redisEnvFromProcess,
+} from '../config/redis-connection.util';
 
 @Module({
   imports: [
@@ -15,14 +20,12 @@ import { EventsModule } from '../events/events.module';
     }),
     BullModule.forRootAsync({
       useFactory: () => ({
-        connection: {
-          host: process.env.REDIS_HOST ?? '127.0.0.1',
-          port: Number(process.env.REDIS_PORT ?? 6379),
-        },
+        connection: buildRedisConnectionOptions(redisEnvFromProcess()),
       }),
     }),
     EventsModule,
     OrchestrationModule,
+    NewsTriggerModule,
   ],
 })
 export class WorkerModule {}

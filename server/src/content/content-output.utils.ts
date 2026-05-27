@@ -3,9 +3,11 @@ import type {
   ContentUserEdits,
 } from './schemas/content.schema';
 import {
+  flattenNodeOutputsFromPipeline,
   flattenNodeOutputsToAiOutputs,
   type NodeOutputMap,
   type NodeUserEditMap,
+  type PipelineNodeForFlatten,
 } from './content-node-output.util';
 
 /** Merged view: user edits override AI outputs when present. */
@@ -20,8 +22,10 @@ export type ResolvedContentOutputs = {
 };
 
 export type MergeResolvedOptions = {
-  /** When set with non-empty nodeOutputs, AI base fields are last-wins from nodes then overlaid with flat outputs as fallback. */
+  /** Workflow template node order (legacy / fallback). */
   workflowNodesOrdered?: Array<{ nodeId: string; type: string }>;
+  /** Materialized pipeline nodes — preferred when present with nodeOutputs. */
+  pipelineNodesOrdered?: PipelineNodeForFlatten[];
 };
 
 export function mergeResolvedOutputs(
@@ -36,20 +40,30 @@ export function mergeResolvedOutputs(
   const u = version.userEdits ?? {};
   const flatOutputs = version.outputs ?? {};
   const nodeOut = version.nodeOutputs ?? {};
-  const hasNodeData =
-    opts?.workflowNodesOrdered?.length &&
-    nodeOut &&
-    Object.keys(nodeOut).length > 0;
-  const o: ContentOutputs = hasNodeData
-    ? {
-        ...flatOutputs,
-        ...flattenNodeOutputsToAiOutputs(
-          opts!.workflowNodesOrdered!,
-          nodeOut,
-          version.nodeUserEdits ?? {},
-        ),
-      }
-    : flatOutputs;
+  const nodeUserEdits = version.nodeUserEdits ?? {};
+  const hasNodeData = nodeOut && Object.keys(nodeOut).length > 0;
+
+  let flattened: ContentOutputs = {};
+  if (hasNodeData && opts?.pipelineNodesOrdered?.length) {
+    flattened = flattenNodeOutputsFromPipeline(
+      opts.pipelineNodesOrdered,
+      nodeOut,
+      nodeUserEdits,
+    );
+  } else if (hasNodeData && opts?.workflowNodesOrdered?.length) {
+    flattened = flattenNodeOutputsToAiOutputs(
+      opts.workflowNodesOrdered,
+      nodeOut,
+      nodeUserEdits,
+    );
+  }
+
+  const o: ContentOutputs =
+    hasNodeData &&
+    (opts?.pipelineNodesOrdered?.length || opts?.workflowNodesOrdered?.length)
+      ? { ...flatOutputs, ...flattened }
+      : flatOutputs;
+
   return {
     keywords: coalesce(u.keywords, o.keywords),
     text: coalesce(u.text, o.text),

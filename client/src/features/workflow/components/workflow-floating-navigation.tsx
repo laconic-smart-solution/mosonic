@@ -37,7 +37,7 @@ function WorkflowFloatingNavigation({
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-11 w-11 rounded-full bg-white shadow-md"
+                  className="h-11 w-11 rounded-full bg-card shadow-md"
                   onClick={onBackToRuleSetup}
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -58,7 +58,7 @@ function WorkflowFloatingNavigation({
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-11 w-11 rounded-full bg-white shadow-md"
+                  className="h-11 w-11 rounded-full bg-card shadow-md"
                   onClick={onOpenExistingWorkflow}
                   disabled={!hasExistingWorkflow}
                 >

@@ -1,6 +1,8 @@
 import type { MouseEvent, ReactNode } from "react"
 import type { Edge, Node } from "@xyflow/react"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
+import { channelLabel } from "@/shared/constants/distribution-channels"
 import {
   isPreviewEdgeId,
   persistedLayoutFromApiNodes,
@@ -297,7 +299,16 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
         quality: "standard",
       }
     case "video":
-      return { model, aspectRatio: "16:9", resolution: "720p", duration: 8 }
+      return {
+        mode: "cinematic",
+        model,
+        aspectRatio: "16:9",
+        resolution: "720p",
+        duration: 8,
+        heygenOrientation: "landscape",
+        heygenExpressiveness: "medium",
+        removeBackground: true,
+      }
     case "translation":
       return {
         model,
@@ -310,6 +321,8 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       return { model, language: "auto", sourceType: "audio" }
     case "summarization":
       return { model, summaryLength: "medium", outputFormat: "paragraph" }
+    case "branch":
+      return { mode: "rule_channels" }
     default:
       return { model }
   }
@@ -390,7 +403,7 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
     case "transcription":
       return [s("sourceType"), s("language")].filter(Boolean).join(" · ") || "Transcription"
     case "branch":
-      return s("mode") === "manual" ? "Manual channels" : "Rule channels"
+      return "From campaign rule"
     case "adapt":
       return s("channel") ? `Channel: ${s("channel")}` : "Channel adapt"
     case "merge":
@@ -575,11 +588,13 @@ export function apiNodesToRf(
     const laneFromApi =
       typeof n.lane === "string" && n.lane.trim() ? n.lane.trim() : ""
     const effectiveLaneKey = laneFromApi || laneFromConfig
-    const laneLabel =
+    const channelDisplay =
       effectiveLaneKey && channelHandles.length > 0
         ? (channelHandles.find((ch) => ch.id === effectiveLaneKey)?.label ??
-          effectiveLaneKey)
-        : effectiveLaneKey || null
+          channelLabel(effectiveLaneKey))
+        : effectiveLaneKey
+          ? channelLabel(effectiveLaneKey)
+          : null
     const hasPosition =
       typeof n.x === "number" &&
       Number.isFinite(n.x) &&
@@ -590,7 +605,9 @@ export function apiNodesToRf(
       type: rfType,
       position: hasPosition ? { x: n.x!, y: n.y! } : { x: 80, y: 140 },
       data: {
-        label: laneLabel ? `${meta.label} (${laneLabel})` : meta.label,
+        label: channelDisplay
+          ? formatLaneNodeLabel(canvasType, channelDisplay)
+          : meta.label,
         wfType: canvasType,
         status: "idle" as NodeStatus,
         locked: false,

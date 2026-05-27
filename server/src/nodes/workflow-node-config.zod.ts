@@ -160,17 +160,46 @@ const soraDurationSchema = z.preprocess(
     .optional(),
 );
 
+const videoModeSchema = z.enum(['cinematic', 'presenter']).optional();
+
+const heygenOrientationSchema = z.enum(['landscape', 'portrait']).optional();
+
+const heygenExpressivenessSchema = z
+  .enum(['low', 'medium', 'high'])
+  .optional();
+
 const videoConfigSchema = z
   .object({
     laneId: laneIdSchema,
+    mode: videoModeSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     duration: soraDurationSchema,
     resolution: z.string().min(1).optional(),
     aspectRatio: videoAspect.optional(),
     negativePrompt: z.string().max(2000).optional(),
+    heygenAvatarId: z.string().min(1).optional(),
+    heygenAvatarAssetId: z.string().min(1).optional(),
+    heygenAvatarPhotoUrl: z.string().max(2048).optional(),
+    heygenBackgroundAssetId: z.string().min(1).optional(),
+    heygenBackgroundUrl: z.string().max(2048).optional(),
+    heygenVoiceId: z.string().min(1).optional(),
+    heygenOrientation: heygenOrientationSchema,
+    heygenExpressiveness: heygenExpressivenessSchema,
+    heygenMotionPrompt: z.string().max(500).optional(),
+    removeBackground: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    const mode = data.mode ?? 'cinematic';
+    if (mode === 'presenter' && !data.heygenAvatarId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'heygenAvatarId is required when mode is presenter',
+        path: ['heygenAvatarId'],
+      });
+    }
+  });
 
 const transcriptionConfigSchema = z
   .object({
@@ -217,8 +246,7 @@ const keywordPlannerConfigSchema = z
 
 const branchConfigSchema = z
   .object({
-    mode: z.enum(['rule_channels', 'manual']).optional(),
-    channelIds: z.array(z.string().min(1)).optional(),
+    mode: z.enum(['rule_channels']).optional(),
   })
   .strict();
 
@@ -303,10 +331,14 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     size: aspectRatioToOpenAiImageSize('1:1', 'gpt-image-1'),
   },
   [WorkflowNodeType.VideoGeneration]: {
+    mode: 'cinematic',
     model: 'sora-2',
     duration: 8,
     resolution: '720p',
     aspectRatio: NodeAspectRatio.R16x9,
+    heygenOrientation: 'landscape',
+    heygenExpressiveness: 'medium',
+    removeBackground: true,
   },
   [WorkflowNodeType.Translation]: {
     model: 'gpt-4o',

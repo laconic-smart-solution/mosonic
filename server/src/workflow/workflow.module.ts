@@ -10,9 +10,12 @@ import {
   WorkflowNodeSchema,
 } from '../nodes/schemas/workflow-node.schema';
 import { WorkflowController } from './workflow.controller';
+import { WorkflowHeygenController } from './workflow-heygen.controller';
+import { WorkflowHeygenService } from './workflow-heygen.service';
 import { Workflow, WorkflowSchema } from './schemas/workflow.schema';
 import { WorkflowGenerationService } from './services/workflow-generation.service';
 import { WorkflowService } from './workflow.service';
+import { WorkflowResolveService } from './workflow-resolve.service';
 
 @Module({
   imports: [
@@ -26,8 +29,13 @@ import { WorkflowService } from './workflow.service';
       { name: WorkflowNode.name, schema: WorkflowNodeSchema },
     ]),
   ],
-  controllers: [WorkflowController],
-  providers: [WorkflowService, WorkflowGenerationService],
-  exports: [MongooseModule, WorkflowService],
+  controllers: [WorkflowController, WorkflowHeygenController],
+  providers: [
+    WorkflowService,
+    WorkflowGenerationService,
+    WorkflowResolveService,
+    WorkflowHeygenService,
+  ],
+  exports: [MongooseModule, WorkflowService, WorkflowResolveService],
 })
 export class WorkflowModule {}

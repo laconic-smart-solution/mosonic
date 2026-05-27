@@ -146,7 +146,7 @@ export class WorkflowNodeConfig {
   @Prop({ type: String })
   sourceNodeRef?: string;
 
-  /** branch node: rule_channels | manual */
+  /** branch node: rule_channels (lanes follow campaign rule channels) */
   @Prop({ type: String })
   mode?: string;
 
@@ -169,6 +169,39 @@ export class WorkflowNodeConfig {
   /** Lane-scoped subgraph: normalized channel handle (matches Branch sourceHandle ids). */
   @Prop({ type: String })
   laneId?: string;
+
+  /** video_generation presenter (HeyGen) */
+  @Prop({ type: String })
+  heygenAvatarId?: string;
+
+  @Prop({ type: String })
+  heygenAvatarAssetId?: string;
+
+  @Prop({ type: String })
+  heygenAvatarPhotoUrl?: string;
+
+  @Prop({ type: String })
+  heygenBackgroundAssetId?: string;
+
+  @Prop({ type: String })
+  heygenBackgroundUrl?: string;
+
+  @Prop({ type: String })
+  heygenVoiceId?: string;
+
+  /** landscape | portrait */
+  @Prop({ type: String })
+  heygenOrientation?: string;
+
+  /** low | medium | high */
+  @Prop({ type: String })
+  heygenExpressiveness?: string;
+
+  @Prop({ type: String })
+  heygenMotionPrompt?: string;
+
+  @Prop({ type: Boolean })
+  removeBackground?: boolean;
 }
 export const WorkflowNodeConfigSchema =
   SchemaFactory.createForClass(WorkflowNodeConfig);

@@ -68,7 +68,7 @@ export function PostsBulkActionsBar({
       )}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-        <span className="inline-flex items-center rounded-md bg-navy-50 px-2.5 py-1 text-xs font-semibold text-navy-700 tabular-nums">
+        <span className="inline-flex items-center rounded-md bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground tabular-nums">
           {selectedCount} selected
         </span>
         <Button

@@ -1,46 +1,52 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  migrateBranchConfigFromRule,
   normalizeLaneId,
   resolveBranchChannels,
 } from "./branch-channels"
 
 describe("branch-channels", () => {
+  it("normalizeLaneId trims and lowercases lane handles", () => {
+    expect(normalizeLaneId(" Instagram ")).toBe("instagram")
+  })
+
   const ruleChannels = [
     { channel: "Instagram" },
     { channel: "LinkedIn" },
     { channel: "Facebook" },
   ]
 
-  it("normalizeLaneId lowercases and trims", () => {
-    expect(normalizeLaneId("  LinkedIn  ")).toBe("linkedin")
-  })
-
-  it("returns all rule channels for rule_channels mode", () => {
-    const handles = resolveBranchChannels(ruleChannels, { mode: "rule_channels" })
+  it("resolves lanes from rule channels", () => {
+    const handles = resolveBranchChannels(
+      { mode: "rule_channels" },
+      ruleChannels,
+    )
     expect(handles).toHaveLength(3)
-    expect(handles.map((h) => h.id)).toEqual(["instagram", "linkedin", "facebook"])
+    expect(handles.map((h) => h.id).sort()).toEqual([
+      "facebook",
+      "instagram",
+      "linkedin",
+    ])
+    expect(handles.find((h) => h.id === "facebook")?.label).toBe("Facebook")
   })
 
-  it("filters channels for manual mode", () => {
-    const handles = resolveBranchChannels(ruleChannels, {
-      mode: "manual",
-      channelIds: ["linkedin", "instagram"],
-    })
-    expect(handles).toHaveLength(2)
-    expect(handles.map((h) => h.id).sort()).toEqual(["instagram", "linkedin"])
+  it("returns empty when rule has no channels", () => {
+    expect(resolveBranchChannels({ mode: "rule_channels" }, [])).toEqual([])
   })
 
-  it("dedupes ab_test variants by lane id", () => {
-    const handles = resolveBranchChannels(ruleChannels, {
-      mode: "ab_test",
-      variants: [
-        { id: "a", channel: "instagram" },
-        { id: "b", channel: "Instagram" },
-        { id: "c", channel: "linkedin" },
-      ],
+  it("migrateBranchConfigFromRule always uses rule_channels mode", () => {
+    expect(migrateBranchConfigFromRule({}, ruleChannels)).toEqual({
+      mode: "rule_channels",
     })
-    expect(handles).toHaveLength(2)
-    expect(handles.map((h) => h.id).sort()).toEqual(["instagram", "linkedin"])
+  })
+
+  it("ignores unknown channel names on the rule", () => {
+    const handles = resolveBranchChannels({ mode: "rule_channels" }, [
+      { channel: "Facebook" },
+      { channel: "unknown_platform" },
+    ])
+    expect(handles).toHaveLength(1)
+    expect(handles[0]?.id).toBe("facebook")
   })
 })

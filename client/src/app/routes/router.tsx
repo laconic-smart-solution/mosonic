@@ -6,6 +6,7 @@ import {
   HomePage,
   DashboardPage,
   RulesPage,
+  NewsTriggerPage,
   WorkflowPage,
   WorkflowsListPage,
   PipelinesPage,
@@ -91,6 +92,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/rules", element: <RulesPage /> },
+          { path: "/rules/:ruleId/news-trigger", element: <NewsTriggerPage /> },
           { path: "/workflows", element: <WorkflowsListPage /> },
           { path: "/pipelines", element: <PipelinesPage /> },
           { path: "/workflow/:ruleId", element: <WorkflowPage /> },

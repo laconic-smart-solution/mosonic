@@ -15,6 +15,7 @@ type WorkflowPropertiesPanelProps = {
   propConfig: Record<string, unknown>
   setPropConfig: (next: Record<string, unknown>) => void
   resolvedChannels?: BranchChannelHandle[]
+  workflowId?: string
   onClose: () => void
   onApply: () => void
   onReset: () => void
@@ -25,6 +26,7 @@ export function WorkflowPropertiesPanel({
   propConfig,
   setPropConfig,
   resolvedChannels = [],
+  workflowId,
   onClose,
   onApply,
   onReset,
@@ -39,7 +41,7 @@ export function WorkflowPropertiesPanel({
 
   return (
     <div
-      className="z-50 flex w-[300px] min-w-[300px] flex-col overflow-hidden border-l bg-white"
+      className="z-50 flex w-[300px] min-w-[300px] flex-col overflow-hidden border-l bg-card"
       style={{ borderColor: T.surfaceBorder }}
     >
       <div
@@ -100,10 +102,19 @@ export function WorkflowPropertiesPanel({
           canvasType={selNode.type}
           config={propConfig}
           onChange={setPropConfig}
+          workflowId={workflowId}
+          nodeId={selNode.id}
         />
 
-        {selNode.type === "branch" && resolvedChannels.length > 0 ? (
-          <BranchChannelList channels={resolvedChannels} />
+        {selNode.type === "branch" ? (
+          resolvedChannels.length > 0 ? (
+            <BranchChannelList channels={resolvedChannels} />
+          ) : (
+            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+              Add at least two distribution channels on the campaign rule to enable
+              branching.
+            </p>
+          )
         ) : null}
 
         <div className="rounded-lg bg-gray-100 px-2.5 py-2 text-[11px] leading-relaxed text-gray-400">

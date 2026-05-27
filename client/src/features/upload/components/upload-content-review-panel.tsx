@@ -13,6 +13,7 @@ import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Popover,
   PopoverContent,
@@ -37,12 +38,22 @@ import {
   outputKeyForNodeType,
 } from "@/features/content/data/content-review-helpers"
 import { buildGenerationNodesForContent } from "@/features/upload/lib/upload-generation-nodes"
+import {
+  filterGenerationNodesForChannel,
+  staticTextFromLayer,
+  type GenerationLaneFilter,
+} from "@/features/upload/lib/upload-generation-lane"
+import {
+  getPlatformMediaConfig,
+  normalizeChannelKey,
+} from "@/features/upload/lib/upload-platform-media"
 import { ContentDetailNodeCard } from "@/features/content/components/content-detail/content-detail-node-card"
 import {
   ContentDetailConfirmDialogs,
   ContentDetailImageLightbox,
   ContentDetailRerunSheet,
 } from "@/features/content/components/content-detail/content-detail-overlays"
+import { ContentNewsSourceBanner } from "@/features/content/components/content-detail/content-news-source-banner"
 import { ContentDetailReviewHeader } from "@/features/content/components/content-detail/content-detail-review-header"
 import { ContentDetailReviewSidebar } from "@/features/content/components/content-detail/content-detail-review-sidebar"
 import {
@@ -74,28 +85,6 @@ import {
 import { UploadGenerationDraggableCard } from "@/features/upload/components/upload-generation-draggable-card"
 import type { WorkflowNodeLayersSnapshot } from "@/features/upload/lib/upload-channel-draft"
 
-function staticTextFromLayer(
-  layer: Record<string, unknown>,
-  key: OutputKey
-): string {
-  switch (key) {
-    case "keywords":
-      return typeof layer.keywords === "string" ? layer.keywords : ""
-    case "text":
-      return typeof layer.text === "string" ? layer.text : ""
-    case "translatedText":
-      return typeof layer.translatedText === "string"
-        ? layer.translatedText
-        : ""
-    case "transcription":
-      return typeof layer.transcription === "string" ? layer.transcription : ""
-    case "summary":
-      return typeof layer.summary === "string" ? layer.summary : ""
-    default:
-      return ""
-  }
-}
-
 export type UploadContentReviewPanelProps = {
   contentId: string | undefined
   /** Current upload route id — used to invalidate publish workspace after save/approve */
@@ -108,6 +97,10 @@ export type UploadContentReviewPanelProps = {
   channelPreview?: ReactNode
   /** Fired whenever per-node outputs / edits change (used to resolve pinned drag-drop captions). */
   onWorkflowLayersChange?: (layers: WorkflowNodeLayersSnapshot) => void
+  /** Channel keys (tabs) to show in Generated contents header filter. */
+  generationChannelKeys?: string[]
+  /** Default selected Generated contents filter tab. */
+  generationDefaultKey?: GenerationLaneFilter
 }
 
 export function UploadContentReviewPanel({
@@ -117,6 +110,8 @@ export function UploadContentReviewPanel({
   preview,
   channelPreview,
   onWorkflowLayersChange,
+  generationChannelKeys,
+  generationDefaultKey = "all",
 }: UploadContentReviewPanelProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -201,6 +196,24 @@ export function UploadContentReviewPanel({
     nodeId: string
   } | null>(null)
 
+  const normalizedGenerationChannelKeys = useMemo(() => {
+    const keys = (generationChannelKeys ?? [])
+      .map((k) => normalizeChannelKey(k))
+      .filter(Boolean)
+    return Array.from(new Set(keys))
+  }, [generationChannelKeys])
+
+  const [generationTabKey, setGenerationTabKey] =
+    useState<GenerationLaneFilter>(generationDefaultKey)
+
+  useEffect(() => {
+    if (generationTabKey === "all") return
+    const cur = normalizeChannelKey(String(generationTabKey))
+    if (!normalizedGenerationChannelKeys.includes(cur)) {
+      setGenerationTabKey("all")
+    }
+  }, [generationTabKey, normalizedGenerationChannelKeys])
+
   const generationNodes = useMemo(() => {
     const merged = buildGenerationNodesForContent(
       pipelineQuery.data?.nodes,
@@ -230,6 +243,38 @@ export function UploadContentReviewPanel({
     pipelineQuery.data?.nodes,
     sortedWorkflowNodes,
   ])
+
+  const filteredGenerationNodes = useMemo(() => {
+    const filterKey: GenerationLaneFilter =
+      embedInUpload && generationTabKey !== "all"
+        ? normalizeChannelKey(String(generationTabKey))
+        : "all"
+    return filterGenerationNodesForChannel(generationNodes, {
+      filterKey,
+      pipelineNodes: pipelineQuery.data?.nodes,
+      nodeOutputs,
+      nodeUserEdits,
+      runByNodeId,
+    })
+  }, [
+    embedInUpload,
+    generationTabKey,
+    generationNodes,
+    nodeOutputs,
+    nodeUserEdits,
+    pipelineQuery.data?.nodes,
+    runByNodeId,
+  ])
+
+  const generationFilterLabel = useMemo(() => {
+    if (!embedInUpload || generationTabKey === "all") return null
+    const key = normalizeChannelKey(String(generationTabKey))
+    try {
+      return getPlatformMediaConfig(key).displayName
+    } catch {
+      return key
+    }
+  }, [embedInUpload, generationTabKey])
 
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
@@ -847,34 +892,83 @@ export function UploadContentReviewPanel({
                 <p className="text-[11px] font-semibold tracking-wide text-[#A89D8E] uppercase">
                   Generation
                 </p>
+                {generationFilterLabel ? (
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    Showing outputs for {generationFilterLabel}
+                  </p>
+                ) : null}
               </div>
               <div className="h-full min-h-0 flex-1 overflow-y-auto">
                 <div className="w-full border-b border-[#EDE9E1] px-4 py-3 [&_button]:w-full">
                   {genMorePopover}
                 </div>
                 <div className="px-4 py-3">
-                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
-                      Generated contents
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="relative h-9 shrink-0 border-[#EDE9E1] text-[#62594E] hover:bg-[#F7F4EF] sm:min-w-[140px]"
-                      disabled={saveLoading || blockPipeline}
-                      onClick={() => void handleSave()}
-                    >
-                      {saveLoading ? "Saving…" : "Save changes"}
-                      {hasUnsavedChanges ? (
-                        <span
-                          className="absolute top-1 right-2 size-2 rounded-full bg-amber-500"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </Button>
+                  <div className="mb-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
+                        Generated contents
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="relative h-9 shrink-0 border-[#EDE9E1] text-[#62594E] hover:bg-[#F7F4EF] sm:min-w-[140px]"
+                        disabled={saveLoading || blockPipeline}
+                        onClick={() => void handleSave()}
+                      >
+                        {saveLoading ? "Saving…" : "Save changes"}
+                        {hasUnsavedChanges ? (
+                          <span
+                            className="absolute top-1 right-2 size-2 rounded-full bg-amber-500"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </Button>
+                    </div>
+                    {embedInUpload && normalizedGenerationChannelKeys.length > 0 ? (
+                      <Tabs
+                        value={String(generationTabKey)}
+                        onValueChange={(v) => {
+                          if (v === "all") {
+                            setGenerationTabKey("all")
+                            return
+                          }
+                          setGenerationTabKey(normalizeChannelKey(v))
+                        }}
+                        className="min-w-0"
+                      >
+                        <TabsList
+                          variant="default"
+                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-[#EDE9E1] bg-[#F7F4EF] p-0.5"
+                        >
+                          <TabsTrigger
+                            value="all"
+                            className="h-7 shrink-0 flex-none rounded-md px-2.5 text-xs select-none after:hidden"
+                          >
+                            All
+                          </TabsTrigger>
+                          {normalizedGenerationChannelKeys.map((key) => {
+                            let label = key
+                            try {
+                              label = getPlatformMediaConfig(key).displayName
+                            } catch {
+                              // ignore
+                            }
+                            return (
+                              <TabsTrigger
+                                key={key}
+                                value={key}
+                                className="h-7 shrink-0 flex-none rounded-md px-2.5 text-xs select-none after:hidden"
+                              >
+                                {label}
+                              </TabsTrigger>
+                            )
+                          })}
+                        </TabsList>
+                      </Tabs>
+                    ) : null}
                   </div>
                   <div className="flex flex-col gap-2">
-                    {generationNodes.map((wfNode, cardIndex) => {
+                    {filteredGenerationNodes.map((wfNode, cardIndex) => {
                       const nodeId = wfNode.nodeId
                       const run = runByNodeId[nodeId] ?? emptyRunState()
                       const key = outputKeyForNodeType(wfNode.type)
@@ -885,7 +979,9 @@ export function UploadContentReviewPanel({
                       )
                       const baseText = key
                         ? staticTextFromLayer(layer, key)
-                        : ""
+                        : wfNode.type === "adapt"
+                          ? staticTextFromLayer(layer, "text")
+                          : ""
                       const displayText =
                         run.phase === "streaming" || run.phase === "running"
                           ? run.stream ||
@@ -926,9 +1022,11 @@ export function UploadContentReviewPanel({
                       )
                     })}
                   </div>
-                  {generationNodes.length === 0 ? (
+                  {filteredGenerationNodes.length === 0 ? (
                     <p className="mt-4 text-center text-xs text-muted-foreground">
-                      No outputs to display yet.
+                      {generationNodes.length > 0 && generationFilterLabel
+                        ? `Nothing generated for ${generationFilterLabel} yet.`
+                        : "No outputs to display yet."}
                     </p>
                   ) : null}
                 </div>
@@ -949,6 +1047,10 @@ export function UploadContentReviewPanel({
                 breadcrumbParentHref={embedInUpload ? "/upload" : "/content"}
                 breadcrumbParentLabel={embedInUpload ? "Upload" : "Content"}
               />
+
+              {data.newsMeta ? (
+                <ContentNewsSourceBanner newsMeta={data.newsMeta} />
+              ) : null}
 
               <div className="mb-4">{genMorePopover}</div>
 

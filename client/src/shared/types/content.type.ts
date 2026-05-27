@@ -47,6 +47,8 @@ export type ContentPageItem = {
   updatedAt: string
   /** Merged userEdits over outputs (matches content detail). */
   outputs?: ContentOutputs
+  /** Per-channel adapt outputs (multi-lane runs). */
+  laneOutputs?: Record<string, Record<string, unknown>>
   uploadId?: string
 }
 
@@ -85,6 +87,14 @@ export type ContentDetail = {
   experimentId?: string | null
   createdAt: string
   updatedAt: string
+  newsMeta?: {
+    title: string
+    url: string
+    sourceId: string
+    publishedAt: string
+    relevanceScore: number
+    suggestedAngle: string
+  } | null
 }
 
 export type AvailableNodeTypesResponse = {

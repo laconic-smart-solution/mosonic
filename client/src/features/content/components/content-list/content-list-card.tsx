@@ -12,11 +12,12 @@ import {
 import { toast } from "sonner"
 import type {
   ContentPageItem,
-  ContentOutputs,
 } from "@/shared/types/content.type"
 import { cn } from "@/lib/utils"
 import {
+  contentPreviewFromPageItem,
   displayLinkedRef,
+  laneOutputChannelCount,
   listCardPrimaryTitle,
 } from "@/features/content/lib/content-display"
 import {
@@ -42,15 +43,23 @@ type GridHeroResolved =
   | { kind: "text"; label: string; body: string }
   | null
 
-/** Preview priority for grid hero: video → image → summary → translation → transcript → text. */
-function resolveGridHeroOutput(
-  o: ContentOutputs | undefined
-): GridHeroResolved {
+/** Preview priority for grid hero: video → image → lane/page text → other fields. */
+function resolveGridHeroOutput(item: ContentPageItem): GridHeroResolved {
+  const o = item.outputs
   if (hasOutput(o?.video)) {
     return { kind: "video", url: o!.video!.trim() }
   }
   if (hasOutput(o?.image)) {
     return { kind: "image", url: o!.image!.trim() }
+  }
+  const pagePreview = contentPreviewFromPageItem(item)
+  if (pagePreview) {
+    const hasLaneCaption = laneOutputChannelCount(item.laneOutputs) > 0
+    return {
+      kind: "text",
+      label: hasLaneCaption ? "Caption" : "Text",
+      body: pagePreview,
+    }
   }
   if (hasOutput(o?.summary)) {
     return { kind: "text", label: "Summary", body: o!.summary!.trim() }
@@ -64,9 +73,6 @@ function resolveGridHeroOutput(
   }
   if (hasOutput(o?.transcription)) {
     return { kind: "text", label: "Transcript", body: o!.transcription!.trim() }
-  }
-  if (hasOutput(o?.text)) {
-    return { kind: "text", label: "Text", body: o!.text!.trim() }
   }
   return null
 }
@@ -96,7 +102,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
   const hasTranslation = hasOutput(o?.translatedText)
   const hasVideo = hasOutput(o?.video)
   const hasSummary = hasOutput(o?.summary)
-  const gridHero = resolveGridHeroOutput(o)
+  const laneCount = laneOutputChannelCount(item.laneOutputs)
+  const gridHero = resolveGridHeroOutput(item)
   const showMediaHero =
     gridHero?.kind === "image" || gridHero?.kind === "video"
 
@@ -117,8 +124,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         }
       }}
       className={cn(
-        "group cursor-pointer overflow-hidden rounded-2xl border border-canvas-200 bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
-        "hover:border-canvas-300 hover:shadow-lg"
+        "group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
+        "hover:border-muted-foreground/30 hover:shadow-lg"
       )}
     >
       <div className="relative flex h-40 items-center justify-center overflow-hidden">
@@ -158,7 +165,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             </div>
           ) : (
             <>
-              <span className="text-3xl text-canvas-50">
+              <span className="text-3xl text-foreground/90">
                 {previewEmoji(item.status)}
               </span>
             </>
@@ -174,31 +181,36 @@ export function ContentListCard({ item, index, onOpen }: Props) {
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex gap-2">
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] font-semibold tracking-wider text-canvas-500 uppercase">
+                <p className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                   Campaign
                 </p>
-                <h2 className="line-clamp-2 font-heading text-[15px] leading-snug tracking-tight text-navy-700">
+                <h2 className="line-clamp-2 font-heading text-[15px] leading-snug tracking-tight text-foreground">
                   {title}
                 </h2>
                 {campaignLabel.trim() ? (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-canvas-500">{campaignLabel}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{campaignLabel}</p>
+                ) : null}
+                {laneCount > 1 ? (
+                  <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+                    {laneCount} channels
+                  </p>
                 ) : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span
-                className="flex size-[22px] items-center justify-center rounded-md border border-canvas-200 bg-canvas-100 text-[11px] text-canvas-600"
+                className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
                 title="Workflow"
               >
                 W
               </span>
               <span
-                className="flex size-[22px] items-center justify-center rounded-md border border-canvas-200 bg-canvas-100 text-[11px] text-canvas-600"
+                className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
                 title="Pipeline"
               >
                 P
               </span>
-              <span className="ml-auto text-[11px] text-canvas-400">
+              <span className="ml-auto text-[11px] text-muted-foreground/70">
                 {formatRelativeTime(item.updatedAt)}
               </span>
             </div>
@@ -206,14 +218,14 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 border-t border-canvas-200 bg-canvas-100 px-4 py-2.5">
+      <div className="flex items-center gap-1.5 border-t border-border bg-muted px-4 py-2.5">
         <div className="flex items-center gap-1">
           <span
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
               hasText
-                ? "border-canvas-200/80 bg-navy-50 text-navy-500"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+                ? "border-border/80 bg-accent text-accent-foreground"
+                : "border-border bg-muted text-muted-foreground/40 opacity-70"
             )}
             title="Text or transcript"
           >
@@ -223,8 +235,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
               hasVideo
-                ? "border-canvas-200/80 bg-amber-50 text-amber-700"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+                ? "border-border/80 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                : "border-border bg-muted text-muted-foreground/40 opacity-70"
             )}
             title="Video"
           >
@@ -234,8 +246,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
               hasImage
-                ? "border-canvas-200/80 bg-teal-50 text-teal-600"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+                ? "border-border/80 bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-300"
+                : "border-border bg-muted text-muted-foreground/40 opacity-70"
             )}
             title="Image"
           >
@@ -245,8 +257,8 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
               hasTranslation
-                ? "border-canvas-200/80 bg-navy-50 text-navy-500"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+                ? "border-border/80 bg-accent text-accent-foreground"
+                : "border-border bg-muted text-muted-foreground/40 opacity-70"
             )}
             title="Translation"
           >
@@ -256,15 +268,15 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             className={cn(
               "flex size-5 items-center justify-center rounded-md border",
               hasSummary
-                ? "border-canvas-200/80 bg-violet-50 text-violet-700"
-                : "border-canvas-200 bg-canvas-100 text-canvas-300 opacity-70"
+                ? "border-border/80 bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+                : "border-border bg-muted text-muted-foreground/40 opacity-70"
             )}
             title="Summary"
           >
             <AlignLeft className="size-2.5" />
           </span>
         </div>
-        <span className="ml-1 text-[11px] text-canvas-400">Outputs</span>
+        <span className="ml-1 text-[11px] text-muted-foreground/70">Outputs</span>
         <div
           className="ml-auto flex gap-1"
           onClick={(e) => e.stopPropagation()}
@@ -272,7 +284,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
           <button
             type="button"
             title="Copy link"
-            className="flex size-7 items-center justify-center rounded-md border border-canvas-200 bg-transparent text-canvas-500 transition-colors hover:border-canvas-300 hover:bg-card hover:text-navy-700"
+            className="flex size-7 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-card hover:text-foreground"
             onClick={(e) => void copyPageLink(item.contentId, item.uploadId, e)}
           >
             <Copy className="size-3.5" />
@@ -280,7 +292,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
           <button
             type="button"
             title="Open"
-            className="flex size-7 items-center justify-center rounded-md border border-canvas-200 bg-transparent text-canvas-500 transition-colors hover:border-canvas-300 hover:bg-card hover:text-navy-700"
+            className="flex size-7 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-card hover:text-foreground"
             onClick={() => onOpen(item.contentId)}
           >
             <ArrowRight className="size-3.5" />

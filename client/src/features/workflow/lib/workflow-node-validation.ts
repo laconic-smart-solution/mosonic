@@ -194,9 +194,6 @@ function applyExtraRules(
   const graphMode = hasWorkflowBranch(ctx.nodes)
   let result = [...types]
 
-  if (ctx.channelCount < 2) {
-    result = result.filter((t) => t !== "branch")
-  }
   if (ctx.nodes.some((n) => n.data.wfType === "branch")) {
     result = result.filter((t) => t !== "branch")
   }
@@ -438,6 +435,37 @@ export function getBranchSubgraphLaneErrors(
     errors.push(
       `${wfTypeLabel(wfType)} must be assigned to a channel (add it from a lane node, not from trunk Text).`,
     )
+  }
+  return errors
+}
+
+/** Presenter video nodes need avatar + voice before pipeline run. */
+export function getVideoPresenterConfigErrors(
+  config: Record<string, unknown> | undefined,
+): string[] {
+  if (config?.mode !== "presenter") return []
+  const errors: string[] = []
+  if (!String(config.heygenAvatarId ?? "").trim()) {
+    errors.push("Presenter video requires an avatar photo.")
+  }
+  if (!String(config.heygenVoiceId ?? "").trim()) {
+    errors.push("Presenter video requires a voice.")
+  }
+  return errors
+}
+
+/** Validate presenter video nodes on the canvas before starting a pipeline. */
+export function getVideoPresenterErrorsFromRfNodes(rfNodes: WfRfNode[]): string[] {
+  const errors: string[] = []
+  for (const n of rfNodes) {
+    if (n.type === "plus_placeholder") continue
+    const data = n.data as WfNodeData
+    if (data.wfType !== "video") continue
+    const nodeErrors = getVideoPresenterConfigErrors(data.config)
+    const label = data.label?.trim() || n.id
+    for (const msg of nodeErrors) {
+      errors.push(`${label}: ${msg}`)
+    }
   }
   return errors
 }

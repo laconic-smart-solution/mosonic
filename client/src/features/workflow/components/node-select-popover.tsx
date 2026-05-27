@@ -52,7 +52,7 @@ export function NodeSelectPopover({
     <div
       ref={ref}
       role="listbox"
-      className="fixed z-50 min-w-[240px] origin-top-left animate-in fade-in zoom-in-95 rounded-xl border bg-white p-1.5 shadow-lg duration-150"
+      className="fixed z-50 min-w-[240px] origin-top-left animate-in fade-in zoom-in-95 rounded-xl border bg-card p-1.5 shadow-lg duration-150"
       style={{
         left: anchorPosition.x,
         top: anchorPosition.y,

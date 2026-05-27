@@ -5,7 +5,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom"
-import { ChevronDown, ChevronUp, FileStack, Home, Library } from "lucide-react"
+import { FileStack, Home, Library } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -27,17 +27,19 @@ import { WorkflowFlowSkeleton } from "@/features/workflow/components/workflow-fl
 import { WorkflowGenerationProgress } from "@/features/workflow/components/workflow-generation-progress"
 import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-content-drawer"
 import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
-import {
-  backendTypeToCanvas,
-  rfNodesToApiPayload,
-} from "@/features/workflow/data/workflow-model"
+import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
+import { rfNodesToApiPayload } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import {
   resolveBranchChannels,
-  type BranchNodeConfig,
+  RULE_CHANNELS_BRANCH_CONFIG,
 } from "@/features/workflow/lib/branch-channels"
+import type { WfRfNode } from "@/features/workflow/data/workflow-model"
 import { pipelineGraphToRf } from "@/features/workflow/lib/branch-layout"
-import { getBranchSubgraphLaneErrors } from "@/features/workflow/lib/workflow-node-validation"
+import {
+  getBranchSubgraphLaneErrors,
+  getVideoPresenterErrorsFromRfNodes,
+} from "@/features/workflow/lib/workflow-node-validation"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
 import { useRuleByIdQuery } from "@/shared/queries/rule.query"
 import { useContentPageQuery } from "@/shared/queries/content.query"
@@ -82,10 +84,7 @@ import {
 } from "@/shared/socket/workflow-events"
 import type { WorkflowEdge, WorkflowNode } from "@/shared/types/workflow.type"
 import type { ContentPageItem } from "@/shared/types/content.type"
-import type {
-  PipelinePageItem,
-  PipelineNodeSnapshot,
-} from "@/shared/types/pipeline.type"
+import type { PipelinePageItem } from "@/shared/types/pipeline.type"
 import { T } from "@/lib/tokens"
 
 type GenerationStep = "started" | "generating" | "failed"
@@ -96,6 +95,26 @@ type RouteState = {
   contentPrompt?: string
 }
 type ProcessingMode = "edit" | "processing" | "failed"
+
+type SnapshotBaseline = {
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+  prompt: string
+}
+
+function normalizeBranchNodesForSave(nodes: WfRfNode[]): WfRfNode[] {
+  return nodes.map((n) => {
+    if (n.type === "plus_placeholder") return n
+    if (n.type !== "branchNode" && n.data.wfType !== "branch") return n
+    return {
+      ...n,
+      data: {
+        ...n.data,
+        config: RULE_CHANNELS_BRANCH_CONFIG,
+      },
+    } as WfRfNode
+  })
+}
 
 export default function WorkflowPage() {
   const navigate = useNavigate()
@@ -150,12 +169,10 @@ export default function WorkflowPage() {
   const [selectedSnapshotPipelineId, setSelectedSnapshotPipelineId] =
     useState<string>()
   const pipelinePromptHydratedRef = useRef(false)
+  const snapshotBaselineRef = useRef<SnapshotBaseline | null>(null)
   const completedNodeIdsRef = useRef<Set<string>>(new Set())
   const pipelineCompletionHandledRef = useRef(false)
   const stuckFinalizeAttemptedRef = useRef(false)
-  const [branchConfigDraft, setBranchConfigDraft] = useState<BranchNodeConfig | null>(
-    null,
-  )
   const [canvasEdited, setCanvasEdited] = useState(false)
   const [configDraftDirty, setConfigDraftDirty] = useState(false)
 
@@ -247,34 +264,34 @@ export default function WorkflowPage() {
   })
   const ruleQuery = useRuleByIdQuery<RuleEntity>(ruleId)
 
-  const branchConfigFromTemplate = useMemo((): BranchNodeConfig => {
-    const branch = apiNodes?.find((n) => backendTypeToCanvas(n.type) === "branch")
-    return (branch?.config ?? { mode: "rule_channels" }) as BranchNodeConfig
-  }, [apiNodes])
-
-  const effectiveBranchConfig = branchConfigDraft ?? branchConfigFromTemplate
-
   const branchChannels = useMemo(
-    () => resolveBranchChannels(ruleQuery.data?.channels, effectiveBranchConfig),
-    [effectiveBranchConfig, ruleQuery.data?.channels],
+    () => resolveBranchChannels({ mode: "rule_channels" }, ruleQuery.data?.channels),
+    [ruleQuery.data?.channels],
   )
 
-  const materializedCanvas = useMemo(() => {
-    if (processingMode !== "processing" || !runningPipelineQuery.data) {
-      return null
-    }
-    const snap = runningPipelineQuery.data
-    if (snap.nodes.length === 0) return null
+  /** Live run or used-pipeline preview — uses stored graph layout, not template auto-layout. */
+  const pipelineCanvasOverride = useMemo(() => {
+    const snap =
+      processingMode === "processing"
+        ? runningPipelineQuery.data
+        : selectedSnapshotPipelineId
+          ? selectedPipelineSnapshotQuery.data
+          : null
+    if (!snap || snap.nodes.length === 0) return null
     return pipelineGraphToRf({
       nodes: snap.nodes,
       edges: snap.graph?.edges ?? [],
       lanes: snap.graph?.lanes ?? [],
       layout: snap.graph?.layout,
     })
-  }, [processingMode, runningPipelineQuery.data])
+  }, [
+    processingMode,
+    runningPipelineQuery.data,
+    selectedSnapshotPipelineId,
+    selectedPipelineSnapshotQuery.data,
+  ])
 
   useEffect(() => {
-    setBranchConfigDraft(null)
     setCanvasEdited(false)
     setConfigDraftDirty(false)
   }, [apiNodes])
@@ -366,6 +383,7 @@ export default function WorkflowPage() {
     setPipelineItems([])
     setPipelineTotalPages(0)
     setSelectedSnapshotPipelineId(undefined)
+    snapshotBaselineRef.current = null
     pipelinePromptHydratedRef.current = false
   }, [activeWorkflowId])
 
@@ -477,13 +495,6 @@ export default function WorkflowPage() {
   useEffect(() => {
     const snap = selectedPipelineSnapshotQuery.data
     if (!snap || !selectedSnapshotPipelineId) return
-    const snapshotNodes = mapPipelineSnapshotNodesToWorkflowNodes(
-      snap.nodes,
-      snap.pipeline.workflowRef
-    )
-    if (snapshotNodes.length > 0) {
-      setApiNodes(snapshotNodes)
-    }
     setWorkflowPrompt(snap.pipeline.contentPrompt ?? "")
   }, [selectedSnapshotPipelineId, selectedPipelineSnapshotQuery.data])
 
@@ -668,6 +679,18 @@ export default function WorkflowPage() {
     )
   }
 
+  function resetWorkflowEditStateAfterSave() {
+    canvasRef.current?.dismissPropertiesPanel()
+    setSelectedSnapshotPipelineId(undefined)
+    const wfData = workflowByRuleQuery.data
+    if (wfData?.nodes?.length) {
+      setApiNodes(wfData.nodes)
+      setApiEdges(wfData.edges ?? [])
+    }
+    setCanvasEdited(false)
+    setConfigDraftDirty(false)
+  }
+
   function handleSave() {
     if (!ruleId) return
     const rfNodes = canvasRef.current?.getRfNodes() ?? []
@@ -694,19 +717,21 @@ export default function WorkflowPage() {
         "Replaced unassigned Adapt nodes with one Adapt per channel from Branch.",
       )
     }
+    if (branchChannels.length > 0 && branchChannels.length < 2) {
+      toast.error(
+        "Branch requires at least two distribution channels on the campaign rule.",
+      )
+      return
+    }
     if (laneErrors.length > 0) {
       toast.error(laneErrors[0])
       return
     }
+    nodesToSave = normalizeBranchNodesForSave(nodesToSave)
     const payload = rfNodesToApiPayload(nodesToSave, edgesToSave)
     if (payload.nodes.length === 0) {
       toast.error("Add at least one node before saving.")
       return
-    }
-
-    const onSaveSuccess = () => {
-      setCanvasEdited(false)
-      setConfigDraftDirty(false)
     }
 
     if (activeWorkflowId) {
@@ -721,7 +746,7 @@ export default function WorkflowPage() {
         },
         {
           onSuccess: () => {
-            onSaveSuccess()
+            resetWorkflowEditStateAfterSave()
             if (name) {
               committedWfNameRef.current = name
             }
@@ -741,7 +766,7 @@ export default function WorkflowPage() {
       },
       {
         onSuccess: (data) => {
-          onSaveSuccess()
+            resetWorkflowEditStateAfterSave()
           setActiveWorkflowId(data.workflowId)
           if (name) committedWfNameRef.current = name
           void workflowByRuleQuery.refetch()
@@ -750,16 +775,10 @@ export default function WorkflowPage() {
     )
   }
 
-  function handleStartPipeline(contentPromptOverride?: string) {
-    if (!activeWorkflowId || !ruleId) return
-    const contentPrompt = (contentPromptOverride ?? workflowPrompt).trim()
-    if (!contentPrompt) {
-      toast.error("Please enter what you want to post about.")
-      return
-    }
+  function runStartPipelineMutation(contentPrompt: string) {
     const useLearnings = searchParams.get("useLearnings") === "1"
     startPipelineMutation.mutate(
-      { workflowId: activeWorkflowId, ruleId, contentPrompt, useLearnings },
+      { workflowId: activeWorkflowId!, ruleId: ruleId!, contentPrompt, useLearnings },
       {
         onSuccess: ({ pipelineId: id }) => {
           pipelineCompletionHandledRef.current = false
@@ -780,7 +799,59 @@ export default function WorkflowPage() {
         onError: () => {
           toast.error("Could not start pipeline. Please try again.")
         },
-      }
+      },
+    )
+  }
+
+  function handleStartPipeline(contentPromptOverride?: string) {
+    if (!activeWorkflowId || !ruleId) return
+    const contentPrompt = (contentPromptOverride ?? workflowPrompt).trim()
+    if (!contentPrompt) {
+      toast.error("Please enter what you want to post about.")
+      return
+    }
+
+    const rfNodes = canvasRef.current?.getRfNodes() ?? []
+    const presenterErrors = getVideoPresenterErrorsFromRfNodes(rfNodes)
+    if (presenterErrors.length > 0) {
+      toast.error(presenterErrors[0])
+      return
+    }
+
+    const startAfterSave = () => runStartPipelineMutation(contentPrompt)
+
+    if (!canvasEdited && !configDraftDirty) {
+      startAfterSave()
+      return
+    }
+
+    const rfEdges = canvasRef.current?.getRfEdges() ?? []
+    let nodesToSave = rfNodes
+    let edgesToSave = rfEdges
+    nodesToSave = normalizeBranchNodesForSave(nodesToSave)
+    const payload = rfNodesToApiPayload(nodesToSave, edgesToSave)
+    if (payload.nodes.length === 0) {
+      toast.error("Add at least one node before running.")
+      return
+    }
+
+    saveNodesMutation.mutate(
+      {
+        workflowId: activeWorkflowId,
+        ruleId,
+        name: wfName.trim() || undefined,
+        nodes: payload.nodes,
+        edges: payload.edges,
+      },
+      {
+        onSuccess: () => {
+          resetWorkflowEditStateAfterSave()
+          startAfterSave()
+        },
+        onError: () => {
+          toast.error("Save the workflow before running (presenter settings were not saved).")
+        },
+      },
     )
   }
 
@@ -909,8 +980,41 @@ export default function WorkflowPage() {
     handleWorkflowGenerateSubmit(contentPrompt, [])
   }
 
-  function handleSelectPipelineSnapshot(item: PipelinePageItem) {
+  function restoreWorkflowCanvasBaseline() {
+    const baseline = snapshotBaselineRef.current
+    if (baseline) {
+      setApiNodes(baseline.nodes)
+      setApiEdges(baseline.edges)
+      setWorkflowPrompt(baseline.prompt)
+    } else {
+      const data = workflowByRuleQuery.data
+      if (data?.nodes?.length) {
+        setApiNodes(data.nodes)
+        setApiEdges(data.edges ?? [])
+      }
+    }
+    snapshotBaselineRef.current = null
+    setSelectedSnapshotPipelineId(undefined)
+    setCanvasEdited(false)
+    setConfigDraftDirty(false)
+  }
+
+  function handleTogglePipelineSnapshot(item: PipelinePageItem) {
     if (!item.pipelineId) return
+
+    if (selectedSnapshotPipelineId === item.pipelineId) {
+      restoreWorkflowCanvasBaseline()
+      return
+    }
+
+    if (!selectedSnapshotPipelineId) {
+      snapshotBaselineRef.current = {
+        nodes: apiNodes ?? [],
+        edges: apiEdges ?? [],
+        prompt: workflowPrompt,
+      }
+    }
+
     setSelectedSnapshotPipelineId(item.pipelineId)
     setWorkflowPrompt(item.contentPrompt ?? "")
   }
@@ -950,26 +1054,37 @@ export default function WorkflowPage() {
     return Math.round((completedNodes / totalNodes) * 100)
   }, [completedNodes, totalNodes])
 
-  const generationUiLocked = useMemo(() => {
+  const promptInputDisabled = useMemo(() => {
     if (processingMode !== "edit") return true
-    if (selectedSnapshotPipelineId) return true
     if (generationStep === "generating" || generationStep === "started") {
       return true
     }
     if (generateWorkflow.isPending || regenerateWorkflowByRule.isPending) {
       return true
     }
+    return false
+  }, [
+    generateWorkflow.isPending,
+    generationStep,
+    processingMode,
+    regenerateWorkflowByRule.isPending,
+  ])
+
+  const generationUiLocked = useMemo(() => {
+    if (promptInputDisabled) return true
+    if (selectedSnapshotPipelineId) return true
     if (canvasEdited || configDraftDirty) return true
     return false
   }, [
     canvasEdited,
     configDraftDirty,
-    generateWorkflow.isPending,
-    generationStep,
-    processingMode,
-    regenerateWorkflowByRule.isPending,
+    promptInputDisabled,
     selectedSnapshotPipelineId,
   ])
+
+  const generationBlockedByDrafts =
+    !promptInputDisabled &&
+    (canvasEdited || configDraftDirty || Boolean(selectedSnapshotPipelineId))
 
   if (!ruleId) {
     return (
@@ -1027,7 +1142,7 @@ export default function WorkflowPage() {
       />
 
       {processingMode === "processing" ? (
-        <div className="border-b bg-white px-4 py-2">
+        <div className="border-b bg-card px-4 py-2">
           {pipelinePaused ? (
             <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               Pipeline paused
@@ -1040,7 +1155,7 @@ export default function WorkflowPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 border-amber-400 bg-white text-[11px]"
+                    className="h-7 border-amber-400 bg-card text-[11px]"
                     disabled={replanMutation.isPending}
                     onClick={() => {
                       const nodes = runningPipelineQuery.data?.nodes ?? []
@@ -1127,12 +1242,11 @@ export default function WorkflowPage() {
         ) : (
           <WorkflowFlowCanvas
             ref={canvasRef}
-            apiNodes={
-              materializedCanvas ? undefined : apiNodes
-            }
-            apiEdges={materializedCanvas ? undefined : apiEdges}
-            rfNodesOverride={materializedCanvas?.nodes}
-            rfEdgesOverride={materializedCanvas?.edges}
+            workflowId={activeWorkflowId ?? undefined}
+            apiNodes={pipelineCanvasOverride ? undefined : apiNodes}
+            apiEdges={pipelineCanvasOverride ? undefined : apiEdges}
+            rfNodesOverride={pipelineCanvasOverride?.nodes}
+            rfEdgesOverride={pipelineCanvasOverride?.edges}
             branchChannels={branchChannels}
             resolvedChannels={branchChannels}
             channelCount={branchChannels.length}
@@ -1141,7 +1255,6 @@ export default function WorkflowPage() {
             runtimeById={nodeRuntimeById}
             onRetryNode={handleRetryNode}
             onSkipNode={handleSkipNode}
-            onBranchConfigApplied={setBranchConfigDraft}
             onCanvasEdited={() => setCanvasEdited(true)}
             onConfigDraftChange={setConfigDraftDirty}
           />
@@ -1149,8 +1262,8 @@ export default function WorkflowPage() {
         {processingMode === "edit" &&
         showWorkflowPrompt &&
         (canvasMode === "empty" || canvasMode === "ready") ? (
-          <div className="pointer-events-none absolute bottom-0 left-1/2 z-20 flex w-full -translate-x-1/2 justify-center px-4 pb-4">
-            <div className="pointer-events-auto w-full max-w-[760px] rounded-2xl border border-canvas-200 bg-white/95 p-2 shadow-lg backdrop-blur">
+          <div className="absolute bottom-0 left-1/2 z-50 w-full max-w-[760px] -translate-x-1/2 px-4 pb-4">
+            <div className="w-full rounded-2xl border border-border bg-card/95 p-2 shadow-lg backdrop-blur">
               <p className="px-2 pb-1 text-xs font-medium text-canvas-500">
                 {canvasMode === "empty"
                   ? "Describe this workflow (structure)"
@@ -1160,7 +1273,8 @@ export default function WorkflowPage() {
                 value={workflowPrompt}
                 onChange={setWorkflowPrompt}
                 onSubmit={handleBottomPromptSubmit}
-                disabled={generationUiLocked}
+                disabled={promptInputDisabled}
+                submitDisabled={generationUiLocked}
                 placeholder={
                   canvasMode === "empty"
                     ? "e.g. Instagram + Facebook captions, Thai translation, hero image…"
@@ -1168,10 +1282,11 @@ export default function WorkflowPage() {
                 }
                 className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
               />
-              {generationUiLocked ? (
+              {generationBlockedByDrafts ? (
                 <p className="px-2 pt-1 text-[11px] text-amber-700">
-                  Save workflow changes, apply node settings, or exit run view before
-                  generating.
+                  {selectedSnapshotPipelineId
+                    ? "Clear or click the selected pipeline again to exit preview and generate."
+                    : "Save workflow changes or apply node settings before generating. You can still edit this prompt."}
                 </p>
               ) : null}
               {canvasMode === "ready" ? (
@@ -1185,78 +1300,19 @@ export default function WorkflowPage() {
         ) : null}
 
         {processingMode === "edit" && activeWorkflowId ? (
-          <div className="absolute top-3 right-3 z-10 w-[320px] rounded-xl border border-canvas-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-            <div className="mb-2 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setPipelineListCollapsed((v) => !v)}
-                className="flex items-center gap-2 text-sm font-semibold text-canvas-800"
-              >
-                <span>Used Pipelines</span>
-                {pipelineListCollapsed ? (
-                  <ChevronDown className="size-4 text-canvas-500" />
-                ) : (
-                  <ChevronUp className="size-4 text-canvas-500" />
-                )}
-              </button>
-              <span className="text-xs text-canvas-500">
-                {pipelineItems.length}/{pipelinePageQuery.data?.meta.total ?? 0}
-              </span>
-            </div>
-            {!pipelineListCollapsed ? (
-              <>
-                <div className="max-h-[280px] space-y-2 overflow-auto pr-1">
-                  {pipelineItems.map((item) => {
-                    const selected =
-                      selectedSnapshotPipelineId === item.pipelineId
-                    return (
-                      <button
-                        key={item.pipelineId}
-                        type="button"
-                        onClick={() => handleSelectPipelineSnapshot(item)}
-                        className={`w-full rounded-lg border px-2.5 py-2 text-left transition ${
-                          selected
-                            ? "border-canvas-500 bg-canvas-50"
-                            : "border-canvas-200 hover:border-canvas-300 hover:bg-canvas-50/60"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-canvas-800">
-                            {item.status}
-                          </span>
-                          <span className="text-[10px] text-canvas-500">
-                            {new Date(item.startedAt).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-canvas-600">
-                          {item.contentPrompt}
-                        </p>
-                        <p className="mt-1 text-[10px] text-canvas-500">
-                          {item.nodeCount} nodes
-                        </p>
-                      </button>
-                    )
-                  })}
-                  {pipelineItems.length === 0 &&
-                  !pipelinePageQuery.isLoading ? (
-                    <p className="py-3 text-center text-xs text-canvas-500">
-                      No pipelines yet for this workflow.
-                    </p>
-                  ) : null}
-                </div>
-                {pipelinePage < pipelineTotalPages ? (
-                  <button
-                    type="button"
-                    className="mt-2 w-full rounded-md border border-canvas-300 px-2 py-1.5 text-xs font-medium text-canvas-700 hover:bg-canvas-50 disabled:opacity-60"
-                    disabled={pipelinePageQuery.isFetching}
-                    onClick={() => setPipelinePage((p) => p + 1)}
-                  >
-                    {pipelinePageQuery.isFetching ? "Loading..." : "Load more"}
-                  </button>
-                ) : null}
-              </>
-            ) : null}
-          </div>
+          <WorkflowUsedPipelinesPanel
+            items={pipelineItems}
+            total={pipelinePageQuery.data?.meta.total ?? 0}
+            collapsed={pipelineListCollapsed}
+            onCollapsedChange={setPipelineListCollapsed}
+            selectedPipelineId={selectedSnapshotPipelineId}
+            onToggleSelect={handleTogglePipelineSnapshot}
+            onClearSelection={restoreWorkflowCanvasBaseline}
+            isLoading={pipelinePageQuery.isLoading}
+            hasMore={pipelinePage < pipelineTotalPages}
+            isFetchingMore={pipelinePageQuery.isFetching}
+            onLoadMore={() => setPipelinePage((p) => p + 1)}
+          />
         ) : null}
       </div>
 
@@ -1284,7 +1340,7 @@ export default function WorkflowPage() {
       <div className="pointer-events-none fixed right-6 bottom-6 z-30 flex flex-col gap-2">
         <button
           type="button"
-          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
           style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
           onClick={() => setContentDrawerOpen(true)}
           title="Workflow Contents"
@@ -1293,7 +1349,7 @@ export default function WorkflowPage() {
         </button>
         <button
           type="button"
-          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
           style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
           onClick={() => navigate("/")}
           title="Go to Home"
@@ -1302,7 +1358,7 @@ export default function WorkflowPage() {
         </button>
         <button
           type="button"
-          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-white shadow-sm"
+          className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
           style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
           onClick={() =>
             navigate("/rules", { state: { selectedRuleId: ruleId } })
@@ -1422,20 +1478,3 @@ function outputToRuntime(
   }
 }
 
-function mapPipelineSnapshotNodesToWorkflowNodes(
-  nodes: PipelineNodeSnapshot[],
-  workflowRef: string
-): WorkflowNode[] {
-  return [...nodes]
-    .sort((a, b) => a.order - b.order)
-    .map((node) => ({
-      nodeId: node.nodeId,
-      type: node.type,
-      order: node.order,
-      workflowRef,
-      isLocked: node.isLocked,
-      config: node.config ?? {},
-      createdAt: node.executedAt ?? new Date().toISOString(),
-      updatedAt: node.executedAt ?? new Date().toISOString(),
-    }))
-}

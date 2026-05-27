@@ -119,7 +119,7 @@ export function ContentDetailRerunSheet({
           </Button>
           <Button
             type="button"
-            className="bg-[#0F1F3D] text-white hover:bg-[#1A3260]"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={!openNodeId || globalRerunning}
             onClick={() => openNodeId && onSubmit(openNodeId)}
           >

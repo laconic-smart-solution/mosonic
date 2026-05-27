@@ -276,7 +276,7 @@ export default function PipelinesPage() {
               Runs
             </span>
           </div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-navy-700">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             Pipelines
           </h1>
           <p className="text-sm text-muted-foreground">

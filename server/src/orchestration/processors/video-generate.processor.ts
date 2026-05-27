@@ -6,7 +6,10 @@ import {
 } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
-import { VideoGenerationService } from '../../nodes/services/video-generation.service';
+import {
+  getVideoGenerationMode,
+  VideoGenerationService,
+} from '../../nodes/services/video-generation.service';
 import { PipelineRepository } from '../../pipeline/pipeline.repository';
 import { PipelineNodeExecutionStatus } from '../../pipeline/schemas/pipeline.schema';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
@@ -36,6 +39,7 @@ export class VideoGenerateProcessor extends WorkerHost {
 
     this.logger.log(`[video:submit] pipeline=${pipelineId} node=${nodeId}`);
 
+    let videoProvider: 'sora' | 'heygen' = 'sora';
     try {
       const input = await this.completion.buildVideoGenerationInput(payload);
 
@@ -45,14 +49,24 @@ export class VideoGenerateProcessor extends WorkerHost {
         PipelineNodeExecutionStatus.Running,
       );
 
+      const isPresenter =
+        getVideoGenerationMode(input.config) === 'presenter';
+      videoProvider = isPresenter ? 'heygen' : 'sora';
+
       await this.videoService.emitProcessing(
         pipelineId,
         nodeId,
-        'Video generation started...',
+        isPresenter
+          ? 'Presenter video generation started...'
+          : 'Video generation started...',
       );
 
-      const { externalJobId, estimatedSeconds, normalized } =
-        await this.videoService.submitVideoJob(input);
+      const submitResult = isPresenter
+        ? await this.videoService.submitPresenterVideoJob(input)
+        : await this.videoService.submitVideoJob(input);
+
+      const { externalJobId, estimatedSeconds, normalized } = submitResult;
+      videoProvider = submitResult.videoProvider ?? videoProvider;
 
       await this.pipelineRepo.saveExternalJobId(
         pipelineId,
@@ -71,6 +85,7 @@ export class VideoGenerateProcessor extends WorkerHost {
         externalJobId,
         checkCount: 0,
         submittedAt: new Date().toISOString(),
+        videoProvider: videoProvider ?? (isPresenter ? 'heygen' : 'sora'),
         normalized,
       };
 
@@ -92,8 +107,21 @@ export class VideoGenerateProcessor extends WorkerHost {
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error(String(err ?? 'Submit failed'));
-      if (job.opts.attempts && job.attemptsMade >= job.opts.attempts) {
-        await this.completion.failVideoNode(payload, error);
+      const isFinal =
+        job.opts.attempts && job.attemptsMade >= job.opts.attempts;
+      if (isFinal) {
+        this.logger.error(
+          `[video:submit] failed pipeline=${pipelineId} node=${nodeId} provider=${videoProvider}: ${error.message}`,
+          error.stack,
+        );
+        await this.completion.failVideoNode(payload, error, {
+          videoProvider,
+          stage: 'submit',
+        });
+      } else {
+        this.logger.warn(
+          `[video:submit] attempt ${job.attemptsMade + 1} failed pipeline=${pipelineId}: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -108,7 +136,11 @@ export class VideoGenerateProcessor extends WorkerHost {
       return;
     }
     if (job.opts.attempts && job.attemptsMade >= job.opts.attempts) {
-      await this.completion.failVideoNode(job.data, error);
+      this.logger.error(
+        `[video:submit] worker failed pipeline=${job.data.pipelineId} node=${job.data.nodeId}: ${error.message}`,
+        error.stack,
+      );
+      await this.completion.failVideoNode(job.data, error, { stage: 'submit' });
     }
   }
 }

@@ -6,6 +6,7 @@ import type { ChannelEntry } from '../../rule/schemas/rule.schema';
 import { normalizedRuleChannelMapping } from '../../rule/rule-mapping.util';
 import { CaptionMappingSource } from '../../rule/schemas/rule.schema';
 import type { WorkflowNodeConfig } from '../schemas/workflow-node.schema';
+import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
 import type {
   NodeExecutionInput,
   NodeExecutionResult,
@@ -91,10 +92,11 @@ export class AdaptNodeService {
       new SystemMessage(system),
       new HumanMessage(human),
     ]);
-    const adaptedText =
-      typeof res.content === 'string'
+    const adaptedText = sanitizeGeneratedPostText(
+      (typeof res.content === 'string'
         ? res.content.trim()
-        : String(res.content ?? '').trim();
+        : String(res.content ?? '').trim()) || '',
+    );
 
     const usage = extractUsageFromAiMessage(res);
 

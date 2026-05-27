@@ -67,6 +67,14 @@ export type ContentDetailResponse = {
   experimentId?: string | null;
   createdAt: string;
   updatedAt: string;
+  newsMeta?: {
+    title: string;
+    url: string;
+    sourceId: string;
+    publishedAt: string;
+    relevanceScore: number;
+    suggestedAngle: string;
+  } | null;
 };
 
 @Injectable()
@@ -121,12 +129,34 @@ export class ContentService {
       doc.workflowRef,
       auth,
     );
+    const pipeline = await this.pipelineModel
+      .findOne(
+        mergeUserIdFilter({ pipelineId: doc.pipelineRef }, auth),
+        { metadata: 1, 'nodes.nodeId': 1, 'nodes.type': 1, 'nodes.order': 1 },
+      )
+      .lean()
+      .exec();
+    const pipelineNodesOrdered = this.pipelineNodesForMerge(pipeline);
     const outputs = mergeResolvedOutputs(snapshot, {
-      workflowNodesOrdered,
+      ...(pipelineNodesOrdered.length > 0
+        ? { pipelineNodesOrdered }
+        : { workflowNodesOrdered }),
     });
 
     const createdAtRaw = (doc as { createdAt?: Date }).createdAt;
     const updatedAtRaw = (doc as { updatedAt?: Date }).updatedAt;
+
+    const newsMeta =
+      pipeline?.metadata?.source === 'news' && pipeline.metadata.newsMeta
+        ? {
+            title: pipeline.metadata.newsMeta.title,
+            url: pipeline.metadata.newsMeta.url,
+            sourceId: pipeline.metadata.newsMeta.sourceId,
+            publishedAt: pipeline.metadata.newsMeta.publishedAt,
+            relevanceScore: pipeline.metadata.newsMeta.relevanceScore,
+            suggestedAngle: pipeline.metadata.newsMeta.suggestedAngle ?? '',
+          }
+        : null;
 
     return {
       contentId: doc.contentId,
@@ -140,6 +170,7 @@ export class ContentService {
       approval: doc.approval ?? { steps: [], currentStepIndex: 0, records: [] },
       variantId: doc.variantId ?? null,
       experimentId: doc.experimentId ?? null,
+      newsMeta,
       createdAt: this.versionDateToIso(createdAtRaw ?? new Date()),
       updatedAt: this.versionDateToIso(updatedAtRaw ?? new Date()),
     };
@@ -726,13 +757,29 @@ export class ContentService {
       throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
     }
 
+    const pipeline = await this.pipelineModel
+      .findOne(mergeUserIdFilter({ pipelineId: doc.pipelineRef }, auth))
+      .exec();
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${doc.pipelineRef} not found`);
+    }
+
+    const snapshot = this.resolveEditableState(doc.toObject());
+    const pipelineNodesOrdered = this.pipelineNodesForMerge(pipeline);
     const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
       doc.workflowRef,
       auth,
     );
-    const resolvedOutputs = mergeResolvedOutputs(
-      this.resolveEditableState(doc.toObject()),
-      { workflowNodesOrdered },
+    const resolvedOutputs = mergeResolvedOutputs(snapshot, {
+      ...(pipelineNodesOrdered.length > 0
+        ? { pipelineNodesOrdered }
+        : { workflowNodesOrdered }),
+    });
+
+    const channels = this.uploadService.buildChannelEntriesFromPipeline(
+      rule.channels ?? [],
+      pipeline,
+      resolvedOutputs,
     );
 
     await this.contentRepository.updateStatus(
@@ -753,6 +800,7 @@ export class ContentService {
         ruleRef: doc.ruleRef,
         resolvedOutputs,
         ruleChannels: rule.channels ?? [],
+        channels,
       },
       auth,
     );
@@ -775,13 +823,27 @@ export class ContentService {
       if (!rule) {
         throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
       }
+      const pipeline = await this.pipelineModel
+        .findOne(mergeUserIdFilter({ pipelineId: doc.pipelineRef }, auth))
+        .exec();
+      if (!pipeline) {
+        throw new NotFoundException(`Pipeline ${doc.pipelineRef} not found`);
+      }
+      const snapshot = this.resolveEditableState(doc.toObject());
+      const pipelineNodesOrdered = this.pipelineNodesForMerge(pipeline);
       const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
         doc.workflowRef,
         auth,
       );
-      const resolvedOutputs = mergeResolvedOutputs(
-        this.resolveEditableState(doc.toObject()),
-        { workflowNodesOrdered },
+      const resolvedOutputs = mergeResolvedOutputs(snapshot, {
+        ...(pipelineNodesOrdered.length > 0
+          ? { pipelineNodesOrdered }
+          : { workflowNodesOrdered }),
+      });
+      const channels = this.uploadService.buildChannelEntriesFromPipeline(
+        rule.channels ?? [],
+        pipeline,
+        resolvedOutputs,
       );
       return this.uploadService.createUpload({
         userId: auth.userId,
@@ -790,6 +852,7 @@ export class ContentService {
         ruleRef: doc.ruleRef,
         resolvedOutputs,
         ruleChannels: rule.channels ?? [],
+        channels,
       });
     }
   }
@@ -840,6 +903,22 @@ export class ContentService {
       nodeId: n.nodeId,
       type: typeof n.type === 'string' ? n.type : String(n.type ?? ''),
     }));
+  }
+
+  private pipelineNodesForMerge(
+    pipeline:
+      | { nodes?: Array<{ nodeId: string; type: unknown; order: number }> }
+      | null
+      | undefined,
+  ): Array<{ nodeId: string; type: string; order: number }> {
+    if (!pipeline?.nodes?.length) return [];
+    return [...pipeline.nodes]
+      .sort((a, b) => a.order - b.order)
+      .map((n) => ({
+        nodeId: n.nodeId,
+        type: typeof n.type === 'string' ? n.type : String(n.type ?? ''),
+        order: n.order,
+      }));
   }
 
   private async persistNodeCompletion(

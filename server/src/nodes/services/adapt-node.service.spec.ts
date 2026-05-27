@@ -64,4 +64,21 @@ describe('AdaptNodeService', () => {
     expect(parsed.adaptedCaption).toBe('IG adapted caption');
     expect(parsed.channel).toBe('instagram');
   });
+
+  it('sanitizes meta visual prompt artifacts from adapted captions', async () => {
+    invoke.mockResolvedValueOnce({
+      content:
+        '[Visual: Clean, modern graphic showcasing a developer]\\n\\nIG adapted caption',
+      response_metadata: {},
+    });
+    const result = await service.execute({
+      rule: rule as never,
+      config: { channel: 'instagram', model: 'gpt-4o' },
+      contentPrompt: 'Summer sale',
+      previousOutputs: { text: 'Base marketing copy' },
+    });
+    const parsed = JSON.parse(result.output) as Record<string, string>;
+    expect(parsed.text).toBe('IG adapted caption');
+    expect(parsed.adaptedCaption).toBe('IG adapted caption');
+  });
 });

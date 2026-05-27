@@ -28,6 +28,8 @@ export type PipelinePageItem = {
   nodeTypes: string[]
   startedAt: string
   completedAt: string | null
+  metadataSource?: string
+  newsTitle?: string
 }
 
 export type PipelinePageResponse = {
@@ -102,7 +104,12 @@ export type GetPipelineResponse = {
     uploadId?: string
   }
   graph: {
-    edges: Array<{ from: string; to: string }>
+    edges: Array<{
+      from: string
+      to: string
+      sourceHandle?: string
+      targetHandle?: string
+    }>
     lanes: string[]
     layout?: Record<string, { x: number; y: number }>
   }

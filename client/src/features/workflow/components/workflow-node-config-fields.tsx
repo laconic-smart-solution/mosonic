@@ -1,4 +1,5 @@
 import { Textarea } from "@/components/ui/textarea"
+import { WorkflowVideoPresenterSettings } from "@/features/workflow/components/workflow-video-presenter-settings"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
@@ -132,6 +133,16 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
   ],
   video: [
     {
+      key: "mode",
+      label: "Mode",
+      control: "buttons",
+      options: [
+        { label: "Cinematic", value: "cinematic" },
+        { label: "Presenter", value: "presenter" },
+      ],
+      defaultValue: "cinematic",
+    },
+    {
       key: "aspectRatio",
       label: "Aspect Ratio",
       control: "buttons",
@@ -140,6 +151,7 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "9:16", value: "9:16" },
       ],
       defaultValue: "16:9",
+      visibleWhen: { key: "mode", value: "cinematic" },
     },
     {
       key: "duration",
@@ -154,6 +166,7 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
         { label: "20s", value: "20" },
       ],
       defaultValue: "8",
+      visibleWhen: { key: "mode", value: "cinematic" },
     },
     {
       key: "resolution",
@@ -161,6 +174,7 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
       control: "select",
       options: [{ label: "720p (Sora 2)", value: "720p" }],
       defaultValue: "720p",
+      visibleWhen: { key: "mode", value: "cinematic" },
     },
     {
       key: "negativePrompt",
@@ -169,6 +183,61 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
       defaultValue: "",
       rows: 3,
       placeholder: "Optional — extra things to avoid in the video",
+      visibleWhen: { key: "mode", value: "cinematic" },
+    },
+    {
+      key: "duration",
+      label: "Target duration",
+      control: "buttons",
+      valueAsNumber: true,
+      options: [
+        { label: "4s", value: "4" },
+        { label: "8s", value: "8" },
+        { label: "12s", value: "12" },
+        { label: "16s", value: "16" },
+        { label: "20s", value: "20" },
+      ],
+      defaultValue: "8",
+      visibleWhen: { key: "mode", value: "presenter" },
+    },
+    {
+      key: "heygenOrientation",
+      label: "Orientation",
+      control: "buttons",
+      options: [
+        { label: "Landscape 16:9", value: "landscape" },
+        { label: "Portrait 9:16", value: "portrait" },
+      ],
+      defaultValue: "landscape",
+      visibleWhen: { key: "mode", value: "presenter" },
+    },
+    {
+      key: "heygenExpressiveness",
+      label: "Expressiveness",
+      control: "buttons",
+      options: [
+        { label: "Low", value: "low" },
+        { label: "Medium", value: "medium" },
+        { label: "High", value: "high" },
+      ],
+      defaultValue: "medium",
+      visibleWhen: { key: "mode", value: "presenter" },
+    },
+    {
+      key: "removeBackground",
+      label: "Remove original photo background",
+      control: "toggle",
+      defaultValue: true,
+      visibleWhen: { key: "mode", value: "presenter" },
+    },
+    {
+      key: "heygenMotionPrompt",
+      label: "Motion prompt (optional)",
+      control: "textarea",
+      defaultValue: "",
+      rows: 2,
+      placeholder: "e.g. nodding gently while presenting",
+      visibleWhen: { key: "mode", value: "presenter" },
     },
   ],
   translation: [
@@ -283,19 +352,7 @@ export const WORKFLOW_NODE_FIELD_DEFS: Record<string, ConfigField[]> = {
       visibleWhen: { key: "searchType", value: "custom" },
     },
   ],
-  branch: [
-    {
-      key: "mode",
-      label: "Branch mode",
-      control: "select",
-      options: [
-        { label: "Rule channels", value: "rule_channels" },
-        { label: "Manual channels", value: "manual" },
-        { label: "A/B test", value: "ab_test" },
-      ],
-      defaultValue: "rule_channels",
-    },
-  ],
+  branch: [],
 }
 
 export type WorkflowNodeConfigFieldsProps = {
@@ -304,6 +361,9 @@ export type WorkflowNodeConfigFieldsProps = {
   onChange: (next: Record<string, unknown>) => void
   compact?: boolean
   className?: string
+  /** Required for presenter avatar/background uploads (workflow editor). */
+  workflowId?: string
+  nodeId?: string
 }
 
 export function WorkflowNodeConfigFields({
@@ -312,11 +372,22 @@ export function WorkflowNodeConfigFields({
   onChange,
   compact = false,
   className,
+  workflowId,
+  nodeId,
 }: WorkflowNodeConfigFieldsProps) {
+  const mode =
+    canvasType === "video"
+      ? String(config.mode ?? "cinematic")
+      : ""
+
   const configFields = (WORKFLOW_NODE_FIELD_DEFS[canvasType] ?? []).filter(
     (field) => {
       if (!field.visibleWhen) return true
-      return String(config[field.visibleWhen.key] ?? "") === field.visibleWhen.value
+      const current =
+        field.visibleWhen.key === "mode" && canvasType === "video"
+          ? mode
+          : String(config[field.visibleWhen.key] ?? "")
+      return current === field.visibleWhen.value
     },
   )
 
@@ -337,6 +408,15 @@ export function WorkflowNodeConfigFields({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
+      {canvasType === "video" && mode === "presenter" && nodeId ? (
+        <WorkflowVideoPresenterSettings
+          workflowId={workflowId}
+          nodeId={nodeId}
+          config={config}
+          onPatch={(patch) => onChange({ ...config, ...patch })}
+          compact={compact}
+        />
+      ) : null}
       {configFields.map((field) => {
         if (field.control === "toggle") {
           const on = Boolean(config[field.key] ?? field.defaultValue)
@@ -458,7 +538,7 @@ export function WorkflowNodeConfigFields({
               style={{
                 borderColor: T.surfaceBorder,
                 color: T.textPrimary,
-                background: "white",
+                background: "var(--nt-surface)",
               }}
             >
               {field.options.map((option) => (

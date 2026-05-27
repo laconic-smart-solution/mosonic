@@ -1,5 +1,6 @@
-import Redis from 'ioredis';
+import { publishRealtimeEventToRedis } from './realtime-events-redis.util';
 
+/** @deprecated Legacy channel; new publishes use {@link REALTIME_EVENTS_CHANNEL}. */
 export const PIPELINE_EVENTS_CHANNEL = 'pipeline:logs';
 
 export async function publishPipelineEventToRedis(
@@ -8,13 +9,10 @@ export async function publishPipelineEventToRedis(
   event: string,
   payload: unknown,
 ): Promise<void> {
-  const client = new Redis(redisUrl, { maxRetriesPerRequest: null });
-  try {
-    await client.publish(
-      PIPELINE_EVENTS_CHANNEL,
-      JSON.stringify({ pipelineId, event, payload }),
-    );
-  } finally {
-    await client.quit();
-  }
+  await publishRealtimeEventToRedis(redisUrl, {
+    scope: 'pipeline',
+    id: pipelineId,
+    event,
+    payload,
+  });
 }

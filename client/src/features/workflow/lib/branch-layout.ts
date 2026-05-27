@@ -9,6 +9,8 @@ import {
   type WfRfNode,
 } from "@/features/workflow/data/workflow-model"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
+import { channelLabel } from "@/shared/constants/distribution-channels"
 import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 import type { WorkflowEdge, WorkflowNode } from "@/shared/types/workflow.type"
 
@@ -209,12 +211,15 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
         ? { x: saved.x, y: saved.y }
         : autoPos
     const lane = laneLabel(n)
+    const displayChannel = lane ? channelLabel(lane) : null
     return {
       id: n.nodeId,
       type: "wfNode" as const,
       position: pos,
       data: {
-        label: lane ? `${meta.label} (${lane})` : meta.label,
+        label: displayChannel
+          ? formatLaneNodeLabel(canvasType, displayChannel)
+          : meta.label,
         wfType: canvasType,
         status: (n.status === "failed"
           ? "failed_final"
@@ -228,9 +233,11 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
   })
 
   const rfEdges: Edge[] = snapEdges.map((e) => ({
-    id: `e-${e.from}-${e.to}`,
+    id: `e-${e.from}-${e.to}-${e.sourceHandle ?? ""}-${e.targetHandle ?? ""}`,
     source: e.from,
     target: e.to,
+    sourceHandle: e.sourceHandle,
+    targetHandle: e.targetHandle,
     type: "smoothstep",
     animated: true,
     style: { stroke: "#00A589", strokeWidth: 2 },

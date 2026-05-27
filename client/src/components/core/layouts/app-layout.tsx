@@ -8,6 +8,7 @@ import {
   SidebarProvider,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { NotificationProvider } from "@/features/notifications/notification-provider"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 
 function AppLayout() {
@@ -15,6 +16,7 @@ function AppLayout() {
 
   return (
     <SidebarProvider className="h-screen max-h-[100dvh] min-h-0 w-full overflow-hidden [--sidebar-width:216px]">
+      <NotificationProvider />
       <Sidebar collapsible="icon" variant="sidebar" className="border-sidebar-border">
         <SidebarPanel />
         <SidebarRail />

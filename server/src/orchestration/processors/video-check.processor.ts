@@ -23,8 +23,14 @@ export class VideoCheckProcessor extends WorkerHost {
 
   async process(job: Job<MediaCheckJobPayload>): Promise<void> {
     const payload = job.data;
-    const { pipelineId, nodeId, externalJobId, checkCount, normalized } =
-      payload;
+    const {
+      pipelineId,
+      nodeId,
+      externalJobId,
+      checkCount,
+      normalized,
+      videoProvider = 'sora',
+    } = payload;
 
     this.logger.log(
       `[video:check] pipeline=${pipelineId} node=${nodeId} attempt=${checkCount}`,
@@ -37,16 +43,20 @@ export class VideoCheckProcessor extends WorkerHost {
       await this.completion.failVideoNode(
         payload,
         new Error(POLL_CONFIG.video.timeoutLabel),
+        { videoProvider, stage: 'timeout' },
       );
       return;
     }
 
     let check;
     try {
-      check = await this.videoService.checkVideoJob(
-        externalJobId,
-        normalized.provider,
-      );
+      check =
+        videoProvider === 'heygen'
+          ? await this.videoService.checkHeyGenVideoJob(externalJobId)
+          : await this.videoService.checkVideoJob(
+              externalJobId,
+              normalized?.provider,
+            );
     } catch (err) {
       this.logger.warn(
         `[video:check] poll error pipeline=${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
@@ -68,23 +78,45 @@ export class VideoCheckProcessor extends WorkerHost {
     }
 
     if (check.status === 'failed') {
-      await this.completion.failVideoNode(
-        payload,
-        new Error(check.error ?? 'Video generation failed'),
+      const failError = new Error(
+        check.error ?? 'Video generation failed',
       );
+      this.logger.error(
+        `[video:check] provider reported failed pipeline=${pipelineId} node=${nodeId} provider=${videoProvider} message=${failError.message}`,
+      );
+      await this.completion.failVideoNode(payload, failError, {
+        videoProvider,
+        stage: 'poll',
+      });
       return;
     }
 
     const input = await this.completion.buildVideoGenerationInput(payload);
-    const completed = await this.videoService.completeVideoJob(externalJobId, {
-      ...input,
-      normalized,
-    });
+    try {
+      const completed =
+        videoProvider === 'heygen'
+          ? await this.videoService.completeHeyGenVideoJob(externalJobId, input)
+          : await this.videoService.completeVideoJob(externalJobId, {
+              ...input,
+              normalized: normalized!,
+            });
 
-    await this.completion.completeVideoNode(payload, completed);
-    this.logger.log(
-      `[video:check] completed pipeline=${pipelineId} url=${completed.video}`,
-    );
+      await this.completion.completeVideoNode(payload, completed);
+      this.logger.log(
+        `[video:check] completed pipeline=${pipelineId} url=${completed.video}`,
+      );
+    } catch (err) {
+      const error =
+        err instanceof Error ? err : new Error(String(err ?? 'Complete failed'));
+      this.logger.error(
+        `[video:check] completion error pipeline=${pipelineId} node=${nodeId} provider=${videoProvider}: ${error.message}`,
+        error.stack,
+      );
+      await this.completion.failVideoNode(payload, error, {
+        videoProvider,
+        stage: 'complete',
+      });
+    }
   }
 
   private async scheduleNextCheck(payload: MediaCheckJobPayload): Promise<void> {

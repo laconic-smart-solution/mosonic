@@ -14,17 +14,18 @@ import {
   inferCaptionSource,
 } from "./upload-publish.helpers"
 import {
+  inferMediaTabFromUrls,
+  resolveLaneMediaForChannel,
+  type WorkflowNodeLayersSnapshot,
+} from "@/features/upload/lib/upload-lane-media"
+import {
   getPlatformMediaConfig,
   isVideoUrl,
   normalizeChannelKey,
   type MediaTabMode,
 } from "./upload-platform-media"
 
-/** Live per-node layers from the generation panel (required to resolve pinned captions). */
-export type WorkflowNodeLayersSnapshot = {
-  nodeOutputs: Record<string, Record<string, unknown>>
-  nodeUserEdits: Record<string, Record<string, unknown>>
-}
+export type { WorkflowNodeLayersSnapshot } from "@/features/upload/lib/upload-lane-media"
 
 export type ChannelDraft = {
   captionSource: CaptionSourceOption
@@ -88,6 +89,7 @@ export function draftFromUploadRow(
   row: UploadChannelRow,
   channelKey: string,
   resolved: UploadResolvedOutputs,
+  layers?: WorkflowNodeLayersSnapshot | null,
 ): ChannelDraft {
   const persisted = (row.caption ?? "").trim()
   const inferred = inferCaptionSource(row, resolved)
@@ -108,7 +110,7 @@ export function draftFromUploadRow(
     }
   }
 
-  const mediaTab = inferMediaTabFromRow(row, channelKey)
+  let mediaTab = inferMediaTabFromRow(row, channelKey)
   const storedUrls =
     row.mediaUrls?.length && row.mediaUrls.some(Boolean)
       ? row.mediaUrls.filter(Boolean)
@@ -123,12 +125,34 @@ export function draftFromUploadRow(
     videoUrl =
       storedUrls.find((u) => isVideoUrl(u)) ||
       (row.mediaUrl && isVideoUrl(row.mediaUrl) ? row.mediaUrl : null) ||
-      resolved.video?.trim() ||
       null
   } else {
     imageUrls = storedUrls.filter((u) => u && !isVideoUrl(u))
     if (imageUrls.length === 0 && storedUrls[0] && !isVideoUrl(storedUrls[0])) {
       imageUrls = [storedUrls[0]]
+    }
+  }
+
+  const hasStoredMedia =
+    imageUrls.length > 0 || Boolean(videoUrl?.trim())
+  if (!hasStoredMedia) {
+    const laneMedia = resolveLaneMediaForChannel(channelKey, resolved, layers)
+    mediaTab = inferMediaTabFromUrls(
+      channelKey,
+      laneMedia.image,
+      laneMedia.video,
+      mediaTab,
+    )
+    if (mediaTab === "video") {
+      videoUrl = laneMedia.video ?? null
+      imageUrls = []
+    } else if (laneMedia.image) {
+      imageUrls = [laneMedia.image]
+      videoUrl = null
+    } else if (laneMedia.video) {
+      videoUrl = laneMedia.video
+      imageUrls = []
+      mediaTab = "video"
     }
   }
 
@@ -195,6 +219,7 @@ export function effectiveMediaUrlsForPublish(
   row: UploadChannelRow,
   resolved: UploadResolvedOutputs,
   channelKey: string,
+  layers?: WorkflowNodeLayersSnapshot | null,
 ): string[] {
   const stored = draft.dirty
     ? draftToMediaStorage(draft, channelKey)
@@ -215,6 +240,10 @@ export function effectiveMediaUrlsForPublish(
 
   if (urls.length > 0) return urls
 
+  const laneMedia = resolveLaneMediaForChannel(channelKey, resolved, layers)
+  const laneUrl = (laneMedia.video ?? laneMedia.image ?? "").trim()
+  if (laneUrl) return [laneUrl]
+
   const fallback = (resolved.image?.trim() || resolved.video?.trim() || "").trim()
   return fallback ? [fallback] : []
 }
@@ -224,11 +253,18 @@ export function getChannelMediaValidationError(
   draft: ChannelDraft,
   row: UploadChannelRow,
   resolved: UploadResolvedOutputs,
+  layers?: WorkflowNodeLayersSnapshot | null,
 ): string | null {
   if (!channelRequiresMedia(channelKey)) return null
 
   const key = normalizeChannelKey(channelKey)
-  const urls = effectiveMediaUrlsForPublish(draft, row, resolved, channelKey)
+  const urls = effectiveMediaUrlsForPublish(
+    draft,
+    row,
+    resolved,
+    channelKey,
+    layers,
+  )
   const label = getPlatformMediaConfig(channelKey).displayName
 
   if (urls.length === 0) {

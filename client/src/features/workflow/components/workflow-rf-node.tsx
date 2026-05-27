@@ -1,3 +1,5 @@
+"use client"
+
 import {
   Handle,
   Position,
@@ -6,6 +8,7 @@ import {
   useNodes,
   type NodeProps,
 } from "@xyflow/react"
+import type { Node } from "@xyflow/react"
 
 import {
   NODE_W,
@@ -14,12 +17,8 @@ import {
   statusStyle,
   type WfNodeData,
 } from "@/features/workflow/data/workflow-model"
-import type { Node } from "@xyflow/react"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
-import { T } from "@/lib/tokens"
-
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
-
 import { WorkflowNodeAddButton } from "./workflow-node-add-button"
 
 export function WorkflowRfNode({
@@ -29,219 +28,359 @@ export function WorkflowRfNode({
   const nodeId = useNodeId()
   const edges = useEdges()
   const allNodes = useNodes()
+
   const validationNodes = allNodes
     .filter((n) => n.type !== "plus_placeholder")
-    .map((n) => ({
-      id: n.id,
-      data: { wfType: (n.data as WfNodeData).wfType },
-    }))
+    .map((n) => ({ id: n.id, data: { wfType: (n.data as WfNodeData).wfType } }))
+
   const blockingOutgoing = nodeId
     ? hasBlockingOutgoingEdge(nodeId, edges, validationNodes)
     : true
+
   const showAddButton =
     Boolean(data.onOpenAddPopover) &&
     !data.readOnly &&
     !blockingOutgoing &&
     data.wfType !== "merge"
-  const nt =
-    WF_NODE_TYPES.find((t) => t.type === data.wfType) ?? WF_NODE_TYPES[0]
+
+  const nt = WF_NODE_TYPES.find((t) => t.type === data.wfType) ?? WF_NODE_TYPES[0]
   const sc = statusStyle(data.status)
-  const isSel = selected
+
   const previewImageSrc = useFileObjectUrl(data.previewImage)
   const previewVideoSrc = useFileObjectUrl(data.previewVideo)
 
+  const configSummary = canvasConfigSummary(data.wfType, data.config ?? {})
+
   return (
     <div
-      className="group relative flex flex-col overflow-visible rounded-xl border-[1.5px] bg-white transition-[border-color,box-shadow] duration-150 select-none"
+      className="relative flex flex-col select-none"
       style={{
         width: NODE_W,
-        // height: NODE_H,
-        borderColor: isSel ? nt.color : T.surfaceBorder,
-        boxShadow: isSel
-          ? `0 0 0 3px ${nt.color}20, 0 4px 20px ${nt.color}18, 0 2px 6px rgba(0,0,0,0.06)`
-          : "0 2px 8px rgba(0,0,0,0.06)",
-        cursor: data.locked ? "pointer" : "grab",
+        filter: selected
+          ? `drop-shadow(0 0 12px ${nt.color}35)`
+          : "drop-shadow(0 2px 6px rgba(0,0,0,0.08))",
       }}
     >
-      {data.wfType !== "keywords" ? (
+      {/* LEFT HANDLE */}
+      {data.wfType !== "keywords" && (
         <Handle
           type="target"
           position={Position.Left}
-          className="size-3! border-2! bg-white!"
           style={{
-            borderColor: nt.color,
-            boxShadow: `0 0 0 2px ${nt.color}20`,
+            width: 10,
+            height: 10,
+            background: "#fff",
+            border: `2px solid ${nt.color}`,
+            boxShadow: `0 0 0 3px ${nt.color}20`,
           }}
         />
-      ) : null}
+      )}
 
+      {/* CARD */}
       <div
-        className="h-0.5 bg-linear-to-r shadow-sm"
         style={{
-          backgroundImage: `linear-gradient(90deg,${nt.color},${nt.color}90)`,
+          background: "#fff",
+          borderRadius: 12,
+          border: `1.5px solid ${selected ? nt.color : "#E5E1D8"}`,
+          overflow: "hidden",
+          transition: "border-color 0.15s",
         }}
-      />
-      <div className="flex items-center gap-1.5 border-b border-gray-100 px-2.5 pt-2 pb-1.5">
+      >
+        {/* ACCENT LINE */}
+        <div style={{ height: 2, background: nt.color, flexShrink: 0 }} />
+
+        {/* HEADER */}
         <div
-          className="flex size-6 shrink-0 items-center justify-center rounded-md border text-current"
           style={{
-            background: nt.bg,
-            borderColor: `${nt.color}30`,
-            color: nt.color,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 10px 8px",
+            borderBottom: "1px solid #F0EDE8",
           }}
         >
-          {nt.icon}
-        </div>
-        <span
-          className="min-w-0 flex-1 truncate text-xs font-bold"
-          style={{ color: T.textPrimary }}
-        >
-          {data.label}
-        </span>
-        {data.lane ? (
-          <span
-            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+          {/* Icon */}
+          <div
             style={{
-              background: `${nt.color}18`,
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: nt.bg,
+              border: `1px solid ${nt.color}30`,
               color: nt.color,
-              border: `1px solid ${nt.color}40`,
+              flexShrink: 0,
             }}
           >
-            {data.lane}
-          </span>
-        ) : null}
-        {data.locked ? (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            aria-hidden
-          >
-            <rect
-              x="2"
-              y="5"
-              width="8"
-              height="6"
-              rx="1.5"
-              stroke="#718096"
-              strokeWidth="1.2"
-            />
-            <path
-              d="M4 5V3.5a2 2 0 0 1 4 0V5"
-              stroke="#718096"
-              strokeWidth="1.2"
-            />
-          </svg>
-        ) : null}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-2.5 py-1.5">
-        <div
-          className="line-clamp-2 text-[11px] leading-snug"
-          style={{ color: T.textSecondary }}
-        >
-          {canvasConfigSummary(data.wfType, data.config ?? {})}
-        </div>
-        {data.processingMessage ? (
-          <div className="line-clamp-2 text-[10px] leading-snug text-[#2563EB]">
-            {data.processingMessage}
+            {nt.icon}
           </div>
-        ) : null}
-        {data.errorMessage ? (
-          <div className="line-clamp-2 text-[10px] leading-snug text-[#DC2626]">
-            {data.errorMessage}
-          </div>
-        ) : null}
-        {previewImageSrc ? (
-          <img
-            src={previewImageSrc}
-            alt="Node output preview"
-            className="w-full rounded object-cover"
-          />
-        ) : null}
-        {previewVideoSrc ? (
-          <video
-            src={previewVideoSrc}
-            className="h-10 w-full rounded object-cover"
-            muted
-            controls
-          />
-        ) : null}
-        {data.previewText ? (
-          <div className="line-clamp-3 rounded bg-gray-50 px-1.5 py-1 text-[10px] leading-snug text-gray-600">
-            {data.previewText}
-          </div>
-        ) : null}
-        <div className="flex items-center justify-between">
+
+          {/* Label */}
           <span
-            className="inline-flex items-center gap-1 rounded-[20px] border px-1.5 py-0.5 text-[10px] font-semibold"
             style={{
-              background: sc.bg,
-              color: sc.text,
-              borderColor: sc.border,
+              flex: 1,
+              minWidth: 0,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#0F1F3D",
+              letterSpacing: "-0.01em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
-            <span
-              className="size-[5px] shrink-0 rounded-full"
-              style={{ background: sc.dot }}
-            />
-            {sc.label}
+            {data.label}
           </span>
-          {data.status === "retrying" &&
-          data.retryAttempt &&
-          data.retryMaxAttempts ? (
-            <span className="text-[10px] text-[#EA580C]">
-              {data.retryAttempt}/{data.retryMaxAttempts}
+
+          {/* Lane pill */}
+          {data.lane && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: `${nt.color}18`,
+                color: nt.color,
+                border: `1px solid ${nt.color}40`,
+                flexShrink: 0,
+              }}
+            >
+              {data.lane}
             </span>
-          ) : null}
-          {data.status === "failed_final" ? (
-            <span className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => data.onRetry?.()}
-                className="rounded border border-[#DC2626] bg-[#FEE2E2] px-1.5 py-0.5 text-[10px] text-[#DC2626]"
-              >
-                Retry
-              </button>
-              {data.onSkip ? (
+          )}
+
+          {/* Lock icon */}
+          {data.locked && (
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-label="Locked"
+              style={{ flexShrink: 0, opacity: 0.45 }}
+            >
+              <rect x="2" y="5" width="8" height="6" rx="1.5" stroke="#4A5568" strokeWidth="1.2" />
+              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="#4A5568" strokeWidth="1.2" />
+            </svg>
+          )}
+        </div>
+
+        {/* BODY */}
+        <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column", gap: 7 }}>
+
+          {/* Config summary */}
+          {configSummary && (
+            <p
+              style={{
+                fontSize: 11,
+                lineHeight: 1.55,
+                color: "#857A6C",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {configSummary}
+            </p>
+          )}
+
+          {/* Processing message */}
+          {data.processingMessage && (
+            <p
+              style={{
+                fontSize: 10,
+                lineHeight: 1.5,
+                color: "#2563EB",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {data.processingMessage}
+            </p>
+          )}
+
+          {/* Error message */}
+          {data.errorMessage && (
+            <div
+              style={{
+                fontSize: 10,
+                lineHeight: 1.5,
+                color: "#DC2626",
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                borderRadius: 6,
+                padding: "5px 7px",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {data.errorMessage}
+            </div>
+          )}
+
+          {/* Image preview */}
+          {previewImageSrc && (
+            <img
+              src={previewImageSrc}
+              alt="Node output preview"
+              style={{ width: "100%", borderRadius: 6, objectFit: "cover", maxHeight: 80 }}
+            />
+          )}
+
+          {/* Video preview */}
+          {previewVideoSrc && (
+            <video
+              src={previewVideoSrc}
+              style={{ width: "100%", height: 40, borderRadius: 6, objectFit: "cover" }}
+              muted
+              controls
+            />
+          )}
+
+          {/* Text preview */}
+          {data.previewText && (
+            <div
+              style={{
+                fontSize: 10,
+                lineHeight: 1.6,
+                color: "#62594E",
+                background: "#F7F4EF",
+                borderRadius: 6,
+                padding: "5px 7px",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {data.previewText}
+            </div>
+          )}
+
+          {/* FOOTER ROW: status + retry/skip + delete */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+
+            {/* Status badge */}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "3px 7px",
+                borderRadius: 20,
+                border: `1px solid ${sc.border}`,
+                background: sc.bg,
+                color: sc.text,
+              }}
+            >
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  background: sc.dot,
+                  flexShrink: 0,
+                }}
+              />
+              {sc.label}
+            </span>
+
+            {/* Retry attempt counter */}
+            {data.status === "retrying" && data.retryAttempt && data.retryMaxAttempts && (
+              <span style={{ fontSize: 10, color: "#EA580C", fontVariantNumeric: "tabular-nums" }}>
+                {data.retryAttempt}/{data.retryMaxAttempts}
+              </span>
+            )}
+
+            {/* Retry / Skip buttons on final failure */}
+            {data.status === "failed_final" && (
+              <div style={{ display: "flex", gap: 4 }}>
                 <button
                   type="button"
-                  onClick={() => data.onSkip?.()}
-                  className="rounded border border-amber-500 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
+                  onClick={() => data.onRetry?.()}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "3px 8px",
+                    borderRadius: 5,
+                    border: "1px solid #FECACA",
+                    background: "#FEF2F2",
+                    color: "#DC2626",
+                    cursor: "pointer",
+                  }}
                 >
-                  Skip
+                  Retry
                 </button>
-              ) : null}
-            </span>
-          ) : null}
-          {isSel ? (
-            <div className="flex gap-0.5">
-              <button
-                type="button"
-                title="Drag to reorder"
-                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border bg-gray-100 text-[11px]"
-                style={{ borderColor: T.surfaceBorder, color: T.textSecondary }}
-              >
-                ::
-              </button>
+                {data.onSkip && (
+                  <button
+                    type="button"
+                    onClick={() => data.onSkip?.()}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: 5,
+                      border: "1px solid #FCD34D",
+                      background: "#FFFBEB",
+                      color: "#92400E",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Skip
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Delete button when selected */}
+            {selected && data.onDelete && (
               <button
                 type="button"
                 onClick={() => data.onDelete?.()}
-                className="flex size-[22px] cursor-pointer items-center justify-center rounded-[5px] border border-[#FCA5A5] bg-[#FEE2E2] text-[11px] text-[#DC2626]"
+                style={{
+                  width: 22,
+                  height: 22,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 5,
+                  border: "1px solid #FECACA",
+                  background: "#FEF2F2",
+                  color: "#DC2626",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+                aria-label="Delete node"
               >
                 ✕
               </button>
-            </div>
-          ) : null}
+            )}
+          </div>
         </div>
       </div>
 
+      {/* RIGHT HANDLE */}
       <Handle
         type="source"
         position={Position.Right}
-        className="size-3! border-2! border-white!"
         style={{
+          width: 10,
+          height: 10,
           background: nt.color,
+          border: "2px solid #fff",
           boxShadow: `0 0 0 3px ${nt.color}30, 0 2px 4px ${nt.color}40`,
         }}
       />
