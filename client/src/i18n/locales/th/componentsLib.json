@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "ไลบรารีคอมโพเนนต์",
+    "subtitle": "คำศัพท์ภาพที่ใช้ทั่ว NeuralTex อ้างอิงเพื่อการใช้งานที่สอดคล้องกัน"
+  },
+  "sections": {
+    "buttons": "ปุ่ม",
+    "statusChips": "ชิปสถานะ",
+    "nodeCards": "รูปแบบการ์ดโหนด",
+    "toasts": "ทูสต์ / การแจ้งเตือน",
+    "emptyState": "สถานะว่าง",
+    "typography": "ตัวอักษร",
+    "colorPalette": "จานสี"
+  },
+  "buttons": {
+    "primary": "หลัก",
+    "secondary": "รอง",
+    "ghost": "โปร่ง",
+    "destructive": "ทำลาย",
+    "accent": "เน้น",
+    "small": "เล็ก",
+    "large": "ใหญ่",
+    "withIcon": "มีไอคอน"
+  },
+  "chips": {
+    "idle": "ว่าง",
+    "ready": "พร้อม",
+    "running": "กำลังรัน",
+    "done": "เสร็จ",
+    "failed": "ล้มเหลว",
+    "warning": "คำเตือน",
+    "draft": "ฉบับร่าง",
+    "published": "เผยแพร่แล้ว",
+    "archived": "เก็บถาวร",
+    "scheduled": "กำหนดเวลา"
+  },
+  "nodes": {
+    "textGeneration": "สร้างข้อความ",
+    "imageGeneration": "สร้างภาพ",
+    "translation": "แปลภาษา",
+    "videoGeneration": "สร้างวิดีโอ",
+    "addInstruction": "คลิกเพื่อเพิ่มคำสั่ง…",
+    "status": {
+      "idle": "ว่าง",
+      "running": "กำลังรัน",
+      "done": "เสร็จ",
+      "failed": "ล้มเหลว"
+    }
+  },
+  "toasts": {
+    "ruleSaved": "บันทึกกฎแล้ว — พร้อมใช้ในเวิร์กโฟลว์",
+    "twitterLimit": "โพสต์ X/Twitter เกินขีดจำกัด 32 ตัวอักษร",
+    "imageFailed": "สร้างภาพไม่สำเร็จ ตรวจสอบโควตา API ของคุณ",
+    "pipelineRunning": "ไปป์ไลน์กำลังรัน — คาดว่าเสร็จใน ~45 วินาที"
+  },
+  "empty": {
+    "title": "ยังไม่มีกฎ",
+    "desc": "กำหนดกลยุทธ์แบรนด์ครั้งเดียวแล้วนำไปใช้กับทุกแคมเปญ",
+    "cta": "+ สร้างกฎแรกของคุณ"
+  },
+  "typography": {
+    "pageTitle": "ชื่อหน้า",
+    "pageTitleSample": "การวิเคราะห์",
+    "sectionHeading": "หัวข้อส่วน",
+    "sectionHeadingSample": "ฉบับร่าง · V2",
+    "cardTitle": "ชื่อการ์ด",
+    "cardTitleSample": "การดูตามเวลา",
+    "bodyPrimary": "เนื้อหา / หลัก",
+    "bodySample": "คำบรรยายไม่เกิน 80 ตัวอักษรทำผลดีกว่าเนื้อหายาวบน Instagram 3 เท่าในเดือนนี้",
+    "secondary": "รอง",
+    "secondarySample": "ประสิทธิภาพทุกแคมเปญและช่องทาง",
+    "muted": "จาง / เวลา",
+    "mutedSample": "2026-05-04 10:42:33",
+    "label": "ป้าย / บรรทัดบน",
+    "labelSample": "การดูทั้งหมด"
+  },
+  "colors": {
+    "accent": "เน้น",
+    "accentLight": "เน้นอ่อน",
+    "green": "เขียว",
+    "amber": "เหลืองอำพัน",
+    "red": "แดง",
+    "blue": "น้ำเงิน",
+    "textPrimary": "ข้อความหลัก",
+    "textSecondary": "ข้อความรอง",
+    "textMuted": "ข้อความจาง",
+    "canvasBg": "พื้นหลังแคนวาส",
+    "surface": "พื้นผิว",
+    "sidebar": "แถบด้านข้าง"
+  }
+}

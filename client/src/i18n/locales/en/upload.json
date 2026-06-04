@@ -1,0 +1,133 @@
+{
+  "page": {
+    "title": "Upload content",
+    "allChannels": "All channels",
+    "missingId": "Missing upload id.",
+    "loading": "Loading upload…",
+    "loadErrorTitle": "Could not load upload",
+    "back": "Back"
+  },
+  "captionSource": {
+    "text": "Primary text",
+    "translatedText": "Translation",
+    "summary": "Summary",
+    "custom": "Custom",
+    "fallback": "Text"
+  },
+  "preview": {
+    "title": "Preview",
+    "save": "Save",
+    "noMedia": "No media",
+    "tiktokVerticalHint": "TikTok uses vertical 9:16 video in preview."
+  },
+  "scheduledEdit": {
+    "title": "Edit scheduled post",
+    "hint": "Changes apply to this channel only. Media and platform cannot be changed after scheduling.",
+    "caption": "Caption",
+    "captionPlaceholder": "Update caption for this channel",
+    "youtubeTitle": "YouTube title",
+    "youtubeTitlePlaceholder": "Update YouTube video title",
+    "rescheduleTo": "Reschedule to",
+    "cancel": "Cancel",
+    "updating": "Updating...",
+    "confirm": "Confirm changes",
+    "scheduledHint": "This post is scheduled. Use Edit scheduled post to update the caption, schedule time, or YouTube title for this channel only. Media changes are not supported by Zernio."
+  },
+  "fields": {
+    "media": "Media",
+    "videoTitle": "Video title",
+    "youtubeTitlePlaceholder": "Enter YouTube video title…"
+  },
+  "mediaTab": {
+    "single": "Single image",
+    "multiple": "Multiple images",
+    "video": "Video"
+  },
+  "publish": {
+    "publishNow": "Publish now",
+    "publishAll": "Publish all included",
+    "schedule": "Schedule",
+    "scheduleAll": "Schedule all included",
+    "globalPublishing": "Global publishing",
+    "schedulePublication": "Schedule publication",
+    "scheduleAllChannels": "Schedule all included channels",
+    "dateTime": "Date & time",
+    "cancel": "Cancel",
+    "confirmSchedule": "Confirm schedule",
+    "publishedNoAction": "Published — no further action needed",
+    "scheduledEditable": "Scheduled — caption, schedule time, and YouTube title can still be edited",
+    "publishingInProgress": "Publishing in progress…",
+    "editScheduled": "Edit scheduled post",
+    "whenToPublish": "When to publish",
+    "confirm": "Confirm",
+    "channelPublishing": "{{platform}} publishing"
+  },
+  "banner": {
+    "notConnected": "Your {{platform}} account is not connected.",
+    "connect": "Connect",
+    "failed": "Publishing failed. Please retry.",
+    "retry": "Retry",
+    "publishing": "Publishing to {{platform}}…",
+    "published": "Published successfully to {{platform}}{{when}}",
+    "scheduled": "Scheduled for {{when}} on {{platform}}"
+  },
+  "toast": {
+    "channelIncluded": "Channel included",
+    "channelExcluded": "Channel excluded",
+    "captionRequired": "Caption is required.",
+    "scheduleFuture": "Scheduled time must be in the future.",
+    "selectDateTime": "Select a date and time.",
+    "postUpdated": "Post updated successfully",
+    "savedChannel": "Saved for this channel",
+    "connectAccount": "Connect this account in Settings first.",
+    "assignCaption": "Assign caption text before publishing.",
+    "publishing": "Publishing…",
+    "scheduling": "Scheduling…",
+    "noEligibleChannels": "No eligible included channels to publish.",
+    "nodeUpdated": "Node output updated — save when ready.",
+    "changesSaved": "Changes saved",
+    "saveFailed": "Failed to save. Please try again.",
+    "loadOutputsFailed": "Could not load available outputs.",
+    "unknownNodeType": "Unknown node type.",
+    "startGenerationFailed": "Could not start generation.",
+    "approved": "Content approved.",
+    "approveFailed": "Could not approve. Please try again.",
+    "rejected": "Content rejected.",
+    "rejectFailed": "Could not reject. Please try again.",
+    "openUploadFailed": "Could not open upload. Try the Upload page from the main menu.",
+    "waitGeneration": "Wait for the current generation to finish.",
+    "resolveNodeFailed": "Could not resolve node for this output.",
+    "rerunFailed": "Could not start re-run.",
+    "nothingToCopy": "Nothing to copy",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Copy failed",
+    "mediaUploadFailed": "Media upload failed.",
+    "noMediaSlot": "No media slot for upload."
+  },
+  "review": {
+    "defaultTitle": "Content review",
+    "loading": "Loading…",
+    "loadFailed": "Could not load content.",
+    "backToList": "Back to content list",
+    "workflowLayers": "Workflow layers",
+    "addOutput": "Add another output",
+    "addOutputTitle": "Add output",
+    "pickNodeHint": "Pick a node type to generate more content for this workflow.",
+    "generate": "Generate",
+    "rejectedBanner": "This content was rejected. Review outputs and approve when ready.",
+    "processing": "Processing…",
+    "retrying": "Retrying… attempt {{attempt}}/{{maxAttempts}}",
+    "rerunFailed": "Re-run failed. Please try again.",
+    "uploadingMedia": "Uploading {{type}}…",
+    "uploadFailed": "Upload failed. Try again.",
+    "image": "image",
+    "video": "video"
+  },
+  "palette": {
+    "dragHint": "Drag outputs into caption or media zones"
+  },
+  "publishSummary": {
+    "included": "{{count}} channel(s) included",
+    "eligible": "{{count}} ready to publish"
+  }
+}

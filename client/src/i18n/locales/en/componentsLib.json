@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "Component Library",
+    "subtitle": "Visual vocabulary used throughout NeuralTex. Reference for consistent implementation."
+  },
+  "sections": {
+    "buttons": "Buttons",
+    "statusChips": "Status Chips",
+    "nodeCards": "Node Card Variants",
+    "toasts": "Toasts / Notifications",
+    "emptyState": "Empty State",
+    "typography": "Typography",
+    "colorPalette": "Color Palette"
+  },
+  "buttons": {
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "ghost": "Ghost",
+    "destructive": "Destructive",
+    "accent": "Accent",
+    "small": "Small",
+    "large": "Large",
+    "withIcon": "With Icon"
+  },
+  "chips": {
+    "idle": "Idle",
+    "ready": "Ready",
+    "running": "Running",
+    "done": "Done",
+    "failed": "Failed",
+    "warning": "Warning",
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived",
+    "scheduled": "Scheduled"
+  },
+  "nodes": {
+    "textGeneration": "Text Generation",
+    "imageGeneration": "Image Generation",
+    "translation": "Translation",
+    "videoGeneration": "Video Generation",
+    "addInstruction": "Click to add instruction…",
+    "status": {
+      "idle": "Idle",
+      "running": "Running",
+      "done": "Done",
+      "failed": "Failed"
+    }
+  },
+  "toasts": {
+    "ruleSaved": "Rule saved successfully — ready to use in workflows.",
+    "twitterLimit": "X/Twitter post exceeds limit by 32 characters.",
+    "imageFailed": "Image generation failed. Check your API quota.",
+    "pipelineRunning": "Pipeline running — estimated completion in ~45 seconds."
+  },
+  "empty": {
+    "title": "No rules yet",
+    "desc": "Define your brand strategy once and reuse it across all campaigns.",
+    "cta": "+ Create your first Rule"
+  },
+  "typography": {
+    "pageTitle": "Page Title",
+    "pageTitleSample": "Analytics",
+    "sectionHeading": "Section Heading",
+    "sectionHeadingSample": "Draft · V2",
+    "cardTitle": "Card Title",
+    "cardTitleSample": "Views Over Time",
+    "bodyPrimary": "Body / Primary",
+    "bodySample": "Captions under 80 chars outperformed long-form on Instagram 3× this month.",
+    "secondary": "Secondary",
+    "secondarySample": "Performance across all campaigns and channels.",
+    "muted": "Muted / Timestamp",
+    "mutedSample": "2026-05-04 10:42:33",
+    "label": "Label / Overline",
+    "labelSample": "Total Views"
+  },
+  "colors": {
+    "accent": "Accent",
+    "accentLight": "Accent Light",
+    "green": "Green",
+    "amber": "Amber",
+    "red": "Red",
+    "blue": "Blue",
+    "textPrimary": "Text Primary",
+    "textSecondary": "Text Secondary",
+    "textMuted": "Text Muted",
+    "canvasBg": "Canvas Bg",
+    "surface": "Surface",
+    "sidebar": "Sidebar"
+  }
+}

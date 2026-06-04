@@ -1,0 +1,86 @@
+{
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening",
+    "defaultName": "there"
+  },
+  "header": {
+    "overview": "Overview",
+    "subtitle": "Campaign health, engagement, and what needs your attention—updated as your content moves through NeuralTex.",
+    "startGeneration": "Start new generation"
+  },
+  "stats": {
+    "publishedMonth": "Published this month",
+    "publishedMonthHint": "Across all channels",
+    "pendingReview": "Pending review",
+    "pendingReviewHint": "Drafts awaiting approval",
+    "scheduled": "Scheduled",
+    "scheduledHint": "Upcoming posts",
+    "reachWeek": "Reach this week",
+    "reachWeekHint": "Estimated impressions"
+  },
+  "charts": {
+    "engagementTitle": "This week — engagement",
+    "engagementDesc": "Reach, reactions, and clicks captured for the current period.",
+    "activityTitle": "Activity (last 7 days)",
+    "activityDesc": "Volume of recorded events from your workspace.",
+    "thisWeek": "This week",
+    "activity": "Activity",
+    "events": "{{count}} events",
+    "metrics": {
+      "reach": "Reach",
+      "likes": "Likes",
+      "comments": "Comments",
+      "clicks": "Clicks"
+    }
+  },
+  "recentActivity": {
+    "title": "Recent activity",
+    "desc": "Latest changes across content and uploads",
+    "empty": "No recent activity yet."
+  },
+  "actionQueue": {
+    "title": "Action queue",
+    "desc": "Prioritized next steps",
+    "draftsApproval": "{{count}} drafts need approval",
+    "draftsHint": "Review before publishing",
+    "review": "Review",
+    "ruleSuggestions": "{{count}} rule suggestions",
+    "ruleSuggestionsHint": "Tune campaigns from analytics",
+    "open": "Open",
+    "failedPublishes": "{{count}} failed publishes",
+    "failedHint": "Retry from uploads",
+    "uploads": "Uploads"
+  },
+  "scheduled": {
+    "title": "Scheduled",
+    "desc": "Next posts on the calendar",
+    "viewAll": "View all",
+    "empty": "No upcoming scheduled posts.",
+    "fallbackCaption": "Scheduled post"
+  },
+  "highlights": {
+    "title": "Highlights",
+    "desc": "This week's standouts",
+    "reach": "reach",
+    "likes": "likes",
+    "comments": "comments",
+    "clicks": "clicks",
+    "bestChannel": "Best channel:",
+    "bestPost": "Best post:",
+    "fullAnalytics": "Full analytics"
+  },
+  "quickStart": {
+    "title": "Welcome to NeuralTex",
+    "desc": "Three quick steps to your first publish",
+    "step1": "Create your Rule",
+    "step2": "Generate your first content",
+    "step3": "Publish to social media",
+    "cta": "Create your first rule"
+  },
+  "error": {
+    "title": "Couldn't load dashboard",
+    "desc": "Check your connection and try again."
+  }
+}

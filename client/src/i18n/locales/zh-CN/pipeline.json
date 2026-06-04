@@ -1,0 +1,82 @@
+{
+  "page": {
+    "sectionLabel": "运行",
+    "title": "流水线",
+    "description": "浏览工作流运行，按状态筛选，并打开已完成输出或实时编辑器。",
+    "statsUnavailableTitle": "流水线统计不可用",
+    "statsUnavailableDescription": "无法加载状态统计。若刚部署更改，请重启 API。",
+    "retryStats": "重试统计",
+    "loadErrorTitle": "无法加载流水线",
+    "loadingMatches": "正在加载匹配项…",
+    "noMatches": "没有符合这些筛选条件的流水线。",
+    "oneMatch": "1 次运行匹配",
+    "manyMatches": "{{count}} 次运行匹配",
+    "showingRange": "显示 {{start}}–{{end}}",
+    "emptyTitle": "未找到流水线",
+    "emptyDescription": "尝试其他状态标签或清除筛选以查看更多运行。",
+    "pageOf": "第 {{page}} 页，共 {{total}} 页",
+    "toastStopped": "流水线已停止"
+  },
+  "stopDialog": {
+    "title": "停止此流水线？",
+    "description": "生成将停止。仍在运行的步骤可能短暂完成，但不会启动新步骤。此操作无法撤销。",
+    "keepRunning": "继续运行",
+    "stopping": "正在停止…",
+    "stop": "停止流水线",
+    "error": "无法停止流水线。"
+  },
+  "toolbar": {
+    "workflow": "工作流",
+    "allWorkflows": "所有工作流",
+    "workflowFallback": "工作流",
+    "sort": "排序",
+    "perPage": "每页",
+    "clear": "清除"
+  },
+  "sort": {
+    "startedDesc": "开始时间（最新）",
+    "startedAsc": "开始时间（最早）",
+    "completedDesc": "完成时间（最新）",
+    "completedAsc": "完成时间（最早）"
+  },
+  "status": {
+    "all": "全部",
+    "running": "运行中",
+    "paused": "已暂停",
+    "completed": "已完成",
+    "failed": "失败"
+  },
+  "card": {
+    "news": "新闻",
+    "noPrompt": "无提示",
+    "noSteps": "无记录步骤",
+    "node_one": "{{count}} 个节点",
+    "node_other": "{{count}} 个节点",
+    "openRun": "打开运行",
+    "stop": "停止"
+  },
+  "nodeTypes": {
+    "keyword_planner": "关键词",
+    "text_generation": "文本",
+    "image_generation": "图像",
+    "video_generation": "视频",
+    "translation": "翻译",
+    "transcription": "转录",
+    "summarization": "摘要",
+    "intelligence": "智能",
+    "adapt": "适配",
+    "branch": "分支",
+    "merge": "合并"
+  },
+  "relativeTime": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前",
+    "weeksAgo": "{{count}} 周前"
+  },
+  "errors": {
+    "loadFailed": "加载流水线失败。",
+    "invalidStatsResponse": "流水线统计响应无效"
+  }
+}

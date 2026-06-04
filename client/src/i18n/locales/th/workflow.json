@@ -1,0 +1,493 @@
+{
+  "nodeTypes": {
+    "keywords": "วางแผนคีย์เวิร์ด",
+    "text": "สร้างข้อความ",
+    "image": "สร้างภาพ",
+    "video": "สร้างวิดีโอ",
+    "translation": "แปลภาษา",
+    "transcription": "ถอดเสียง",
+    "summarization": "สรุปเนื้อหา",
+    "branch": "แยกสาย",
+    "adapt": "ปรับให้เหมาะช่องทาง",
+    "merge": "รวมสาย",
+    "intelligence": "ข่าวกรอง"
+  },
+  "nodeTypesShort": {
+    "keywords": "คีย์เวิร์ด",
+    "text": "สร้างข้อความ",
+    "image": "ภาพ",
+    "video": "วิดีโอ",
+    "translation": "แปลภาษา",
+    "transcription": "ถอดเสียง",
+    "summarization": "สรุป",
+    "branch": "แยกสาย",
+    "adapt": "ปรับช่องทาง",
+    "merge": "รวมสาย",
+    "intelligence": "ข่าวกรอง"
+  },
+  "nodeTypesBackend": {
+    "keyword_planner": "วางแผนคีย์เวิร์ด",
+    "text_generation": "ข้อความ / LLM",
+    "image_generation": "ภาพ",
+    "video_generation": "วิดีโอ",
+    "translation": "แปลภาษา",
+    "transcription": "ถอดเสียง",
+    "summarization": "สรุปเนื้อหา"
+  },
+  "laneNodeLabel": {
+    "forChannel": "{{type}} สำหรับ {{channel}}"
+  },
+  "guide": {
+    "labels": {
+      "usage": "การใช้งาน",
+      "example": "ตัวอย่าง",
+      "tip": "เคล็ดลับ"
+    },
+    "defaultFallback": "ปรับวิธีที่ขั้นตอนนี้ทำงานด้วยช่องด้านล่าง หัวข้อหรือบรีฟแคมเปญจะใส่ตอนเริ่มสร้างเนื้อหา (รันไปป์ไลน์) ไม่ใช่บนโหนด",
+    "keywords": {
+      "usage": "สร้างคีย์เวิร์ด SEO และธีมจากบรีฟแคมเปญเมื่อไปป์ไลน์รัน เพิ่มโหนดได้หลายตัวก่อนขั้นตอนข้อความหรือภาพที่ต้องการใช้คำที่วางไว้",
+      "example": "คีย์เวิร์ด → สร้างข้อความ: วางคำสำหรับเปิดตัวสินค้า แล้วเขียนแคปชันที่ใช้คีย์เวิร์ดอย่างเป็นธรรมชาติ"
+    },
+    "text": {
+      "usage": "สร้างข้อความโพสต์จากพรอมpt ของรันและผลลัพธ์ก่อนหน้า (คีย์เวิร์ด ข่าวกรอง ฯลฯ) เพิ่มโหนดข้อความได้หลายตัวและเชื่อมเหมือนขั้นตอนอื่น",
+      "example": "หลังคีย์เวิร์ด ตั้งโทนเป็นมืออาชีพและความยาวปานกลาง เพื่อได้ย่อหน้าพร้อมโพสต์ LinkedIn",
+      "tips": "หัวข้อแคมเปญใส่ตอนเริ่มรันไปป์ไลน์ ไม่ใช่ในแผงนี้"
+    },
+    "image": {
+      "usage": "สร้างภาพจากข้อความหรือคีย์เวิร์ดก่อนหน้า ตั้งอัตราส่วนและสไตล์ให้ตรงช่องทางในกฎ",
+      "example": "ข้อความ → ภาพ อัตราส่วน 1:1 สไตล์ Natural สำหรับภาพหลัก Instagram จากแคปชัน"
+    },
+    "video": {
+      "usage": "สร้างคลิปวิดีโอสั้นจากพรอมpt และสินทรัพย์ก่อนหน้า (มักเป็นข้อความหรือภาพอ้างอิง) รันคิววิดีโอแยกและอาจใช้เวลานานกว่าโหนดอื่น",
+      "example": "ภาพ → วิดีโอ 9:16 ความยาว 8 วินาที เปลี่ยนภาพนิ่งเป็นคลิปแนวตั้ง"
+    },
+    "translation": {
+      "usage": "แปลข้อความจากโหนดก่อนหน้าเป็นภาษาเป้าหมาย ใช้เมื่อแคมเปญเดียวกันต้องการข้อความหลายภาษา",
+      "example": "ข้อความอังกฤษ → แปล (เป้าหมายไทย) ก่อนโหนด Adapt บนสาย Facebook สำหรับตลาดไทย"
+    },
+    "transcription": {
+      "usage": "แปลงเสียงหรือวิดีโอจากสินทรัพย์ก่อนหน้าเป็นข้อความ เหมาะเมื่อต้นทางเป็นการบันทึกไม่ใช่ข้อความ",
+      "example": "วิดีโอ → ถอดเสียง (ภาษาอัตโนมัติ) → สรุป เพื่อได้ bullet จากคลิปเวบinar"
+    },
+    "summarization": {
+      "usage": "ย่อข้อความยาวจากก่อนหน้า เลือกความยาวและรูปแบบ (ย่อหน้า bullet TL;DR) ให้พอดีขีดจำกัดช่องทาง",
+      "example": "ถอดเสียง → สรุป ความยาวปานกลาง รูปแบบ Bullets สำหรับสไลด์ carousel"
+    },
+    "branch": {
+      "usage": "แตกรันขนานเป็นสายช่องทาง (จากช่องทางในกฎ เลือกเอง หรือ A/B) ตอนรันจะสร้าง subgraph ต่อสายระหว่าง Branch กับ Merge",
+      "example": "ข้อความ → Branch (ช่องทางจากกฎ) → Adapt → Merge เมื่อโพสต์แคมเปญเดียวกันไป Instagram Facebook LinkedIn",
+      "tips": "เชื่อม Branch กับ Merge ด้านล่างเพื่อให้ทุกสายเสร็จก่อนสรุป"
+    },
+    "adapt": {
+      "usage": "ปรับข้อความร่วมให้เหมาะสไตล์ช่องทาง (ความยาวแคปชัน โทน แฮชแท็ก) หนึ่ง adapt ต่อสาย ช่องทางตั้งอัตโนมัติจากกฎ",
+      "example": "บนสาย Instagram หลัง Branch: adapt เขียนแคปชันให้ตรงสไตล์ Instagram จากกฎ",
+      "tips": "ไม่ต้องตั้งช่องทางที่นี่ — มาจากสายที่สร้างตอน materialize"
+    },
+    "merge": {
+      "usage": "รอให้ทุกสายขนานเสร็จ (หรือข้าม) ก่อนไปป์ไลน์สรุปเนื้อหาและอัปโหลด เป็น barrier รวมสาย ไม่มีขั้น LLM",
+      "example": "Branch → Adapt (ต่อช่องทาง) → Merge: รอจน adapt ทุกสายเสร็จ แล้วรวมเนื้อหาให้ตรวจ"
+    },
+    "intelligence": {
+      "usage": "ค้นหาเว็บ (เทรนด์ ตลาด คู่แข่ง หรือทั้งหมด) ผ่าน OpenAI แล้วส่งต่อให้สร้างข้อความ มี analytics overlay เมื่อเริ่มรันด้วยข้อมูลล่าสุด",
+      "example": "ข่าวกรอง (ทั้งหมด) → ข้อความ: ค้นหาแฮชแท็ก ข่าวอุตสาหกรรม และช่องว่างคู่แข่งก่อนเขียนคัดลอก",
+      "tips": "ใช้ \"ทั้งหมด\" แทนการซ้อนหลายโหนด Intelligence เลือก Custom เมื่อต้องการคำถามวิจัยเฉพาะ"
+    }
+  },
+  "popoverDescriptions": {
+    "keywords": "วางคีย์เวิร์ดและหัวข้อก่อน",
+    "intelligence": "ดึงเทรนด์และสัญญาณตลาดก่อน",
+    "text": "สร้างเนื้อหาด้วย AI",
+    "transcription": "ถอดเสียงหรือวิดีโอก่อน",
+    "branch": "แตกเป็นสายช่องทางขนาน",
+    "adapt": "เขียนใหม่สำหรับช่องทางนี้",
+    "image": "สร้างภาพด้วย AI",
+    "video": "สร้างวิดีโอด้วย AI",
+    "summarization": "สรุปเนื้อหาก่อนหน้า",
+    "translation": "แปลเป็นภาษาเป้าหมาย",
+    "merge": "รวบรวมทุกสายก่อนสรุป"
+  },
+  "fields": {
+    "shared": { "on": "เปิด", "off": "ปิด" },
+    "text": {
+      "outputFormat": { "label": "รูปแบบผลลัพธ์" },
+      "tone": { "label": "โทนการเขียน" },
+      "textLength": { "label": "ความยาว" }
+    },
+    "image": {
+      "style": { "label": "สไตล์" },
+      "aspectRatio": { "label": "อัตราส่วนภาพ" },
+      "quality": { "label": "คุณภาพ" },
+      "negativePrompt": {
+        "label": "พรอมpt สิ่งที่ไม่ต้องการ",
+        "placeholder": "ไม่บังคับ — สิ่งที่ไม่ต้องการในภาพ"
+      }
+    },
+    "video": {
+      "mode": { "label": "โหมด" },
+      "aspectRatio": { "label": "อัตราส่วนภาพ" },
+      "duration": { "label": "ความยาว" },
+      "targetDuration": { "label": "ความยาวเป้าหมาย" },
+      "resolution": { "label": "ความละเอียด" },
+      "negativePrompt": {
+        "label": "พรอมpt สิ่งที่ไม่ต้องการ",
+        "placeholder": "ไม่บังคับ — สิ่งที่ไม่ต้องการในวิดีโอ"
+      },
+      "heygenOrientation": { "label": "ทิศทาง" },
+      "heygenExpressiveness": { "label": "ความแสดงออก" },
+      "removeBackground": { "label": "ลบพื้นหลังรูปต้นฉบับ" },
+      "heygenMotionPrompt": {
+        "label": "พรอมpt การเคลื่อนไหว (ไม่บังคับ)",
+        "placeholder": "เช่น พยักหน้าเบา ๆ ขณะนำเสนอ"
+      }
+    },
+    "translation": {
+      "sourceLanguage": { "label": "ภาษาต้นทาง" },
+      "targetLanguage": { "label": "ภาษาเป้าหมาย" },
+      "formalityLevel": { "label": "ระดับความเป็นทางการ" },
+      "preserveFormatting": { "label": "รักษารูปแบบเดิม" }
+    },
+    "transcription": { "language": { "label": "ภาษา" } },
+    "summarization": {
+      "summaryLength": { "label": "ความยาวสรุป" },
+      "outputFormat": { "label": "รูปแบบผลลัพธ์" }
+    },
+    "intelligence": {
+      "searchType": { "label": "ประเภทการค้นหา" },
+      "customPrompt": {
+        "label": "พรอมpt ค้นหาแบบกำหนดเอง",
+        "placeholder": "อธิบายสิ่งที่ต้องการค้นหา…"
+      }
+    },
+    "options": {
+      "paragraph": "ย่อหน้า",
+      "bullets": "หัวข้อย่อย",
+      "caption": "แคปชัน",
+      "professional": "มืออาชีพ",
+      "casual": "สบาย ๆ",
+      "friendly": "เป็นกันเอง",
+      "formal": "ทางการ",
+      "witty": "มีไหวพริบ",
+      "short": "สั้น",
+      "medium": "ปานกลาง",
+      "long": "ยาว",
+      "natural": "ธรรมชาติ",
+      "vivid": "สดใส",
+      "standard": "มาตรฐาน",
+      "hd": "HD",
+      "cinematic": "ภาพยนตร์",
+      "presenter": "ผู้นำเสนอ",
+      "landscape169": "แนวนอน 16:9",
+      "portrait916": "แนวตั้ง 9:16",
+      "resolution720p": "720p (Sora 2)",
+      "duration4s": "4 วิ",
+      "duration8s": "8 วิ",
+      "duration12s": "12 วิ",
+      "duration16s": "16 วิ",
+      "duration20s": "20 วิ",
+      "low": "ต่ำ",
+      "high": "สูง",
+      "autoDetect": "ตรวจจับอัตโนมัติ",
+      "auto": "อัตโนมัติ",
+      "english": "อังกฤษ",
+      "thai": "ไทย",
+      "japanese": "ญี่ปุ่น",
+      "chinese": "จีน",
+      "korean": "เกาหลี",
+      "spanish": "สเปน",
+      "french": "ฝรั่งเศส",
+      "german": "เยอรมัน",
+      "tldr": "TL;DR",
+      "searchAll": "ทั้งหมด (เทรนด์ + ตลาด + คู่แข่ง)",
+      "searchTrend": "เทรนด์ — แฮชแท็กและรูปแบบ",
+      "searchMarket": "ตลาด — ข่าวและสัญญาณ",
+      "searchCompetitor": "คู่แข่ง — ช่องว่างและมุม",
+      "searchCustom": "กำหนดเอง — พรอมpt ของคุณ"
+    }
+  },
+  "configSummary": {
+    "textSettings": "ตั้งค่าข้อความ",
+    "imageSettings": "ตั้งค่าภาพ",
+    "videoSettings": "ตั้งค่าวิดีโอ",
+    "translation": "แปลภาษา",
+    "keywordPlanner": "วางแผนคีย์เวิร์ด",
+    "summary": "สรุป",
+    "transcription": "ถอดเสียง",
+    "fromCampaignRule": "จากกฎแคมเปญ",
+    "channelAdapt": "ปรับช่องทาง",
+    "channel": "ช่องทาง: {{channel}}",
+    "fanInBarrier": "จุดรวมสาย",
+    "configured": "ตั้งค่าแล้ว",
+    "intelligenceTypes": {
+      "all": "ทั้งหมด",
+      "trend": "เทรนด์",
+      "market": "ตลาด",
+      "competitor": "คู่แข่ง",
+      "custom": "กำหนดเอง"
+    }
+  },
+  "nodeStatus": {
+    "pending": "รอดำเนินการ",
+    "idle": "ว่าง",
+    "ready": "พร้อม",
+    "running": "กำลังรัน",
+    "streaming": "สตรีม",
+    "processing": "กำลังประมวลผล",
+    "retrying": "กำลังลองใหม่",
+    "done": "เสร็จ",
+    "completed": "เสร็จสมบูรณ์",
+    "failed_final": "ล้มเหลว",
+    "failed": "ล้มเหลว"
+  },
+  "validation": {
+    "laneAssignment": "{{type}} ต้องกำหนดช่องทาง (เพิ่มจากโหนดในสาย ไม่ใช่จาก Text บนท่อหลัก)",
+    "presenterAvatarRequired": "วิดีโอผู้นำเสนอต้องมีอวตาร",
+    "presenterVoiceRequired": "วิดีโอผู้นำเสนอต้องมีเสียง"
+  },
+  "toolbar": {
+    "workflowNameAria": "ชื่อเวิร์กโฟลว์",
+    "untitledWorkflow": "เวิร์กโฟลว์ไม่มีชื่อ",
+    "rebuildNodes": "สร้างโหนดใหม่",
+    "describeWorkflow": "อธิบายเวิร์กโฟลว์",
+    "saving": "กำลังบันทึก…",
+    "saveChanges": "บันทึกการเปลี่ยนแปลง",
+    "runPipeline": "รันไปป์ไลน์",
+    "stopPipeline": "หยุดไปป์ไลน์",
+    "generateContent": "สร้างเนื้อหา"
+  },
+  "palette": {
+    "title": "โหนด",
+    "subtitle": "ลากลงบนแคนวาสเพื่อเพิ่มและเชื่อม",
+    "collapseAria": "ยุบแผงโหนด",
+    "expandAria": "ขยายแผงโหนด",
+    "dragAria": "ลาก {{label}} ลงบนแคนวาส"
+  },
+  "properties": {
+    "title": "คุณสมบัติ",
+    "configuration": "การตั้งค่า",
+    "branchChannelsHint": "เพิ่มช่องทางกระจายอย่างน้อยสองช่องทางในกฎแคมเปญเพื่อเปิดใช้การแยกสาย",
+    "channelLanes": "สายช่องทาง",
+    "applyHint": "การเปลี่ยนแปลงใช้กับรันนี้เท่านั้น บันทึกเวิร์กโฟลว์เพื่อเก็บถาวร",
+    "applyChanges": "ใช้การเปลี่ยนแปลง",
+    "applyChangesNow": "ใช้การเปลี่ยนแปลงทันที",
+    "reset": "รีเซ็ต"
+  },
+  "branchNode": {
+    "label": "แยกสาย",
+    "channelLanes_one": "{{count}} สายช่องทาง",
+    "channelLanes_other": "{{count}} สายช่องทาง",
+    "channelsFromRule": "ช่องทางมาจากกฎแคมเปญ"
+  },
+  "mergeNode": {
+    "label": "รวมสาย",
+    "waitsForLanes_one": "รอ {{count}} สาย",
+    "waitsForLanes_other": "รอ {{count}} สาย",
+    "fanInBarrier": "จุดรวมสาย"
+  },
+  "rfNode": {
+    "locked": "ล็อก",
+    "previewAlt": "ตัวอย่างผลลัพธ์โหนด",
+    "deleteAria": "ลบโหนด",
+    "retry": "ลองใหม่",
+    "skip": "ข้าม"
+  },
+  "presenter": {
+    "saveWorkflowFirst": "บันทึกเวิร์กโฟลว์ก่อนอัปโหลดอวตาร",
+    "saveFailed": "บันทึกการตั้งค่าผู้นำเสนอไม่ได้ บันทึกเวิร์กโฟลว์แล้วลองอีกครั้ง",
+    "deleteConfirm": "ลบ \"{{name}}\" จากบัญชี HeyGen ของคุณ? ไม่สามารถยกเลิกได้",
+    "deleteFailed": "ลบอวตารไม่ได้ ลองอีกครั้ง",
+    "fileTooLarge": "รูปต้องไม่เกิน 32MB",
+    "uploadFailed": "อัปโหลดล้มเหลว ลองอีกครั้ง",
+    "avatar": "อวตาร",
+    "clearSelection": "ล้างการเลือก",
+    "loadingAvatars": "กำลังโหลดอวตาร…",
+    "loadAvatarsFailed": "โหลดอวตารไม่ได้",
+    "noAvatars": "ยังไม่มีอวตาร อัปโหลดด้านล่าง",
+    "uploadNewAvatar": "อัปโหลดอวตารใหม่",
+    "uploadAvatarHint": "PNG/JPEG · หันหน้าตรง · สูงสุด 32MB",
+    "backgroundImage": "ภาพพื้นหลัง",
+    "backgroundHint": "พื้นหลังกำหนดเอง (ไม่บังคับ)",
+    "voice": "เสียง",
+    "voiceSaveFailed": "บันทึกเสียงไม่ได้ บันทึกเวิร์กโฟลว์แล้วลองอีกครั้ง",
+    "clickOrDrag": "คลิกหรือลากรูปมาที่นี่",
+    "uploading": "กำลังอัปโหลด…"
+  },
+  "voicePicker": {
+    "genderAll": "ทั้งหมด",
+    "genderMale": "ชาย",
+    "genderFemale": "หญิง",
+    "language": "ภาษา",
+    "search": "ค้นหา",
+    "searchPlaceholder": "ชื่อ…",
+    "loadingSelection": "กำลังโหลดการเลือก…",
+    "noVoiceSelected": "ยังไม่ได้เลือกเสียง",
+    "voicesAria": "เสียง HeyGen",
+    "loadingVoices": "กำลังโหลดเสียง…",
+    "loadVoicesFailed": "โหลดเสียงไม่ได้",
+    "noSearchResults": "ไม่พบเสียงที่ตรงกับการค้นหาในผลที่โหลด",
+    "noFilterResults": "ไม่มีเสียงสำหรับตัวกรองนี้",
+    "unknownLanguage": "ภาษาไม่ทราบ",
+    "loadMore": "โหลดเพิ่ม (แสดง {{count}})",
+    "stopPreview": "หยุดตัวอย่าง {{name}}",
+    "playPreview": "เล่นตัวอย่าง {{name}}",
+    "previewPlayFailed": "เล่นตัวอย่าง {{name}} ไม่ได้",
+    "previewLoadFailed": "โหลดตัวอย่าง {{name}} ไม่ได้"
+  },
+  "canvas": {
+    "cannotAddNode": "เพิ่มโหนดที่นี่ไม่ได้",
+    "imageSizeAdjusted": "ปรับขนาดภาพให้ตรงกับโมเดลที่เลือก (OpenAI รองรับเฉพาะขนาดบางแบบ)",
+    "removedLanes": "ลบสาย: {{lanes}}",
+    "videoSettingsSaveFailed": "บันทึกการตั้งค่าวิดีโอไม่ได้ ใช้บันทึกเวิร์กโฟลว์ก่อนรัน"
+  },
+  "toasts": {
+    "replacedAdaptNodes": "แทนที่โหนด Adapt ที่ไม่ได้กำหนดสายด้วย Adapt ต่อช่องทางจาก Branch",
+    "branchNeedsChannels": "Branch ต้องมีช่องทางกระจายอย่างน้อยสองช่องทางในกฎแคมเปญ",
+    "addNodeBeforeSave": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนบันทึก",
+    "pipelineStartFailed": "เริ่มไปป์ไลน์ไม่ได้ ลองอีกครั้ง",
+    "enterPostTopic": "กรุณาใส่สิ่งที่ต้องการโพสต์",
+    "addNodeBeforeRun": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนรัน",
+    "saveBeforeRunPresenter": "บันทึกเวิร์กโฟลว์ก่อนรัน (การตั้งค่าผู้นำเสนอยังไม่ได้บันทึก)",
+    "retryFailed": "ลองใหม่ไม่ได้ ลองอีกครั้ง",
+    "skipFailed": "ข้ามไม่ได้ ลองอีกครั้ง",
+    "describeWorkflow": "กรุณาอธิบายเวิร์กโฟลว์ที่ต้องการสร้าง",
+    "noReplanNode": "ไม่มีโหนดสำหรับแนบ replan",
+    "translationInserted": "แทรกโหนดแปลแล้ว กำลังดำเนินการต่อ…",
+    "replanFailed": "Replan ล้มเหลว",
+    "pipelineStopped": "หยุดไปป์ไลน์แล้ว"
+  },
+  "processing": {
+    "generating": "กำลังสร้าง...",
+    "retrying": "กำลังลองใหม่... ครั้งที่ {{attempt}}/{{max}}",
+    "running": "กำลังรัน...",
+    "nodesCompleted": "เสร็จ {{completed}} จาก {{total}} โหนด",
+    "pipelinePaused": "ไปป์ไลน์หยุดชั่วคราว",
+    "pipelinePausedChannel": "ไปป์ไลน์หยุดชั่วคราว (ช่องทาง: {{channel}})",
+    "pipelinePausedHint": "— ลองใหม่ที่โหนดที่ล้มเหลวหรือใช้ replan ด้านล่าง",
+    "addTranslationLane": "เพิ่มแปล (สาย)",
+    "startOver": "เริ่มใหม่",
+    "systemMessagesEnglishHint": "ข้อความจากเซิร์ฟเวอร์อาจแสดงเป็นภาษาอังกฤษ"
+  },
+  "promptBar": {
+    "describeStructure": "อธิบายเวิร์กโฟลว์นี้ (โครงสร้าง)",
+    "postTopic": "ต้องการโพสต์เรื่องอะไร?",
+    "structurePlaceholder": "เช่น แคปชัน Instagram + Facebook แปลไทย ภาพหลัก…",
+    "postPlaceholder": "เช่น ลดราคาคริสต์มาส 50% จนถึง 25 ธ.ค.…",
+    "exitPreviewHint": "ล้างหรือคลิกไปป์ไลน์ที่เลือกอีกครั้งเพื่อออกจากตัวอย่างและสร้าง",
+    "saveBeforeGenerateHint": "บันทึกการแก้เวิร์กโฟลว์หรือใช้การตั้งค่าโหนดก่อนสร้าง ยังแก้พรอมpt นี้ได้",
+    "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}"
+  },
+  "nodesLabel_one": "โหนด",
+  "nodesLabel_other": "โหนด",
+  "dialogs": {
+    "rebuildTitle": "สร้างโหนดเวิร์กโฟลว์ใหม่",
+    "rebuildDescription": "แทนที่เลย์เอาต์โหนดปัจจุบันจากกฎและบันทึกของคุณ หัวข้อต่อโพสต์อยู่ในพรอมpt สร้างเนื้อหา ไม่ใช่ที่นี่",
+    "rebuildPlaceholder": "ไม่บังคับ: ช่องทาง รูปแบบ แปล สื่อ… ว่างไว้เพื่ออนุมานจากกฎ",
+    "rebuilding": "กำลังสร้างใหม่…",
+    "rebuild": "สร้างใหม่"
+  },
+  "fab": {
+    "workflowContents": "เนื้อหาเวิร์กโฟลว์",
+    "goHome": "ไปหน้าแรก",
+    "goToRules": "ไปกฎ"
+  },
+  "errors": {
+    "generateWorkflowFailed": "สร้างเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง",
+    "somethingWrong": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+    "invalidUrl": "URL เวิร์กโฟลว์ไม่ถูกต้อง เปิดจากกฎ",
+    "loadWorkflowsFailed": "โหลดเวิร์กโฟลว์ไม่ได้",
+    "pipelineContentNotFound": "ไปป์ไลน์เสร็จแล้วแต่ไม่พบเนื้อหา"
+  },
+  "generationProgress": {
+    "title": "กำลังสร้างเวิร์กโฟลว์",
+    "titleFailed": "สร้างเวิร์กโฟลว์ล้มเหลว",
+    "subtitle": "การสร้างเวิร์กโฟลว์",
+    "started": "กำลังเตรียมเวิร์กโฟลว์…",
+    "generating": "กำลังสร้างเวิร์กโฟลว์…",
+    "failed": "สร้างล้มเหลว",
+    "aiSelecting": "AI กำลังเลือกโหนดที่เหมาะกับเนื้อหาของคุณ…",
+    "chipStarted": "เริ่มแล้ว",
+    "chipGenerating": "กำลังสร้าง",
+    "chipFailed": "ล้มเหลว"
+  },
+  "contentDrawer": {
+    "title": "เนื้อหาที่สร้างแล้ว",
+    "description": "เนื้อหาล่าสุดสำหรับเวิร์กโฟลว์นี้",
+    "loading": "กำลังโหลด...",
+    "empty": "ยังไม่มีเนื้อหาสำหรับเวิร์กโฟลว์นี้",
+    "loadingMore": "กำลังโหลดเพิ่ม...",
+    "viewMore": "ดูเพิ่ม"
+  },
+  "usedPipelines": {
+    "aria": "ไปป์ไลน์ที่ใช้แล้ว",
+    "title": "ไปป์ไลน์ที่ใช้แล้ว",
+    "previewing": "กำลังดูรัน · คลิกอีกครั้งหรือล้างเพื่อแก้เวิร์กโฟลว์",
+    "clear": "ล้าง",
+    "noPrompt": "ไม่มีพรอมpt",
+    "nodes_one": "โหนด",
+    "nodes_other": "โหนด",
+    "empty": "ยังไม่มีไปป์ไลน์สำหรับเวิร์กโฟลว์นี้",
+    "loading": "กำลังโหลดไปป์ไลน์…",
+    "loadMore": "โหลดเพิ่ม",
+    "loadingMore": "กำลังโหลด…"
+  },
+  "workflowsList": {
+    "library": "คลัง",
+    "title": "เวิร์กโฟลว์",
+    "subtitle": "เรียกดูเวิร์กโฟลว์แบบการ์ด กรองตามประเภทโหนด และเปิดตัวแก้ไข",
+    "searchPlaceholder": "ค้นหาตามชื่อเวิร์กโฟลว์…",
+    "searchAria": "ค้นหาเวิร์กโฟลว์",
+    "nodeTypePlaceholder": "ประเภทโหนด",
+    "allNodeTypes": "ทุกประเภทโหนด",
+    "perPage": "{{count}} ต่อหน้า",
+    "loadErrorTitle": "โหลดเวิร์กโฟลว์ไม่ได้",
+    "emptyTitle": "ไม่พบเวิร์กโฟลว์",
+    "emptyFiltered": "ลองปรับการค้นหาหรือตัวกรองประเภทโหนด",
+    "emptyDefault": "สร้างเวิร์กโฟลว์จากกฎเพื่อแสดงที่นี่",
+    "noNodesYet": "ยังไม่มีโหนด",
+    "updated": "อัปเดต {{date}}",
+    "showing": "แสดง {{count}} ในหน้านี้ · ทั้งหมด {{total}}",
+    "pageOf": "หน้า {{page}} จาก {{totalPages}}"
+  },
+  "promptPage": {
+    "selectedRule": "กฎที่เลือก",
+    "title": "ต้องการสร้างอะไร?",
+    "subtitle": "อธิบายเนื้อหาที่ต้องการ เราจะสร้างเวิร์กโฟลว์ที่เหมาะให้",
+    "placeholder": "เช่น โพสต์เปิดตัวสินค้าใหม่สำหรับมืออาชีพรุ่นใหม่…",
+    "generating": "กำลังสร้างเวิร์กโฟลว์…",
+    "existingBanner": "ทำต่อจากเวิร์กโฟลว์ที่บันทึกไว้ หรืออยู่ที่นี่เพื่อสร้างใหม่",
+    "backToRules": "กลับไปตั้งค่ากฎ",
+    "openExisting": "เปิดเวิร์กโฟลว์ที่มีอยู่",
+    "noExisting": "ยังไม่มีเวิร์กโฟลว์"
+  },
+  "generatePage": {
+    "preparing": "กำลังเตรียมเวิร์กโฟลว์…",
+    "building": "กำลังสร้างเวิร์กโฟลว์…",
+    "title": "โหนดเวิร์กโฟลว์",
+    "addNode": "เพิ่มโหนด",
+    "saving": "กำลังบันทึก…",
+    "saveChanges": "บันทึกการเปลี่ยนแปลง"
+  },
+  "addNodeSelector": {
+    "title": "เพิ่มโหนด",
+    "fallbackDescription": "เพิ่มขั้นตอนนี้ในเวิร์กโฟลว์"
+  },
+  "nodeCard": {
+    "nodeSettings": "การตั้งค่าโหนด",
+    "runTopicHint": "หัวข้อโพสต์ตั้งตอนรันเวิร์กโฟลว์ ไม่ใช่ที่นี่",
+    "defaultPlannerSettings": "ตั้งค่า planner เริ่มต้น",
+    "defaultTextSettings": "ตั้งค่าข้อความเริ่มต้น",
+    "defaultImageSettings": "ตั้งค่าภาพเริ่มต้น",
+    "defaultVideoSettings": "ตั้งค่าวิดีโอเริ่มต้น",
+    "defaultSummarySettings": "ตั้งค่าสรุปเริ่มต้น",
+    "reflowOk": "จัดรูปแบบใหม่ได้",
+    "presenter": "ผู้นำเสนอ",
+    "cinematic": "ภาพยนตร์"
+  },
+  "rebuildTooltip": "รีเฟรชโหนดเวิร์กโฟลว์จากกฎและช่องทางปัจจุบัน",
+  "aria": {
+    "openNodeSettings": "เปิดการตั้งค่าโหนด",
+    "addNode": "เพิ่มโหนด",
+    "deleteNode": "ลบโหนด",
+    "insertNode": "แทรกโหนด",
+    "deleteAvatar": "ลบ {{name}}"
+  }
+}

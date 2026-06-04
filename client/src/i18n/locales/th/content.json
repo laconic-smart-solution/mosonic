@@ -1,0 +1,146 @@
+{
+  "page": {
+    "title": "คลังเนื้อหา",
+    "subtitle": "เนื้อหาที่สร้างทั้งหมดจากทุกแคมเปญ",
+    "loadError": "โหลดเนื้อหาไม่สำเร็จ",
+    "loadErrorTitle": "โหลดเนื้อหาไม่ได้"
+  },
+  "stats": {
+    "total": "เนื้อหาทั้งหมด",
+    "pageCountsHint": "จำนวนร่าง อนุมัติ และปฏิเสธ แสดงเฉพาะรายการในหน้านี้"
+  },
+  "filters": {
+    "status": "สถานะ",
+    "allStatus": "ทุกสถานะ",
+    "perPage": "ต่อหน้า",
+    "perPageCount": "{{count}} ต่อหน้า",
+    "outputs": "เอาต์พุต",
+    "hasImage": "มีรูปภาพ",
+    "hasVideo": "มีวิดีโอ",
+    "hasSummary": "มีสรุป",
+    "sortNewest": "ใหม่สุดก่อน",
+    "sortOldest": "เก่าสุดก่อน",
+    "sortTitle": "แคมเปญ ก–ฮ",
+    "sortStatus": "ตามสถานะ"
+  },
+  "list": {
+    "showing": "แสดง",
+    "of": "จาก",
+    "onThisPage": "ในหน้านี้",
+    "totalWord": "รวม",
+    "page": "หน้า",
+    "pageOf": "จาก",
+    "emptyTitle": "ยังไม่มีเนื้อหา",
+    "emptySearch": "ไม่พบเนื้อหาที่ตรงกับการค้นหาหรือตัวกรอง",
+    "emptyDefault": "รันเวิร์กโฟลว์เพื่อสร้างเนื้อหา หรือผ่อนตัวกรองสถานะ",
+    "campaign": "แคมเปญ",
+    "channels": "{{count}} ช่องทาง",
+    "outputs": "เอาต์พุต",
+    "workflow": "เวิร์กโฟลว์",
+    "pipeline": "ไปป์ไลน์",
+    "copyLink": "คัดลอกลิงก์",
+    "open": "เปิด",
+    "heroCaption": "คำบรรยาย",
+    "heroText": "ข้อความ",
+    "heroSummary": "สรุป",
+    "heroTranslation": "แปล",
+    "heroTranscript": "ถอดเสียง",
+    "textOrTranscript": "ข้อความหรือถอดเสียง",
+    "video": "วิดีโอ",
+    "image": "รูปภาพ",
+    "translation": "แปล",
+    "summary": "สรุป"
+  },
+  "status": {
+    "draft": "ร่าง",
+    "in_review": "กำลังตรวจ",
+    "approved": "อนุมัติแล้ว",
+    "rejected": "ปฏิเสธ"
+  },
+  "cardTitle": {
+    "draft": "เนื้อหาร่าง",
+    "in_review": "เนื้อหากำลังตรวจ",
+    "approved": "เนื้อหาที่อนุมัติ",
+    "rejected": "เนื้อหาที่ปฏิเสธ"
+  },
+  "display": {
+    "linkedCampaign": "แคมเปญที่เชื่อม",
+    "linkedPipeline": "ไปป์ไลน์ที่เชื่อม",
+    "videoContent": "เนื้อหาวิดีโอ",
+    "imageContent": "เนื้อหารูปภาพ",
+    "workflow": "เวิร์กโฟลว์"
+  },
+  "output": {
+    "keywords": "คำหลัก",
+    "text": "ข้อความ",
+    "translatedText": "แปล",
+    "image": "รูปภาพ",
+    "video": "วิดีโอ",
+    "transcription": "ถอดเสียง",
+    "summary": "สรุป"
+  },
+  "nodeType": {
+    "keyword_planner": "คำหลัก",
+    "text_generation": "สร้างข้อความ",
+    "image_generation": "สร้างรูป",
+    "translation": "แปล",
+    "video_generation": "สร้างวิดีโอ",
+    "transcription": "ถอดเสียง",
+    "summarization": "สรุป"
+  },
+  "relativeTime": {
+    "justNow": "เมื่อสักครู่",
+    "minutesAgo": "{{count}} นาทีที่แล้ว",
+    "hoursAgo": "{{count}} ชม.ที่แล้ว",
+    "daysAgo": "{{count}} วันที่แล้ว",
+    "weeksAgo": "{{count}} สัปดาห์ที่แล้ว"
+  },
+  "toast": {
+    "linkCopied": "คัดลอกลิงก์แล้ว",
+    "copyFailed": "คัดลอกไม่สำเร็จ"
+  },
+  "redirect": {
+    "openFailed": "เปิดอัปโหลดสำหรับเนื้อหานี้ไม่ได้",
+    "opening": "กำลังเปิดอัปโหลด…"
+  },
+  "news": {
+    "banner": "สร้างจากข่าว",
+    "viewSource": "ดูแหล่งที่มา"
+  },
+  "review": {
+    "breadcrumbContent": "เนื้อหา",
+    "breadcrumbReview": "ตรวจสอบ",
+    "badgeError": "ผิดพลาด",
+    "badgeWorking": "กำลังทำ",
+    "badgeGenerated": "สร้างแล้ว",
+    "badgeEmpty": "ว่าง",
+    "remove": "ลบ",
+    "generating": "กำลังสร้าง…",
+    "targetLanguage": "ภาษาเป้าหมาย",
+    "editHint": "แก้ไขได้โดยตรง บันทึกจากแถบด้านข้าง",
+    "uploadImage": "วางหรือคลิกเพื่ออัปโหลด (JPG, PNG)",
+    "uploadVideo": "วางหรือคลิกเพื่ออัปโหลด (MP4)",
+    "rerunNode": "รันโหนดใหม่",
+    "copy": "คัดลอก",
+    "retry": "ลองใหม่",
+    "decisionTitle": "การตัดสินใจตรวจสอบ",
+    "approveSend": "อนุมัติและส่งไปอัปโหลด",
+    "rejectDraft": "ปฏิเสธร่าง",
+    "infoTitle": "ข้อมูลเนื้อหา",
+    "workflow": "เวิร์กโฟลว์:",
+    "rule": "กฎ:",
+    "pipeline": "ไปป์ไลน์:",
+    "versionTitle": "ประวัติเวอร์ชัน",
+    "nodeStatusTitle": "สถานะโหนด",
+    "nodeDone": "เสร็จ",
+    "nodePending": "รอดำเนินการ",
+    "generated": "สร้างแล้ว",
+    "rerun": "รันใหม่"
+  },
+  "version": {
+    "restore": "กู้คืน"
+  },
+  "header": {
+    "updated": "อัปเดต {{date}}"
+  }
+}

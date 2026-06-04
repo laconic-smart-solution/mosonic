@@ -1,0 +1,146 @@
+{
+  "page": {
+    "title": "内容库",
+    "subtitle": "各营销活动生成的全部内容",
+    "loadError": "加载内容失败。",
+    "loadErrorTitle": "无法加载内容"
+  },
+  "stats": {
+    "total": "内容总数",
+    "pageCountsHint": "草稿、已批准和已拒绝的数量仅反映当前页的项目。"
+  },
+  "filters": {
+    "status": "状态",
+    "allStatus": "全部状态",
+    "perPage": "每页",
+    "perPageCount": "每页 {{count}} 条",
+    "outputs": "输出",
+    "hasImage": "含图片",
+    "hasVideo": "含视频",
+    "hasSummary": "含摘要",
+    "sortNewest": "最新优先",
+    "sortOldest": "最早优先",
+    "sortTitle": "活动 A→Z",
+    "sortStatus": "按状态"
+  },
+  "list": {
+    "showing": "显示",
+    "of": "/",
+    "onThisPage": "（本页）",
+    "totalWord": "条总计",
+    "page": "第",
+    "pageOf": "/",
+    "emptyTitle": "暂无内容",
+    "emptySearch": "没有符合搜索或筛选条件的内容。",
+    "emptyDefault": "运行工作流生成内容，或放宽状态筛选。",
+    "campaign": "活动",
+    "channels": "{{count}} 个渠道",
+    "outputs": "输出",
+    "workflow": "工作流",
+    "pipeline": "流水线",
+    "copyLink": "复制链接",
+    "open": "打开",
+    "heroCaption": "文案",
+    "heroText": "文本",
+    "heroSummary": "摘要",
+    "heroTranslation": "翻译",
+    "heroTranscript": "转录",
+    "textOrTranscript": "文本或转录",
+    "video": "视频",
+    "image": "图片",
+    "translation": "翻译",
+    "summary": "摘要"
+  },
+  "status": {
+    "draft": "草稿",
+    "in_review": "审核中",
+    "approved": "已批准",
+    "rejected": "已拒绝"
+  },
+  "cardTitle": {
+    "draft": "草稿内容",
+    "in_review": "审核中的内容",
+    "approved": "已批准内容",
+    "rejected": "已拒绝内容"
+  },
+  "display": {
+    "linkedCampaign": "关联活动",
+    "linkedPipeline": "关联流水线",
+    "videoContent": "视频内容",
+    "imageContent": "图片内容",
+    "workflow": "工作流"
+  },
+  "output": {
+    "keywords": "关键词",
+    "text": "文本",
+    "translatedText": "翻译",
+    "image": "图片",
+    "video": "视频",
+    "transcription": "转录",
+    "summary": "摘要"
+  },
+  "nodeType": {
+    "keyword_planner": "关键词",
+    "text_generation": "文本生成",
+    "image_generation": "图片生成",
+    "translation": "翻译",
+    "video_generation": "视频生成",
+    "transcription": "转录",
+    "summarization": "摘要"
+  },
+  "relativeTime": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前",
+    "weeksAgo": "{{count}} 周前"
+  },
+  "toast": {
+    "linkCopied": "链接已复制",
+    "copyFailed": "复制失败"
+  },
+  "redirect": {
+    "openFailed": "无法为此内容打开上传页面。",
+    "opening": "正在打开上传…"
+  },
+  "news": {
+    "banner": "由新闻生成",
+    "viewSource": "查看来源"
+  },
+  "review": {
+    "breadcrumbContent": "内容",
+    "breadcrumbReview": "审核",
+    "badgeError": "错误",
+    "badgeWorking": "处理中",
+    "badgeGenerated": "已生成",
+    "badgeEmpty": "空",
+    "remove": "移除",
+    "generating": "生成中…",
+    "targetLanguage": "目标语言",
+    "editHint": "可直接编辑；请从侧栏保存。",
+    "uploadImage": "拖放或点击上传（JPG、PNG）",
+    "uploadVideo": "拖放或点击上传（MP4）",
+    "rerunNode": "重新运行节点",
+    "copy": "复制",
+    "retry": "重试",
+    "decisionTitle": "审核决定",
+    "approveSend": "批准并发送到上传",
+    "rejectDraft": "拒绝草稿",
+    "infoTitle": "内容信息",
+    "workflow": "工作流：",
+    "rule": "规则：",
+    "pipeline": "流水线：",
+    "versionTitle": "版本历史",
+    "nodeStatusTitle": "节点状态",
+    "nodeDone": "完成",
+    "nodePending": "待处理",
+    "generated": "已生成",
+    "rerun": "重新运行"
+  },
+  "version": {
+    "restore": "恢复"
+  },
+  "header": {
+    "updated": "更新于 {{date}}"
+  }
+}

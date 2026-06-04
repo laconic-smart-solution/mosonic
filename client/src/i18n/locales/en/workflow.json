@@ -1,0 +1,498 @@
+{
+  "nodeTypes": {
+    "keywords": "Keyword Planner",
+    "text": "Text Generation",
+    "image": "Image Generation",
+    "video": "Video Generation",
+    "translation": "Translation",
+    "transcription": "Transcription",
+    "summarization": "Summarization",
+    "branch": "Branch",
+    "adapt": "Adapt",
+    "merge": "Merge",
+    "intelligence": "Intelligence"
+  },
+  "nodeTypesShort": {
+    "keywords": "Keywords",
+    "text": "Text Generation",
+    "image": "Image",
+    "video": "Video",
+    "translation": "Translation",
+    "transcription": "Transcription",
+    "summarization": "Summary",
+    "branch": "Branch",
+    "adapt": "Adapt",
+    "merge": "Merge",
+    "intelligence": "Intelligence"
+  },
+  "nodeTypesBackend": {
+    "keyword_planner": "Keyword planner",
+    "text_generation": "Text / LLM",
+    "image_generation": "Image",
+    "video_generation": "Video",
+    "translation": "Translation",
+    "transcription": "Transcription",
+    "summarization": "Summarization"
+  },
+  "laneNodeLabel": {
+    "forChannel": "{{type}} For {{channel}}"
+  },
+  "guide": {
+    "labels": {
+      "usage": "Usage",
+      "example": "Example",
+      "tip": "Tip"
+    },
+    "defaultFallback": "Tune how this step runs using the fields below. The topic or campaign brief is entered when you generate content (pipeline run), not on the node.",
+    "keywords": {
+      "usage": "Generates SEO keywords and themes from your campaign brief when the pipeline runs. Add zero or more nodes anywhere upstream of text or image steps that should use planned terms.",
+      "example": "Keywords → Text Generation: plan terms for a product launch, then write a caption that uses those keywords naturally."
+    },
+    "text": {
+      "usage": "Creates post copy using the run prompt plus upstream outputs (keywords, intelligence hints, etc.). Add as many text nodes as you need and wire them like any other step.",
+      "example": "After Keywords, set tone to Professional and length to Medium to produce a LinkedIn-ready paragraph for your brief.",
+      "tips": "The campaign topic is entered when you start a pipeline run, not in this panel."
+    },
+    "image": {
+      "usage": "Generates an image from upstream text or keywords. Configure aspect ratio and style to match the channels in your rule.",
+      "example": "Text → Image with 1:1 aspect ratio and Natural style for an Instagram feed hero image based on the post caption."
+    },
+    "video": {
+      "usage": "Produces a short video clip from the run prompt and upstream assets (often text or a reference image). Runs on a dedicated video queue and may take longer than other nodes.",
+      "example": "Image → Video at 9:16 and 8s duration to turn a static product shot into a vertical reel."
+    },
+    "translation": {
+      "usage": "Translates text produced by an upstream node into a target language. Use when the same campaign needs localized copy without rewriting from scratch.",
+      "example": "English Text → Translation (target Thai) before an Adapt node on a Facebook lane for the Thai market."
+    },
+    "transcription": {
+      "usage": "Converts audio or video from an upstream asset into text. Useful when your source material is a recording rather than written copy.",
+      "example": "Video → Transcription (auto language) → Summarization to get bullet points from a webinar clip."
+    },
+    "summarization": {
+      "usage": "Shortens long upstream text into a summary. Choose length and output shape (paragraph, bullets, or TL;DR) to fit channel limits.",
+      "example": "Transcription → Summarization with Medium length and Bullets for carousel slide copy."
+    },
+    "branch": {
+      "usage": "Fans out execution into parallel channel lanes (from your rule's channels, manual selection, or A/B variants). At run time the system materializes one subgraph per lane between Branch and Merge.",
+      "example": "Text → Branch (rule channels) → Adapt → Merge when posting the same campaign to Instagram, Facebook, and LinkedIn with per-channel captions.",
+      "tips": "Connect Branch to a Merge node downstream so all lanes complete before finalize."
+    },
+    "adapt": {
+      "usage": "Tailors shared copy to a specific channel's style and mapping (caption length, tone, hashtags). One adapt node per lane after materialization; channel is set automatically from the rule.",
+      "example": "On the Instagram lane after Branch: adapt rewrites the shared text into a caption that fits Instagram's content style from your rule.",
+      "tips": "You do not configure the channel here—it comes from the lane created at materialization."
+    },
+    "merge": {
+      "usage": "Waits for all parallel lane branches to finish (completed or skipped) before the pipeline can finalize content and upload. Acts as a fan-in barrier with no LLM step.",
+      "example": "Branch → Adapt (per channel) → Merge: merge blocks until every lane's adapt node has finished, then content is assembled for review."
+    },
+    "intelligence": {
+      "usage": "Runs a web search brief (trend, market, competitor, or all) via OpenAI and injects the result into downstream text generation. Optional analytics overlay when you start a run with latest learnings.",
+      "example": "Intelligence (All) → Text: one search covers hashtags, industry news, and competitor gaps before copy is written.",
+      "tips": "Use \"All\" for one call instead of stacking multiple Intelligence nodes. Choose Custom when you need a specific research question."
+    }
+  },
+  "popoverDescriptions": {
+    "keywords": "Plan keywords and topics first",
+    "intelligence": "Fetch trends and market signals first",
+    "text": "Generate content with AI",
+    "transcription": "Transcribe audio or video first",
+    "branch": "Fan out to parallel channel lanes",
+    "adapt": "Rewrite for this channel",
+    "image": "Create images with AI",
+    "video": "Create video with AI",
+    "summarization": "Summarize upstream content",
+    "translation": "Translate to target language",
+    "merge": "Collect all lanes before finalize"
+  },
+  "fields": {
+    "shared": {
+      "on": "On",
+      "off": "Off"
+    },
+    "text": {
+      "outputFormat": { "label": "Output Format" },
+      "tone": { "label": "Writing tone" },
+      "textLength": { "label": "Length" }
+    },
+    "image": {
+      "style": { "label": "Style" },
+      "aspectRatio": { "label": "Aspect Ratio" },
+      "quality": { "label": "Quality" },
+      "negativePrompt": {
+        "label": "Negative prompt",
+        "placeholder": "Optional — things to avoid in the image"
+      }
+    },
+    "video": {
+      "mode": { "label": "Mode" },
+      "aspectRatio": { "label": "Aspect Ratio" },
+      "duration": { "label": "Duration" },
+      "targetDuration": { "label": "Target duration" },
+      "resolution": { "label": "Resolution" },
+      "negativePrompt": {
+        "label": "Negative prompt",
+        "placeholder": "Optional — extra things to avoid in the video"
+      },
+      "heygenOrientation": { "label": "Orientation" },
+      "heygenExpressiveness": { "label": "Expressiveness" },
+      "removeBackground": { "label": "Remove original photo background" },
+      "heygenMotionPrompt": {
+        "label": "Motion prompt (optional)",
+        "placeholder": "e.g. nodding gently while presenting"
+      }
+    },
+    "translation": {
+      "sourceLanguage": { "label": "Source Language" },
+      "targetLanguage": { "label": "Target Language" },
+      "formalityLevel": { "label": "Formality" },
+      "preserveFormatting": { "label": "Preserve formatting" }
+    },
+    "transcription": {
+      "language": { "label": "Language" }
+    },
+    "summarization": {
+      "summaryLength": { "label": "Summary Length" },
+      "outputFormat": { "label": "Output shape" }
+    },
+    "intelligence": {
+      "searchType": { "label": "Search type" },
+      "customPrompt": {
+        "label": "Custom search prompt",
+        "placeholder": "Describe what to search for…"
+      }
+    },
+    "options": {
+      "paragraph": "Paragraph",
+      "bullets": "Bullets",
+      "caption": "Caption",
+      "professional": "Professional",
+      "casual": "Casual",
+      "friendly": "Friendly",
+      "formal": "Formal",
+      "witty": "Witty",
+      "short": "Short",
+      "medium": "Medium",
+      "long": "Long",
+      "natural": "Natural",
+      "vivid": "Vivid",
+      "standard": "Standard",
+      "hd": "HD",
+      "cinematic": "Cinematic",
+      "presenter": "Presenter",
+      "landscape169": "Landscape 16:9",
+      "portrait916": "Portrait 9:16",
+      "resolution720p": "720p (Sora 2)",
+      "duration4s": "4s",
+      "duration8s": "8s",
+      "duration12s": "12s",
+      "duration16s": "16s",
+      "duration20s": "20s",
+      "low": "Low",
+      "high": "High",
+      "autoDetect": "Auto-detect",
+      "auto": "Auto",
+      "english": "English",
+      "thai": "Thai",
+      "japanese": "Japanese",
+      "chinese": "Chinese",
+      "korean": "Korean",
+      "spanish": "Spanish",
+      "french": "French",
+      "german": "German",
+      "tldr": "TL;DR",
+      "searchAll": "All (trend + market + competitor)",
+      "searchTrend": "Trend — hashtags & formats",
+      "searchMarket": "Market — news & signals",
+      "searchCompetitor": "Competitor — gaps & angles",
+      "searchCustom": "Custom — your own prompt"
+    }
+  },
+  "configSummary": {
+    "textSettings": "Text settings",
+    "imageSettings": "Image settings",
+    "videoSettings": "Video settings",
+    "translation": "Translation",
+    "keywordPlanner": "Keyword planner",
+    "summary": "Summary",
+    "transcription": "Transcription",
+    "fromCampaignRule": "From campaign rule",
+    "channelAdapt": "Channel adapt",
+    "channel": "Channel: {{channel}}",
+    "fanInBarrier": "Fan-in barrier",
+    "configured": "Configured",
+    "intelligenceTypes": {
+      "all": "All",
+      "trend": "Trend",
+      "market": "Market",
+      "competitor": "Competitor",
+      "custom": "Custom"
+    }
+  },
+  "nodeStatus": {
+    "pending": "Pending",
+    "idle": "Idle",
+    "ready": "Ready",
+    "running": "Running",
+    "streaming": "Streaming",
+    "processing": "Processing",
+    "retrying": "Retrying",
+    "done": "Done",
+    "completed": "Completed",
+    "failed_final": "Failed",
+    "failed": "Failed"
+  },
+  "validation": {
+    "laneAssignment": "{{type}} must be assigned to a channel (add it from a lane node, not from trunk Text).",
+    "presenterAvatarRequired": "Presenter video requires an avatar.",
+    "presenterVoiceRequired": "Presenter video requires a voice."
+  },
+  "toolbar": {
+    "workflowNameAria": "Workflow name",
+    "untitledWorkflow": "Untitled Workflow",
+    "rebuildNodes": "Rebuild nodes",
+    "describeWorkflow": "Describe workflow",
+    "saving": "Saving…",
+    "saveChanges": "Save Changes",
+    "runPipeline": "Run Pipeline",
+    "stopPipeline": "Stop pipeline",
+    "generateContent": "Generate content"
+  },
+  "palette": {
+    "title": "Nodes",
+    "subtitle": "Drag onto the canvas to add and connect",
+    "collapseAria": "Collapse nodes panel",
+    "expandAria": "Expand nodes panel",
+    "dragAria": "Drag {{label}} onto canvas"
+  },
+  "properties": {
+    "title": "Properties",
+    "configuration": "Configuration",
+    "branchChannelsHint": "Add at least two distribution channels on the campaign rule to enable branching.",
+    "channelLanes": "Channel lanes",
+    "applyHint": "Changes apply to this run only. Save the workflow to persist.",
+    "applyChanges": "Apply changes",
+    "applyChangesNow": "Apply changes now",
+    "reset": "Reset"
+  },
+  "branchNode": {
+    "label": "Branch",
+    "channelLanes_one": "{{count}} channel lane",
+    "channelLanes_other": "{{count}} channel lanes",
+    "channelsFromRule": "Channels come from campaign rule"
+  },
+  "mergeNode": {
+    "label": "Merge",
+    "waitsForLanes_one": "Waits for {{count}} lane",
+    "waitsForLanes_other": "Waits for {{count}} lanes",
+    "fanInBarrier": "Fan-in barrier"
+  },
+  "rfNode": {
+    "locked": "Locked",
+    "previewAlt": "Node output preview",
+    "deleteAria": "Delete node",
+    "retry": "Retry",
+    "skip": "Skip"
+  },
+  "presenter": {
+    "saveWorkflowFirst": "Save the workflow before uploading avatars.",
+    "saveFailed": "Presenter settings could not be saved. Save the workflow and try again.",
+    "deleteConfirm": "Delete \"{{name}}\" from your HeyGen account? This cannot be undone.",
+    "deleteFailed": "Could not delete avatar. Try again.",
+    "fileTooLarge": "Image must be 32MB or smaller.",
+    "uploadFailed": "Upload failed. Try again.",
+    "avatar": "Avatar",
+    "clearSelection": "Clear selection",
+    "loadingAvatars": "Loading avatars…",
+    "loadAvatarsFailed": "Could not load avatars.",
+    "noAvatars": "No avatars yet. Upload one below.",
+    "uploadNewAvatar": "Upload new avatar",
+    "uploadAvatarHint": "PNG/JPEG · front-facing · max 32MB",
+    "backgroundImage": "Background image",
+    "backgroundHint": "Optional custom background",
+    "voice": "Voice",
+    "voiceSaveFailed": "Voice could not be saved. Save the workflow and try again.",
+    "clickOrDrag": "Click or drag image here",
+    "uploading": "Uploading…"
+  },
+  "voicePicker": {
+    "genderAll": "All",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "language": "Language",
+    "search": "Search",
+    "searchPlaceholder": "Name…",
+    "loadingSelection": "Loading selection…",
+    "noVoiceSelected": "No voice selected",
+    "voicesAria": "HeyGen voices",
+    "loadingVoices": "Loading voices…",
+    "loadVoicesFailed": "Could not load voices.",
+    "noSearchResults": "No voices match your search in loaded results.",
+    "noFilterResults": "No voices for this filter.",
+    "unknownLanguage": "Unknown language",
+    "loadMore": "Load more ({{count}} shown)",
+    "stopPreview": "Stop preview for {{name}}",
+    "playPreview": "Play preview for {{name}}",
+    "previewPlayFailed": "Could not play preview for {{name}}.",
+    "previewLoadFailed": "Could not load preview for {{name}}."
+  },
+  "canvas": {
+    "cannotAddNode": "Cannot add this node here",
+    "imageSizeAdjusted": "Image size was adjusted to match the selected model (OpenAI only allows certain dimensions).",
+    "removedLanes": "Removed lanes: {{lanes}}",
+    "videoSettingsSaveFailed": "Could not save video settings to the server. Use Save workflow before running."
+  },
+  "toasts": {
+    "replacedAdaptNodes": "Replaced unassigned Adapt nodes with one Adapt per channel from Branch.",
+    "branchNeedsChannels": "Branch requires at least two distribution channels on the campaign rule.",
+    "addNodeBeforeSave": "Add at least one node before saving.",
+    "pipelineStartFailed": "Could not start pipeline. Please try again.",
+    "enterPostTopic": "Please enter what you want to post about.",
+    "addNodeBeforeRun": "Add at least one node before running.",
+    "saveBeforeRunPresenter": "Save the workflow before running (presenter settings were not saved).",
+    "retryFailed": "Could not retry. Please try again.",
+    "skipFailed": "Could not skip. Please try again.",
+    "describeWorkflow": "Please describe what workflow should be generated.",
+    "noReplanNode": "No node to attach replan operation.",
+    "translationInserted": "Translation node inserted; resuming…",
+    "replanFailed": "Replan failed.",
+    "pipelineStopped": "Pipeline stopped"
+  },
+  "processing": {
+    "generating": "Generating...",
+    "retrying": "Retrying... attempt {{attempt}}/{{max}}",
+    "running": "Running...",
+    "nodesCompleted": "{{completed}} of {{total}} nodes completed",
+    "pipelinePaused": "Pipeline paused",
+    "pipelinePausedChannel": "Pipeline paused (channel: {{channel}})",
+    "pipelinePausedHint": "— retry the failed node or use replan actions below.",
+    "addTranslationLane": "Add translation (lane)",
+    "startOver": "Start Over",
+    "systemMessagesEnglishHint": "System messages from the server may appear in English."
+  },
+  "promptBar": {
+    "describeStructure": "Describe this workflow (structure)",
+    "postTopic": "What do you want to post about?",
+    "structurePlaceholder": "e.g. Instagram + Facebook captions, Thai translation, hero image…",
+    "postPlaceholder": "e.g. Our Christmas sale — 50% off all items until Dec 25…",
+    "exitPreviewHint": "Clear or click the selected pipeline again to exit preview and generate.",
+    "saveBeforeGenerateHint": "Save workflow changes or apply node settings before generating. You can still edit this prompt.",
+    "usingWorkflow": "Using workflow: {{name}} · {{count}} {{nodesLabel}}"
+  },
+  "nodesLabel_one": "node",
+  "nodesLabel_other": "nodes",
+  "dialogs": {
+    "rebuildTitle": "Rebuild workflow nodes",
+    "rebuildDescription": "Replaces the current node layout from the rule and your notes. Per-post topics stay in the Generate content prompt, not here.",
+    "rebuildPlaceholder": "Optional: channels, formats, translation, media… Leave blank to infer from the rule.",
+    "rebuilding": "Rebuilding…",
+    "rebuild": "Rebuild"
+  },
+  "fab": {
+    "workflowContents": "Workflow Contents",
+    "goHome": "Go to Home",
+    "goToRules": "Go to Rules"
+  },
+  "errors": {
+    "generateWorkflowFailed": "Could not generate workflow. Please try again.",
+    "somethingWrong": "Something went wrong. Please try again.",
+    "invalidUrl": "Invalid workflow URL. Open a workflow from Rules.",
+    "loadWorkflowsFailed": "Failed to load workflows.",
+    "pipelineContentNotFound": "Pipeline finished but content was not found."
+  },
+  "generationProgress": {
+    "title": "Generating your workflow",
+    "titleFailed": "Workflow generation failed",
+    "subtitle": "Workflow generation",
+    "started": "Preparing your workflow…",
+    "generating": "Building your workflow…",
+    "failed": "Generation failed",
+    "aiSelecting": "AI is selecting the best nodes for your content…",
+    "chipStarted": "started",
+    "chipGenerating": "generating",
+    "chipFailed": "failed"
+  },
+  "contentDrawer": {
+    "title": "Generated Contents",
+    "description": "Latest generated content for this workflow.",
+    "loading": "Loading...",
+    "empty": "No content generated yet for this workflow.",
+    "loadingMore": "Loading more...",
+    "viewMore": "View More"
+  },
+  "usedPipelines": {
+    "aria": "Used pipelines",
+    "title": "Used Pipelines",
+    "previewing": "Previewing run · click again or clear to edit workflow",
+    "clear": "Clear",
+    "noPrompt": "No prompt",
+    "nodes_one": "node",
+    "nodes_other": "nodes",
+    "empty": "No pipelines yet for this workflow.",
+    "loading": "Loading pipelines…",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…"
+  },
+  "workflowsList": {
+    "library": "Library",
+    "title": "Workflows",
+    "subtitle": "Browse workflows in a card grid, filter by node type, and open the editor.",
+    "searchPlaceholder": "Search by workflow name…",
+    "searchAria": "Search workflows",
+    "nodeTypePlaceholder": "Node type",
+    "allNodeTypes": "All node types",
+    "perPage": "{{count}} per page",
+    "loadErrorTitle": "Could not load workflows",
+    "emptyTitle": "No workflows found",
+    "emptyFiltered": "Try adjusting search or the node type filter.",
+    "emptyDefault": "Generate a workflow from a rule to see it listed here.",
+    "noNodesYet": "No nodes yet",
+    "updated": "Updated {{date}}",
+    "showing": "Showing {{count}} on this page · {{total}} total",
+    "pageOf": "Page {{page}} of {{totalPages}}"
+  },
+  "promptPage": {
+    "selectedRule": "Selected rule",
+    "title": "What would you like to create?",
+    "subtitle": "Describe the content you want to produce and we'll build the right workflow for it.",
+    "placeholder": "e.g. A launch post for our new product targeting young professionals…",
+    "generating": "Generating workflow…",
+    "existingBanner": "Continue from your saved workflow, or stay here to generate a new one.",
+    "backToRules": "Back to rule setup",
+    "openExisting": "Open existing workflow",
+    "noExisting": "No existing workflow yet"
+  },
+  "generatePage": {
+    "preparing": "Preparing your workflow…",
+    "building": "Building your workflow…",
+    "title": "Workflow Nodes",
+    "addNode": "Add Node",
+    "saving": "Saving…",
+    "saveChanges": "Save Changes"
+  },
+  "addNodeSelector": {
+    "title": "Add Node",
+    "fallbackDescription": "Add this step to your workflow"
+  },
+  "nodeCard": {
+    "nodeSettings": "Node settings",
+    "runTopicHint": "What to post about is set when you run the workflow, not here.",
+    "defaultPlannerSettings": "Default planner settings",
+    "defaultTextSettings": "Default text settings",
+    "defaultImageSettings": "Default image settings",
+    "defaultVideoSettings": "Default video settings",
+    "defaultSummarySettings": "Default summary settings",
+    "reflowOk": "reflow OK",
+    "presenter": "Presenter",
+    "cinematic": "Cinematic"
+  },
+  "rebuildTooltip": "Refresh workflow nodes from the current rule and channel settings.",
+  "aria": {
+    "openNodeSettings": "Open node settings",
+    "addNode": "Add node",
+    "deleteNode": "Delete node",
+    "insertNode": "Insert node",
+    "deleteAvatar": "Delete {{name}}"
+  }
+}

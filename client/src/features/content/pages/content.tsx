@@ -1,0 +1,485 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { useLocation, useNavigate } from "react-router-dom"
+import { CircleAlertIcon, InboxIcon, X } from "lucide-react"
+import { motion } from "framer-motion"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ContentListCard } from "@/features/content/components/content-list/content-list-card"
+import {
+  PAGE_SIZE_OPTIONS,
+  type SortOption,
+} from "@/features/content/components/content-list/content-list-constants"
+import { ContentListStatCard } from "@/features/content/components/content-list/content-list-stat-card"
+import { ContentPageShell } from "@/features/content/components/content-list/content-page-shell"
+import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { useContentPageQuery } from "@/shared/queries/content.query"
+import type {
+  ContentPageQueryPayload,
+  ContentStatus,
+} from "@/shared/types/content.type"
+import {
+  navigateSearchParams,
+  readListPagination,
+  setListLimitInParams,
+  setListPageInParams,
+  type ListPaginationDefaults,
+} from "@/lib/list-pagination-url"
+import { cn } from "@/lib/utils"
+
+const SEARCH_DEBOUNCE_MS = 300
+
+const CONTENT_PAGINATION_DEFAULTS: ListPaginationDefaults = {
+  defaultPage: 1,
+  defaultLimit: 12,
+  allowedLimits: PAGE_SIZE_OPTIONS,
+}
+
+export default function ContentPage() {
+  const { t } = useTranslation(["content", "common"])
+  const navigate = useNavigate()
+  const location = useLocation()
+  const locationRef = useRef(location)
+  locationRef.current = location
+  const hydrated = useAuthStoreHydrated()
+
+  const { page, limit } = useMemo(
+    () =>
+      readListPagination(
+        new URLSearchParams(location.search),
+        CONTENT_PAGINATION_DEFAULTS
+      ),
+    [location.search]
+  )
+
+  const goToPage = useCallback(
+    (next: number) => {
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListPageInParams(params, next, CONTENT_PAGINATION_DEFAULTS)
+      })
+    },
+    [navigate]
+  )
+
+  const resetToFirstPage = useCallback(() => {
+    navigateSearchParams(navigate, locationRef.current, (params) => {
+      setListPageInParams(params, 1, CONTENT_PAGINATION_DEFAULTS)
+    })
+  }, [navigate])
+
+  const setLimitFromUrl = useCallback(
+    (n: (typeof PAGE_SIZE_OPTIONS)[number]) => {
+      navigateSearchParams(navigate, locationRef.current, (params) => {
+        setListLimitInParams(params, n, CONTENT_PAGINATION_DEFAULTS)
+      })
+    },
+    [navigate]
+  )
+
+  const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all")
+  const [searchInput, setSearchInput] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [sortOption, setSortOption] = useState<SortOption>("newest")
+  const [filterHasImage, setFilterHasImage] = useState(false)
+  const [filterHasVideo, setFilterHasVideo] = useState(false)
+  const [filterHasSummary, setFilterHasSummary] = useState(false)
+
+  /** When true, next debouncedSearch change came from URL (?search=), do not reset page. */
+  const skipPageResetFromUrlSearch = useRef(false)
+  /** Ignore search-driven page resets until the first debounce cycle completes. */
+  const searchDebounceSettled = useRef(false)
+  const resetToFirstPageRef = useRef(resetToFirstPage)
+  resetToFirstPageRef.current = resetToFirstPage
+
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get("search")?.trim()
+    if (!q) {
+      return
+    }
+    skipPageResetFromUrlSearch.current = true
+    searchDebounceSettled.current = true
+    setSearchInput(q)
+    setDebouncedSearch(q)
+  }, [location.search])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      searchDebounceSettled.current = true
+      setDebouncedSearch(searchInput.trim())
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [searchInput])
+
+  useEffect(() => {
+    if (!searchDebounceSettled.current) {
+      return
+    }
+    if (skipPageResetFromUrlSearch.current) {
+      skipPageResetFromUrlSearch.current = false
+      return
+    }
+    resetToFirstPageRef.current()
+  }, [debouncedSearch])
+
+  const payload = useMemo(() => {
+    const filter: NonNullable<ContentPageQueryPayload["filter"]> = {}
+    if (statusFilter !== "all") filter.status = statusFilter
+    if (filterHasImage) filter.hasImage = true
+    if (filterHasVideo) filter.hasVideo = true
+    if (filterHasSummary) filter.hasSummary = true
+
+    const hasFilter = Object.keys(filter).length > 0
+
+    const search = debouncedSearch.length > 0 ? debouncedSearch : undefined
+
+    return {
+      page,
+      limit,
+      sortBy: "updatedAt" as const,
+      sortOrder: sortOption === "oldest" ? ("asc" as const) : ("desc" as const),
+      search,
+      filter: hasFilter ? filter : undefined,
+    }
+  }, [
+    page,
+    limit,
+    statusFilter,
+    sortOption,
+    filterHasImage,
+    filterHasVideo,
+    filterHasSummary,
+    debouncedSearch,
+  ])
+
+  const queryEnabled = hydrated
+  const { data, isPending, isError, error, refetch } = useContentPageQuery(
+    payload,
+    queryEnabled
+  )
+
+  const items = data?.data ?? []
+  const meta = data?.meta
+  const totalPages = meta?.totalPages ?? 0
+
+  useEffect(() => {
+    if (!meta?.totalPages) return
+    if (page > meta.totalPages) {
+      goToPage(meta.totalPages)
+    }
+  }, [meta?.totalPages, page, goToPage, meta])
+
+  const sortedItems = useMemo(() => {
+    const list = [...items]
+    if (sortOption === "title") {
+      list.sort(
+        (a, b) =>
+          a.ruleRef.localeCompare(b.ruleRef) ||
+          a.contentId.localeCompare(b.contentId)
+      )
+    } else if (sortOption === "status") {
+      list.sort(
+        (a, b) =>
+          a.status.localeCompare(b.status) ||
+          b.updatedAt.localeCompare(a.updatedAt)
+      )
+    }
+    return list
+  }, [items, sortOption])
+
+  const totalAll = meta?.total ?? 0
+  const draftPage = items.filter((i) => i.status === "draft").length
+  const approvedPage = items.filter((i) => i.status === "approved").length
+  const rejectedPage = items.filter((i) => i.status === "rejected").length
+
+  const empty =
+    !isPending &&
+    !isError &&
+    queryEnabled &&
+    items.length === 0 &&
+    (meta?.total ?? 0) === 0
+
+  const errorMessage =
+    error instanceof Error ? error.message : t("content:page.loadError")
+
+  function clearFilters() {
+    setSearchInput("")
+    setDebouncedSearch("")
+    setStatusFilter("all")
+    setSortOption("newest")
+    setFilterHasImage(false)
+    setFilterHasVideo(false)
+    setFilterHasSummary(false)
+    navigateSearchParams(navigate, locationRef.current, (params) => {
+      params.delete("search")
+      setListPageInParams(params, 1, CONTENT_PAGINATION_DEFAULTS)
+    })
+  }
+
+
+  return (
+    <ContentPageShell>
+      <motion.header
+        className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"
+        initial={false}
+      >
+        <div>
+          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
+            {t("content:page.title")}
+          </h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            {t("content:page.subtitle")}
+          </p>
+        </div>
+      </motion.header>
+
+      {!isPending && !isError && meta ? (
+        <div className="mb-6 flex flex-wrap gap-2.5">
+          <ContentListStatCard value={totalAll} label={t("content:stats.total")} />
+          <ContentListStatCard
+            value={draftPage}
+            label={t("content:status.draft")}
+            dotClass="bg-amber-400"
+          />
+          <ContentListStatCard
+            value={approvedPage}
+            label={t("content:status.approved")}
+            dotClass="bg-teal-400"
+          />
+          <ContentListStatCard
+            value={rejectedPage}
+            label={t("content:status.rejected")}
+            dotClass="bg-navy-500"
+          />
+        </div>
+      ) : null}
+      {meta && meta.totalPages > 1 ? (
+        <p className="mb-4 text-xs text-muted-foreground">
+          {t("content:stats.pageCountsHint")}
+        </p>
+      ) : null}
+
+      <div className="mb-5 flex flex-wrap items-center gap-2.5">
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v as "all" | ContentStatus)
+            resetToFirstPage()
+          }}
+        >
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-border bg-card sm:w-[160px]">
+            <SelectValue placeholder={t("content:filters.status")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("content:filters.allStatus")}</SelectItem>
+            <SelectItem value="draft">{t("content:status.draft")}</SelectItem>
+            <SelectItem value="approved">{t("content:status.approved")}</SelectItem>
+            <SelectItem value="rejected">{t("content:status.rejected")}</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => {
+            setLimitFromUrl(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number])
+          }}
+        >
+          <SelectTrigger className="h-[38px] w-full rounded-lg border-border bg-card sm:w-[140px]">
+            <SelectValue placeholder={t("common:pagination.perPage")} />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {t("content:filters.perPageCount", { count: n })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-[38px] rounded-lg border-border bg-card px-3.5 text-[13px] text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
+            onClick={clearFilters}
+          >
+            <X className="mr-1 size-3.5" />
+            {t("common:actions.clear")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-5">
+        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {t("content:filters.outputs")}
+        </span>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasImage}
+            onCheckedChange={(v) => {
+              setFilterHasImage(v === true)
+              resetToFirstPage()
+            }}
+          />
+          <span className="text-[13px] text-foreground">{t("content:filters.hasImage")}</span>
+        </Label>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasVideo}
+            onCheckedChange={(v) => {
+              setFilterHasVideo(v === true)
+              resetToFirstPage()
+            }}
+          />
+          <span className="text-[13px] text-foreground">{t("content:filters.hasVideo")}</span>
+        </Label>
+        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+          <Checkbox
+            checked={filterHasSummary}
+            onCheckedChange={(v) => {
+              setFilterHasSummary(v === true)
+              resetToFirstPage()
+            }}
+          />
+          <span className="text-[13px] text-foreground">{t("content:filters.hasSummary")}</span>
+        </Label>
+      </div>
+
+      {isError ? (
+        <Alert variant="destructive" className="mb-6">
+          <CircleAlertIcon />
+          <AlertTitle>{t("content:page.loadErrorTitle")}</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>{errorMessage}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+            >
+              {t("common:actions.retry")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!isPending && !isError && meta ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-muted-foreground">
+          <span>
+            {t("content:list.showing")}{" "}
+            <strong className="font-medium text-foreground">
+              {sortedItems.length}
+            </strong>{" "}
+            {t("content:list.of")}{" "}
+            <strong className="font-medium text-foreground">
+              {items.length}
+            </strong>{" "}
+            {t("content:list.onThisPage")}
+            {meta.total != null ? (
+              <>
+                {" "}
+                ·{" "}
+                <strong className="font-medium text-foreground">
+                  {meta.total}
+                </strong>{" "}
+                {t("content:list.totalWord")}
+              </>
+            ) : null}
+          </span>
+          <Select
+            value={sortOption}
+            onValueChange={(v) => {
+              setSortOption(v as SortOption)
+              resetToFirstPage()
+            }}
+          >
+            <SelectTrigger className="h-auto w-fit min-w-[140px] border-0 bg-transparent text-[13px] text-muted-foreground shadow-none focus:ring-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">{t("content:filters.sortNewest")}</SelectItem>
+              <SelectItem value="oldest">{t("content:filters.sortOldest")}</SelectItem>
+              <SelectItem value="title">{t("content:filters.sortTitle")}</SelectItem>
+              <SelectItem value="status">{t("content:filters.sortStatus")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {empty ? (
+        <div className="flex flex-col items-center py-20 text-center text-muted-foreground">
+          <InboxIcon className="mb-4 size-12 text-muted-foreground/50" aria-hidden />
+          <h3 className="mb-1.5 text-base font-semibold text-foreground">
+            {t("content:list.emptyTitle")}
+          </h3>
+          <p className="max-w-sm text-[13px]">
+            {debouncedSearch
+              ? t("content:list.emptySearch")
+              : t("content:list.emptyDefault")}
+          </p>
+        </div>
+      ) : null}
+
+      {(isPending || (!empty && !isError && items.length > 0)) && !isError ? (
+        <div
+          className={cn(
+            "grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4",
+            empty && "hidden"
+          )}
+        >
+          {isPending
+            ? Array.from({ length: Math.min(limit, 6) }).map((_, i) => (
+                <div
+                  key={i}
+                  className="overflow-hidden rounded-2xl border border-border bg-card"
+                >
+                  <Skeleton className="h-40 rounded-none bg-muted" />
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-3 w-24 bg-muted" />
+                    <Skeleton className="h-5 w-full bg-muted" />
+                    <Skeleton className="h-8 w-full bg-muted" />
+                  </div>
+                </div>
+              ))
+            : sortedItems.map((item, idx) => (
+                <ContentListCard
+                  key={item.contentId}
+                  item={item}
+                  index={idx}
+                  onOpen={(id, uid) =>
+                    navigate(uid ? `/upload/${uid}` : `/content/${id}`)
+                  }
+                />
+              ))}
+        </div>
+      ) : null}
+
+      {!isPending && !isError && meta && totalPages > 1 ? (
+        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
+          <p className="text-[13px] text-muted-foreground">
+            {t("content:list.page")}{" "}
+            <strong className="text-foreground">{meta.page}</strong>{" "}
+            {t("content:list.pageOf")}{" "}
+            <strong className="text-foreground">{meta.totalPages}</strong>
+          </p>
+          <PersistedShadcnPagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            className="mx-0 w-full justify-end sm:w-auto"
+          />
+        </div>
+      ) : null}
+    </ContentPageShell>
+  )
+}

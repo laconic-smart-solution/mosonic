@@ -1,0 +1,183 @@
+{
+  "page": {
+    "title": "Content library",
+    "subtitle": "All generated content across campaigns",
+    "loadError": "Failed to load content.",
+    "loadErrorTitle": "Could not load content"
+  },
+  "stats": {
+    "total": "Total content",
+    "pageCountsHint": "Draft, approved, and rejected counts reflect items on the current page only."
+  },
+  "filters": {
+    "status": "Status",
+    "allStatus": "All status",
+    "perPage": "Per page",
+    "perPageCount": "{{count}} per page",
+    "outputs": "Outputs",
+    "hasImage": "Has image",
+    "hasVideo": "Has video",
+    "hasSummary": "Has summary",
+    "sortNewest": "Newest first",
+    "sortOldest": "Oldest first",
+    "sortTitle": "Campaign A → Z",
+    "sortStatus": "By status"
+  },
+  "list": {
+    "showing": "Showing",
+    "of": "of",
+    "onThisPage": "on this page",
+    "totalWord": "total",
+    "page": "Page",
+    "pageOf": "of",
+    "emptyTitle": "No content yet",
+    "emptySearch": "No content matched your search or filters.",
+    "emptyDefault": "Run a workflow to generate content, or relax the status filter.",
+    "campaign": "Campaign",
+    "channels": "{{count}} channels",
+    "outputs": "Outputs",
+    "workflow": "Workflow",
+    "pipeline": "Pipeline",
+    "copyLink": "Copy link",
+    "open": "Open",
+    "heroCaption": "Caption",
+    "heroText": "Text",
+    "heroSummary": "Summary",
+    "heroTranslation": "Translation",
+    "heroTranscript": "Transcript",
+    "textOrTranscript": "Text or transcript",
+    "video": "Video",
+    "image": "Image",
+    "translation": "Translation",
+    "summary": "Summary"
+  },
+  "status": {
+    "draft": "Draft",
+    "in_review": "In review",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "cardTitle": {
+    "draft": "Draft content",
+    "in_review": "Content in review",
+    "approved": "Approved content",
+    "rejected": "Rejected content"
+  },
+  "display": {
+    "linkedCampaign": "Linked campaign",
+    "linkedPipeline": "Linked pipeline",
+    "videoContent": "Video content",
+    "imageContent": "Image content",
+    "workflow": "Workflow"
+  },
+  "output": {
+    "keywords": "Keywords",
+    "text": "Text",
+    "translatedText": "Translation",
+    "image": "Image",
+    "video": "Video",
+    "transcription": "Transcription",
+    "summary": "Summary"
+  },
+  "nodeType": {
+    "keyword_planner": "Keywords",
+    "text_generation": "Text Gen",
+    "image_generation": "Image Gen",
+    "translation": "Translation",
+    "video_generation": "Video Gen",
+    "transcription": "Transcription",
+    "summarization": "Summary"
+  },
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "weeksAgo": "{{count}}w ago"
+  },
+  "toast": {
+    "linkCopied": "Link copied",
+    "copyFailed": "Copy failed"
+  },
+  "redirect": {
+    "openFailed": "Could not open upload for this content.",
+    "opening": "Opening upload…"
+  },
+  "news": {
+    "banner": "Generated from news",
+    "viewSource": "View source"
+  },
+  "review": {
+    "breadcrumbContent": "Content",
+    "breadcrumbReview": "Review",
+    "badgeError": "Error",
+    "badgeWorking": "Working",
+    "badgeGenerated": "Generated",
+    "badgeEmpty": "Empty",
+    "remove": "Remove",
+    "generating": "Generating…",
+    "targetLanguage": "Target language",
+    "editHint": "Edit directly; save from the sidebar.",
+    "uploadImage": "Drop or click to upload (JPG, PNG)",
+    "uploadVideo": "Drop or click to upload (MP4)",
+    "rerunNode": "Re-run node",
+    "copy": "Copy",
+    "retry": "Retry",
+    "decisionTitle": "Review Decision",
+    "approveSend": "Approve & Send to Upload",
+    "rejectDraft": "Reject Draft",
+    "infoTitle": "Content Info",
+    "workflow": "Workflow:",
+    "rule": "Rule:",
+    "pipeline": "Pipeline:",
+    "versionTitle": "Version History",
+    "nodeStatusTitle": "Node Status",
+    "nodeDone": "done",
+    "nodePending": "pending",
+    "generated": "Generated",
+    "rerun": "Re-run"
+  },
+  "header": {
+    "updated": "Updated {{date}}"
+  },
+  "sidebar": {
+    "reviewDecision": "Review decision",
+    "currentStatus": "Current status",
+    "statusDraft": "Draft — pending review",
+    "statusInReview": "In review — approval routing",
+    "statusApproved": "Approved — ready for upload",
+    "statusRejected": "Rejected",
+    "approvalSteps": "Approval steps",
+    "optional": "(optional)",
+    "stepApproved": "Approved",
+    "stepPending": "Pending",
+    "stepWaiting": "Waiting",
+    "approvedHint": "Use the preview column to assign captions and publish.",
+    "opening": "Opening…",
+    "continueToUpload": "Continue to upload",
+    "approving": "Approving…",
+    "approveStep": "Approve step",
+    "approveSend": "Approve & send to upload",
+    "saveFirst": "Save your changes first",
+    "rejectDraft": "Reject draft",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "contentInfo": "Content info",
+    "workflow": "Workflow",
+    "updated": "Updated"
+  },
+  "version": {
+    "restore": "Restore",
+    "current": "Current"
+  },
+  "detailHeader": {
+    "content": "Content",
+    "lastEdited": "Last edited",
+    "currentVersion": "current",
+    "history": "History"
+  },
+  "nodeCard": {
+    "generated": "Generated",
+    "rerun": "Re-run"
+  }
+}

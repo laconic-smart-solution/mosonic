@@ -1,0 +1,1 @@
+{"sessionId":"ee99c0","runId":"pre-fix","hypothesisId":"H1","location":"lazyload.ts:RulesPageImportCatch","message":"Rules page dynamic import failed","data":{"name":"TypeError","message":"Failed to fetch dynamically imported module: http://localhost:5173/src/features/rules/pages/rules.tsx?t=1777977330763"},"timestamp":1777977349593}

@@ -1,0 +1,46 @@
+{
+  "prompt": {
+    "focusedPlaceholder": "อธิบายสิ่งที่คุณต้องการสร้างวันนี้…",
+    "generatingWorkflow": "กำลังสร้างเวิร์กโฟลว์…"
+  },
+  "promptSuggestions": {
+    "songkran": "เขียนโปรโมชั่นเทศกาลสงกรานต์สำหรับ Facebook และ Instagram",
+    "coffee": "สร้างแคมเปญเปิดตัวสินค้าสำหรับแบรนด์กาแฟไทย",
+    "newsletter": "สร้างจดหมายข่าวรายสัปดาห์สำหรับกลุ่มไลฟ์สไตล์กรุงเทพ"
+  },
+  "templates": {
+    "dashboard": { "label": "แดชบอร์ด", "sub": "ภาพรวมและ KPI" },
+    "content": { "label": "เนื้อหา", "sub": "คลังและรายการ" },
+    "rules": { "label": "กฎ", "sub": "กฎแคมเปญ" },
+    "railLabel": "เทมเพลต"
+  },
+  "recent": {
+    "label": "ล่าสุด",
+    "noItem": "ไม่มีรายการล่าสุด",
+    "openLibrary": "เปิดคลังเนื้อหา"
+  },
+  "helper": {
+    "setupRule": "ตั้งค่ากฎ",
+    "selectRule": "เลือกกฎ",
+    "selectedRule": "กฎที่เลือก: {{name}}",
+    "rulePrefix": "กฎ: {{name}}",
+    "savedRules": "กฎที่บันทึกไว้",
+    "loadingRules": "กำลังโหลดกฎ...",
+    "noRules": "ไม่พบกฎ",
+    "tones": "โทน: {{value}}",
+    "channels": "ช่องทาง: {{value}}",
+    "updated": "อัปเดต: {{date}}",
+    "viewMore": "ดูเพิ่มเติม",
+    "loadingMore": "กำลังโหลด..."
+  },
+  "footer": {
+    "copyright": "© 2026 NeuralTex Co., Ltd. — กรุงเทพฯ ประเทศไทย"
+  },
+  "userStrip": {
+    "loading": "กำลังโหลด…",
+    "admin": "ผู้ดูแล",
+    "member": "สมาชิก",
+    "account": "บัญชี",
+    "dashboard": "แดชบอร์ด"
+  }
+}

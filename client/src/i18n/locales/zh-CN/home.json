@@ -1,0 +1,46 @@
+{
+  "prompt": {
+    "focusedPlaceholder": "描述您今天想创作的内容…",
+    "generatingWorkflow": "正在生成工作流…"
+  },
+  "promptSuggestions": {
+    "songkran": "为 Facebook 和 Instagram 撰写宋干节促销文案",
+    "coffee": "为泰国咖啡品牌创建产品发布活动",
+    "newsletter": "为曼谷生活方式受众生成每周简报"
+  },
+  "templates": {
+    "dashboard": { "label": "仪表盘", "sub": "概览与 KPI" },
+    "content": { "label": "内容", "sub": "库与条目" },
+    "rules": { "label": "规则", "sub": "活动规则" },
+    "railLabel": "模板"
+  },
+  "recent": {
+    "label": "最近",
+    "noItem": "暂无最近项目",
+    "openLibrary": "打开内容库"
+  },
+  "helper": {
+    "setupRule": "设置规则",
+    "selectRule": "选择规则",
+    "selectedRule": "已选规则：{{name}}",
+    "rulePrefix": "规则：{{name}}",
+    "savedRules": "已保存的规则",
+    "loadingRules": "正在加载规则…",
+    "noRules": "未找到规则。",
+    "tones": "语调：{{value}}",
+    "channels": "渠道：{{value}}",
+    "updated": "更新：{{date}}",
+    "viewMore": "查看更多",
+    "loadingMore": "加载中…"
+  },
+  "footer": {
+    "copyright": "© 2026 NeuralTex Co., Ltd. — 泰国曼谷"
+  },
+  "userStrip": {
+    "loading": "加载中…",
+    "admin": "管理员",
+    "member": "成员",
+    "account": "账户",
+    "dashboard": "仪表盘"
+  }
+}
