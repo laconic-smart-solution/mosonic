@@ -1,0 +1,157 @@
+{
+  "appName": "NeuralTex",
+  "appTagline": "แพลตฟอร์ม AI",
+  "platform": "แพลตฟอร์ม",
+  "account": "บัญชี",
+  "accountMenu": "เมนูบัญชี",
+  "logOut": "ออกจากระบบ",
+  "pendingSuggestions": "คำแนะนำ AI ที่รอดำเนินการ",
+  "language": "ภาษา",
+  "languageDescription": "เลือกภาษาสำหรับส่วนติดต่อของแอปพลิเคชัน",
+  "languages": {
+    "en": "English",
+    "th": "ไทย",
+    "zhCN": "简体中文"
+  },
+  "systemMessagesEnglish": "ข้อความจากเซิร์ฟเวอร์อาจแสดงเป็นภาษาอังกฤษ",
+  "searchPlaceholder": "ค้นหาหน้า…",
+  "search": {
+    "ariaLabel": "ค้นหาคอนเทนต์และหน้า",
+    "placeholder": "ค้นหาคอนเทนต์และหน้า…",
+    "noMatches": "ไม่พบหน้าหรือคอนเทนต์ที่ตรงกัน",
+    "goTo": "ไปที่",
+    "content": "คอนเทนต์",
+    "searching": "กำลังค้นหา…",
+    "noContentMatches": "ไม่พบคอนเทนต์ ลองใช้ campaign ref, workflow ref, pipeline ref หรือ content ID",
+    "viewAllContent": "ดูทั้งหมดในคอนเทนต์"
+  },
+  "noResults": "ไม่พบผลลัพธ์",
+  "actions": {
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "edit": "แก้ไข",
+    "close": "ปิด",
+    "confirm": "ยืนยัน",
+    "retry": "ลองอีกครั้ง",
+    "skip": "ข้าม",
+    "back": "กลับ",
+    "next": "ถัดไป",
+    "submit": "ส่ง",
+    "loading": "กำลังโหลด…",
+    "refresh": "รีเฟรช",
+    "copy": "คัดลอก",
+    "view": "ดู",
+    "open": "เปิด",
+    "create": "สร้าง",
+    "add": "เพิ่ม",
+    "remove": "ลบออก",
+    "upload": "อัปโหลด",
+    "download": "ดาวน์โหลด",
+    "approve": "อนุมัติ",
+    "reject": "ปฏิเสธ",
+    "stop": "หยุด",
+    "run": "รัน",
+    "search": "ค้นหา",
+    "filter": "กรอง",
+    "clear": "ล้าง",
+    "apply": "ใช้",
+    "reset": "รีเซ็ต",
+    "yes": "ใช่",
+    "no": "ไม่"
+  },
+  "nav": {
+    "home": "หน้าแรก",
+    "dashboard": "แดชบอร์ด",
+    "rules": "กฎ",
+    "workflows": "เวิร์กโฟลว์",
+    "pipelines": "ไปป์ไลน์",
+    "content": "คอนเทนต์",
+    "posts": "โพสต์",
+    "analytics": "การวิเคราะห์",
+    "cost": "ค่าใช้จ่าย",
+    "settingsAccounts": "ตั้งค่าบัญชี",
+    "admin": "ผู้ดูแล"
+  },
+  "routes": {
+    "dashboard": "แดชบอร์ด",
+    "rules": "กฎ",
+    "workflow": "เวิร์กโฟลว์",
+    "liveRun": "รันสด",
+    "content": "คอนเทนต์",
+    "upload": "อัปโหลด",
+    "posts": "โพสต์",
+    "analytics": "การวิเคราะห์",
+    "logs": "บันทึก",
+    "components": "คอมโพเนนต์",
+    "pipelines": "ไปป์ไลน์",
+    "cost": "ค่าใช้จ่าย",
+    "settings": "ตั้งค่า",
+    "admin": "ผู้ดูแล"
+  },
+  "searchRoutes": {
+    "dashboard": {
+      "title": "แดชบอร์ด",
+      "subtitle": "ภาพรวมแอป",
+      "keywords": "แดชบอร์ด หน้าแรก ภาพรวม เริ่มต้น dashboard home overview"
+    },
+    "rules": {
+      "title": "กฎ",
+      "subtitle": "กฎแคมเปญ",
+      "keywords": "กฎ แคมเปญ ตั้งค่า rules campaigns"
+    },
+    "content": {
+      "title": "คอนเทนต์",
+      "subtitle": "คลังคอนเทนต์",
+      "keywords": "คอนเทนต์ คลัง โพสต์ content library"
+    },
+    "pipelines": {
+      "title": "ไปป์ไลน์",
+      "subtitle": "การรันไปป์ไลน์",
+      "keywords": "ไปป์ไลน์ รัน pipelines runs"
+    },
+    "settingsAccounts": {
+      "title": "ตั้งค่าบัญชี",
+      "subtitle": "บัญชีที่เชื่อมต่อ",
+      "keywords": "ตั้งค่า บัญชี โปรไฟล์ settings account"
+    },
+    "analytics": {
+      "title": "การวิเคราะห์",
+      "subtitle": "เมตริกและรายงาน",
+      "keywords": "การวิเคราะห์ เมตริก analytics metrics"
+    }
+  },
+  "status": {
+    "draft": "ฉบับร่าง",
+    "approved": "อนุมัติแล้ว",
+    "rejected": "ปฏิเสธแล้ว",
+    "running": "กำลังรัน",
+    "completed": "เสร็จสิ้น",
+    "failed": "ล้มเหลว",
+    "paused": "หยุดชั่วคราว",
+    "pending": "รอดำเนินการ",
+    "scheduled": "กำหนดเวลาแล้ว",
+    "published": "เผยแพร่แล้ว",
+    "active": "ใช้งาน",
+    "archived": "เก็บถาวร"
+  },
+  "errors": {
+    "unknown": "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+    "network": "ข้อผิดพลาดเครือข่าย ตรวจสอบการเชื่อมต่อแล้วลองใหม่",
+    "unauthorized": "คุณยังไม่ได้เข้าสู่ระบบ",
+    "forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
+    "notFound": "ไม่พบ"
+  },
+  "pagination": {
+    "page": "หน้า {{page}}",
+    "of": "จาก {{total}}",
+    "showing": "{{start}}–{{end}} จาก {{total}}",
+    "previous": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "perPage": "ต่อหน้า"
+  },
+  "empty": "ยังไม่มีรายการ",
+  "noData": "ไม่มีข้อมูล",
+  "optional": "ไม่บังคับ",
+  "required": "จำเป็น"
+}

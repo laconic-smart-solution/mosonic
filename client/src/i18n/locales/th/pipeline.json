@@ -1,0 +1,82 @@
+{
+  "page": {
+    "sectionLabel": "การรัน",
+    "title": "ไปป์ไลน์",
+    "description": "เรียกดูการรันเวิร์กโฟลว์ กรองตามสถานะ และเปิดผลลัพธ์หรือตัวแก้ไขสด",
+    "statsUnavailableTitle": "ไม่สามารถโหลดจำนวนไปป์ไลน์ได้",
+    "statsUnavailableDescription": "ไม่สามารถโหลดจำนวนตามสถานะได้ ลองรีสตาร์ท API หากเพิ่ง deploy",
+    "retryStats": "ลองโหลดสถิติอีกครั้ง",
+    "loadErrorTitle": "ไม่สามารถโหลดไปป์ไลน์ได้",
+    "loadingMatches": "กำลังโหลดรายการ…",
+    "noMatches": "ไม่มีไปป์ไลน์ที่ตรงกับตัวกรอง",
+    "oneMatch": "พบ 1 การรัน",
+    "manyMatches": "พบ {{count}} การรัน",
+    "showingRange": "แสดง {{start}}–{{end}}",
+    "emptyTitle": "ไม่พบไปป์ไลน์",
+    "emptyDescription": "ลองเปลี่ยนแถบสถานะหรือล้างตัวกรองเพื่อดูการรันเพิ่ม",
+    "pageOf": "หน้า {{page}} จาก {{total}}",
+    "toastStopped": "หยุดไปป์ไลน์แล้ว"
+  },
+  "stopDialog": {
+    "title": "หยุดไปป์ไลน์นี้?",
+    "description": "การสร้างจะหยุด ขั้นตอนที่กำลังรันอาจใช้เวลาสั้นๆ แต่จะไม่เริ่มขั้นตอนใหม่ การกระทำนี้ย้อนกลับไม่ได้",
+    "keepRunning": "ให้รันต่อ",
+    "stopping": "กำลังหยุด…",
+    "stop": "หยุดไปป์ไลน์",
+    "error": "ไม่สามารถหยุดไปป์ไลน์ได้"
+  },
+  "toolbar": {
+    "workflow": "เวิร์กโฟลว์",
+    "allWorkflows": "เวิร์กโฟลว์ทั้งหมด",
+    "workflowFallback": "เวิร์กโฟลว์",
+    "sort": "เรียงลำดับ",
+    "perPage": "ต่อหน้า",
+    "clear": "ล้าง"
+  },
+  "sort": {
+    "startedDesc": "เริ่ม (ใหม่สุด)",
+    "startedAsc": "เริ่ม (เก่าสุด)",
+    "completedDesc": "เสร็จ (ใหม่สุด)",
+    "completedAsc": "เสร็จ (เก่าสุด)"
+  },
+  "status": {
+    "all": "ทั้งหมด",
+    "running": "กำลังรัน",
+    "paused": "หยุดชั่วคราว",
+    "completed": "เสร็จสิ้น",
+    "failed": "ล้มเหลว"
+  },
+  "card": {
+    "news": "ข่าว",
+    "noPrompt": "ไม่มีพรอมต์",
+    "noSteps": "ไม่มีขั้นตอนที่บันทึก",
+    "node_one": "{{count}} โหนด",
+    "node_other": "{{count}} โหนด",
+    "openRun": "เปิดการรัน",
+    "stop": "หยุด"
+  },
+  "nodeTypes": {
+    "keyword_planner": "คำหลัก",
+    "text_generation": "ข้อความ",
+    "image_generation": "รูปภาพ",
+    "video_generation": "วิดีโอ",
+    "translation": "แปล",
+    "transcription": "ถอดเสียง",
+    "summarization": "สรุป",
+    "intelligence": "วิเคราะห์",
+    "adapt": "ปรับ",
+    "branch": "แยก",
+    "merge": "รวม"
+  },
+  "relativeTime": {
+    "justNow": "เมื่อสักครู่",
+    "minutesAgo": "{{count}} นาทีที่แล้ว",
+    "hoursAgo": "{{count}} ชม.ที่แล้ว",
+    "daysAgo": "{{count}} วันที่แล้ว",
+    "weeksAgo": "{{count}} สัปดาห์ที่แล้ว"
+  },
+  "errors": {
+    "loadFailed": "โหลดไปป์ไลน์ไม่สำเร็จ",
+    "invalidStatsResponse": "การตอบกลับสถิติไปป์ไลน์ไม่ถูกต้อง"
+  }
+}

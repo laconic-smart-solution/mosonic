@@ -1,0 +1,306 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { type SsoTokenClaims } from '../auth/auth.types';
+import {
+  User,
+  type UserDocument,
+  UserRole,
+  UserStatus,
+} from './schemas/user.schema';
+
+export type ConnectedAccountRecord = {
+  channel: string;
+  accountId: string;
+  connectedAt: Date;
+};
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+  ) {}
+
+  async upsertFromSsoClaims(args: {
+    authServerUserId: string;
+    claims: SsoTokenClaims;
+  }): Promise<User> {
+    const { authServerUserId, claims } = args;
+
+    const email = typeof claims.email === 'string' ? claims.email : undefined;
+    const username =
+      typeof claims.preferred_username === 'string'
+        ? claims.preferred_username
+        : undefined;
+    const firstName =
+      typeof claims.given_name === 'string' ? claims.given_name : undefined;
+    const lastName =
+      typeof claims.family_name === 'string' ? claims.family_name : undefined;
+
+    const now = new Date();
+
+    const existing = await this.userModel.findOne({ authServerUserId }).exec();
+    if (existing) {
+      // Do not overwrite role/status from SSO.
+      existing.email = email ?? existing.email;
+      existing.username = username ?? existing.username;
+      existing.firstName = firstName ?? existing.firstName;
+      existing.lastName = lastName ?? existing.lastName;
+      existing.lastLoginAt = now;
+      return await existing.save();
+    }
+
+    return await this.userModel.create({
+      authServerUserId,
+      email,
+      username,
+      firstName,
+      lastName,
+      role: UserRole.CUSTOMER,
+      status: UserStatus.ACTIVE,
+      lastLoginAt: now,
+    });
+  }
+
+  async findByUserId(userId: string): Promise<User | null> {
+    return this.userModel.findOne({ userId }).exec();
+  }
+
+  /**
+   * Users with at least one Zernio-connected social account (for monthly cost allocation).
+   */
+  async listUserIdsWithZernioConnectedAccounts(): Promise<
+    Array<{ userId: string; accountCount: number }>
+  > {
+    const users = await this.userModel
+      .find({})
+      .select({ userId: 1, zernioConnectedAccounts: 1 })
+      .lean()
+      .exec();
+
+    const out: Array<{ userId: string; accountCount: number }> = [];
+    for (const row of users) {
+      const userId = typeof row.userId === 'string' ? row.userId : '';
+      if (!userId) continue;
+      const count = this.normalizeConnectedAccounts(
+        row.zernioConnectedAccounts,
+      ).length;
+      if (count > 0) {
+        out.push({ userId, accountCount: count });
+      }
+    }
+    return out;
+  }
+
+  async findByZernioProfileId(profileId: string): Promise<User | null> {
+    const id = profileId.trim();
+    if (!id) {
+      return null;
+    }
+    return this.userModel.findOne({ zernioProfileId: id }).exec();
+  }
+
+  async findByAuthServerUserId(authServerUserId: string): Promise<User | null> {
+    return this.userModel.findOne({ authServerUserId }).exec();
+  }
+
+  async setZernioProfileId(userId: string, profileId: string): Promise<void> {
+    const result = await this.userModel
+      .updateOne({ userId }, { $set: { zernioProfileId: profileId } })
+      .exec();
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+  }
+
+  async setZernioConnectedAccount(
+    userId: string,
+    platform: string,
+    accountId: string,
+  ): Promise<void> {
+    const key = this.normalizeChannel(platform);
+    const normalizedAccountId = accountId.trim();
+    if (!key) {
+      throw new BadRequestException('platform is required');
+    }
+    if (!normalizedAccountId) {
+      throw new BadRequestException('accountId is required');
+    }
+
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const now = new Date();
+    const accounts = this.normalizeConnectedAccounts(
+      user.zernioConnectedAccounts,
+    );
+    const next = accounts.filter((acc) => acc.channel !== key);
+    next.push({
+      channel: key,
+      accountId: normalizedAccountId,
+      connectedAt: now,
+    });
+    await this.replaceZernioConnectedAccounts(userId, next);
+  }
+
+  async syncZernioConnectedAccounts(
+    userId: string,
+    accounts: Array<{
+      channel: string;
+      accountId: string;
+      connectedAt?: Date;
+    }>,
+  ): Promise<void> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const byChannel = new Map<string, ConnectedAccountRecord>();
+    for (const item of this.normalizeConnectedAccounts(user.zernioConnectedAccounts)) {
+      byChannel.set(item.channel, item);
+    }
+    for (const item of accounts) {
+      const channel = this.normalizeChannel(item.channel);
+      const accountId = item.accountId?.trim();
+      if (!channel || !accountId) continue;
+      byChannel.set(channel, {
+        channel,
+        accountId,
+        connectedAt: item.connectedAt ?? new Date(),
+      });
+    }
+    await this.replaceZernioConnectedAccounts(
+      userId,
+      Array.from(byChannel.values()),
+    );
+  }
+
+  async getZernioConnectedAccounts(
+    userId: string,
+  ): Promise<ConnectedAccountRecord[]> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts);
+  }
+
+  async disconnectZernioConnectedAccount(
+    userId: string,
+    channel: string,
+  ): Promise<void> {
+    const key = this.normalizeChannel(channel);
+    if (!key) {
+      throw new BadRequestException('channel is required');
+    }
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const next = this.normalizeConnectedAccounts(
+      user.zernioConnectedAccounts,
+    ).filter((acc) => acc.channel !== key);
+    await this.replaceZernioConnectedAccounts(userId, next);
+  }
+
+  async getZernioPublishContext(userId: string): Promise<{
+    profileId: string;
+    accounts: Record<string, string>;
+  }> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const profileId = user.zernioProfileId?.trim();
+    if (!profileId) {
+      throw new BadRequestException(
+        'Zernio profile missing; connect a social account first',
+      );
+    }
+    const normalized = this.normalizeConnectedAccounts(
+      user.zernioConnectedAccounts,
+    );
+    const accounts = normalized.reduce<Record<string, string>>((acc, item) => {
+      acc[item.channel] = item.accountId;
+      return acc;
+    }, {});
+
+    return {
+      profileId,
+      accounts,
+    };
+  }
+
+  private async replaceZernioConnectedAccounts(
+    userId: string,
+    accounts: ConnectedAccountRecord[],
+  ): Promise<void> {
+    const result = await this.userModel
+      .updateOne(
+        { userId },
+        {
+          $set: {
+            zernioConnectedAccounts: accounts,
+          },
+        },
+      )
+      .exec();
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+  }
+
+  private normalizeConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {
+    if (Array.isArray(raw)) {
+      const normalized: ConnectedAccountRecord[] = [];
+      for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const rec = item as {
+          channel?: string;
+          accountId?: string;
+          connectedAt?: Date | string;
+        };
+        const channel = this.normalizeChannel(rec.channel ?? '');
+        const accountId = rec.accountId?.trim();
+        if (!channel || !accountId) continue;
+        normalized.push({
+          channel,
+          accountId,
+          connectedAt: this.toDate(rec.connectedAt),
+        });
+      }
+      return normalized;
+    }
+
+    if (raw && typeof raw === 'object') {
+      return Object.entries(raw as Record<string, unknown>)
+        .map(([channel, accountId]) => ({
+          channel: this.normalizeChannel(channel),
+          accountId:
+            typeof accountId === 'string' ? accountId.trim() : '',
+          connectedAt: new Date(),
+        }))
+        .filter((item) => Boolean(item.channel && item.accountId));
+    }
+
+    return [];
+  }
+
+  private normalizeChannel(input: string): string {
+    return input.trim().toLowerCase();
+  }
+
+  private toDate(value: Date | string | undefined): Date {
+    if (value instanceof Date) return value;
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  }
+}

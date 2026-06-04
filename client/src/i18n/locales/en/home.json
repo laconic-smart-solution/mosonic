@@ -1,0 +1,46 @@
+{
+  "prompt": {
+    "focusedPlaceholder": "Describe what you want to create today…",
+    "generatingWorkflow": "Generating workflow…"
+  },
+  "promptSuggestions": {
+    "songkran": "Write a Songkran festival promotion for Facebook and Instagram",
+    "coffee": "Create a product launch campaign for Thai coffee brand",
+    "newsletter": "Generate a weekly newsletter for BKK lifestyle audience"
+  },
+  "templates": {
+    "dashboard": { "label": "Dashboard", "sub": "Overview and KPIs" },
+    "content": { "label": "Content", "sub": "Library and items" },
+    "rules": { "label": "Rules", "sub": "Campaign rules" },
+    "railLabel": "Templates"
+  },
+  "recent": {
+    "label": "Recent",
+    "noItem": "No recent item",
+    "openLibrary": "Open content library"
+  },
+  "helper": {
+    "setupRule": "Set up rule",
+    "selectRule": "Select rule",
+    "selectedRule": "Selected rule: {{name}}",
+    "rulePrefix": "Rule: {{name}}",
+    "savedRules": "Saved rules",
+    "loadingRules": "Loading rules...",
+    "noRules": "No rules found.",
+    "tones": "Tones: {{value}}",
+    "channels": "Channels: {{value}}",
+    "updated": "Updated: {{date}}",
+    "viewMore": "View more",
+    "loadingMore": "Loading..."
+  },
+  "footer": {
+    "copyright": "© 2026 NeuralTex Co., Ltd. — Bangkok, Thailand"
+  },
+  "userStrip": {
+    "loading": "Loading…",
+    "admin": "Admin",
+    "member": "Member",
+    "account": "Account",
+    "dashboard": "Dashboard"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "page": {
+    "title": "อัปโหลดเนื้อหา",
+    "allChannels": "ทุกช่องทาง",
+    "missingId": "ไม่มีรหัสอัปโหลด",
+    "loading": "กำลังโหลดอัปโหลด…",
+    "loadErrorTitle": "โหลดอัปโหลดไม่ได้",
+    "back": "กลับ"
+  },
+  "captionSource": {
+    "text": "ข้อความหลัก",
+    "translatedText": "แปล",
+    "summary": "สรุป",
+    "custom": "กำหนดเอง",
+    "fallback": "ข้อความ"
+  },
+  "preview": {
+    "title": "ตัวอย่าง",
+    "save": "บันทึก",
+    "noMedia": "ไม่มีสื่อ",
+    "tiktokVerticalHint": "TikTok ใช้วิดีโอแนวตั้ง 9:16 ในตัวอย่าง"
+  },
+  "scheduledEdit": {
+    "title": "แก้ไขโพสต์ที่กำหนดเวลา",
+    "hint": "การเปลี่ยนแปลงใช้กับช่องทางนี้เท่านั้น ไม่สามารถเปลี่ยนสื่อและแพลตฟอร์มหลังกำหนดเวลาแล้ว",
+    "caption": "คำบรรยาย",
+    "captionPlaceholder": "อัปเดตคำบรรยายสำหรับช่องทางนี้",
+    "youtubeTitle": "ชื่อ YouTube",
+    "youtubeTitlePlaceholder": "อัปเดตชื่อวิดีโอ YouTube",
+    "rescheduleTo": "กำหนดเวลาใหม่เป็น",
+    "cancel": "ยกเลิก",
+    "updating": "กำลังอัปเดต...",
+    "confirm": "ยืนยันการเปลี่ยนแปลง",
+    "scheduledHint": "โพสต์นี้ถูกกำหนดเวลาแล้ว ใช้แก้ไขโพสต์ที่กำหนดเวลาเพื่ออัปเดตคำบรรยาย เวลา หรือชื่อ YouTube สำหรับช่องทางนี้เท่านั้น ไม่รองรับการเปลี่ยนสื่อผ่าน Zernio"
+  },
+  "fields": {
+    "media": "สื่อ",
+    "videoTitle": "ชื่อวิดีโอ",
+    "youtubeTitlePlaceholder": "ใส่ชื่อวิดีโอ YouTube…"
+  },
+  "mediaTab": {
+    "single": "รูปเดียว",
+    "multiple": "หลายรูป",
+    "video": "วิดีโอ"
+  },
+  "publish": {
+    "publishNow": "เผยแพร่ทันที",
+    "publishAll": "เผยแพร่ทั้งหมดที่รวม",
+    "schedule": "กำหนดเวลา",
+    "scheduleAll": "กำหนดเวลาทั้งหมดที่รวม",
+    "globalPublishing": "เผยแพร่ทั่วทั้งระบบ",
+    "schedulePublication": "กำหนดเวลาเผยแพร่",
+    "scheduleAllChannels": "กำหนดเวลาทุกช่องทางที่รวม",
+    "dateTime": "วันที่และเวลา",
+    "cancel": "ยกเลิก",
+    "confirmSchedule": "ยืนยันกำหนดเวลา",
+    "publishedNoAction": "เผยแพร่แล้ว — ไม่ต้องดำเนินการเพิ่ม",
+    "scheduledEditable": "กำหนดเวลาแล้ว — ยังแก้คำบรรยาย เวลา และชื่อ YouTube ได้",
+    "publishingInProgress": "กำลังเผยแพร่…",
+    "editScheduled": "แก้ไขโพสต์ที่กำหนดเวลา"
+  },
+  "banner": {
+    "notConnected": "บัญชี {{platform}} ของคุณยังไม่ได้เชื่อม",
+    "connect": "เชื่อมต่อ",
+    "failed": "เผยแพร่ไม่สำเร็จ กรุณาลองใหม่",
+    "retry": "ลองใหม่",
+    "publishing": "กำลังเผยแพร่ไป {{platform}}…",
+    "published": "เผยแพร่ไป {{platform}} สำเร็จ{{when}}",
+    "scheduled": "กำหนดเวลา {{when}} บน {{platform}}"
+  },
+  "toast": {
+    "channelIncluded": "รวมช่องทางแล้ว",
+    "channelExcluded": "ยกเว้นช่องทางแล้ว",
+    "captionRequired": "ต้องมีคำบรรยาย",
+    "scheduleFuture": "เวลาที่กำหนดต้องอยู่ในอนาคต",
+    "selectDateTime": "เลือกวันที่และเวลา",
+    "postUpdated": "อัปเดตโพสต์สำเร็จ",
+    "savedChannel": "บันทึกสำหรับช่องทางนี้แล้ว",
+    "connectAccount": "เชื่อมบัญชีนี้ในการตั้งค่าก่อน",
+    "assignCaption": "กำหนดข้อความคำบรรยายก่อนเผยแพร่",
+    "publishing": "กำลังเผยแพร่…",
+    "scheduling": "กำลังกำหนดเวลา…",
+    "noEligibleChannels": "ไม่มีช่องทางที่รวมและพร้อมเผยแพร่",
+    "nodeUpdated": "อัปเดตเอาต์พุตโหนดแล้ว — บันทึกเมื่อพร้อม",
+    "changesSaved": "บันทึกการเปลี่ยนแปลงแล้ว",
+    "saveFailed": "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง",
+    "loadOutputsFailed": "โหลดเอาต์พุตที่มีไม่ได้",
+    "unknownNodeType": "ประเภทโหนดไม่รู้จัก",
+    "startGenerationFailed": "เริ่มสร้างไม่ได้",
+    "approved": "อนุมัติเนื้อหาแล้ว",
+    "approveFailed": "อนุมัติไม่ได้ กรุณาลองอีกครั้ง",
+    "rejected": "ปฏิเสธเนื้อหาแล้ว",
+    "rejectFailed": "ปฏิเสธไม่ได้ กรุณาลองอีกครั้ง",
+    "openUploadFailed": "เปิดอัปโหลดไม่ได้ ลองจากเมนูอัปโหลดหลัก",
+    "waitGeneration": "รอให้การสร้างปัจจุบันเสร็จก่อน",
+    "resolveNodeFailed": "ระบุโหนดสำหรับเอาต์พุตนี้ไม่ได้",
+    "rerunFailed": "เริ่มรันใหม่ไม่ได้",
+    "nothingToCopy": "ไม่มีอะไรให้คัดลอก",
+    "copied": "คัดลอกไปคลิปบอร์ดแล้ว",
+    "copyFailed": "คัดลอกไม่สำเร็จ",
+    "mediaUploadFailed": "อัปโหลดสื่อไม่สำเร็จ",
+    "noMediaSlot": "ไม่มีช่องสำหรับอัปโหลดสื่อ"
+  },
+  "review": {
+    "defaultTitle": "ตรวจสอบเนื้อหา",
+    "loading": "กำลังโหลด…",
+    "loadFailed": "โหลดเนื้อหาไม่ได้",
+    "backToList": "กลับไปรายการเนื้อหา",
+    "workflowLayers": "เลเยอร์เวิร์กโฟลว์",
+    "addOutput": "เพิ่มเอาต์พุตอื่น",
+    "addOutputTitle": "เพิ่มเอาต์พุต",
+    "pickNodeHint": "เลือกประเภทโหนดเพื่อสร้างเนื้อหาเพิ่มสำหรับเวิร์กโฟลว์นี้",
+    "generate": "สร้าง",
+    "rejectedBanner": "เนื้อหานี้ถูกปฏิเสธ ตรวจสอบเอาต์พุตและอนุมัติเมื่อพร้อม",
+    "processing": "กำลังประมวลผล…",
+    "retrying": "กำลังลองใหม่… ครั้งที่ {{attempt}}/{{maxAttempts}}",
+    "rerunFailed": "รันใหม่ไม่สำเร็จ กรุณาลองอีกครั้ง",
+    "uploadingMedia": "กำลังอัปโหลด{{type}}…",
+    "uploadFailed": "อัปโหลดไม่สำเร็จ ลองอีกครั้ง",
+    "image": "รูปภาพ",
+    "video": "วิดีโอ"
+  },
+  "palette": {
+    "dragHint": "ลากเอาต์พุตไปยังโซนคำบรรยายหรือสื่อ"
+  },
+  "publishSummary": {
+    "included": "รวม {{count}} ช่องทาง",
+    "eligible": "พร้อมเผยแพร่ {{count}}"
+  }
+}

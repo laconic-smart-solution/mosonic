@@ -1,0 +1,157 @@
+{
+  "appName": "NeuralTex",
+  "appTagline": "AI Platform",
+  "platform": "Platform",
+  "account": "Account",
+  "accountMenu": "Account menu",
+  "logOut": "Log out",
+  "pendingSuggestions": "Pending AI suggestions",
+  "language": "Language",
+  "languageDescription": "Choose the language for the application interface.",
+  "languages": {
+    "en": "English",
+    "th": "ไทย",
+    "zhCN": "简体中文"
+  },
+  "systemMessagesEnglish": "System messages from the server may appear in English.",
+  "searchPlaceholder": "Search pages…",
+  "search": {
+    "ariaLabel": "Search content and pages",
+    "placeholder": "Search content and pages…",
+    "noMatches": "No matching pages or content.",
+    "goTo": "Go to",
+    "content": "Content",
+    "searching": "Searching…",
+    "noContentMatches": "No content matches. Try a campaign ref, workflow ref, pipeline ref, or content ID.",
+    "viewAllContent": "View all in Content"
+  },
+  "noResults": "No results",
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "loading": "Loading…",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "view": "View",
+    "open": "Open",
+    "create": "Create",
+    "add": "Add",
+    "remove": "Remove",
+    "upload": "Upload",
+    "download": "Download",
+    "approve": "Approve",
+    "reject": "Reject",
+    "stop": "Stop",
+    "run": "Run",
+    "search": "Search",
+    "filter": "Filter",
+    "clear": "Clear",
+    "apply": "Apply",
+    "reset": "Reset",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "rules": "Rules",
+    "workflows": "Workflows",
+    "pipelines": "Pipelines",
+    "content": "Content",
+    "posts": "Posts",
+    "analytics": "Analytics",
+    "cost": "Costs",
+    "settingsAccounts": "Account settings",
+    "admin": "Admin"
+  },
+  "routes": {
+    "dashboard": "Dashboard",
+    "rules": "Rules",
+    "workflow": "Workflows",
+    "liveRun": "Live Run",
+    "content": "Content",
+    "upload": "Upload",
+    "posts": "Posts",
+    "analytics": "Analytics",
+    "logs": "Logs",
+    "components": "Components",
+    "pipelines": "Pipelines",
+    "cost": "Costs",
+    "settings": "Settings",
+    "admin": "Admin"
+  },
+  "searchRoutes": {
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "App overview",
+      "keywords": "dashboard home overview start"
+    },
+    "rules": {
+      "title": "Rules",
+      "subtitle": "Campaign rules",
+      "keywords": "rules campaigns setup"
+    },
+    "content": {
+      "title": "Content",
+      "subtitle": "Content library",
+      "keywords": "content library posts items"
+    },
+    "pipelines": {
+      "title": "Pipelines",
+      "subtitle": "Pipeline runs",
+      "keywords": "pipelines runs executions workflow runs"
+    },
+    "settingsAccounts": {
+      "title": "Account settings",
+      "subtitle": "Linked accounts",
+      "keywords": "settings account profile users"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "subtitle": "Metrics and reports",
+      "keywords": "analytics metrics stats"
+    }
+  },
+  "status": {
+    "draft": "Draft",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "paused": "Paused",
+    "pending": "Pending",
+    "scheduled": "Scheduled",
+    "published": "Published",
+    "active": "Active",
+    "archived": "Archived"
+  },
+  "errors": {
+    "unknown": "Something went wrong. Please try again.",
+    "network": "Network error. Check your connection and try again.",
+    "unauthorized": "You are not signed in.",
+    "forbidden": "You do not have permission to do that.",
+    "notFound": "Not found."
+  },
+  "pagination": {
+    "page": "Page {{page}}",
+    "of": "of {{total}}",
+    "showing": "{{start}}–{{end}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "perPage": "Per page"
+  },
+  "empty": "No items yet",
+  "noData": "No data",
+  "optional": "Optional",
+  "required": "Required"
+}

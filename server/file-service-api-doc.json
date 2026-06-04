@@ -1,0 +1,111 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "file-service",
+    "version": "1.0.0",
+    "description": "Local file upload and download (multipart + optional folderPath)."
+  },
+  "paths": {
+    "/api/file/v1/file": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Download file",
+        "description": "Streams the stored file as application/octet-stream.",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "name": "relativePath",
+            "in": "query",
+            "description": "Path relative to storage root",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary file body"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/api/file/v1/upload": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Upload file",
+        "description": "Stores the file under the configured storage root, optionally inside folderPath.",
+        "operationId": "uploadFile",
+        "requestBody": {
+          "description": "multipart/form-data: \"file\" (required), \"folderPath\" (optional).",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadMultipartForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; JSON envelope with FileUploadResponse in \"data\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadCreatedApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or unsupported type"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "originalFileName": {
+            "type": "string"
+          },
+          "storedFileName": {
+            "type": "string"
+          },
+          "relativePath": {
+            "type": "string"
+          },
+          "fileUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "FileUploadCreatedApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FileUploadResponse"
+          }
+        },
+        "required": ["success"]
+      },
+      "FileUploadMultipartForm": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  }
+}

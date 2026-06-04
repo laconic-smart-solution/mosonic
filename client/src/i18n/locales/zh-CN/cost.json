@@ -1,0 +1,76 @@
+{
+  "dashboard": {
+    "title": "费用管理",
+    "subtitle": "跟踪 AI 生成支出和预算使用情况。",
+    "rangeMonth": "本月",
+    "rangeAll": "全部时间",
+    "rangeLast": "最近 {{range}}",
+    "budgetSettings": "预算设置",
+    "loadError": "无法加载费用仪表板。",
+    "loadingCharts": "正在加载图表…"
+  },
+  "range": {
+    "month": "本月",
+    "7d": "最近 7 天",
+    "30d": "最近 30 天",
+    "all": "全部时间",
+    "allRecorded": "全部已记录支出",
+    "billing": "账单：{{month}}"
+  },
+  "summary": {
+    "monthlyBudget": "月度预算",
+    "noLimit": "无限制",
+    "usedPct": "已用 {{pct}}%（{{billing}}）",
+    "thisCycle": "本周期",
+    "remaining": "剩余（本周期）",
+    "unlimited": "无限制",
+    "vsLimit": "对比月度上限",
+    "noCap": "未设置上限"
+  },
+  "budget": {
+    "title": "预算设置",
+    "subtitle": "设置限额以控制 AI 生成支出。",
+    "backToCosts": "返回费用",
+    "loading": "正在加载设置…",
+    "monthlyLimitSection": "月度限额",
+    "monthlyLimitLabel": "月度限额（美元）",
+    "monthlyLimitHint": "留空表示无限制。",
+    "warnAtLabel": "警告阈值（%）",
+    "whenMonthlyHit": "达到月度限额时",
+    "warnOnly": "仅警告",
+    "stopPipeline": "停止流水线",
+    "perRunSection": "单次运行限额",
+    "perRunLabel": "每次流水线运行最高费用（美元）",
+    "perRunHint": "留空表示无单次上限。",
+    "whenRunHit": "达到运行限额时",
+    "notificationsSection": "通知",
+    "emailAlerts": "邮件提醒（当前仅记录）",
+    "inAppAlerts": "应用内提醒（流水线事件）",
+    "saving": "保存中…",
+    "save": "保存预算设置",
+    "saved": "设置已保存。",
+    "saveFailed": "无法保存设置。"
+  },
+  "progress": {
+    "usage": "月度预算使用情况",
+    "spent": "已支出 ${{amount}}",
+    "limit": "限额 ${{amount}}",
+    "approaching": "即将达到月度限额（已用 {{pct}}%）。",
+    "reached": "已达到月度预算限额。"
+  },
+  "charts": {
+    "noSpend": "此时间范围内无支出数据",
+    "noDailySpend": "此时间范围内无每日支出",
+    "byProvider": "按服务商支出",
+    "byType": "按条目类型支出",
+    "byDay": "按日支出"
+  },
+  "pipelineTable": {
+    "loading": "正在加载流水线费用…",
+    "title": "流水线明细（合计 ${{total}}）",
+    "node": "节点",
+    "model": "模型",
+    "usd": "美元",
+    "time": "时间"
+  }
+}

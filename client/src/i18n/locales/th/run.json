@@ -1,0 +1,41 @@
+{
+  "page": {
+    "runTitle": "โปรโมชัน Songkran 2026",
+    "runMeta": "รัน #4821 · เริ่ม 10:42:01 · เสร็จ 2 โหนด",
+    "statusRunning": "● กำลังรัน",
+    "pause": "หยุดชั่วคราว",
+    "cancel": "ยกเลิก",
+    "pipelineProgress": "ความคืบหน้าไปป์ไลน์",
+    "liveLogs": "บันทึกสด",
+    "filterAll": "ทั้งหมด",
+    "filterInfo": "info",
+    "filterWarn": "warn",
+    "filterError": "error",
+    "timedOut": "หมดเวลาหลังลอง 2 ครั้ง",
+    "retry": "↩ ลองใหม่",
+    "skip": "ข้าม →",
+    "bannerMessage": "สร้างรูปภาพล้มเหลว สำเร็จ 2 จาก 3 โหนด ตรวจสอบแล้วลองใหม่หรือดำเนินการต่อ",
+    "retryFailedNodes": "ลองโหนดที่ล้มเหลว",
+    "reviewDraft": "ตรวจฉบับร่าง →"
+  },
+  "nodes": {
+    "textGeneration": "สร้างข้อความ",
+    "imageGeneration": "สร้างรูปภาพ",
+    "translation": "แปลภาษา"
+  },
+  "nodeStatus": {
+    "done": "เสร็จ",
+    "running": "กำลังรัน",
+    "failed": "ล้มเหลว",
+    "idle": "รอ"
+  },
+  "logs": {
+    "pipelineStarted": "เริ่มไปป์ไลน์ — รัน #4821",
+    "textStarted": "สร้างข้อความ — เริ่ม",
+    "textCompleted": "สร้างข้อความ — เสร็จ (320 โทเคน, 3.2 วินาที)",
+    "imageStarted": "สร้างรูปภาพ — เริ่ม",
+    "imageRetry": "สร้างรูปภาพ — หมดเวลา กำลังลองใหม่ (ครั้ง 1/2)…",
+    "imageFailed": "สร้างรูปภาพ — ล้มเหลวหลังลองใหม่ ต้องดำเนินการ",
+    "translationBlocked": "แปลภาษา — ถูกบล็อก: รอขั้นตอนก่อนหน้า"
+  }
+}

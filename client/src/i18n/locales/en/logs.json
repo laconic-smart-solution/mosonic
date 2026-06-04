@@ -1,0 +1,11 @@
+{
+  "page": {
+    "title": "Logs",
+    "subtitle": "System and workflow logs will appear here as this area is built out."
+  },
+  "activity": {
+    "title": "Activity",
+    "desc": "For recent workspace activity, use the dashboard in the meantime.",
+    "openDashboard": "Open dashboard"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "language": {
+    "sectionTitle": "语言",
+    "sectionDesc": "选择整个应用中菜单、按钮和标签的显示语言。"
+  },
+  "page": {
+    "title": "账户设置",
+    "subtitle": "关联您用于发布的渠道。连接与上传和定时发布共享，因此只需认证一次。"
+  },
+  "toolbar": {
+    "createProfile": "创建 Zernio 配置文件",
+    "syncAccounts": "同步账户"
+  },
+  "oauth": {
+    "alertTitle": "授权社交网络后",
+    "alertDesc": "您将返回此页面，我们将同步您的 Zernio 账户。若 Zernio 显示渠道已连接但此处未出现，请使用「同步账户」。",
+    "syncAccountsBold": "同步账户",
+    "connectedToast": "{{platform}} 已连接，正在同步账户…",
+    "syncedToast": "账户已同步。",
+    "callbackFailed": "Zernio 回调失败。",
+    "syncFailed": "无法同步账户。",
+    "profileReady": "Zernio 配置文件已就绪。",
+    "profileFailed": "无法创建配置文件。",
+    "connectUrlFailed": "无法获取连接 URL。",
+    "disconnected": "渠道已断开。",
+    "disconnectFailed": "无法断开账户。"
+  },
+  "channels": {
+    "sectionTitle": "发布渠道",
+    "sectionDesc": "Facebook、X（Twitter）、Instagram、YouTube、LinkedIn 和 TikTok。仅连接您使用的网络；与上传和定时发布共享。",
+    "connected": "已连接",
+    "notConnected": "未连接",
+    "accountId": "账户 ID",
+    "disconnect": "断开",
+    "connect": "连接",
+    "connectAria": "连接 {{channel}}",
+    "facebook": {
+      "label": "Facebook",
+      "description": "用于 Meta 发布的页面和个人资料。"
+    },
+    "twitter": {
+      "label": "Twitter",
+      "description": "通过 X 发布短文。"
+    },
+    "instagram": {
+      "label": "Instagram",
+      "description": "动态、Reels 和视觉故事。"
+    },
+    "youtube": {
+      "label": "YouTube",
+      "description": "长视频和 Shorts 发布。"
+    },
+    "linkedin": {
+      "label": "LinkedIn",
+      "description": "专业动态和公司页面。"
+    },
+    "tiktok": {
+      "label": "TikTok",
+      "description": "竖屏视频和 TikTok 原生格式。"
+    }
+  }
+}

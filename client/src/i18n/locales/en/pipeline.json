@@ -1,0 +1,82 @@
+{
+  "page": {
+    "sectionLabel": "Runs",
+    "title": "Pipelines",
+    "description": "Browse workflow runs, filter by status, and open completed output or the live editor.",
+    "statsUnavailableTitle": "Pipeline counts unavailable",
+    "statsUnavailableDescription": "Status counts could not be loaded. Restart the API if you just deployed changes.",
+    "retryStats": "Retry stats",
+    "loadErrorTitle": "Could not load pipelines",
+    "loadingMatches": "Loading matches…",
+    "noMatches": "No pipelines match these filters.",
+    "oneMatch": "1 run matches",
+    "manyMatches": "{{count}} runs match",
+    "showingRange": "Showing {{start}}–{{end}}",
+    "emptyTitle": "No pipelines found",
+    "emptyDescription": "Try a different status tile or clear filters to see more runs.",
+    "pageOf": "Page {{page}} of {{total}}",
+    "toastStopped": "Pipeline stopped"
+  },
+  "stopDialog": {
+    "title": "Stop this pipeline?",
+    "description": "Generation will stop. Steps still running may finish briefly, but no new steps will start. This cannot be undone.",
+    "keepRunning": "Keep running",
+    "stopping": "Stopping…",
+    "stop": "Stop pipeline",
+    "error": "Could not stop the pipeline."
+  },
+  "toolbar": {
+    "workflow": "Workflow",
+    "allWorkflows": "All workflows",
+    "workflowFallback": "Workflow",
+    "sort": "Sort",
+    "perPage": "Per page",
+    "clear": "Clear"
+  },
+  "sort": {
+    "startedDesc": "Started (newest)",
+    "startedAsc": "Started (oldest)",
+    "completedDesc": "Completed (newest)",
+    "completedAsc": "Completed (oldest)"
+  },
+  "status": {
+    "all": "All",
+    "running": "Running",
+    "paused": "Paused",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "card": {
+    "news": "News",
+    "noPrompt": "No prompt",
+    "noSteps": "No steps recorded",
+    "node_one": "{{count}} node",
+    "node_other": "{{count}} nodes",
+    "openRun": "Open run",
+    "stop": "Stop"
+  },
+  "nodeTypes": {
+    "keyword_planner": "Keywords",
+    "text_generation": "Text",
+    "image_generation": "Image",
+    "video_generation": "Video",
+    "translation": "Translate",
+    "transcription": "Transcribe",
+    "summarization": "Summary",
+    "intelligence": "Intelligence",
+    "adapt": "Adapt",
+    "branch": "Branch",
+    "merge": "Merge"
+  },
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "weeksAgo": "{{count}}w ago"
+  },
+  "errors": {
+    "loadFailed": "Failed to load pipelines.",
+    "invalidStatsResponse": "Invalid pipeline stats response"
+  }
+}

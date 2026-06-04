@@ -1,0 +1,86 @@
+{
+  "greeting": {
+    "morning": "早上好",
+    "afternoon": "下午好",
+    "evening": "晚上好",
+    "defaultName": "您"
+  },
+  "header": {
+    "overview": "概览",
+    "subtitle": "活动健康度、互动情况以及需要关注的事项——随内容在 NeuralTex 中流转而更新。",
+    "startGeneration": "开始新的生成"
+  },
+  "stats": {
+    "publishedMonth": "本月已发布",
+    "publishedMonthHint": "所有渠道",
+    "pendingReview": "待审核",
+    "pendingReviewHint": "等待批准的草稿",
+    "scheduled": "已排期",
+    "scheduledHint": "即将发布的帖子",
+    "reachWeek": "本周触达",
+    "reachWeekHint": "预估展示次数"
+  },
+  "charts": {
+    "engagementTitle": "本周 — 互动",
+    "engagementDesc": "当前周期记录的触达、反应和点击。",
+    "activityTitle": "活动（近 7 天）",
+    "activityDesc": "工作区记录的事件数量。",
+    "thisWeek": "本周",
+    "activity": "活动",
+    "events": "{{count}} 个事件",
+    "metrics": {
+      "reach": "触达",
+      "likes": "点赞",
+      "comments": "评论",
+      "clicks": "点击"
+    }
+  },
+  "recentActivity": {
+    "title": "最近活动",
+    "desc": "内容与上传的最新变更",
+    "empty": "暂无最近活动。"
+  },
+  "actionQueue": {
+    "title": "待办队列",
+    "desc": "优先处理的下一步",
+    "draftsApproval": "{{count}} 份草稿待批准",
+    "draftsHint": "发布前请审核",
+    "review": "审核",
+    "ruleSuggestions": "{{count}} 条规则建议",
+    "ruleSuggestionsHint": "根据分析优化活动",
+    "open": "打开",
+    "failedPublishes": "{{count}} 次发布失败",
+    "failedHint": "在上传模块重试",
+    "uploads": "上传"
+  },
+  "scheduled": {
+    "title": "已排期",
+    "desc": "日历上的下一批帖子",
+    "viewAll": "查看全部",
+    "empty": "暂无即将发布的排期帖子。",
+    "fallbackCaption": "已排期帖子"
+  },
+  "highlights": {
+    "title": "亮点",
+    "desc": "本周表现突出",
+    "reach": "触达",
+    "likes": "点赞",
+    "comments": "评论",
+    "clicks": "点击",
+    "bestChannel": "最佳渠道：",
+    "bestPost": "最佳帖子：",
+    "fullAnalytics": "完整分析"
+  },
+  "quickStart": {
+    "title": "欢迎使用 NeuralTex",
+    "desc": "三步完成首次发布",
+    "step1": "创建规则",
+    "step2": "生成首条内容",
+    "step3": "发布到社交媒体",
+    "cta": "创建您的第一条规则"
+  },
+  "error": {
+    "title": "无法加载仪表盘",
+    "desc": "请检查网络连接后重试。"
+  }
+}

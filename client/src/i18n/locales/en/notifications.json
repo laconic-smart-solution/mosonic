@@ -1,0 +1,29 @@
+{
+  "bell": {
+    "title": "Notifications",
+    "unreadAria": "Notifications, {{count}} unread",
+    "aria": "Notifications",
+    "markAllRead": "Mark all read",
+    "enableBackground": "Enable background alerts",
+    "tryAgain": "Try again (browser settings)",
+    "backgroundOn": "Background alerts on",
+    "empty": "No notifications yet",
+    "clearAll": "Clear all",
+    "sectorNews": "News"
+  },
+  "browser": {
+    "iosBrowser": "On iPhone and iPad, add NeuralTex to your Home Screen to get background alerts. Until then, use the bell and in-app toasts.",
+    "unsupported": "This browser does not support background alerts. You will still see in-app notifications.",
+    "grantedPwa": "Home Screen alerts are on.",
+    "grantedDesktop": "Browser alerts are on when this tab is in the background.",
+    "denied": "Browser alerts are blocked. Enable them in browser settings or use in-app notifications.",
+    "iosPwaPrompt": "Turn on alerts for the installed app (Settings → Notifications).",
+    "defaultPrompt": "Enable alerts to get notified when a pipeline finishes while you are on another tab."
+  },
+  "toast": {
+    "iosPwaEnabled": "Home Screen alerts enabled",
+    "browserEnabled": "Browser alerts enabled",
+    "notEnabledTitle": "Alerts not enabled",
+    "notEnabledDesc": "You can still use the notification bell and in-app toasts while using NeuralTex."
+  }
+}

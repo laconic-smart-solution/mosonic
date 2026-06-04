@@ -1,0 +1,493 @@
+{
+  "nodeTypes": {
+    "keywords": "关键词规划",
+    "text": "文本生成",
+    "image": "图像生成",
+    "video": "视频生成",
+    "translation": "翻译",
+    "transcription": "转录",
+    "summarization": "摘要",
+    "branch": "分支",
+    "adapt": "渠道适配",
+    "merge": "合并",
+    "intelligence": "情报检索"
+  },
+  "nodeTypesShort": {
+    "keywords": "关键词",
+    "text": "文本生成",
+    "image": "图像",
+    "video": "视频",
+    "translation": "翻译",
+    "transcription": "转录",
+    "summarization": "摘要",
+    "branch": "分支",
+    "adapt": "适配",
+    "merge": "合并",
+    "intelligence": "情报"
+  },
+  "nodeTypesBackend": {
+    "keyword_planner": "关键词规划",
+    "text_generation": "文本 / LLM",
+    "image_generation": "图像",
+    "video_generation": "视频",
+    "translation": "翻译",
+    "transcription": "转录",
+    "summarization": "摘要"
+  },
+  "laneNodeLabel": {
+    "forChannel": "{{type}} · {{channel}}"
+  },
+  "guide": {
+    "labels": {
+      "usage": "用途",
+      "example": "示例",
+      "tip": "提示"
+    },
+    "defaultFallback": "使用下方字段调整此步骤的运行方式。主题或活动简报在生成内容（流水线运行）时输入，而非在此节点上。",
+    "keywords": {
+      "usage": "在流水线运行时根据活动简报生成 SEO 关键词和主题。可在文本或图像步骤上游添加零个或多个节点，以便使用规划好的词。",
+      "example": "关键词 → 文本生成：为产品发布规划术语，然后撰写自然融入这些关键词的文案。"
+    },
+    "text": {
+      "usage": "使用运行提示词及上游输出（关键词、情报提示等）创建帖子文案。可按需添加多个文本节点并像其他步骤一样连接。",
+      "example": "在关键词之后，将语气设为专业、长度设为中等，即可为简报生成适合 LinkedIn 的段落。",
+      "tips": "活动主题在启动流水线运行时输入，而非在此面板中。"
+    },
+    "image": {
+      "usage": "根据上游文本或关键词生成图像。配置宽高比和风格以匹配规则中的渠道。",
+      "example": "文本 → 图像，1:1 宽高比、Natural 风格，基于帖子文案生成 Instagram 信息流主图。"
+    },
+    "video": {
+      "usage": "根据运行提示词和上游素材（通常是文本或参考图）生成短视频。在专用视频队列中运行，可能比其他节点耗时更长。",
+      "example": "图像 → 视频，9:16、8 秒，将静态产品图转为竖屏 Reels。"
+    },
+    "translation": {
+      "usage": "将上游节点产生的文本翻译为目标语言。适用于同一活动需要本地化文案而无需重写的情况。",
+      "example": "英文文本 → 翻译（目标泰语）→ 在 Facebook 泰国市场分支上的 Adapt 节点之前。"
+    },
+    "transcription": {
+      "usage": "将上游素材中的音频或视频转为文本。适用于源材料是录音而非书面文案的情况。",
+      "example": "视频 → 转录（自动语言）→ 摘要，从网络研讨会片段获取要点列表。"
+    },
+    "summarization": {
+      "usage": "将冗长的上游文本缩短为摘要。选择长度和输出形式（段落、要点或 TL;DR）以符合渠道限制。",
+      "example": "转录 → 摘要，中等长度、要点形式，用于轮播幻灯片文案。"
+    },
+    "branch": {
+      "usage": "将执行拆分为并行渠道分支（来自规则的渠道、手动选择或 A/B 变体）。运行时会在 Branch 与 Merge 之间为每个分支实例化一个子图。",
+      "example": "文本 → 分支（规则渠道）→ 适配 → 合并，向 Instagram、Facebook、LinkedIn 发布同一活动并生成各渠道文案。",
+      "tips": "在下游将 Branch 连接到 Merge，以便所有分支在最终完成前结束。"
+    },
+    "adapt": {
+      "usage": "将共享文案调整为特定渠道的风格与映射（文案长度、语气、话题标签）。实例化后每个分支一个 adapt 节点；渠道由规则自动设置。",
+      "example": "Branch 后 Instagram 分支：adapt 将共享文本改写为符合规则中 Instagram 内容风格的文案。",
+      "tips": "无需在此配置渠道——它来自实例化时创建的分支。"
+    },
+    "merge": {
+      "usage": "等待所有并行分支完成（或跳过）后，流水线才能完成内容并上传。作为汇聚屏障，无 LLM 步骤。",
+      "example": "Branch → Adapt（各渠道）→ Merge：在所有分支的 adapt 完成前阻塞，然后组装内容供审核。"
+    },
+    "intelligence": {
+      "usage": "通过 OpenAI 运行网络检索简报（趋势、市场、竞品或全部），并将结果注入下游文本生成。使用最新洞察启动运行时可选用分析叠加。",
+      "example": "情报（全部）→ 文本：一次检索覆盖话题标签、行业新闻和竞品差距后再撰写文案。",
+      "tips": "使用「全部」一次调用，而非堆叠多个 Intelligence 节点。需要特定研究问题时选择自定义。"
+    }
+  },
+  "popoverDescriptions": {
+    "keywords": "先规划关键词和主题",
+    "intelligence": "先获取趋势和市场信号",
+    "text": "使用 AI 生成内容",
+    "transcription": "先转录音频或视频",
+    "branch": "拆分为并行渠道分支",
+    "adapt": "为此渠道改写",
+    "image": "使用 AI 创建图像",
+    "video": "使用 AI 创建视频",
+    "summarization": "摘要上游内容",
+    "translation": "翻译为目标语言",
+    "merge": "在最终完成前收集所有分支"
+  },
+  "fields": {
+    "shared": { "on": "开", "off": "关" },
+    "text": {
+      "outputFormat": { "label": "输出格式" },
+      "tone": { "label": "写作语气" },
+      "textLength": { "label": "长度" }
+    },
+    "image": {
+      "style": { "label": "风格" },
+      "aspectRatio": { "label": "宽高比" },
+      "quality": { "label": "质量" },
+      "negativePrompt": {
+        "label": "负向提示词",
+        "placeholder": "可选 — 图像中需避免的内容"
+      }
+    },
+    "video": {
+      "mode": { "label": "模式" },
+      "aspectRatio": { "label": "宽高比" },
+      "duration": { "label": "时长" },
+      "targetDuration": { "label": "目标时长" },
+      "resolution": { "label": "分辨率" },
+      "negativePrompt": {
+        "label": "负向提示词",
+        "placeholder": "可选 — 视频中需额外避免的内容"
+      },
+      "heygenOrientation": { "label": "方向" },
+      "heygenExpressiveness": { "label": "表现力" },
+      "removeBackground": { "label": "移除原始照片背景" },
+      "heygenMotionPrompt": {
+        "label": "动作提示词（可选）",
+        "placeholder": "例如：演示时轻轻点头"
+      }
+    },
+    "translation": {
+      "sourceLanguage": { "label": "源语言" },
+      "targetLanguage": { "label": "目标语言" },
+      "formalityLevel": { "label": "正式程度" },
+      "preserveFormatting": { "label": "保留格式" }
+    },
+    "transcription": { "language": { "label": "语言" } },
+    "summarization": {
+      "summaryLength": { "label": "摘要长度" },
+      "outputFormat": { "label": "输出形式" }
+    },
+    "intelligence": {
+      "searchType": { "label": "检索类型" },
+      "customPrompt": {
+        "label": "自定义检索提示词",
+        "placeholder": "描述要检索的内容…"
+      }
+    },
+    "options": {
+      "paragraph": "段落",
+      "bullets": "要点",
+      "caption": "文案",
+      "professional": "专业",
+      "casual": "休闲",
+      "friendly": "友好",
+      "formal": "正式",
+      "witty": "诙谐",
+      "short": "短",
+      "medium": "中",
+      "long": "长",
+      "natural": "自然",
+      "vivid": "鲜明",
+      "standard": "标准",
+      "hd": "HD",
+      "cinematic": "电影感",
+      "presenter": "数字人",
+      "landscape169": "横屏 16:9",
+      "portrait916": "竖屏 9:16",
+      "resolution720p": "720p (Sora 2)",
+      "duration4s": "4秒",
+      "duration8s": "8秒",
+      "duration12s": "12秒",
+      "duration16s": "16秒",
+      "duration20s": "20秒",
+      "low": "低",
+      "high": "高",
+      "autoDetect": "自动检测",
+      "auto": "自动",
+      "english": "英语",
+      "thai": "泰语",
+      "japanese": "日语",
+      "chinese": "中文",
+      "korean": "韩语",
+      "spanish": "西班牙语",
+      "french": "法语",
+      "german": "德语",
+      "tldr": "TL;DR",
+      "searchAll": "全部（趋势 + 市场 + 竞品）",
+      "searchTrend": "趋势 — 话题标签与格式",
+      "searchMarket": "市场 — 新闻与信号",
+      "searchCompetitor": "竞品 — 差距与角度",
+      "searchCustom": "自定义 — 您的提示词"
+    }
+  },
+  "configSummary": {
+    "textSettings": "文本设置",
+    "imageSettings": "图像设置",
+    "videoSettings": "视频设置",
+    "translation": "翻译",
+    "keywordPlanner": "关键词规划",
+    "summary": "摘要",
+    "transcription": "转录",
+    "fromCampaignRule": "来自活动规则",
+    "channelAdapt": "渠道适配",
+    "channel": "渠道：{{channel}}",
+    "fanInBarrier": "汇聚屏障",
+    "configured": "已配置",
+    "intelligenceTypes": {
+      "all": "全部",
+      "trend": "趋势",
+      "market": "市场",
+      "competitor": "竞品",
+      "custom": "自定义"
+    }
+  },
+  "nodeStatus": {
+    "pending": "待处理",
+    "idle": "空闲",
+    "ready": "就绪",
+    "running": "运行中",
+    "streaming": "流式",
+    "processing": "处理中",
+    "retrying": "重试中",
+    "done": "完成",
+    "completed": "已完成",
+    "failed_final": "失败",
+    "failed": "失败"
+  },
+  "validation": {
+    "laneAssignment": "{{type}} 必须分配到渠道（从分支节点添加，而非从主干 Text 添加）。",
+    "presenterAvatarRequired": "数字人视频需要选择形象。",
+    "presenterVoiceRequired": "数字人视频需要选择语音。"
+  },
+  "toolbar": {
+    "workflowNameAria": "工作流名称",
+    "untitledWorkflow": "未命名工作流",
+    "rebuildNodes": "重建节点",
+    "describeWorkflow": "描述工作流",
+    "saving": "保存中…",
+    "saveChanges": "保存更改",
+    "runPipeline": "运行流水线",
+    "stopPipeline": "停止流水线",
+    "generateContent": "生成内容"
+  },
+  "palette": {
+    "title": "节点",
+    "subtitle": "拖到画布上添加并连接",
+    "collapseAria": "折叠节点面板",
+    "expandAria": "展开节点面板",
+    "dragAria": "将 {{label}} 拖到画布"
+  },
+  "properties": {
+    "title": "属性",
+    "configuration": "配置",
+    "branchChannelsHint": "在活动规则中添加至少两个分发渠道以启用分支。",
+    "channelLanes": "渠道分支",
+    "applyHint": "更改仅适用于本次运行。保存工作流以持久化。",
+    "applyChanges": "应用更改",
+    "applyChangesNow": "立即应用更改",
+    "reset": "重置"
+  },
+  "branchNode": {
+    "label": "分支",
+    "channelLanes_one": "{{count}} 个渠道分支",
+    "channelLanes_other": "{{count}} 个渠道分支",
+    "channelsFromRule": "渠道来自活动规则"
+  },
+  "mergeNode": {
+    "label": "合并",
+    "waitsForLanes_one": "等待 {{count}} 个分支",
+    "waitsForLanes_other": "等待 {{count}} 个分支",
+    "fanInBarrier": "汇聚屏障"
+  },
+  "rfNode": {
+    "locked": "已锁定",
+    "previewAlt": "节点输出预览",
+    "deleteAria": "删除节点",
+    "retry": "重试",
+    "skip": "跳过"
+  },
+  "presenter": {
+    "saveWorkflowFirst": "上传形象前请先保存工作流。",
+    "saveFailed": "无法保存数字人设置。请保存工作流后重试。",
+    "deleteConfirm": "从您的 HeyGen 账户删除「{{name}}」？此操作无法撤销。",
+    "deleteFailed": "无法删除形象。请重试。",
+    "fileTooLarge": "图像必须小于 32MB。",
+    "uploadFailed": "上传失败。请重试。",
+    "avatar": "形象",
+    "clearSelection": "清除选择",
+    "loadingAvatars": "加载形象中…",
+    "loadAvatarsFailed": "无法加载形象。",
+    "noAvatars": "暂无形象。请在下方上传。",
+    "uploadNewAvatar": "上传新形象",
+    "uploadAvatarHint": "PNG/JPEG · 正脸 · 最大 32MB",
+    "backgroundImage": "背景图",
+    "backgroundHint": "可选自定义背景",
+    "voice": "语音",
+    "voiceSaveFailed": "无法保存语音。请保存工作流后重试。",
+    "clickOrDrag": "点击或拖拽图像到此处",
+    "uploading": "上传中…"
+  },
+  "voicePicker": {
+    "genderAll": "全部",
+    "genderMale": "男",
+    "genderFemale": "女",
+    "language": "语言",
+    "search": "搜索",
+    "searchPlaceholder": "名称…",
+    "loadingSelection": "加载选择中…",
+    "noVoiceSelected": "未选择语音",
+    "voicesAria": "HeyGen 语音",
+    "loadingVoices": "加载语音中…",
+    "loadVoicesFailed": "无法加载语音。",
+    "noSearchResults": "已加载结果中没有匹配的语音。",
+    "noFilterResults": "此筛选条件下没有语音。",
+    "unknownLanguage": "未知语言",
+    "loadMore": "加载更多（已显示 {{count}}）",
+    "stopPreview": "停止预览 {{name}}",
+    "playPreview": "播放预览 {{name}}",
+    "previewPlayFailed": "无法播放 {{name}} 的预览。",
+    "previewLoadFailed": "无法加载 {{name}} 的预览。"
+  },
+  "canvas": {
+    "cannotAddNode": "无法在此添加节点",
+    "imageSizeAdjusted": "已调整图像尺寸以匹配所选模型（OpenAI 仅支持特定尺寸）。",
+    "removedLanes": "已移除分支：{{lanes}}",
+    "videoSettingsSaveFailed": "无法将视频设置保存到服务器。运行前请先保存工作流。"
+  },
+  "toasts": {
+    "replacedAdaptNodes": "已用 Branch 的每个渠道一个 Adapt 替换未分配分支的 Adapt 节点。",
+    "branchNeedsChannels": "Branch 需要在活动规则中至少两个分发渠道。",
+    "addNodeBeforeSave": "保存前请至少添加一个节点。",
+    "pipelineStartFailed": "无法启动流水线。请重试。",
+    "enterPostTopic": "请输入您要发布的内容主题。",
+    "addNodeBeforeRun": "运行前请至少添加一个节点。",
+    "saveBeforeRunPresenter": "运行前请保存工作流（数字人设置尚未保存）。",
+    "retryFailed": "无法重试。请重试。",
+    "skipFailed": "无法跳过。请重试。",
+    "describeWorkflow": "请描述要生成的工作流。",
+    "noReplanNode": "没有可附加 replan 操作的节点。",
+    "translationInserted": "已插入翻译节点；正在恢复…",
+    "replanFailed": "Replan 失败。",
+    "pipelineStopped": "流水线已停止"
+  },
+  "processing": {
+    "generating": "生成中...",
+    "retrying": "重试中... 第 {{attempt}}/{{max}} 次",
+    "running": "运行中...",
+    "nodesCompleted": "已完成 {{completed}} / {{total}} 个节点",
+    "pipelinePaused": "流水线已暂停",
+    "pipelinePausedChannel": "流水线已暂停（渠道：{{channel}}）",
+    "pipelinePausedHint": "— 重试失败节点或使用下方 replan 操作。",
+    "addTranslationLane": "添加翻译（分支）",
+    "startOver": "重新开始",
+    "systemMessagesEnglishHint": "来自服务器的系统消息可能显示为英文。"
+  },
+  "promptBar": {
+    "describeStructure": "描述此工作流（结构）",
+    "postTopic": "您想发布什么内容？",
+    "structurePlaceholder": "例如：Instagram + Facebook 文案、泰语翻译、主图…",
+    "postPlaceholder": "例如：圣诞促销 — 12 月 25 日前全场五折…",
+    "exitPreviewHint": "清除或再次点击所选流水线以退出预览并生成。",
+    "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
+    "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}"
+  },
+  "nodesLabel_one": "节点",
+  "nodesLabel_other": "节点",
+  "dialogs": {
+    "rebuildTitle": "重建工作流节点",
+    "rebuildDescription": "根据规则和您的备注替换当前节点布局。单帖主题在「生成内容」提示词中，而非此处。",
+    "rebuildPlaceholder": "可选：渠道、格式、翻译、媒体… 留空则从规则推断。",
+    "rebuilding": "重建中…",
+    "rebuild": "重建"
+  },
+  "fab": {
+    "workflowContents": "工作流内容",
+    "goHome": "返回首页",
+    "goToRules": "前往规则"
+  },
+  "errors": {
+    "generateWorkflowFailed": "无法生成工作流。请重试。",
+    "somethingWrong": "出错了。请重试。",
+    "invalidUrl": "工作流 URL 无效。请从规则打开工作流。",
+    "loadWorkflowsFailed": "无法加载工作流。",
+    "pipelineContentNotFound": "流水线已完成但未找到内容。"
+  },
+  "generationProgress": {
+    "title": "正在生成工作流",
+    "titleFailed": "工作流生成失败",
+    "subtitle": "工作流生成",
+    "started": "正在准备工作流…",
+    "generating": "正在构建工作流…",
+    "failed": "生成失败",
+    "aiSelecting": "AI 正在为您的内容选择最佳节点…",
+    "chipStarted": "已开始",
+    "chipGenerating": "生成中",
+    "chipFailed": "失败"
+  },
+  "contentDrawer": {
+    "title": "已生成内容",
+    "description": "此工作流的最新生成内容。",
+    "loading": "加载中...",
+    "empty": "此工作流尚无生成内容。",
+    "loadingMore": "加载更多...",
+    "viewMore": "查看更多"
+  },
+  "usedPipelines": {
+    "aria": "已用流水线",
+    "title": "已用流水线",
+    "previewing": "预览运行中 · 再次点击或清除以编辑工作流",
+    "clear": "清除",
+    "noPrompt": "无提示词",
+    "nodes_one": "节点",
+    "nodes_other": "节点",
+    "empty": "此工作流尚无流水线。",
+    "loading": "加载流水线中…",
+    "loadMore": "加载更多",
+    "loadingMore": "加载中…"
+  },
+  "workflowsList": {
+    "library": "库",
+    "title": "工作流",
+    "subtitle": "以卡片网格浏览工作流，按节点类型筛选并打开编辑器。",
+    "searchPlaceholder": "按工作流名称搜索…",
+    "searchAria": "搜索工作流",
+    "nodeTypePlaceholder": "节点类型",
+    "allNodeTypes": "全部节点类型",
+    "perPage": "每页 {{count}} 条",
+    "loadErrorTitle": "无法加载工作流",
+    "emptyTitle": "未找到工作流",
+    "emptyFiltered": "请尝试调整搜索或节点类型筛选。",
+    "emptyDefault": "从规则生成工作流后将显示在此处。",
+    "noNodesYet": "尚无节点",
+    "updated": "更新于 {{date}}",
+    "showing": "本页显示 {{count}} 条 · 共 {{total}} 条",
+    "pageOf": "第 {{page}} 页，共 {{totalPages}} 页"
+  },
+  "promptPage": {
+    "selectedRule": "所选规则",
+    "title": "您想创建什么？",
+    "subtitle": "描述您要制作的内容，我们将构建合适的工作流。",
+    "placeholder": "例如：面向年轻职场人士的新品发布帖…",
+    "generating": "正在生成工作流…",
+    "existingBanner": "从已保存的工作流继续，或留在此页生成新的。",
+    "backToRules": "返回规则设置",
+    "openExisting": "打开已有工作流",
+    "noExisting": "尚无已有工作流"
+  },
+  "generatePage": {
+    "preparing": "正在准备工作流…",
+    "building": "正在构建工作流…",
+    "title": "工作流节点",
+    "addNode": "添加节点",
+    "saving": "保存中…",
+    "saveChanges": "保存更改"
+  },
+  "addNodeSelector": {
+    "title": "添加节点",
+    "fallbackDescription": "将此步骤添加到工作流"
+  },
+  "nodeCard": {
+    "nodeSettings": "节点设置",
+    "runTopicHint": "发布主题在运行工作流时设置，而非此处。",
+    "defaultPlannerSettings": "默认规划器设置",
+    "defaultTextSettings": "默认文本设置",
+    "defaultImageSettings": "默认图像设置",
+    "defaultVideoSettings": "默认视频设置",
+    "defaultSummarySettings": "默认摘要设置",
+    "reflowOk": "可重排格式",
+    "presenter": "数字人",
+    "cinematic": "电影感"
+  },
+  "rebuildTooltip": "根据当前规则和渠道设置刷新工作流节点。",
+  "aria": {
+    "openNodeSettings": "打开节点设置",
+    "addNode": "添加节点",
+    "deleteNode": "删除节点",
+    "insertNode": "插入节点",
+    "deleteAvatar": "删除 {{name}}"
+  }
+}

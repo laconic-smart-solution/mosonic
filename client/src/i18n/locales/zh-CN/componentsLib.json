@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "组件库",
+    "subtitle": "NeuralTex 全站使用的视觉规范，供实现时保持一致参考。"
+  },
+  "sections": {
+    "buttons": "按钮",
+    "statusChips": "状态标签",
+    "nodeCards": "节点卡片变体",
+    "toasts": "提示 / 通知",
+    "emptyState": "空状态",
+    "typography": "排版",
+    "colorPalette": "调色板"
+  },
+  "buttons": {
+    "primary": "主要",
+    "secondary": "次要",
+    "ghost": "幽灵",
+    "destructive": "危险",
+    "accent": "强调",
+    "small": "小",
+    "large": "大",
+    "withIcon": "带图标"
+  },
+  "chips": {
+    "idle": "空闲",
+    "ready": "就绪",
+    "running": "运行中",
+    "done": "完成",
+    "failed": "失败",
+    "warning": "警告",
+    "draft": "草稿",
+    "published": "已发布",
+    "archived": "已归档",
+    "scheduled": "已定时"
+  },
+  "nodes": {
+    "textGeneration": "文本生成",
+    "imageGeneration": "图像生成",
+    "translation": "翻译",
+    "videoGeneration": "视频生成",
+    "addInstruction": "点击添加说明…",
+    "status": {
+      "idle": "空闲",
+      "running": "运行中",
+      "done": "完成",
+      "failed": "失败"
+    }
+  },
+  "toasts": {
+    "ruleSaved": "规则已保存 — 可在工作流中使用。",
+    "twitterLimit": "X/Twitter 帖子超出限制 32 个字符。",
+    "imageFailed": "图像生成失败，请检查 API 配额。",
+    "pipelineRunning": "流水线运行中 — 预计约 45 秒完成。"
+  },
+  "empty": {
+    "title": "尚无规则",
+    "desc": "一次性定义品牌策略，即可在所有活动中复用。",
+    "cta": "+ 创建您的第一条规则"
+  },
+  "typography": {
+    "pageTitle": "页面标题",
+    "pageTitleSample": "分析",
+    "sectionHeading": "章节标题",
+    "sectionHeadingSample": "草稿 · V2",
+    "cardTitle": "卡片标题",
+    "cardTitleSample": "浏览量趋势",
+    "bodyPrimary": "正文 / 主要",
+    "bodySample": "本月 Instagram 上 80 字以内的配文表现优于长文 3 倍。",
+    "secondary": "次要",
+    "secondarySample": "所有活动和渠道的整体表现。",
+    "muted": "弱化 / 时间戳",
+    "mutedSample": "2026-05-04 10:42:33",
+    "label": "标签 / 上标",
+    "labelSample": "总浏览量"
+  },
+  "colors": {
+    "accent": "强调色",
+    "accentLight": "浅强调色",
+    "green": "绿色",
+    "amber": "琥珀色",
+    "red": "红色",
+    "blue": "蓝色",
+    "textPrimary": "主文本",
+    "textSecondary": "次文本",
+    "textMuted": "弱化文本",
+    "canvasBg": "画布背景",
+    "surface": "表面",
+    "sidebar": "侧边栏"
+  }
+}

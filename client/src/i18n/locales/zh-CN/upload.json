@@ -1,0 +1,130 @@
+{
+  "page": {
+    "title": "上传内容",
+    "allChannels": "全部渠道",
+    "missingId": "缺少上传 ID。",
+    "loading": "正在加载上传…",
+    "loadErrorTitle": "无法加载上传",
+    "back": "返回"
+  },
+  "captionSource": {
+    "text": "主文本",
+    "translatedText": "翻译",
+    "summary": "摘要",
+    "custom": "自定义",
+    "fallback": "文本"
+  },
+  "preview": {
+    "title": "预览",
+    "save": "保存",
+    "noMedia": "无媒体",
+    "tiktokVerticalHint": "TikTok 预览使用竖屏 9:16 视频。"
+  },
+  "scheduledEdit": {
+    "title": "编辑定时帖子",
+    "hint": "更改仅适用于此渠道。定时后无法更改媒体和平台。",
+    "caption": "文案",
+    "captionPlaceholder": "更新此渠道的文案",
+    "youtubeTitle": "YouTube 标题",
+    "youtubeTitlePlaceholder": "更新 YouTube 视频标题",
+    "rescheduleTo": "重新定时为",
+    "cancel": "取消",
+    "updating": "正在更新...",
+    "confirm": "确认更改",
+    "scheduledHint": "此帖子已定时。使用“编辑定时帖子”可更新此渠道的文案、时间或 YouTube 标题。Zernio 不支持更改媒体。"
+  },
+  "fields": {
+    "media": "媒体",
+    "videoTitle": "视频标题",
+    "youtubeTitlePlaceholder": "输入 YouTube 视频标题…"
+  },
+  "mediaTab": {
+    "single": "单图",
+    "multiple": "多图",
+    "video": "视频"
+  },
+  "publish": {
+    "publishNow": "立即发布",
+    "publishAll": "发布所有已包含",
+    "schedule": "定时",
+    "scheduleAll": "定时所有已包含",
+    "globalPublishing": "全局发布",
+    "schedulePublication": "定时发布",
+    "scheduleAllChannels": "定时所有已包含渠道",
+    "dateTime": "日期和时间",
+    "cancel": "取消",
+    "confirmSchedule": "确认定时",
+    "publishedNoAction": "已发布 — 无需进一步操作",
+    "scheduledEditable": "已定时 — 仍可编辑文案、时间和 YouTube 标题",
+    "publishingInProgress": "正在发布…",
+    "editScheduled": "编辑定时帖子"
+  },
+  "banner": {
+    "notConnected": "您的 {{platform}} 账户未连接。",
+    "connect": "连接",
+    "failed": "发布失败，请重试。",
+    "retry": "重试",
+    "publishing": "正在发布到 {{platform}}…",
+    "published": "已成功发布到 {{platform}}{{when}}",
+    "scheduled": "已定时于 {{when}} 发布到 {{platform}}"
+  },
+  "toast": {
+    "channelIncluded": "已包含渠道",
+    "channelExcluded": "已排除渠道",
+    "captionRequired": "需要填写文案。",
+    "scheduleFuture": "定时时间必须在未来。",
+    "selectDateTime": "请选择日期和时间。",
+    "postUpdated": "帖子更新成功",
+    "savedChannel": "已保存此渠道",
+    "connectAccount": "请先在设置中连接此账户。",
+    "assignCaption": "发布前请指定文案。",
+    "publishing": "正在发布…",
+    "scheduling": "正在定时…",
+    "noEligibleChannels": "没有可发布的已包含渠道。",
+    "nodeUpdated": "节点输出已更新 — 准备好后请保存。",
+    "changesSaved": "更改已保存",
+    "saveFailed": "保存失败，请重试。",
+    "loadOutputsFailed": "无法加载可用输出。",
+    "unknownNodeType": "未知节点类型。",
+    "startGenerationFailed": "无法开始生成。",
+    "approved": "内容已批准。",
+    "approveFailed": "无法批准，请重试。",
+    "rejected": "内容已拒绝。",
+    "rejectFailed": "无法拒绝，请重试。",
+    "openUploadFailed": "无法打开上传，请从主菜单进入上传页面。",
+    "waitGeneration": "请等待当前生成完成。",
+    "resolveNodeFailed": "无法解析此输出的节点。",
+    "rerunFailed": "无法开始重新运行。",
+    "nothingToCopy": "没有可复制的内容",
+    "copied": "已复制到剪贴板",
+    "copyFailed": "复制失败",
+    "mediaUploadFailed": "媒体上传失败。",
+    "noMediaSlot": "没有媒体上传槽位。"
+  },
+  "review": {
+    "defaultTitle": "内容审核",
+    "loading": "加载中…",
+    "loadFailed": "无法加载内容。",
+    "backToList": "返回内容列表",
+    "workflowLayers": "工作流层",
+    "addOutput": "添加其他输出",
+    "addOutputTitle": "添加输出",
+    "pickNodeHint": "选择节点类型以为此工作流生成更多内容。",
+    "generate": "生成",
+    "rejectedBanner": "此内容已被拒绝。请审核输出并在准备好后批准。",
+    "processing": "处理中…",
+    "retrying": "正在重试… 第 {{attempt}}/{{maxAttempts}} 次",
+    "rerunFailed": "重新运行失败，请重试。",
+    "uploadingMedia": "正在上传{{type}}…",
+    "uploadFailed": "上传失败，请重试。",
+    "image": "图片",
+    "video": "视频"
+  },
+  "palette": {
+    "dragHint": "将输出拖入文案或媒体区域"
+  },
+  "publishSummary": {
+    "included": "已包含 {{count}} 个渠道",
+    "eligible": "{{count}} 个可发布"
+  }
+}

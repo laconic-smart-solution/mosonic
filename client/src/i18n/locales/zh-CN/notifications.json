@@ -1,0 +1,29 @@
+{
+  "bell": {
+    "title": "通知",
+    "unreadAria": "通知，{{count}} 条未读",
+    "aria": "通知",
+    "markAllRead": "全部标为已读",
+    "enableBackground": "启用后台提醒",
+    "tryAgain": "重试（浏览器设置）",
+    "backgroundOn": "后台提醒已开启",
+    "empty": "暂无通知",
+    "clearAll": "全部清除",
+    "sectorNews": "新闻"
+  },
+  "browser": {
+    "iosBrowser": "在 iPhone 和 iPad 上，请将 NeuralTex 添加到主屏幕以接收后台提醒。在此之前请使用铃铛和应用内提示。",
+    "unsupported": "此浏览器不支持后台提醒。您仍会看到应用内通知。",
+    "grantedPwa": "主屏幕提醒已开启。",
+    "grantedDesktop": "标签页在后台时浏览器提醒已开启。",
+    "denied": "浏览器提醒已被阻止。请在浏览器设置中启用，或使用应用内通知。",
+    "iosPwaPrompt": "为已安装的应用开启提醒（设置 → 通知）。",
+    "defaultPrompt": "启用提醒后，当您在其他标签页时也能收到流水线完成通知。"
+  },
+  "toast": {
+    "iosPwaEnabled": "主屏幕提醒已启用",
+    "browserEnabled": "浏览器提醒已启用",
+    "notEnabledTitle": "提醒未启用",
+    "notEnabledDesc": "您仍可使用 NeuralTex 的通知铃铛和应用内提示。"
+  }
+}

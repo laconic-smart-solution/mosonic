@@ -1,0 +1,880 @@
+---
+alwaysApply: true
+---
+
+# NeuralTex — AI-Driven Digital Content Generation Platform
+
+## Project Flow & Complete Functionality Specification
+
+**Company:** NeuralTex Software Co., Ltd.
+**Product Type:** Cloud-based SaaS — AI Content Orchestration Platform
+**Primary Markets:** SMEs, Startups, Marketing Agencies, E-Commerce, Large Enterprises
+
+---
+
+## 📑 Table of Contents
+
+1. [Project Overview](#1-project-overview)
+2. [End-to-End Project Flow](#2-end-to-end-project-flow)
+3. [Module 1 — Rule Module](#3-module-1--rule-module)
+4. [Module 2 — Workflow Module](#4-module-2--workflow-module)
+5. [Module 3 — Orchestration Module](#5-module-3--orchestration-module)
+6. [Module 4 — Logging Module](#6-module-4--logging-module)
+7. [Module 5 — Content Module](#7-module-5--content-module)
+8. [Module 6 — Upload Module](#8-module-6--upload-module)
+9. [Module 7 — Analytics Module](#9-module-7--analytics-module)
+10. [Data Schemas (MongoDB)](#10-data-schemas-mongodb)
+11. [Technology Stack](#11-technology-stack)
+12. [Revenue Model & Tiering](#12-revenue-model--tiering)
+
+---
+
+## 1. Project Overview
+
+NeuralTex is a Thailand-based **Software-as-a-Service (SaaS)** platform that helps businesses automatically produce marketing content, social media materials, and digital media assets through AI orchestration.
+
+### Mission
+
+Replace manual content workflows with intelligent, automated AI orchestration — and ensure the high-value intellectual property remains within Thailand.
+
+### Core Innovation
+
+NeuralTex does **not** train foundational AI language models. The proprietary innovation lives in the **Orchestration Layer** — how user inputs are translated into precise AI instructions controlling **tone, format, length, keywords, and validation**.
+
+### Platform Capabilities (High Level)
+
+- Campaign-driven AI content generation (text, images, video, translation)
+- Multi-channel publishing (Facebook, Instagram, Twitter/X, LinkedIn)
+- Workflow automation with approval routing
+- API integration with CRM, e-commerce, and distribution channels
+- Real-time analytics with auto-feedback to improve campaign rules
+
+---
+
+## 2. End-to-End Project Flow
+
+The platform is composed of **seven interconnected modules** that move content from strategy → generation → publishing → measurement → improvement.
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    NEURALTEX PLATFORM FLOW                         │
+└────────────────────────────────────────────────────────────────────┘
+
+  [ ONE-TIME PER CAMPAIGN ]
+        ↓
+  ┌─────────────────────┐
+  │  1. RULE MODULE     │  ← Strategy input (text, file, URL)
+  │  Brand voice, audi- │  ← AI extracts → JSON Rule
+  │  ence, goals, chan- │  ← User confirms
+  │  nels, keywords     │
+  └──────────┬──────────┘
+             │  JSON Rule (reusable)
+             ↓
+  [ PER GENERATION RUN ]
+        ↓
+  ┌─────────────────────┐
+  │  2. WORKFLOW MODULE │  ← User adds Content Prompt
+  │  Build pipeline:    │  ← Auto-suggest nodes from Rule
+  │  Text → Image →     │  ← User reorders / adds nodes
+  │  Translate → Video  │  ← Optional per-node prompts
+  └──────────┬──────────┘
+             │  Ordered Work Nodes + JSON Rule + Content Prompt
+             ↓
+  ┌─────────────────────┐         ┌──────────────────┐
+  │ 3. ORCHESTRATION    │ ──────→ │ 4. LOGGING       │
+  │ Sequential GPT-4o   │  live   │ Real-time stream │
+  │ calls per node,     │  logs   │ to frontend, 90- │
+  │ pass context fwd    │         │ day retention    │
+  └──────────┬──────────┘         └──────────────────┘
+             │  Full Content Package
+             ↓
+  ┌─────────────────────┐
+  │  5. CONTENT MODULE  │  ← Draft displayed per node
+  │  Edit text inline,  │  ← Re-run any node (with new prompt)
+  │  swap image/video,  │  ← Version history kept forever
+  │  approve / reject   │
+  └──────────┬──────────┘
+             │  Approved Content
+             ↓
+  ┌─────────────────────┐
+  │  6. UPLOAD MODULE   │  ← Per-channel preview
+  │  Direct or schedule │  ← MCP layer publishes
+  │  publish, retry on  │  ← Status tracked per channel
+  │  failure            │
+  └──────────┬──────────┘
+             │  Published Content
+             ↓
+  ┌─────────────────────┐
+  │  7. ANALYTICS       │  ← Weekly auto-pull via MCP
+  │  Per-channel metric │  ← Aggregated by Campaign (Rule)
+  │  aggregation,       │  ← Auto-feedback suggestions
+  │  dashboards         │
+  └──────────┬──────────┘
+             │  Feedback Signal
+             ↓
+       [ Loops back to RULE MODULE ]
+       Auto-suggested Rule improvements
+       → User accepts or rejects
+```
+
+### Two Key Architectural Separations
+
+| Separation                                                         | Why It Matters                                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **Rule** (campaign strategy) vs **Content Prompt** (per-run input) | Strategy stays stable; content varies per run. One Rule fuels many generations.                                    |
+| **Node Definition** vs **Pipeline Execution**                      | Workflow stores the template; Pipeline stores the runtime state. Clean separation enables versioning and rollback. |
+
+---
+
+## 3. Module 1 — Rule Module
+
+### Purpose
+
+Defines the **strategic foundation** for a campaign — brand voice, audience, goals, channels. Set up **once per campaign** and reused across many generation runs. This is **separate from the content prompt**, which is provided later in the Workflow Module.
+
+### Functionality
+
+**3.1 Strategy Input Handling**
+Accepts any of:
+
+- Text, document, or file (PDF, DOCX, TXT) about the business/brand/campaign strategy
+- URL — AI scrapes and reads the page (e.g., company website)
+- Free text prompt — describing brand or campaign strategy
+
+> ⚠️ This is **NOT the content prompt** — it's about _who the brand is_, not _what to generate_.
+
+**3.2 AI Rule Extraction**
+AI reads input **once** and extracts a structured JSON Rule containing:
+
+- Brand tone & voice
+- Target audience
+- Campaign goals
+- Keywords & SEO priorities
+- Preferred content formats
+- Distribution channels
+
+The original document is stored in MongoDB / S3 as reference.
+
+**3.3 Default Rule Generation**
+If user provides no input → system generates a generic baseline JSON Rule so the workflow is never blocked.
+
+**3.4 Rule Review & Confirmation**
+User sees the extracted Rule as a readable summary, then confirms or adjusts before saving.
+
+**3.5 Rule Management**
+
+- Save with a name
+- Edit field by field
+- Duplicate (useful for agencies with multiple clients)
+- Delete
+- Version history with full snapshot rollback
+
+**3.6 Rule Reusability**
+Once saved, the same Rule is reused across many generation runs. Each run only needs a fresh **content prompt** (handled in Workflow Module).
+
+**3.7 Rule Feedback Update**
+Analytics sends performance signals back. Rule receives auto-suggested improvements. User accepts or rejects.
+
+### Module Flow
+
+```
+[ ONE TIME PER CAMPAIGN ]
+
+User Strategy Input (text / file / URL / prompt about the brand)
+        ↓
+AI reads input ONCE → Extracts Structured JSON Rule
+        ↓
+Original doc saved as reference
+        ↓
+User Reviews & Confirms / Adjusts
+        ↓
+JSON Rule Saved → reusable across many generation runs
+        ↓
+Flows into Workflow Module (combined with Content Prompt per run)
+
+[ ONGOING ]
+Analytics Feedback → Rule Improvement Suggestion → User Accept/Reject
+```
+
+---
+
+## 4. Module 2 — Workflow Module
+
+### Purpose
+
+Builds the **content generation pipeline** for a single generation run. Combines the **Content Prompt** (what to generate this time) with the **JSON Rule** (brand strategy) to drive the work nodes.
+
+### Functionality
+
+**4.1 Content Prompt Input**
+User enters the per-run prompt — e.g., _"Write a post announcing our Black Friday 50% off sale"_. This is the **primary input** to the Text Generation node.
+
+**4.2 Predefined Work Node Types**
+A fixed set of node types users can pick from:
+
+- 📝 **Text Generation** — always first, cannot be removed (locked)
+- 🖼️ **Image Generation** — generates visuals from content context
+- 🎬 **Video Generation** — generates video assets
+- 🌐 **Translation** — translates generated content into target language
+
+**4.3 Workflow Creation**
+
+- System auto-suggests a workflow based on the JSON Rule (channels, content types)
+- User can add extra nodes from the predefined list
+
+**4.4 Work Node Management**
+
+- Insert predefined nodes
+- Reorder by drag and drop
+- Delete nodes — except Text Generation (locked as first)
+- Each node has its own optional prompt input field
+
+**4.5 Node Prompt Input (Optional)**
+Each node exposes an editable prompt field. Examples: _"Generate image in minimalist style"_ or _"Translate to Thai, keep formal tone"_. If left empty, the node runs on JSON Rule + Content Prompt + previous outputs.
+
+**4.6 Pipeline Architecture**
+
+```
+Content Prompt + JSON Rule
+        ↓
+[Text Generation Node] (locked, always Node 1)
+        ↓ outputs: full generated text
+[Image Generation Node] ← consumes text → generates image
+        ↓ outputs: text + image
+[Translation Node] ← consumes text → translates
+        ↓ outputs: text + image + translated text
+[Video Generation Node] ← consumes all previous → generates video
+        ↓
+Final Content Package → Content Module
+```
+
+**4.7 Workflow Templates**
+Save a configured workflow as a reusable template. Apply across campaigns or clients.
+
+**4.8 Workflow Versioning**
+Track changes over time. Roll back to a previous version when needed.
+
+### Key Architectural Points
+
+- **Two combined inputs:** JSON Rule (strategic) + Content Prompt (per-run)
+- **Text Generation is always Node 1 and locked** — produces the base content
+- **Every subsequent node receives the full output** of the previous node
+- **User prompt per node** acts as an extra instruction on top of pipeline context
+- **Workflow is per-run** — Rule stays reusable
+
+---
+
+## 5. Module 3 — Orchestration Module
+
+### Purpose
+
+The **execution engine**. Receives the ordered Work Nodes and JSON Rule, then runs the pipeline sequentially while passing context forward and streaming logs live.
+
+### Functionality
+
+**5.1 Pipeline Execution**
+
+- Receives ordered Work Nodes from Workflow Module
+- Receives JSON Rule from Rule Module
+- Executes nodes **sequentially**, one by one
+- Passes the **full output context forward** to each next node
+
+**5.2 Context Building (per node)**
+Each node assembles a single AI instruction object containing:
+
+- JSON Rule (tone, audience, goals, keywords)
+- User prompt from the node
+- Output from all previous nodes
+
+**5.3 Node Execution — GPT Only**
+All nodes call **OpenAI GPT-4o**:
+
+| Node                | Backend Call                             |
+| ------------------- | ---------------------------------------- |
+| 📝 Text Generation  | GPT-4o LLM                               |
+| 🖼️ Image Generation | GPT-4o + DALL-E                          |
+| 🌐 Translation      | GPT-4o (translation prompt)              |
+| 🎬 Video Generation | GPT-4o + video API (Sora when available) |
+
+**5.4 Live Generation Logging**
+
+- Every node execution writes a real-time log entry to MongoDB
+- Logs are streamed to the frontend so the user can watch generation happen live
+- Each log captures: node type, input context sent, output received, timestamp, status
+
+**5.5 Retry & Failure Handling**
+
+```
+Node Fails
+    ↓
+Auto Retry Once
+    ↓
+Still Fails → Pause Pipeline
+    ↓
+Ask User: Skip this node or Retry manually?
+    ├── Skip  → continue without this node's output
+    └── Retry → re-run node once more
+```
+
+**5.6 Pipeline Status Tracking**
+Overall status tracked per execution: `running | completed | failed | paused`.
+
+### Key Decisions
+
+| Decision              | Choice                                        |
+| --------------------- | --------------------------------------------- |
+| AI Provider           | OpenAI GPT-4o for all nodes                   |
+| Generation visibility | Live log streaming to frontend                |
+| Retry policy          | Auto retry once, then ask user                |
+| On skip               | Pipeline continues without failed node output |
+
+---
+
+## 6. Module 4 — Logging Module
+
+### Purpose
+
+Captures and streams generation activity for real-time visibility, debugging, and historical review.
+
+### Functionality
+
+**6.1 Log Capture (Orchestration Only)**
+Every node execution writes a log entry capturing:
+
+- Node type
+- Short input summary sent to GPT
+- Short output summary received
+- Timestamp
+- Status
+- Log level
+
+**6.2 Log Levels**
+
+- **INFO** — normal generation progress (node started, node completed)
+- **WARNING** — recoverable unexpected event (retry attempt triggered)
+- **ERROR** — node failed after retry, pipeline paused, user action required
+
+**6.3 Log Storage**
+
+- Stored in MongoDB as structured documents
+- Linked to pipeline execution ID
+- **Auto-deleted after 90 days**
+
+**6.4 Live Log Streaming**
+Logs streamed real-time to frontend during generation. Example user view:
+
+```
+[INFO]    Text Generation — Started
+[INFO]    Text Generation — Completed
+[INFO]    Image Generation — Started
+[WARNING] Image Generation — Failed, retrying...
+[ERROR]   Image Generation — Failed after retry. Action required.
+```
+
+**6.5 Failed Node Logs**
+Always shows a **short, user-friendly** message — never raw API errors.
+
+✅ Good:
+
+> ❌ Image Generation failed — Could not connect to generation service. Please retry or skip.
+
+❌ Bad:
+
+> ❌ OpenAI API Error 429: Rate limit exceeded on model dall-e-3 at endpoint /v1/images/generations
+
+**6.6 Log History**
+User can review logs of any past generation run for 90 days. Useful for understanding why a past generation produced unexpected results.
+
+---
+
+## 7. Module 5 — Content Module
+
+### Purpose
+
+Receives the generated content package, presents it to the user for review, supports edits and node-level re-runs, and tracks every version forever.
+
+### Functionality
+
+**7.1 Receiving Draft**
+Receives the full content package from Orchestration. Stores it as a draft in MongoDB with version tracking.
+
+**7.2 Draft Display**
+Shows each node output separately and clearly:
+
+- 📝 Text output
+- 🖼️ Image output
+- 🌐 Translated text output
+- 🎬 Video output
+
+**7.3 User Editing**
+
+| Output Type     | Editing Behavior                        |
+| --------------- | --------------------------------------- |
+| Text            | Editable directly inline                |
+| Translated text | Editable directly inline                |
+| Image           | Remove only + manual upload replacement |
+| Video           | Remove only + manual upload replacement |
+
+> Native image/video editing is intentionally out of scope for v1. If the user dislikes the AI output, they remove it and upload their own.
+
+**7.4 Node Re-run**
+
+- User can re-run any single node independently
+- Before re-running, the user can adjust that node's prompt (otherwise the same bad output is likely)
+- Re-run uses the same JSON Rule + previous pipeline context
+- Output replaces only that node's result; other nodes are untouched
+- The previous output is saved as version history
+
+**7.5 Draft Management**
+
+- Every draft version is **kept forever** — never deleted
+- User can browse version history and restore a previous version
+- User can compare versions side by side
+
+**7.6 Approval**
+
+- **Approve** → content moves to Upload Module
+- **Reject** → stays in draft status, can be re-edited or re-run
+
+### Module Flow
+
+```
+Orchestration completes pipeline
+        ↓
+Content Module receives full content package
+        ↓
+Stored as Draft Version 1 in MongoDB
+        ↓
+User reviews each node output
+        ↓
+User edits text / removes & uploads image or video
+        ↓
+User wants to re-run a node?
+  ├── Adjust prompt → Re-run single node → Save as new version
+  └── Happy with result → Approve
+        ↓
+Approved → Ready Content → Upload Module
+```
+
+---
+
+## 8. Module 6 — Upload Module
+
+### Purpose
+
+Previews approved content per channel, publishes it directly or on schedule, and tracks status with retry on failure.
+
+### Functionality
+
+**8.1 Receiving Ready Content**
+Receives the approved content package from Content Module. Stored as **Ready Content** in MongoDB.
+
+**8.2 Channel Preview (Draft State)**
+
+- Predefined preview templates per channel
+- User sees how content will appear on each selected channel before publishing
+- Channels selected from the JSON Rule (set during Rule Module)
+- Preview adapts content to channel constraints (text length, image ratios, hashtag support, video length)
+
+**8.3 Upload Options**
+
+- **Direct Upload** — publish immediately to selected channels
+- **Scheduled Upload** — user picks date and time per channel
+
+**8.4 MCP Layer — Generic Publishing**
+A generic MCP endpoint handles actual publishing to all platforms. New platforms added later just need a new preview template — MCP handles the rest.
+
+**8.5 Upload Status Tracking**
+
+- Tracks status per channel: `pending | scheduled | published | failed`
+- Notifies user on completion or failure
+- Auto-retry on failure
+
+### Channel Templates — Phase 1
+
+| Channel   | Max Text | Image Ratio | Video Support |
+| --------- | -------- | ----------- | ------------- |
+| Facebook  | 63,206   | 1.91:1      | Yes           |
+| Instagram | 2,200    | 1:1 or 4:5  | Yes (60s)     |
+| Twitter/X | 280      | 16:9        | Yes (140s)    |
+| LinkedIn  | 3,000    | 1.91:1      | Yes           |
+
+### Module Flow
+
+```
+Approved Content arrives from Content Module
+        ↓
+Load channel templates from JSON Rule
+        ↓
+Show Preview per channel (Draft State)
+        ↓
+User chooses Direct Upload or Schedule per channel
+        ↓
+MCP Layer publishes to each channel
+        ↓
+Track status per channel → Notify user
+        ↓
+On failure → Retry → Notify user
+```
+
+---
+
+## 9. Module 7 — Analytics Module
+
+### Purpose
+
+Pulls performance metrics from each platform, aggregates them at the campaign level, and feeds insights back to the Rule Module to continuously improve future content.
+
+### Functionality
+
+**9.1 Performance Data Collection**
+
+- Data pulled **weekly automatically** via MCP Layer from each platform
+- Per-channel, per-content metrics: views/impressions, clicks, engagement (likes, shares, comments), conversions
+
+**9.2 Data Aggregation**
+
+- Metrics aggregated at **campaign (Rule) level**
+- All content pieces under the same Rule are grouped
+- Gives a clear picture of overall campaign performance
+
+**9.3 Dashboard**
+Per-campaign metrics and charts:
+
+- Total views / impressions
+- Total engagement
+- Click-through rate
+- Conversions
+- Per-channel breakdown
+- Filter by **date range** and **campaign (Rule)**
+
+**9.4 Auto Feedback Signal**
+After each weekly pull:
+
+- System analyzes performance
+- Links results back to the Rule + Workflow that generated the content
+- Auto-generates Rule improvement suggestions:
+  - Tone adjustments
+  - Keyword updates
+  - Channel priority changes
+- Suggestion sent to Rule Module → user accepts or rejects
+
+### Module Flow
+
+```
+Content Published via Upload Module
+        ↓
+Weekly Auto Pull via MCP Layer
+        ↓
+Metrics stored per content piece per channel
+        ↓
+Aggregated at Campaign (Rule) level
+        ↓
+Dashboard updated with charts & metrics
+        ↓
+System analyzes performance
+        ↓
+Auto-generate feedback suggestions
+        ↓
+Send to Rule Module → User Accept or Reject
+```
+
+---
+
+## 10. Data Schemas (MongoDB)
+
+### 10.1 Rule Schema
+
+```json
+{
+  "ruleId": "uuid",
+  "name": "Black Friday Campaign 2024",
+  "brand": {
+    "brandName": "NeuralTex",
+    "industry": "SaaS / Technology",
+    "brandDescription": "short brand description",
+    "brandTone": ["casual", "inspirational"],
+    "brandVoice": "we are friendly but professional...",
+    "brandRestrictions": ["never mention competitors"],
+    "callToAction": "Shop Now"
+  },
+  "audience": {
+    "description": "Thai SME owners aged 30-50",
+    "ageRange": { "min": 30, "max": 50 },
+    "gender": "all | male | female",
+    "location": ["Thailand", "Southeast Asia"],
+    "interests": ["digital marketing", "e-commerce"],
+    "painPoints": ["too much manual work", "high content costs"],
+    "language": "th",
+    "targetLanguages": ["th", "en"]
+  },
+  "campaign": {
+    "goals": ["brand awareness", "conversions"],
+    "keywords": ["AI content", "automation"],
+    "hashtagStrategy": ["#AIContent", "#DigitalMarketing"],
+    "contentFormats": ["short post", "image caption"],
+    "duration": { "startDate": "2024-11-01", "endDate": "2024-11-30" },
+    "postingFrequency": "daily | weekly | custom",
+    "customSchedule": ["monday", "wednesday", "friday"]
+  },
+  "channels": [
+    {
+      "channel": "instagram",
+      "priority": "high",
+      "contentStyle": "visual-first"
+    },
+    {
+      "channel": "facebook",
+      "priority": "medium",
+      "contentStyle": "story-driven"
+    },
+    { "channel": "linkedin", "priority": "low", "contentStyle": "professional" }
+  ],
+  "contentGuidelines": {
+    "dos": ["use emojis", "keep sentences short"],
+    "donts": ["avoid passive voice", "no technical terms"],
+    "requiredElements": ["always include CTA"],
+    "seoGuidelines": {
+      "primaryKeywords": ["AI content generator"],
+      "secondaryKeywords": ["social media automation"],
+      "keywordDensity": "natural, not forced"
+    }
+  },
+  "originalInput": {
+    "type": "file | url | text",
+    "storedAt": "s3://bucket/rules/uuid/original.pdf"
+  },
+  "status": "active | archived",
+  "versions": [
+    {
+      "versionNumber": 1,
+      "changedFields": ["brandTone", "keywords"],
+      "changedBy": "user | system_suggestion",
+      "snapshot": { "brand": { "brandTone": ["formal"] } },
+      "createdAt": "timestamp"
+    }
+  ],
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
+}
+```
+
+### 10.2 Node Schema (Definition Only)
+
+```json
+{
+  "_schemaNote": "Node DEFINITION only. Execution state lives in Pipeline.nodes[]",
+
+  "nodeId": "uuid",
+  "workflowRef": "workflow_id",
+
+  "type": "text_generation | image_generation | video_generation | translation | transcription | summarization",
+
+  "order": 1,
+  "isLocked": true,
+  "userPrompt": "optional user instruction",
+
+  "config": {
+    "model": "gpt-4o | dall-e-3 | sora | whisper-1",
+    "temperature": 0.7,
+    "maxTokens": 1000,
+    "outputFormat": "paragraph | bullets | caption",
+    "size": "1024x1024",
+    "quality": "standard | hd",
+    "style": "natural | vivid",
+    "duration": 15,
+    "resolution": "1080p",
+    "aspectRatio": "16:9 | 9:16 | 1:1",
+    "sourceLanguage": "en",
+    "targetLanguage": "th",
+    "formalityLevel": "formal | casual",
+    "sourceType": "audio | video",
+    "sourceUrl": "s3://bucket/file.mp4",
+    "language": "auto",
+    "summaryLength": "short | medium | long",
+    "sourceNodeRef": "node_id"
+  },
+
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
+}
+```
+
+### 10.3 Workflow Schema
+
+```json
+{
+  "workflowId": "uuid",
+  "ruleRef": "rule_id",
+  "name": "Black Friday Instagram Posts",
+  "nodes": ["node_id_1", "node_id_2", "node_id_3"],
+  "isTemplate": false,
+  "templateName": null,
+  "version": 1,
+  "versions": [
+    {
+      "versionNumber": 1,
+      "nodes": ["node_id_1", "node_id_2"],
+      "createdAt": "timestamp"
+    }
+  ],
+  "status": "active | archived",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
+}
+```
+
+### 10.4 Pipeline Schema
+
+```json
+{
+  "pipelineId": "uuid",
+  "workflowRef": "workflow_id",
+  "ruleRef": "rule_id",
+  "contentPrompt": "Write a Black Friday post",
+  "nodes": [
+    {
+      "nodeId": "uuid",
+      "type": "text_generation",
+      "order": 1,
+      "isLocked": true,
+      "userPrompt": "",
+      "status": "completed",
+      "input": "context sent to GPT",
+      "output": "generated text",
+      "retryCount": 0,
+      "executedAt": "timestamp"
+    }
+  ],
+  "status": "running | completed | failed | paused",
+  "startedAt": "timestamp",
+  "completedAt": "timestamp"
+}
+```
+
+### 10.5 Content Schema
+
+```json
+{
+  "contentId": "uuid",
+  "pipelineRef": "pipeline_id",
+  "workflowRef": "workflow_id",
+  "ruleRef": "rule_id",
+  "currentVersion": 1,
+  "versions": [
+    {
+      "versionNumber": 1,
+      "outputs": {
+        "text": "generated text",
+        "image": "s3://bucket/image.png",
+        "translatedText": "translated content",
+        "video": "s3://bucket/video.mp4"
+      },
+      "userEdits": {
+        "text": "user edited text",
+        "translatedText": "user edited translation",
+        "image": "s3://bucket/user-uploaded-image.png",
+        "video": "s3://bucket/user-uploaded-video.mp4"
+      },
+      "nodePromptOverrides": {
+        "image_generation": "regenerate in minimalist style",
+        "translation": "use formal Thai tone"
+      },
+      "createdAt": "timestamp"
+    }
+  ],
+  "status": "draft | approved | rejected",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
+}
+```
+
+### 10.6 Upload Schema
+
+```json
+{
+  "uploadId": "uuid",
+  "contentRef": "content_id",
+  "workflowRef": "workflow_id",
+  "ruleRef": "rule_id",
+  "hasScheduled": true,
+  "nextScheduledAt": "timestamp",
+  "channels": [
+    {
+      "channel": "instagram",
+      "status": "pending | scheduled | published | failed",
+      "scheduledAt": "timestamp",
+      "publishedAt": "timestamp",
+      "retryCount": 0,
+      "failureReason": "optional error message"
+    }
+  ],
+  "status": "pending | partial | completed | failed",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
+}
+```
+
+### 10.7 Analytics Schema
+
+```json
+{
+  "analyticsId": "uuid",
+  "ruleRef": "rule_id",
+  "workflowRef": "workflow_id",
+  "period": { "from": "2024-11-01", "to": "2024-11-07" },
+  "pulledAt": "timestamp",
+  "contentPerformance": [
+    {
+      "contentRef": "content_id",
+      "pipelineRef": "pipeline_id",
+      "channel": "instagram",
+      "metrics": {
+        "views": 1200,
+        "clicks": 340,
+        "engagement": 89,
+        "conversions": 12
+      }
+    }
+  ],
+  "campaignSummary": {
+    "totalViews": 5000,
+    "totalClicks": 1200,
+    "totalEngagement": 340,
+    "totalConversions": 45,
+    "bestPerformingChannel": "instagram",
+    "bestPerformingContent": "content_id"
+  },
+  "feedbackSignal": {
+    "suggestions": [
+      {
+        "field": "brand.brandTone",
+        "currentValue": ["formal"],
+        "suggestedValue": ["casual"],
+        "reason": "Casual posts had 3x higher engagement this week"
+      }
+    ],
+    "status": "pending | applied | rejected"
+  },
+  "createdAt": "timestamp"
+}
+```
+
+### 10.8 Log Schema
+
+```json
+{
+  "logId": "uuid",
+  "pipelineRef": "pipeline_id",
+  "workflowRef": "workflow_id",
+  "nodeId": "uuid",
+  "nodeType": "text_generation | image_generation | translation | video_generation",
+  "order": 1,
+  "level": "INFO | WARNING | ERROR",
+  "status": "started | completed | retrying | failed",
+  "message": "Image Generation — Could not connect to generation service. Please retry or skip.",
+  "retryCount": 0,
+  "timestamp": "timestamp",
+  "expiresAt": "timestamp"
+}
+```

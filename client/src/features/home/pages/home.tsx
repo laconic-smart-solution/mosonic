@@ -1,0 +1,204 @@
+import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router-dom"
+
+import { HomeBackdrop } from "@/features/home/components/home-backdrop"
+import { HomeFooter } from "@/features/home/components/home-footer"
+import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
+import type { Attachment } from "@/components/core/prompt-area"
+import { buildStrategyInput } from "@/lib/strategy-input"
+import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
+import { HomeStage } from "@/features/home/components/home-stage"
+import { HomeUserStrip } from "@/features/home/components/home-user-strip"
+import {
+  HOME_TEMPLATE_DEFS,
+  PROMPT_SUGGESTION_KEYS,
+} from "@/features/home/data/home-constants"
+import { buildHomeRecentSlots } from "@/features/home/lib/home-recent-slots"
+import { useContentPageQuery } from "@/shared/queries/content.query"
+import { useRulesPageQuery } from "@/shared/queries/rule.query"
+import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
+import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
+import type { RuleListItem } from "@/shared/services/rule.service"
+import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
+export default function HomePage() {
+  const { t } = useTranslation("home")
+  const navigate = useNavigate()
+  const homeTemplates = useMemo(
+    () =>
+      HOME_TEMPLATE_DEFS.map((def) => ({
+        ...def,
+        label: t(`templates.${def.id}.label`),
+        sub: t(`templates.${def.id}.sub`),
+      })),
+    [t],
+  )
+  useSessionBootstrap()
+  const [prompt, setPrompt] = useState("")
+  const [focused, setFocused] = useState(false)
+  const [hovLeft, setHovLeft] = useState<number | null>(null)
+  const [hovRight, setHovRight] = useState<number | null>(null)
+  const [suggIndex, setSuggIndex] = useState(0)
+  const [orbPulse, setOrbPulse] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [rulesPage, setRulesPage] = useState(1)
+  const [ruleOptions, setRuleOptions] = useState<RuleListItem[]>([])
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
+
+  const rulesPageQuery = useRulesPageQuery(
+    {
+      page: rulesPage,
+      limit: 5,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+      filter: {
+        status: "active",
+      },
+    },
+    true,
+  )
+
+  const recentContentsQuery = useContentPageQuery(
+    {
+      page: 1,
+      limit: 3,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+    },
+    true,
+  )
+
+  const recentSlots = useMemo(
+    () => buildHomeRecentSlots(recentContentsQuery.data?.data ?? []),
+    [recentContentsQuery.data?.data],
+  )
+
+  const generateWorkflow = useGenerateWorkflow()
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setMounted(true), 50)
+    const t2 = setInterval(
+      () => setSuggIndex((i) => (i + 1) % PROMPT_SUGGESTION_KEYS.length),
+      3200,
+    )
+    return () => {
+      clearTimeout(t1)
+      clearInterval(t2)
+    }
+  }, [])
+
+  useEffect(() => {
+    const pageData = rulesPageQuery.data?.data ?? []
+    if (!pageData.length) return
+    setRuleOptions((prev) => {
+      const base = rulesPage === 1 ? [] : prev
+      const map = new Map(base.map((r) => [r.ruleId, r]))
+      for (const item of pageData) map.set(item.ruleId, item)
+      return Array.from(map.values())
+    })
+  }, [rulesPage, rulesPageQuery.data?.data])
+
+  useEffect(() => {
+    if (!selectedRuleId) return
+    if (!ruleOptions.some((r) => r.ruleId === selectedRuleId)) {
+      setSelectedRuleId(null)
+    }
+  }, [ruleOptions, selectedRuleId])
+
+  async function handlePromptSubmit(text: string, attachments: Attachment[]) {
+    const combined = buildStrategyInput(text, attachments)
+    if (!combined.trim()) return
+    setOrbPulse(true)
+
+    const payload: { contentPrompt: string; ruleId?: string } = {
+      contentPrompt: combined,
+    }
+    if (selectedRuleId) payload.ruleId = selectedRuleId
+
+    generateWorkflow.mutate(payload, {
+      onSuccess: (data) => {
+        const { workflowId, ruleId } = data
+        // Join the socket room NOW — before React re-renders for navigation —
+        // so no events are missed while WorkflowPage is mounting.
+        joinWorkflowRoom(workflowId)
+        const ruleName = ruleOptions.find((r) => r.ruleId === ruleId)?.name
+        navigate(`/workflow/${ruleId}`, {
+          state: { generating: true, ruleName, contentPrompt: combined },
+        })
+      },
+      onSettled: () => {
+        setOrbPulse(false)
+      },
+    })
+  }
+
+  function handleSelectRule(ruleId: string) {
+    setSelectedRuleId(ruleId)
+  }
+
+  function handleViewMoreRules() {
+    const meta = rulesPageQuery.data?.meta
+    if (!meta) return
+    if (rulesPage >= meta.totalPages) return
+    setRulesPage((p) => p + 1)
+  }
+
+  return (
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background font-sans">
+      <HomeBackdrop />
+      <HomeUserStrip />
+
+      <div className="flex min-h-0 flex-1 flex-col items-center">
+        <HomeStage
+          mounted={mounted}
+          orbPulse={orbPulse}
+          hovLeft={hovLeft}
+          hovRight={hovRight}
+          setHovLeft={setHovLeft}
+          setHovRight={setHovRight}
+          templates={homeTemplates}
+          onNavigateTemplate={(path) => navigate(path)}
+          recentSlots={recentSlots}
+          isRecentLoading={recentContentsQuery.isLoading}
+          onOpenRecentContent={(contentId, uid) =>
+            navigate(uid ? `/upload/${uid}` : `/content/${contentId}`)
+          }
+          onOpenRecentLibrary={() => navigate("/content")}
+        >
+          <HomePromptBar
+            prompt={prompt}
+            placeholder={
+              focused ? t("prompt.focusedPlaceholder") : t(PROMPT_SUGGESTION_KEYS[suggIndex])
+            }
+            onPromptChange={setPrompt}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onSubmit={handlePromptSubmit}
+          />
+          <HomeHelperLinks
+            rules={ruleOptions}
+            selectedRuleLabel={
+              selectedRuleId
+                ? ruleOptions.find((r) => r.ruleId === selectedRuleId)?.name
+                : undefined
+            }
+            isLoadingRules={rulesPageQuery.isLoading && rulesPage === 1}
+            isLoadingMore={rulesPageQuery.isFetching && rulesPage > 1}
+            canViewMore={(rulesPageQuery.data?.meta.totalPages ?? 1) > rulesPage}
+            onNavigateSetup={() => navigate("/rules")}
+            onSelectRule={handleSelectRule}
+            onViewMore={handleViewMoreRules}
+          />
+        </HomeStage>
+      </div>
+
+      <HomeFooter />
+
+      {generateWorkflow.isPending ? (
+        <div className="pointer-events-none fixed right-6 bottom-6 rounded-full bg-black/80 px-4 py-2 text-xs text-white">
+          {t("prompt.generatingWorkflow")}
+        </div>
+      ) : null}
+    </div>
+  )
+}
