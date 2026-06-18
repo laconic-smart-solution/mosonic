@@ -117,10 +117,10 @@
       "subtitle": "已关联账户",
       "keywords": "设置 账户 个人资料 settings account"
     },
-    "analytics": {
-      "title": "分析",
-      "subtitle": "指标与报告",
-      "keywords": "分析 指标 analytics metrics"
+    "posts": {
+      "title": "帖子",
+      "subtitle": "已发布和已排期的帖子",
+      "keywords": "帖子 发布 社交 posts publish"
     }
   },
   "status": {

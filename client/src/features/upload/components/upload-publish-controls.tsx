@@ -28,7 +28,6 @@ type UploadPublishControlsProps = {
   onScheduleOpenChange: (open: boolean) => void
   onScheduleChange: (v: string) => void
   onConfirmSchedule: () => void
-  onEditScheduled?: () => void
   className?: string
 }
 
@@ -45,7 +44,6 @@ export function UploadPublishControls({
   onScheduleOpenChange,
   onScheduleChange,
   onConfirmSchedule,
-  onEditScheduled,
   className,
 }: UploadPublishControlsProps) {
   const { t } = useTranslation(["upload", "common"])
@@ -53,14 +51,11 @@ export function UploadPublishControls({
   const locked =
     !isGlobal &&
     (serverStatus === "published" || serverStatus === "publishing")
-  const canEditScheduled =
-    !isGlobal &&
-    serverStatus === "scheduled" &&
-    Boolean(onEditScheduled)
+  const isScheduled = !isGlobal && serverStatus === "scheduled"
 
   const canAct = isGlobal
     ? eligibleCount > 0
-    : !locked && serverStatus !== "scheduled"
+    : !locked && !isScheduled
 
   const publishLabel = isGlobal
     ? t("upload:publish.publishAll")
@@ -95,28 +90,9 @@ export function UploadPublishControls({
       aria-label={regionLabel}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-baseline gap-2">
-          {/* <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-            {platformLabel}
-          </span>
-          <span className="truncate text-[11px] font-medium text-muted-foreground/80">
-            Publish
-          </span> */}
-        </div>
+        <div className="flex min-w-0 items-baseline gap-2" />
 
-        {canEditScheduled ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={publishPending}
-            className="h-9 shrink-0 border-[#185FA5] text-[#185FA5] hover:bg-[#E6F1FB]"
-            onClick={onEditScheduled}
-          >
-            <CalendarClock className="mr-1 size-3.5" />
-            {t("upload:publish.editScheduled")}
-          </Button>
-        ) : (
+        {!isScheduled ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -214,10 +190,10 @@ export function UploadPublishControls({
               </PopoverContent>
             </Popover>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {!isGlobal && (locked || serverStatus === "scheduled") ? (
+      {!isGlobal && (locked || isScheduled) ? (
         <div className="flex items-start gap-2 rounded-md border border-border/40 bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground">
           <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>

@@ -345,7 +345,12 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
     case "transcription":
       return { model, language: "auto", sourceType: "audio" }
     case "summarization":
-      return { model, summaryLength: "medium", outputFormat: "paragraph" }
+      return {
+        model,
+        summaryLength: "medium",
+        outputFormat: "paragraph",
+        sourceNodeRef: "text_generation",
+      }
     case "branch":
       return { mode: "rule_channels" }
     default:
@@ -360,7 +365,8 @@ export type GenerateMoreRuleHint = {
 }
 
 /**
- * Defaults for Generate more / re-run config UI (aligned with server content.service).
+ * Defaults for Generate more / re-run config UI — same base as workflow canvas nodes,
+ * with optional rule-aware overrides (mirrors server `defaultWorkflowNodeConfigForRule`).
  */
 export function buildGenerateMoreDefaultConfig(
   type: WorkflowNodeType,
@@ -375,36 +381,18 @@ export function buildGenerateMoreDefaultConfig(
   )
   const audienceLang = rule?.audience?.language?.trim()
 
-  switch (type) {
-    case "video_generation":
-      return {
-        ...base,
-        model: "sora-2",
-        duration: 8,
-        resolution: "720p",
-        aspectRatio: hasInstagram ? "9:16" : "16:9",
-      }
-    case "transcription":
-      return {
-        ...base,
-        model: "whisper-1",
-        sourceType: "audio",
-        language: audienceLang && audienceLang.length > 0 ? audienceLang : "auto",
-      }
-    case "summarization":
-      return {
-        ...base,
-        model: "gpt-4o",
-        summaryLength: "medium",
-        sourceNodeRef: "text_generation",
-      }
-    case "translation":
-      return { ...base, model: "gpt-4o" }
-    case "image_generation":
-      return { ...base, model: "gpt-image-1" }
-    default:
-      return base
+  if (type === "video_generation" && hasInstagram) {
+    base.aspectRatio = "9:16"
   }
+  if (
+    type === "transcription" &&
+    audienceLang &&
+    audienceLang.length > 0
+  ) {
+    base.language = audienceLang
+  }
+
+  return base
 }
 
 const CONFIG_OPTION_ALIASES: Record<string, string> = {

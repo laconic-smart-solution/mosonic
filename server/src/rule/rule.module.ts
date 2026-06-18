@@ -1,6 +1,5 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
@@ -17,7 +16,6 @@ import { Rule, RuleSchema } from './schemas/rule.schema';
     CreditModule,
     LlmModule,
     EventsModule,
-    forwardRef(() => AnalyticsModule),
     MongooseModule.forFeature([{ name: Rule.name, schema: RuleSchema }]),
   ],
   controllers: [RuleController, RuleExtractController],

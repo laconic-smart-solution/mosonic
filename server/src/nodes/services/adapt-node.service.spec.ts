@@ -65,6 +65,37 @@ describe('AdaptNodeService', () => {
     expect(parsed.channel).toBe('instagram');
   });
 
+  it('includes TikTok slideshow title guardrails in adapt prompts', async () => {
+    await service.execute({
+      rule: rule as never,
+      config: { channel: 'tiktok', model: 'gpt-4o' },
+      contentPrompt: 'Summer sale',
+      previousOutputs: { text: 'Base marketing copy' },
+    });
+
+    const systemMsg = invoke.mock.calls[0][0][0];
+    const humanMsg = invoke.mock.calls[0][0][1];
+    expect(String(systemMsg.content)).toMatch(/90 characters/);
+    expect(String(systemMsg.content)).toMatch(/slideshow title/i);
+    expect(String(humanMsg.content)).toMatch(/90 characters/);
+  });
+
+  it('truncates TikTok adapt output over slideshow title limit', async () => {
+    invoke.mockResolvedValueOnce({
+      content: 'x'.repeat(150),
+      response_metadata: {},
+    });
+    const result = await service.execute({
+      rule: rule as never,
+      config: { channel: 'tiktok', model: 'gpt-4o' },
+      contentPrompt: 'Summer sale',
+      previousOutputs: { text: 'Base marketing copy' },
+    });
+    const parsed = JSON.parse(result.output) as Record<string, string>;
+    expect(parsed.text.length).toBeLessThanOrEqual(90);
+    expect(parsed.adaptedCaption.length).toBeLessThanOrEqual(90);
+  });
+
   it('sanitizes meta visual prompt artifacts from adapted captions', async () => {
     invoke.mockResolvedValueOnce({
       content:

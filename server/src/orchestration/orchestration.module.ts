@@ -4,7 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ContentModule } from '../content/content.module';
 import { Content, ContentSchema } from '../content/schemas/content.schema';
-import { AnalyticsModule } from '../analytics/analytics.module';
+import { PostModule } from '../post/post.module';
 import { CampaignModule } from '../campaign/campaign.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { CostModule } from '../cost/cost.module';
@@ -108,7 +108,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
 @Module({
   imports: [
     ConfigModule,
-    forwardRef(() => AnalyticsModule),
+    forwardRef(() => PostModule),
     forwardRef(() => CampaignModule),
     forwardRef(() => IntegrationsModule),
     CostModule,

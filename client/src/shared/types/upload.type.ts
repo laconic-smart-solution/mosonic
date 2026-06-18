@@ -76,6 +76,8 @@ export type UpdateUploadBody = {
   caption?: string | null
   scheduledAt?: string | null
   youtubeTitle?: string | null
+  mediaUrl?: string | null
+  mediaUrls?: string[]
 }
 
 export type UpdateUploadSuccess = { success: true }

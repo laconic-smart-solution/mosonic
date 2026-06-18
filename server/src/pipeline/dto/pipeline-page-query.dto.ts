@@ -63,6 +63,7 @@ export class PipelinePageItemDto {
   completedAt!: string | null;
   metadataSource?: string;
   newsTitle?: string;
+  ruleName?: string;
 }
 
 export class PipelinePageResponseDto {

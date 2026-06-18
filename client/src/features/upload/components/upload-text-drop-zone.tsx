@@ -21,6 +21,9 @@ type UploadTextDropZoneProps = {
   resolved: UploadResolvedOutputs
   workflowLayers?: WorkflowNodeLayersSnapshot | null
   captionSourceLabel: string
+  /** When set (e.g. TikTok photo slideshow), show a character counter and warn over limit. */
+  captionMaxLength?: number
+  captionLimitHint?: string
   activeDrag: UploadPaletteDragPayload | null
   disabled?: boolean
   onCaptionChange: (next: string) => void
@@ -37,6 +40,8 @@ export function UploadTextDropZone({
   resolved,
   workflowLayers = null,
   captionSourceLabel,
+  captionMaxLength,
+  captionLimitHint,
   activeDrag,
   disabled = false,
   onCaptionChange,
@@ -46,6 +51,9 @@ export function UploadTextDropZone({
   const { isOver, setNodeRef } = useDroppable({ id: "drop-text", disabled })
   const caption = effectiveCaptionForDraft(draft, resolved, workflowLayers)
   const has = caption.trim().length > 0
+  const captionLen = caption.length
+  const overCaptionLimit =
+    captionMaxLength != null && captionLen > captionMaxLength
 
   const border =
     isOver && visual === "accept"
@@ -94,6 +102,25 @@ export function UploadTextDropZone({
         <p className="mt-2 text-center text-[11px] text-destructive">
           Text items only
         </p>
+      ) : null}
+      {captionMaxLength != null ? (
+        <div className="mt-2 space-y-1">
+          {captionLimitHint ? (
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              {captionLimitHint}
+            </p>
+          ) : null}
+          <p
+            className={cn(
+              "text-right text-[10px] tabular-nums",
+              overCaptionLimit
+                ? "font-medium text-destructive"
+                : "text-muted-foreground",
+            )}
+          >
+            {captionLen} / {captionMaxLength}
+          </p>
+        </div>
       ) : null}
       {has && !disabled ? (
         <Button

@@ -1,5 +1,4 @@
 import enAdmin from "./locales/en/admin.json"
-import enAnalytics from "./locales/en/analytics.json"
 import enAuth from "./locales/en/auth.json"
 import enCommon from "./locales/en/common.json"
 import enComponentsLib from "./locales/en/componentsLib.json"
@@ -19,7 +18,6 @@ import enUpload from "./locales/en/upload.json"
 import enWorkflow from "./locales/en/workflow.json"
 
 import thAdmin from "./locales/th/admin.json"
-import thAnalytics from "./locales/th/analytics.json"
 import thAuth from "./locales/th/auth.json"
 import thCommon from "./locales/th/common.json"
 import thComponentsLib from "./locales/th/componentsLib.json"
@@ -39,7 +37,6 @@ import thUpload from "./locales/th/upload.json"
 import thWorkflow from "./locales/th/workflow.json"
 
 import zhAdmin from "./locales/zh-CN/admin.json"
-import zhAnalytics from "./locales/zh-CN/analytics.json"
 import zhAuth from "./locales/zh-CN/auth.json"
 import zhCommon from "./locales/zh-CN/common.json"
 import zhComponentsLib from "./locales/zh-CN/componentsLib.json"
@@ -70,7 +67,6 @@ export const I18N_NAMESPACES = [
   "content",
   "upload",
   "posts",
-  "analytics",
   "cost",
   "usage",
   "logs",
@@ -95,7 +91,6 @@ export const resources = {
     content: enContent,
     upload: enUpload,
     posts: enPosts,
-    analytics: enAnalytics,
     cost: enCost,
     usage: enUsage,
     logs: enLogs,
@@ -116,7 +111,6 @@ export const resources = {
     content: thContent,
     upload: thUpload,
     posts: thPosts,
-    analytics: thAnalytics,
     cost: thCost,
     usage: thUsage,
     logs: thLogs,
@@ -137,7 +131,6 @@ export const resources = {
     content: zhContent,
     upload: zhUpload,
     posts: zhPosts,
-    analytics: zhAnalytics,
     cost: zhCost,
     usage: zhUsage,
     logs: zhLogs,

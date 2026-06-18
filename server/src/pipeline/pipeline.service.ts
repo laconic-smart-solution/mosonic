@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { OrchestrationService } from '../orchestration/orchestration.service';
+import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import type {
   PipelinePageItemDto,
   PipelinePageQueryDto,
@@ -38,6 +39,8 @@ export class PipelineService {
     private readonly orchestration: OrchestrationService,
     @InjectModel(Pipeline.name)
     private readonly pipelineModel: Model<PipelineDocument>,
+    @InjectModel(Rule.name)
+    private readonly ruleModel: Model<RuleDocument>,
   ) {}
 
   async findPage(
@@ -77,6 +80,7 @@ export class PipelineService {
           startedAt: 1,
           completedAt: 1,
           nodes: 1,
+          metadata: 1,
         })
         .sort(sort)
         .skip(skip)
@@ -85,6 +89,27 @@ export class PipelineService {
         .exec(),
       this.pipelineModel.countDocuments(filter).exec(),
     ]);
+
+    const ruleIds = [
+      ...new Set(
+        docs
+          .map((doc) => String(doc.ruleRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const ruleNameById = new Map<string, string>();
+    if (ruleIds.length > 0) {
+      const ruleFilter = mergeUserIdFilter({ ruleId: { $in: ruleIds } }, auth);
+      const rules = await this.ruleModel
+        .find(ruleFilter)
+        .select({ ruleId: 1, name: 1 })
+        .lean()
+        .exec();
+      for (const rule of rules) {
+        const name = rule.name?.trim();
+        if (name) ruleNameById.set(rule.ruleId, name);
+      }
+    }
 
     const data: PipelinePageItemDto[] = docs.map((doc) => ({
       pipelineId: doc.pipelineId,
@@ -103,6 +128,7 @@ export class PipelineService {
         : null,
       metadataSource: doc.metadata?.source,
       newsTitle: doc.metadata?.newsMeta?.title,
+      ruleName: ruleNameById.get(doc.ruleRef),
     }));
 
     return { data, total };

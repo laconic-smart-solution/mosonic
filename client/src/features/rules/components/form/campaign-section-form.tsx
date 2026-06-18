@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { FormSection, FullRow } from "./rule-form-helpers"
-import { RuleFormCommaList } from "./rule-form-comma-list"
+import { RuleFormTagList } from "./rule-form-tag-list"
 import { RuleFormSelect } from "./rule-form-select"
 
 export function CampaignSectionForm() {
@@ -13,23 +13,21 @@ export function CampaignSectionForm() {
       subtitle={t("form.campaign.subtitle")}
     >
       <FullRow>
-        <RuleFormCommaList name="campaign.goals" label={t("form.campaign.goals")} className="min-h-16" />
+        <RuleFormTagList name="campaign.goals" label={t("form.campaign.goals")} />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList name="campaign.keywords" label={t("form.campaign.keywords")} className="min-h-16" />
+        <RuleFormTagList name="campaign.keywords" label={t("form.campaign.keywords")} />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList
+        <RuleFormTagList
           name="campaign.hashtagStrategy"
           label={t("form.campaign.hashtags")}
-          className="min-h-16"
         />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList
+        <RuleFormTagList
           name="campaign.contentFormats"
           label={t("form.campaign.contentFormats")}
-          className="min-h-16"
         />
       </FullRow>
       <RuleFormSelect
@@ -42,10 +40,9 @@ export function CampaignSectionForm() {
         ]}
       />
       <FullRow>
-        <RuleFormCommaList
+        <RuleFormTagList
           name="campaign.customSchedule"
           label={t("form.campaign.customSchedule")}
-          className="min-h-16"
         />
       </FullRow>
     </FormSection>

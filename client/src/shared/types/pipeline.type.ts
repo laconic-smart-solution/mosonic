@@ -31,6 +31,7 @@ export type PipelinePageItem = {
   completedAt: string | null
   metadataSource?: string
   newsTitle?: string
+  ruleName?: string
 }
 
 export type PipelinePageResponse = {

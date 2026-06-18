@@ -1,7 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
-import { AnalyticsModule } from '../analytics/analytics.module';
 import { ContentModule } from '../content/content.module';
 import { EventsModule } from '../events/events.module';
 import { McpModule } from '../mcp/mcp.module';
@@ -30,7 +29,6 @@ import {
     AuthModule,
     forwardRef(() => OrchestrationModule),
     forwardRef(() => WorkflowModule),
-    forwardRef(() => AnalyticsModule),
     EventsModule,
     McpModule,
     forwardRef(() => ContentModule),

@@ -9,7 +9,7 @@
     "selectOrCreate": "เลือกหรือสร้างกฎ",
     "loadRuleError": "ไม่สามารถโหลดกฎนี้ได้",
     "viewTree": "แผนผัง",
-    "viewDetail": "รายละเอียด",
+    "viewManage": "จัดการ",
     "pendingChanges": "รอบันทึก {{count}} รายการ",
     "discardAll": "ยกเลิกทั้งหมด",
     "saveChanges": "บันทึกการเปลี่ยนแปลง",
@@ -67,13 +67,12 @@
     "scrollToLoadMore": "เลื่อนเพื่อโหลดเพิ่ม"
   },
   "bubbleNode": {
-    "editTitle": "แก้ไขเนื้อหาโหนด",
     "detailsTitle": "รายละเอียดโหนด",
-    "editDescription": "อัปเดตค่าโหนดนี้แล้วบันทึก",
-    "structureDescription": "โหนดนี้เป็นป้ายกำกับโครงสร้าง",
-    "saveNode": "บันทึกโหนด",
-    "addItem": "เพิ่มรายการ",
-    "removeItem": "ลบรายการ"
+    "viewOnlyDescription": "แสดงตัวอย่างแบบอ่านอย่างเดียว สลับไปที่จัดการเพื่อแก้ไขกฎนี้",
+    "structureDescription": "โหนดนี้เป็นป้ายกำกับโครงสร้าง"
+  },
+  "channelsDialog": {
+    "atLeastOne": "เลือกอย่างน้อยหนึ่งช่องทาง"
   },
   "detail": {
     "campaignRule": "กฎแคมเปญ",
@@ -93,7 +92,10 @@
     "cancel": "ยกเลิก"
   },
   "form": {
-    "commaListHint": "ค่าคั่นด้วยเครื่องหมายจุลภาค",
+    "tagListHint": "พิมพ์ค่าแล้วกด + เพื่อเพิ่ม",
+    "tagListPlaceholder": "เพิ่มค่า…",
+    "tagListAdd": "เพิ่มรายการ",
+    "tagListRemoveAria": "ลบ {{value}}",
     "brand": {
       "title": "แบรนด์",
       "subtitle": "น้ำเสียง การวางตำแหน่ง และการนำเสนอแบรนด์ในเนื้อหา",
@@ -136,9 +138,9 @@
     },
     "channels": {
       "title": "ช่องทาง",
-      "subtitle": "ช่องทางที่กฎนี้ใช้ ใส่ชื่อช่องทางคั่นด้วยเครื่องหมายจุลภาค",
+      "subtitle": "ช่องทางที่กฎนี้ใช้ เลือกแพลตฟอร์มการกระจายที่ต้องการ",
       "distribution": "การกระจาย",
-      "distributionHint": "ชื่อช่องทางคั่นด้วยเครื่องหมายจุลภาค"
+      "distributionHint": "เลือกแพลตฟอร์มที่แคมเปญนี้จะเผยแพร่"
     },
     "guidelines": {
       "title": "แนวทาง",

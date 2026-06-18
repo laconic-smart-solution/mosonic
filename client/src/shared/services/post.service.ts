@@ -6,6 +6,7 @@ import type {
   BulkScheduleBody,
   DeletePostResult,
   PatchPostBody,
+  PostAnalyticsSnapshot,
   PostRecord,
   PostsListQueryParams,
   PostsListResponse,
@@ -89,6 +90,13 @@ export const postService = {
     const response = await apiClient.post<BulkDeleteResult>(
       "/posts/bulk-delete",
       body,
+    )
+    return response.data
+  },
+
+  async syncAnalytics(postId: string): Promise<{ analytics: PostAnalyticsSnapshot }> {
+    const response = await apiClient.post<{ analytics: PostAnalyticsSnapshot }>(
+      `/posts/${encodeURIComponent(postId)}/analytics/sync`,
     )
     return response.data
   },

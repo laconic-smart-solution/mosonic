@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
   Post,
   PlatformPostStatus,
@@ -95,6 +96,7 @@ export class WebhookService {
     private readonly postModel: Model<PostDocument>,
     private readonly events: EventsService,
     private readonly usersService: UsersService,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
   /**
@@ -282,6 +284,7 @@ export class WebhookService {
             failureReason: null,
           }));
     await postDoc.save();
+    await this.postAnalyticsService.ensureForPost(postDoc);
 
     const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
     if (!doc) return;
@@ -415,6 +418,7 @@ export class WebhookService {
     postDoc.status = PostStatus.Partial;
     postDoc.platformResults = platformResults;
     await postDoc.save();
+    await this.postAnalyticsService.ensureForPost(postDoc);
 
     const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
     if (!doc) return;

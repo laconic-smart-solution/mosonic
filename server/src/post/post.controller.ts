@@ -117,6 +117,12 @@ export class PostController {
     return this.postService.retryPost(postId, auth);
   }
 
+  @Post(':postId/analytics/sync')
+  async syncAnalytics(@Req() req: Request, @Param('postId') postId: string) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.postService.syncPostAnalytics(postId, auth);
+  }
+
   @Delete(':postId')
   async remove(@Req() req: Request, @Param('postId') postId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);

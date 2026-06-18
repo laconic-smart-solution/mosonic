@@ -16,13 +16,19 @@
   },
   "preview": {
     "title": "预览",
+    "dialogTitle": "{{platform}} 预览",
+    "dialogDescription": "查看发布后的帖子效果。",
+    "openDialog": "预览",
     "save": "保存",
     "noMedia": "无媒体",
+    "previousMedia": "上一张",
+    "nextMedia": "下一张",
+    "mediaCounter": "{{current}} / {{total}}",
     "tiktokVerticalHint": "TikTok 预览使用竖屏 9:16 视频。"
   },
   "scheduledEdit": {
     "title": "编辑定时帖子",
-    "hint": "更改仅适用于此渠道。定时后无法更改媒体和平台。",
+    "hint": "更改仅适用于此渠道。",
     "caption": "文案",
     "captionPlaceholder": "更新此渠道的文案",
     "youtubeTitle": "YouTube 标题",
@@ -30,8 +36,10 @@
     "rescheduleTo": "重新定时为",
     "cancel": "取消",
     "updating": "正在更新...",
-    "confirm": "确认更改",
-    "scheduledHint": "此帖子已定时。使用“编辑定时帖子”可更新此渠道的文案、时间或 YouTube 标题。Zernio 不支持更改媒体。"
+    "confirm": "确认更改"
+  },
+  "editor": {
+    "scheduledHint": "此帖子已定时。在下方编辑文案、媒体、时间或 YouTube 标题，然后点击保存以同步到 Zernio。"
   },
   "fields": {
     "media": "媒体",
@@ -42,6 +50,10 @@
     "single": "单图",
     "multiple": "多图",
     "video": "视频"
+  },
+  "tiktok": {
+    "slideshowTitleHint": "TikTok 图片帖将此文案作为幻灯片标题（最多 90 个字符）。",
+    "slideshowTitleTooLong": "TikTok 图片帖将文案作为幻灯片标题（最多 {{max}} 个字符）。请缩短 {{over}} 个字符。当前长度：{{count}}。"
   },
   "publish": {
     "publishNow": "立即发布",
@@ -55,7 +67,7 @@
     "cancel": "取消",
     "confirmSchedule": "确认定时",
     "publishedNoAction": "已发布 — 无需进一步操作",
-    "scheduledEditable": "已定时 — 仍可编辑文案、时间和 YouTube 标题",
+    "scheduledEditable": "已定时 — 在下方编辑后点击保存以更新",
     "publishingInProgress": "正在发布…",
     "editScheduled": "编辑定时帖子"
   },

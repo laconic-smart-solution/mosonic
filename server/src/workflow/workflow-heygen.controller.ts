@@ -61,13 +61,36 @@ export class WorkflowHeygenController {
   }
 
   @Get('heygen/avatars')
-  listAvatars() {
+  async listAvatars(@Res({ passthrough: true }) res: Response) {
+    res.setHeader('Cache-Control', 'no-store');
     return this.heygenWorkflow.listAvatarLooks();
   }
 
   @Delete('heygen/avatars/:lookId')
   deleteAvatar(@Param('lookId') lookId: string) {
     return this.heygenWorkflow.deleteAvatarLook(lookId);
+  }
+
+  @Post('heygen/upload-avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 32 * 1024 * 1024 },
+    }),
+  )
+  uploadAvatarDraft(@UploadedFile() file: Express.Multer.File | undefined) {
+    return this.heygenWorkflow.uploadAvatarDraft(file);
+  }
+
+  @Post('heygen/upload-background')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 32 * 1024 * 1024 },
+    }),
+  )
+  uploadBackgroundDraft(@UploadedFile() file: Express.Multer.File | undefined) {
+    return this.heygenWorkflow.uploadBackgroundDraft(file);
   }
 
   @Patch(':workflowId/nodes/:nodeId/heygen/config')

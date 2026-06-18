@@ -3,7 +3,6 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
-import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PreprocessingModule } from './preprocessing/preprocessing.module';
@@ -59,7 +58,6 @@ import {
     UploadModule,
     PostModule,
     WebhookModule,
-    AnalyticsModule,
     CampaignModule,
     NewsTriggerModule,
     IntegrationsModule,

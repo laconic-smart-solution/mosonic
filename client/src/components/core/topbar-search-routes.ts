@@ -43,11 +43,11 @@ export const TOPBAR_SEARCH_ROUTE_DEFS: TopbarSearchRouteEntry[] = [
     keywordsKey: "searchRoutes.settingsAccounts.keywords",
   },
   {
-    id: "analytics",
-    path: "/analytics",
-    titleKey: "searchRoutes.analytics.title",
-    subtitleKey: "searchRoutes.analytics.subtitle",
-    keywordsKey: "searchRoutes.analytics.keywords",
+    id: "posts",
+    path: "/posts",
+    titleKey: "searchRoutes.posts.title",
+    subtitleKey: "searchRoutes.posts.subtitle",
+    keywordsKey: "searchRoutes.posts.keywords",
   },
 ]
 

@@ -28,6 +28,7 @@
   "toolbar": {
     "workflow": "Workflow",
     "allWorkflows": "All workflows",
+    "unnamedWorkflow": "Untitled workflow",
     "workflowFallback": "Workflow",
     "sort": "Sort",
     "perPage": "Per page",
@@ -47,12 +48,13 @@
     "failed": "Failed"
   },
   "card": {
+    "campaign": "Campaign",
     "news": "News",
     "noPrompt": "No prompt",
     "noName": "Untitled run",
     "noSteps": "No steps recorded",
-    "node_one": "{{count}} node",
-    "node_other": "{{count}} nodes",
+    "node_one": "{{count}} step",
+    "node_other": "{{count}} steps",
     "openRun": "Open run",
     "stop": "Stop"
   },

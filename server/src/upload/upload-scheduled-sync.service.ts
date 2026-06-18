@@ -5,6 +5,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
 import { McpService } from '../mcp/mcp.service';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
   PlatformPostStatus,
   Post,
@@ -47,6 +48,7 @@ export class UploadScheduledSyncService {
     private readonly syncLockModel: Model<SyncLockDocument>,
     private readonly mcpService: McpService,
     private readonly events: EventsService,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
   /**
@@ -244,6 +246,10 @@ export class UploadScheduledSyncService {
     }
 
     await post.save();
+
+    if (post.status === PostStatus.Published) {
+      await this.postAnalyticsService.ensureForPost(post);
+    }
 
     const doc = await this.uploadModel.findOne({ uploadId: post.uploadRef }).exec();
     if (!doc) return;

@@ -41,16 +41,31 @@ describe('PostService', () => {
     unpublishZernioPost: jest.fn(),
   };
 
+  const postAnalyticsService = {
+    ensureForPost: jest.fn().mockResolvedValue(null),
+    getDtoForPost: jest.fn().mockResolvedValue(null),
+    syncFromZernio: jest.fn(),
+  };
+
   function service(): PostService {
     return new PostService(
       postModel as never,
       uploadModel as never,
       mcpService as never,
+      postAnalyticsService as never,
     );
   }
 
   beforeEach(() => {
     jest.clearAllMocks();
+    uploadModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(null),
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      }),
+    });
   });
 
   it('bulkCancelScheduled skips missing posts gracefully', async () => {
@@ -445,11 +460,27 @@ describe('PostService', () => {
 
   it('getPostDetail with zernio hydrate merges remote snapshot', async () => {
     postModel.findOne.mockReturnValue({
-      lean: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue({
+      exec: jest.fn().mockResolvedValue({
+        postId: 'p-local',
+        zernioPostId: 'zr',
+        userId: 'u1',
+        uploadRef: 'upl-1',
+        channels: ['facebook'],
+        status: PostStatus.Scheduled,
+        toObject: () => ({
           postId: 'p-local',
           zernioPostId: 'zr',
           userId: 'u1',
+          uploadRef: 'upl-1',
+          channels: ['facebook'],
+          status: PostStatus.Scheduled,
+        }),
+      }),
+    });
+    uploadModel.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
         }),
       }),
     });
@@ -468,6 +499,57 @@ describe('PostService', () => {
     } else {
       throw new Error('expected hydrated shape');
     }
+  });
+
+  it('getPostDetail attaches mediaItems and detailCaption from upload', async () => {
+    postModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        postId: 'p-media',
+        userId: 'u1',
+        uploadRef: 'u-media',
+        channels: ['instagram'],
+        status: PostStatus.Scheduled,
+        toObject: () => ({
+          postId: 'p-media',
+          userId: 'u1',
+          uploadRef: 'u-media',
+          channels: ['instagram'],
+          status: PostStatus.Scheduled,
+        }),
+      }),
+    });
+    uploadModel.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue({
+            uploadId: 'u-media',
+            channels: [
+              {
+                channel: 'instagram',
+                caption: 'Full caption text',
+                mediaUrls: [
+                  'https://cdn.example/a.png',
+                  'https://cdn.example/b.mp4',
+                ],
+              },
+            ],
+            resolvedOutputs: {},
+          }),
+        }),
+      }),
+    });
+
+    const detail = await service().getPostDetail(
+      'p-media',
+      { userId: 'u1', role: 'CUSTOMER' as never },
+    );
+
+    const local = 'local' in detail ? detail.local : detail;
+    expect(local['detailCaption']).toBe('Full caption text');
+    expect(local['mediaItems']).toEqual([
+      { url: 'https://cdn.example/a.png', kind: 'image' },
+      { url: 'https://cdn.example/b.mp4', kind: 'video' },
+    ]);
   });
 
   it('patchPost yields NotFound when post missing', async () => {
