@@ -49,7 +49,10 @@
     "titleFailed": "Rule generation failed",
     "titleGenerating": "Generating your rule",
     "subtitle": "Rule extraction",
-    "waitMessage": "Please wait while we process your prompt..."
+    "waitMessage": "Please wait while we process your prompt...",
+    "failedHint": "We could not extract a rule from your input. Try again with more detail or a different source.",
+    "dismiss": "Dismiss",
+    "tryAgain": "Try again"
   },
   "createDialog": {
     "title": "Create rule by prompt",
@@ -246,6 +249,12 @@
     "runStatusFailed": "Failed",
     "runStatusStarted": "Started",
     "runStatusNoMatch": "No match",
+    "runStatusKeywordSkip": "Keyword filter",
+    "runStatusRelevanceSkip": "Low relevance",
+    "runStatusDailyLimit": "Daily limit",
+    "runStatusNoArticles": "No articles",
+    "runStatusNoWorkflow": "No workflow",
+    "runStatusConcurrentLimit": "Busy",
     "runQueued": "News check queued…",
     "runInProgress": "A run is already in progress for this campaign.",
     "runTimeoutMessage": "News run timed out. Ensure the API worker is running (RUN_WORKERS_IN_API) and Redis is available.",

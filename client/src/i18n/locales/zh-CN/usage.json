@@ -1,0 +1,35 @@
+{
+  "title": "用量",
+  "subtitle": "账户积分与生成活动",
+  "planBanner": {
+    "plan": "套餐",
+    "creditsUsed": "已用 {{used}} / {{total}} 积分",
+    "remaining": "剩余 {{count}}",
+    "resetDate": "重置于 {{date}}",
+    "lowBalance": "积分余额不足 — 剩余不足 10%"
+  },
+  "summary": {
+    "usedThisMonth": "本月已用积分",
+    "topOperation": "最常用操作",
+    "totalGenerations": "总生成次数",
+    "rateTooltip": "当前公开汇率下 {{count}} 积分 ≈ $1.00"
+  },
+  "charts": {
+    "byType": "按操作类型",
+    "daily": "每日积分"
+  },
+  "ledger": {
+    "title": "活动记录",
+    "date": "日期",
+    "pipeline": "流水线",
+    "operation": "操作",
+    "provider": "提供商",
+    "credits": "积分"
+  },
+  "range": {
+    "month": "本月",
+    "7d": "近 7 天",
+    "30d": "近 30 天",
+    "all": "全部"
+  }
+}

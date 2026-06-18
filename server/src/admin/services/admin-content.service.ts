@@ -17,6 +17,21 @@ function displayName(u: {
   return u.username ?? '';
 }
 
+function contentPreview(content: {
+  userEdits?: { text?: string; translatedText?: string };
+  outputs?: { text?: string; translatedText?: string };
+}): string | undefined {
+  const text =
+    content.userEdits?.text ??
+    content.outputs?.text ??
+    content.userEdits?.translatedText ??
+    content.outputs?.translatedText;
+  if (typeof text !== 'string') return undefined;
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length > 160 ? `${trimmed.slice(0, 160)}…` : trimmed;
+}
+
 @Injectable()
 export class AdminContentService {
   constructor(
@@ -81,7 +96,7 @@ export class AdminContentService {
         : Promise.resolve([] as { _id: string; total: number }[]),
       ruleRefs.length
         ? this.ruleModel
-            .find({ ruleId: { $in: ruleRefs } }, { ruleId: 1, channels: 1 })
+            .find({ ruleId: { $in: ruleRefs } }, { ruleId: 1, name: 1, channels: 1 })
             .lean()
         : Promise.resolve([]),
     ]);
@@ -96,6 +111,9 @@ export class AdminContentService {
         return [r.ruleId, chs];
       }),
     );
+    const ruleNameMap = Object.fromEntries(
+      rules.map((r) => [r.ruleId, r.name]),
+    );
 
     return {
       contents: contents.map((c) => {
@@ -103,10 +121,10 @@ export class AdminContentService {
         return {
           contentId: c.contentId,
           status: c.status,
-          userId: c.userId,
           userEmail: u?.email ?? 'unknown',
           displayName: u ? displayName(u) : '',
-          pipelineRef: c.pipelineRef,
+          ruleName: ruleNameMap[c.ruleRef] ?? '',
+          preview: contentPreview(c),
           costUsd: costMap[c.pipelineRef] ?? 0,
           createdAt: (c as { createdAt?: Date }).createdAt,
           channels: ruleChannelMap[c.ruleRef] ?? [],
@@ -123,27 +141,43 @@ export class AdminContentService {
     const content = await this.contentModel.findOne({ contentId }).lean();
     if (!content) throw new NotFoundException('Content not found');
 
-    const [user, pipeline, costs] = await Promise.all([
+    const [user, pipeline, costs, rule] = await Promise.all([
       content.userId
         ? this.userModel
             .findOne(
               { userId: content.userId },
-              { email: 1, firstName: 1, lastName: 1, username: 1, userId: 1 },
+              { userId: 1, email: 1, firstName: 1, lastName: 1, username: 1 },
             )
             .lean()
         : Promise.resolve(null),
       this.pipelineModel.findOne({ pipelineId: content.pipelineRef }).lean(),
       this.costModel.find({ pipelineRef: content.pipelineRef }).lean(),
+      this.ruleModel.findOne({ ruleId: content.ruleRef }, { name: 1 }).lean(),
     ]);
 
     const totalCost = costs.reduce((sum, row) => sum + row.costUsd, 0);
 
     return {
-      content,
+      status: content.status,
+      createdAt: (content as { createdAt?: Date }).createdAt,
+      updatedAt: (content as { updatedAt?: Date }).updatedAt,
+      preview: contentPreview(content),
+      ruleName: rule?.name ?? '',
       user: user
-        ? { ...user, displayName: displayName(user) }
+        ? {
+            userId: user.userId,
+            email: user.email,
+            displayName: displayName(user),
+          }
         : null,
-      pipeline,
+      pipeline: pipeline
+        ? {
+            status: pipeline.status,
+            contentPrompt: pipeline.contentPrompt,
+            startedAt: pipeline.startedAt,
+            completedAt: pipeline.completedAt,
+          }
+        : null,
       costUsd: totalCost,
       costBreakdown: costs.map((row) => ({
         nodeType: row.nodeType,

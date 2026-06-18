@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CreditBillingService } from '../../credit/credit-billing.service';
 import { LlmService } from '../../llm/llm.service';
+import { extractUsageFromAiMessage } from '../../nodes/langchain-usage.util';
+import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
 import {
   NodeAspectRatio,
   NodeFormalityLevel,
@@ -1178,7 +1181,10 @@ DO NOT include branch, adapt, or merge for single-channel workflows.
 export class WorkflowGenerationService {
   private readonly logger = new Logger(WorkflowGenerationService.name);
 
-  constructor(private readonly llm: LlmService) {}
+  constructor(
+    private readonly llm: LlmService,
+    private readonly creditBilling: CreditBillingService,
+  ) {}
 
   private fallback(rule: Rule, contentPrompt: string): GeneratedWorkflowNode[] {
     return generateFallbackWorkflowNodes(rule, contentPrompt);
@@ -1195,6 +1201,7 @@ export class WorkflowGenerationService {
   async generate(
     rule: Rule,
     contentPrompt: string,
+    billing?: { userId: string; workflowId: string },
   ): Promise<GeneratedWorkflowNode[]> {
     // Determine structure upfront so the prompt can explain the right rules
     const structure = inferStructure(rule);
@@ -1254,6 +1261,22 @@ export class WorkflowGenerationService {
 
         if (!normalized.length) {
           throw new Error('normalizeAiOutput returned empty result');
+        }
+
+        if (billing) {
+          const usage = extractUsageFromAiMessage(res);
+          await this.creditBilling.recordAndDeduct({
+            userId: billing.userId,
+            pipelineRef: billing.workflowId,
+            campaignRef: rule.ruleId,
+            nodeId: 'workflow-generation',
+            nodeType: WorkflowNodeType.TextGeneration,
+            provider: LlmProvider.OpenAI,
+            providerModel: 'gpt-4o',
+            entryType: 'openai_llm',
+            inputTokens: usage?.inputTokens,
+            outputTokens: usage?.outputTokens,
+          });
         }
 
         this.logger.log(

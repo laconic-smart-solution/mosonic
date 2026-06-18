@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SsoClientService } from '../../auth/sso-client.service';
+import { PlanService } from '../../plan/plan.service';
 import {
   User,
   type UserDocument,
@@ -28,6 +29,7 @@ export class AdminUserProvisioningService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly sso: SsoClientService,
+    private readonly planService: PlanService,
   ) {}
 
   async createUserViaSso(args: {
@@ -67,6 +69,7 @@ export class AdminUserProvisioningService {
         role: args.role,
         status: UserStatus.ACTIVE,
       });
+      await this.planService.assignDefaultPlan(user.userId);
       return { user, sso: ssoResp };
     } catch (e) {
       try {

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
+import { extractUsageFromAiMessage } from '../nodes/langchain-usage.util';
 import type { RuleStatus } from './schemas/rule.schema';
 
 export interface ExtractedRuleDraft {
@@ -58,7 +59,10 @@ export interface ExtractedRuleDraft {
 export class RuleExtractionService {
   constructor(private readonly llm: LlmService) {}
 
-  async extractRuleFromInput(rawInput: string): Promise<ExtractedRuleDraft> {
+  async extractRuleFromInput(rawInput: string): Promise<{
+    draft: ExtractedRuleDraft;
+    usage?: { inputTokens?: number; outputTokens?: number };
+  }> {
     const model = this.llm.getChatModel();
     const res = await model.invoke([
       [
@@ -173,13 +177,17 @@ export class RuleExtractionService {
       .replace(/```$/i, '')
       .trim();
     const parsed = JSON.parse(cleaned) as Omit<ExtractedRuleDraft, 'status'>;
+    const usage = extractUsageFromAiMessage(res);
     const channels = Array.isArray(parsed.channels)
       ? parsed.channels.map((ch) => normalizeExtractedChannel(ch))
       : [];
     return {
-      ...parsed,
-      channels,
-      status: 'active' as RuleStatus,
+      draft: {
+        ...parsed,
+        channels,
+        status: 'active' as RuleStatus,
+      },
+      usage,
     };
   }
 }

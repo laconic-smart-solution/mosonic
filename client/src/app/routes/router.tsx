@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom"
 
 import AppLayout from "@/components/core/layouts/app-layout"
+import { AdminShell } from "@/features/admin/components/admin-shell"
 import { AdminRoute, GuestOnlyRoute, ProtectedLayout } from "@/features/auth/components/auth-routes"
 import {
   HomePage,
@@ -18,8 +19,7 @@ import {
   SettingsAccountsPage,
   AnalyticsPage,
   AnalyticsDetailPage,
-  CostDashboardPage,
-  CostBudgetPage,
+  UsagePage,
   LogsPage,
   ComponentsLibPage,
   LoginPage,
@@ -31,6 +31,9 @@ import {
   AdminUsersPage,
   AdminUserDetailPage,
   AdminCostPage,
+  AdminCreditConfigPage,
+  AdminPlansPage,
+  AdminUsagePage,
   AdminContentPage,
   AdminContentDetailPage,
 } from "../constants/lazyload"
@@ -106,67 +109,31 @@ export const router = createBrowserRouter([
           { path: "/settings/accounts", element: <SettingsAccountsPage /> },
           { path: "/analytics", element: <AnalyticsPage /> },
           { path: "/analytics/:ruleId", element: <AnalyticsDetailPage /> },
-          { path: "/cost", element: <CostDashboardPage /> },
-          { path: "/cost/budget", element: <CostBudgetPage /> },
+          { path: "/usage", element: <UsagePage /> },
+          { path: "/cost", element: <Navigate to="/usage" replace /> },
+          { path: "/cost/budget", element: <Navigate to="/usage" replace /> },
           { path: "/logs", element: <LogsPage /> },
           { path: "/components", element: <ComponentsLibPage /> },
-
-          {
-            path: "/admin",
-            element: (
-              <AdminRoute>
-                <Navigate to="/admin/dashboard" replace />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/dashboard",
-            element: (
-              <AdminRoute>
-                <AdminDashboardPage />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/users",
-            element: (
-              <AdminRoute>
-                <AdminUsersPage />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/users/:userId",
-            element: (
-              <AdminRoute>
-                <AdminUserDetailPage />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/cost",
-            element: (
-              <AdminRoute>
-                <AdminCostPage />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/content",
-            element: (
-              <AdminRoute>
-                <AdminContentPage />
-              </AdminRoute>
-            ),
-          },
-          {
-            path: "/admin/content/:contentId",
-            element: (
-              <AdminRoute>
-                <AdminContentDetailPage />
-              </AdminRoute>
-            ),
-          },
+        ],
+      },
+      {
+        path: "/admin",
+        element: (
+          <AdminRoute>
+            <AdminShell />
+          </AdminRoute>
+        ),
+        children: [
+          { index: true, element: <Navigate to="dashboard" replace /> },
+          { path: "dashboard", element: <AdminDashboardPage /> },
+          { path: "users", element: <AdminUsersPage /> },
+          { path: "users/:userId", element: <AdminUserDetailPage /> },
+          { path: "credit", element: <AdminCreditConfigPage /> },
+          { path: "plans", element: <AdminPlansPage /> },
+          { path: "usage", element: <AdminUsagePage /> },
+          { path: "cost", element: <AdminCostPage /> },
+          { path: "content", element: <AdminContentPage /> },
+          { path: "content/:contentId", element: <AdminContentDetailPage /> },
         ],
       },
     ],

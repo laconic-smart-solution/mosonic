@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
+import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { NodesModule } from '../nodes/nodes.module';
@@ -20,6 +21,7 @@ import { WorkflowResolveService } from './workflow-resolve.service';
 @Module({
   imports: [
     AuthModule,
+    CreditModule,
     EventsModule,
     LlmModule,
     NodesModule,

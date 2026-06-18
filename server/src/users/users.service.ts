@@ -3,9 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { type SsoTokenClaims } from '../auth/auth.types';
+import { PlanService } from '../plan/plan.service';
 import {
   User,
   type UserDocument,
@@ -23,7 +25,17 @@ export type ConnectedAccountRecord = {
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private async assignDefaultPlanForUser(userId: string): Promise<void> {
+    try {
+      const planService = this.moduleRef.get(PlanService, { strict: false });
+      await planService.assignDefaultPlan(userId);
+    } catch {
+      // PlanModule may not be initialized during early bootstrap
+    }
+  }
 
   async upsertFromSsoClaims(args: {
     authServerUserId: string;
@@ -54,7 +66,7 @@ export class UsersService {
       return await existing.save();
     }
 
-    return await this.userModel.create({
+    const user = await this.userModel.create({
       authServerUserId,
       email,
       username,
@@ -64,6 +76,8 @@ export class UsersService {
       status: UserStatus.ACTIVE,
       lastLoginAt: now,
     });
+    await this.assignDefaultPlanForUser(user.userId);
+    return user;
   }
 
   async findByUserId(userId: string): Promise<User | null> {

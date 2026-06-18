@@ -49,7 +49,10 @@
     "titleFailed": "สร้างกฎไม่สำเร็จ",
     "titleGenerating": "กำลังสร้างกฎของคุณ",
     "subtitle": "การดึงกฎ",
-    "waitMessage": "กรุณารอสักครู่ เรากำลังประมวลผลพรอมต์ของคุณ..."
+    "waitMessage": "กรุณารอสักครู่ เรากำลังประมวลผลพรอมต์ของคุณ...",
+    "failedHint": "ไม่สามารถดึงกฎจากข้อมูลที่คุณให้ได้ ลองอีกครั้งด้วยรายละเอียดเพิ่มเติมหรือแหล่งข้อมูลอื่น",
+    "dismiss": "ปิด",
+    "tryAgain": "ลองอีกครั้ง"
   },
   "createDialog": {
     "title": "สร้างกฎด้วยพรอมต์",
@@ -246,6 +249,12 @@
     "runStatusFailed": "ล้มเหลว",
     "runStatusStarted": "เริ่มแล้ว",
     "runStatusNoMatch": "ไม่ตรงเงื่อนไข",
+    "runStatusKeywordSkip": "คำหลักไม่ตรง",
+    "runStatusRelevanceSkip": "ความเกี่ยวข้องต่ำ",
+    "runStatusDailyLimit": "ครบโควตารายวัน",
+    "runStatusNoArticles": "ไม่มีข่าว",
+    "runStatusNoWorkflow": "ไม่มีเวิร์กโฟลว์",
+    "runStatusConcurrentLimit": "ระบบไม่ว่าง",
     "runQueued": "คิวตรวจข่าวแล้ว…",
     "runInProgress": "มีการรันอยู่แล้วสำหรับแคมเปญนี้",
     "runTimeoutMessage": "รันข่าวหมดเวลา ตรวจสอบว่า API worker ทำงาน (RUN_WORKERS_IN_API) และ Redis พร้อมใช้งาน",

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Handle,
@@ -7,29 +8,34 @@ import {
   useEdges,
   useNodeId,
   useNodes,
+  useUpdateNodeInternals,
   type NodeProps,
 } from "@xyflow/react"
 import type { Node } from "@xyflow/react"
 
 import {
+  NODE_H,
   NODE_W,
   WF_NODE_TYPES,
   canvasConfigSummary,
   statusStyle,
   type WfNodeData,
 } from "@/features/workflow/data/workflow-model"
+import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
 import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
 import { WorkflowNodeAddButton } from "./workflow-node-add-button"
 import { WorkflowNodeSettingsButton } from "./workflow-node-settings-button"
 
-export function WorkflowRfNode({
-  data,
-  selected,
-}: NodeProps<Node<WfNodeData, "wfNode">>) {
+type WorkflowRfNodeProps = NodeProps<
+  Node<WfNodeData, "wfNode" | "branchNode" | "mergeNode">
+>
+
+export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
   const { t } = useTranslation("workflow")
   const nodeId = useNodeId()
+  const updateNodeInternals = useUpdateNodeInternals()
   const edges = useEdges()
   const allNodes = useNodes()
 
@@ -58,31 +64,94 @@ export function WorkflowRfNode({
     previewVideo.status === "ready" ? previewVideo.src : undefined
 
   const configSummary = canvasConfigSummary(data.wfType, data.config ?? {})
+  const channelHandles =
+    (data.channelHandles as BranchChannelHandle[] | undefined) ?? []
+  const isBranch = data.wfType === "branch"
+  const isMerge = data.wfType === "merge"
+  const showLaneHandles =
+    channelHandles.length > 0 && (isBranch || isMerge)
+
+  const bodySummary =
+    showLaneHandles && isBranch
+      ? t("branchNode.channelLanes", { count: channelHandles.length })
+      : showLaneHandles && isMerge
+        ? t("mergeNode.waitsForLanes", { count: channelHandles.length })
+        : configSummary
+
+  const targetHandleStyle = {
+    width: 10,
+    height: 10,
+    background: "#fff",
+    border: `2px solid ${nt.color}`,
+    boxShadow: `0 0 0 3px ${nt.color}20`,
+  }
+  const sourceHandleStyle = {
+    width: 10,
+    height: 10,
+    background: nt.color,
+    border: "2px solid #fff",
+    boxShadow: `0 0 0 3px ${nt.color}30, 0 2px 4px ${nt.color}40`,
+  }
+
+  useEffect(() => {
+    if (nodeId && (isBranch || isMerge)) {
+      updateNodeInternals(nodeId)
+    }
+  }, [
+    channelHandles.length,
+    isBranch,
+    isMerge,
+    nodeId,
+    showLaneHandles,
+    updateNodeInternals,
+  ])
 
   return (
     <div
       className="relative flex flex-col select-none"
       style={{
         width: NODE_W,
+        minHeight: isBranch || isMerge ? NODE_H : undefined,
+        overflow: showLaneHandles ? "visible" : undefined,
         filter: selected
           ? `drop-shadow(0 0 12px ${nt.color}35)`
           : "drop-shadow(0 2px 6px rgba(0,0,0,0.08))",
       }}
     >
-      {/* LEFT HANDLE */}
-      {data.wfType !== "keywords" && (
+      {/* LEFT HANDLE(S) */}
+      {data.wfType !== "keywords" && !isBranch ? (
+        isMerge && showLaneHandles ? (
+          channelHandles.map((ch, index) => {
+            const topPct = ((index + 1) / (channelHandles.length + 1)) * 100
+            return (
+              <Handle
+                key={ch.id}
+                type="target"
+                position={Position.Left}
+                id={ch.id}
+                style={{
+                  ...targetHandleStyle,
+                  top: `${topPct}%`,
+                }}
+                title={ch.label}
+              />
+            )
+          })
+        ) : (
+          <Handle
+            type="target"
+            position={Position.Left}
+            style={targetHandleStyle}
+          />
+        )
+      ) : null}
+      {isBranch ? (
         <Handle
           type="target"
           position={Position.Left}
-          style={{
-            width: 10,
-            height: 10,
-            background: "#fff",
-            border: `2px solid ${nt.color}`,
-            boxShadow: `0 0 0 3px ${nt.color}20`,
-          }}
+          style={targetHandleStyle}
         />
-      )}
+      ) : null}
 
       {/* CARD */}
       <div
@@ -189,7 +258,7 @@ export function WorkflowRfNode({
         <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column", gap: 7 }}>
 
           {/* Config summary */}
-          {configSummary && (
+          {bodySummary ? (
             <p
               style={{
                 fontSize: 11,
@@ -201,9 +270,9 @@ export function WorkflowRfNode({
                 overflow: "hidden",
               }}
             >
-              {configSummary}
+              {bodySummary}
             </p>
-          )}
+          ) : null}
 
           {/* Processing message */}
           {data.processingMessage && (
@@ -417,21 +486,37 @@ export function WorkflowRfNode({
         </div>
       </div>
 
-      {/* RIGHT HANDLE */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          width: 10,
-          height: 10,
-          background: nt.color,
-          border: "2px solid #fff",
-          boxShadow: `0 0 0 3px ${nt.color}30, 0 2px 4px ${nt.color}40`,
-        }}
-      />
+      {/* RIGHT HANDLE(S) */}
+      {isBranch && showLaneHandles
+        ? channelHandles.map((ch, index) => {
+            const topPct = ((index + 1) / (channelHandles.length + 1)) * 100
+            return (
+              <Handle
+                key={ch.id}
+                type="source"
+                position={Position.Right}
+                id={ch.id}
+                style={{
+                  ...sourceHandleStyle,
+                  top: `${topPct}%`,
+                }}
+                title={ch.label}
+              />
+            )
+          })
+        : null}
+      {!isBranch || !showLaneHandles ? (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={sourceHandleStyle}
+        />
+      ) : null}
 
       <WorkflowNodeAddButton
         visible={showAddButton}
+        highlighted={Boolean(data.paletteDropAfterHighlight)}
+        active={Boolean(data.paletteDropAfterActive)}
         onOpen={(event) => data.onOpenAddPopover?.(event, nodeId!)}
       />
     </div>

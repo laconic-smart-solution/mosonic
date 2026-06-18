@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-import { AdminLayout } from "../components/admin-layout"
 import { useAdminUserActions, useAdminUserDetail } from "../hooks/use-admin-users"
 
 export default function AdminUserDetailPage() {
@@ -15,27 +14,18 @@ export default function AdminUserDetailPage() {
   const { suspend, reactivate } = useAdminUserActions()
 
   if (isLoading) {
-    return (
-      <AdminLayout>
-        <div className="text-muted-foreground p-8">{t("userDetail.loading")}</div>
-      </AdminLayout>
-    )
+    return <div className="text-muted-foreground p-8">{t("userDetail.loading")}</div>
   }
 
   if (!data?.user) {
-    return (
-      <AdminLayout>
-        <div className="text-muted-foreground p-8">{t("userDetail.notFound")}</div>
-      </AdminLayout>
-    )
+    return <div className="text-muted-foreground p-8">{t("userDetail.notFound")}</div>
   }
 
   const { user, stats } = data
   const uid = user.userId as string
 
   return (
-    <AdminLayout>
-      <div className="mx-auto max-w-4xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-4xl space-y-6 p-6 md:p-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <Button type="button" variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => navigate("/admin/users")}>
@@ -128,8 +118,7 @@ export default function AdminUserDetailPage() {
             />
           </CardContent>
         </Card>
-      </div>
-    </AdminLayout>
+    </div>
   )
 }
 

@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuthModule } from '../auth/auth.module';
+import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { RuleExtractController } from './rule-extract.controller';
@@ -13,6 +14,7 @@ import { Rule, RuleSchema } from './schemas/rule.schema';
 @Module({
   imports: [
     AuthModule,
+    CreditModule,
     LlmModule,
     EventsModule,
     forwardRef(() => AnalyticsModule),

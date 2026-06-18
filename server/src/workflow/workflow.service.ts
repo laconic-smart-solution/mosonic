@@ -723,6 +723,7 @@ export class WorkflowService {
       const generatedNodes = await this.workflowGeneration.generate(
         rule,
         contentPrompt,
+        { userId: auth.userId, workflowId },
       );
       const channelIds = (rule.channels ?? []).map((ch) =>
         normalizeLaneId(ch.channel),

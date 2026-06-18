@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
 import { RuleChip } from "./rule-chip"
 
 type RuleExtractionProgressProps = {
@@ -8,6 +9,8 @@ type RuleExtractionProgressProps = {
   progressStep: string
   failureMessage: string
   streamedContent: string
+  onDismiss?: () => void
+  onTryAgain?: () => void
 }
 
 export function RuleExtractionProgress({
@@ -15,6 +18,8 @@ export function RuleExtractionProgress({
   progressStep,
   failureMessage,
   streamedContent,
+  onDismiss,
+  onTryAgain,
 }: RuleExtractionProgressProps) {
   const { t } = useTranslation("rules")
   const [displayedProgress, setDisplayedProgress] = useState(8)
@@ -94,6 +99,20 @@ export function RuleExtractionProgress({
             </p>
           )}
         </div>
+        {failureMessage && (onDismiss || onTryAgain) ? (
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            {onDismiss ? (
+              <Button type="button" variant="outline" size="sm" onClick={onDismiss}>
+                {t("extraction.dismiss")}
+              </Button>
+            ) : null}
+            {onTryAgain ? (
+              <Button type="button" size="sm" onClick={onTryAgain}>
+                {t("extraction.tryAgain")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )

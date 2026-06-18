@@ -222,6 +222,8 @@
     "channel": "Channel: {{channel}}",
     "fanInBarrier": "Fan-in barrier",
     "configured": "Configured",
+    "temperature": "Temp {{value}}",
+    "maxTokens": "{{value}} tokens",
     "intelligenceTypes": {
       "all": "All",
       "trend": "Trend",
@@ -257,7 +259,9 @@
     "saveChanges": "Save Changes",
     "runPipeline": "Run Pipeline",
     "stopPipeline": "Stop pipeline",
-    "generateContent": "Generate content"
+    "generateContent": "Generate content",
+    "generateWorkflow": "Generate workflow",
+    "generateWorkflowAndContent": "Generate workflow & content"
   },
   "palette": {
     "title": "Nodes",
@@ -297,6 +301,7 @@
   },
   "presenter": {
     "saveWorkflowFirst": "Save the workflow before uploading avatars.",
+    "saveWorkflowToSync": "Save the workflow to upload new avatars or sync presenter settings to the server. You can still pick avatars and voices locally.",
     "saveFailed": "Presenter settings could not be saved. Save the workflow and try again.",
     "deleteConfirm": "Delete \"{{name}}\" from your HeyGen account? This cannot be undone.",
     "deleteFailed": "Could not delete avatar. Try again.",
@@ -378,7 +383,13 @@
     "postPlaceholder": "e.g. Our Christmas sale — 50% off all items until Dec 25…",
     "exitPreviewHint": "Clear or click the selected pipeline again to exit preview and generate.",
     "saveBeforeGenerateHint": "Save workflow changes or apply node settings before generating. You can still edit this prompt.",
-    "usingWorkflow": "Using workflow: {{name}} · {{count}} {{nodesLabel}}"
+    "usingWorkflow": "Using workflow: {{name}} · {{count}} {{nodesLabel}}",
+    "modeUseCurrentWorkflow": "Use current workflow",
+    "modeGenerateWorkflow": "Auto-generate workflow",
+    "modeTabCurrent": "Current",
+    "modeTabAuto": "Auto",
+    "generateWorkflowPlaceholder": "e.g. Instagram + Facebook captions, Thai translation, hero image…",
+    "autoWorkflowHint": "AI builds a workflow from your post and campaign rule, then generates content."
   },
   "nodesLabel_one": "node",
   "nodesLabel_other": "nodes",
@@ -484,6 +495,7 @@
     "defaultVideoSettings": "Default video settings",
     "defaultSummarySettings": "Default summary settings",
     "reflowOk": "reflow OK",
+    "backgroundKept": "BG kept",
     "presenter": "Presenter",
     "cinematic": "Cinematic"
   },

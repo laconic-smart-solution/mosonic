@@ -407,52 +407,191 @@ export function buildGenerateMoreDefaultConfig(
   }
 }
 
+const CONFIG_OPTION_ALIASES: Record<string, string> = {
+  auto: "auto",
+  en: "english",
+  th: "thai",
+  ja: "japanese",
+  zh: "chinese",
+  ko: "korean",
+  es: "spanish",
+  fr: "french",
+  de: "german",
+  "720p": "resolution720p",
+  landscape: "landscape169",
+  portrait: "portrait916",
+}
+
+function configString(
+  config: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const raw = config[key]
+  if (raw == null || raw === "") return undefined
+  return String(raw)
+}
+
+function configNumber(
+  config: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const raw = config[key]
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function formatOptionLabel(
+  value: string | undefined,
+  options?: { sourceLanguage?: boolean },
+): string | undefined {
+  if (!value) return undefined
+  const keys = new Set<string>([value])
+  const alias = CONFIG_OPTION_ALIASES[value]
+  if (alias) keys.add(alias)
+  if (options?.sourceLanguage && value === "auto") keys.add("autoDetect")
+  for (const key of keys) {
+    const label = i18n.t(`workflow:fields.options.${key}`, { defaultValue: "" })
+    if (label) return label
+  }
+  return value
+}
+
+function formatDuration(config: Record<string, unknown>, key = "duration"): string | undefined {
+  const seconds = configNumber(config, key)
+  if (seconds === undefined) return undefined
+  const durationKey = `duration${seconds}s`
+  return (
+    formatOptionLabel(durationKey) ??
+    i18n.t(`workflow:fields.options.${durationKey}`, { defaultValue: `${seconds}s` })
+  )
+}
+
+function joinConfigParts(parts: Array<string | undefined>): string {
+  return parts.filter((part): part is string => Boolean(part)).join(" · ")
+}
+
 /** Short read-only hint for canvas cards (reusable “how”, not run content). */
 export function canvasConfigSummary(wfType: string, config: Record<string, unknown>): string {
-  const s = (k: string) => (typeof config[k] === "string" ? (config[k] as string) : undefined)
-  const opt = (key: string, value: string | undefined) =>
-    value ? i18n.t(`workflow:fields.options.${key}`, { defaultValue: value }) : undefined
   switch (wfType) {
-    case "text":
-      return [opt("professional", s("tone")), opt("medium", s("textLength")), opt("paragraph", s("outputFormat"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.textSettings")
-    case "image":
-      return [s("aspectRatio"), opt("natural", s("style")), opt("standard", s("quality"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.imageSettings")
-    case "video":
-      return [s("duration") ? `${s("duration")}s` : "", s("aspectRatio"), s("resolution")]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.videoSettings")
-    case "translation":
-      return s("targetLanguage")
-        ? `→ ${opt("thai", s("targetLanguage")) ?? s("targetLanguage")}`
-        : i18n.t("workflow:configSummary.translation")
     case "keywords":
-      return s("model") ?? i18n.t("workflow:configSummary.keywordPlanner")
+      return (
+        joinConfigParts([
+          configString(config, "model"),
+          configNumber(config, "temperature") !== undefined
+            ? i18n.t("workflow:configSummary.temperature", {
+                value: configNumber(config, "temperature"),
+              })
+            : undefined,
+          configNumber(config, "maxTokens") !== undefined
+            ? i18n.t("workflow:configSummary.maxTokens", {
+                value: configNumber(config, "maxTokens"),
+              })
+            : undefined,
+        ]) || i18n.t("workflow:configSummary.keywordPlanner")
+      )
+    case "text":
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "tone")),
+          formatOptionLabel(configString(config, "textLength")),
+          formatOptionLabel(configString(config, "outputFormat")),
+        ]) || i18n.t("workflow:configSummary.textSettings")
+      )
+    case "image":
+      return (
+        joinConfigParts([
+          configString(config, "aspectRatio"),
+          formatOptionLabel(configString(config, "style")),
+          formatOptionLabel(configString(config, "quality")),
+        ]) || i18n.t("workflow:configSummary.imageSettings")
+      )
+    case "video": {
+      const mode = configString(config, "mode") ?? "cinematic"
+      if (mode === "presenter") {
+        return (
+          joinConfigParts([
+            formatOptionLabel("presenter"),
+            formatDuration(config),
+            formatOptionLabel(configString(config, "heygenOrientation")),
+            formatOptionLabel(configString(config, "heygenExpressiveness")),
+            config.removeBackground === false
+              ? i18n.t("workflow:nodeCard.backgroundKept")
+              : undefined,
+          ]) || i18n.t("workflow:configSummary.videoSettings")
+        )
+      }
+      return (
+        joinConfigParts([
+          formatOptionLabel("cinematic"),
+          formatDuration(config),
+          configString(config, "aspectRatio"),
+          formatOptionLabel(configString(config, "resolution")),
+        ]) || i18n.t("workflow:configSummary.videoSettings")
+      )
+    }
+    case "translation": {
+      const source = formatOptionLabel(
+        configString(config, "sourceLanguage") ?? "auto",
+        { sourceLanguage: true },
+      )
+      const target = formatOptionLabel(configString(config, "targetLanguage"))
+      const route =
+        source && target
+          ? `${source} → ${target}`
+          : target
+            ? `→ ${target}`
+            : undefined
+      return (
+        joinConfigParts([
+          route,
+          formatOptionLabel(configString(config, "formalityLevel")),
+          config.preserveFormatting === false
+            ? i18n.t("workflow:nodeCard.reflowOk")
+            : undefined,
+        ]) || i18n.t("workflow:configSummary.translation")
+      )
+    }
     case "summarization":
-      return [opt("medium", s("summaryLength")), opt("paragraph", s("outputFormat"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.summary")
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "summaryLength")),
+          formatOptionLabel(configString(config, "outputFormat")),
+        ]) || i18n.t("workflow:configSummary.summary")
+      )
     case "transcription":
-      return [s("sourceType"), opt("auto", s("language"))].filter(Boolean).join(" · ") ||
-        i18n.t("workflow:configSummary.transcription")
-    case "branch":
-      return i18n.t("workflow:configSummary.fromCampaignRule")
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "language")),
+          configString(config, "sourceType"),
+        ]) || i18n.t("workflow:configSummary.transcription")
+      )
+    case "branch": {
+      const mode = configString(config, "mode") ?? "rule_channels"
+      if (mode === "rule_channels") {
+        return i18n.t("workflow:configSummary.fromCampaignRule")
+      }
+      return formatOptionLabel(mode) ?? i18n.t("workflow:configSummary.fromCampaignRule")
+    }
     case "adapt":
-      return s("channel")
-        ? i18n.t("workflow:configSummary.channel", { channel: s("channel") })
+      return configString(config, "channel")
+        ? i18n.t("workflow:configSummary.channel", {
+            channel: configString(config, "channel"),
+          })
         : i18n.t("workflow:configSummary.channelAdapt")
     case "merge":
       return i18n.t("workflow:configSummary.fanInBarrier")
     case "intelligence": {
-      const st = s("searchType")
-      const typeLabel = st
-        ? i18n.t(`workflow:configSummary.intelligenceTypes.${st}`, { defaultValue: st })
+      const searchType = configString(config, "searchType")
+      const typeLabel = searchType
+        ? i18n.t(`workflow:configSummary.intelligenceTypes.${searchType}`, {
+            defaultValue: formatOptionLabel(searchType) ?? searchType,
+          })
         : i18n.t("workflow:configSummary.intelligenceTypes.all")
-      const model = s("model")
-      return model ? `${typeLabel} · ${model}` : typeLabel
+      return joinConfigParts([typeLabel, configString(config, "model")])
     }
     default:
       return i18n.t("workflow:configSummary.configured")

@@ -70,6 +70,7 @@
     "posts": "Posts",
     "analytics": "Analytics",
     "cost": "Costs",
+    "usage": "Usage",
     "settingsAccounts": "Account settings",
     "admin": "Admin"
   },
@@ -86,6 +87,7 @@
     "components": "Components",
     "pipelines": "Pipelines",
     "cost": "Costs",
+    "usage": "Usage",
     "settings": "Settings",
     "admin": "Admin"
   },

@@ -33,7 +33,8 @@ const ROUTE_LABEL_KEYS: Record<string, string> = {
   "/logs": "routes.logs",
   "/components": "routes.components",
   "/pipelines": "routes.pipelines",
-  "/cost": "routes.cost",
+  "/usage": "routes.usage",
+  "/cost": "routes.usage",
 }
 
 export function Topbar() {

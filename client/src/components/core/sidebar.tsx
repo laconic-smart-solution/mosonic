@@ -196,9 +196,9 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    id: "cost",
-    labelKey: "nav.cost",
-    path: "/cost",
+    id: "usage",
+    labelKey: "nav.usage",
+    path: "/usage",
     icon: (active) => (
       <Wallet
         className="size-4 shrink-0"
@@ -268,8 +268,8 @@ function navItemActive(item: NavItem, pathname: string): boolean {
   if (item.id === "posts") {
     return pathname === "/posts" || pathname.startsWith("/posts/")
   }
-  if (item.id === "cost") {
-    return pathname === "/cost" || pathname.startsWith("/cost/")
+  if (item.id === "usage") {
+    return pathname === "/usage" || pathname.startsWith("/usage/")
   }
   if (item.id === "admin") {
     return pathname.startsWith("/admin")

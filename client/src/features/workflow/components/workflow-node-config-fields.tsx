@@ -1,10 +1,18 @@
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { WorkflowVideoPresenterSettings } from "@/features/workflow/components/workflow-video-presenter-settings"
-import { mergeHeygenVideoConfig } from "@/features/workflow/lib/workflow-node-validation"
 import i18n from "@/i18n"
-import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
 const fo = (key: string) => i18n.t(`workflow:fields.options.${key}`)
@@ -241,15 +249,6 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
       defaultValue: true,
       visibleWhen: { key: "mode", value: "presenter" },
     },
-    {
-      key: "heygenMotionPrompt",
-      label: fl("video", "heygenMotionPrompt"),
-      control: "textarea",
-      defaultValue: "",
-      rows: 2,
-      placeholder: fp("video", "heygenMotionPrompt"),
-      visibleWhen: { key: "mode", value: "presenter" },
-    },
   ],
   translation: [
     {
@@ -381,6 +380,154 @@ export type WorkflowNodeConfigFieldsProps = {
   nodeId?: string
 }
 
+function ConfigFieldShell({
+  label,
+  children,
+  layout = "stacked",
+}: {
+  label: string
+  children: ReactNode
+  layout?: "stacked" | "inline"
+}) {
+  if (layout === "inline") {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-2.5">
+        <Label className="text-xs font-medium text-foreground">{label}</Label>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+    </div>
+  )
+}
+
+function configControlClass(compact: boolean) {
+  return cn(compact ? "text-xs" : "text-sm")
+}
+
+function filterVisibleFields(
+  fields: ReturnType<typeof getWorkflowNodeFieldDefs>[string],
+  canvasType: string,
+  config: Record<string, unknown>,
+  mode: string,
+) {
+  return (fields ?? []).filter((field) => {
+    if (!field.visibleWhen) return true
+    const current =
+      field.visibleWhen.key === "mode" && canvasType === "video"
+        ? mode
+        : String(config[field.visibleWhen.key] ?? "")
+    return current === field.visibleWhen.value
+  })
+}
+
+function renderConfigField(
+  field: ConfigField,
+  config: Record<string, unknown>,
+  compact: boolean,
+  triggerClass: string,
+  setConfigValue: (key: string, value: unknown) => void,
+  updateConfig: (key: string, value: string) => void,
+) {
+  if (field.control === "toggle") {
+    const on = Boolean(config[field.key] ?? field.defaultValue)
+    return (
+      <ConfigFieldShell key={field.key} label={field.label} layout="inline">
+        <Switch
+          checked={on}
+          onCheckedChange={(checked) => setConfigValue(field.key, checked)}
+          size={compact ? "sm" : "default"}
+          aria-label={field.label}
+        />
+      </ConfigFieldShell>
+    )
+  }
+
+  if (field.control === "textarea") {
+    const val = String(config[field.key] ?? field.defaultValue ?? "")
+    return (
+      <ConfigFieldShell key={field.key} label={field.label}>
+        <Textarea
+          value={val}
+          onChange={(e) => setConfigValue(field.key, e.target.value)}
+          rows={field.rows ?? 3}
+          className={cn(
+            "min-h-[72px] resize-y bg-background leading-relaxed",
+            configControlClass(compact),
+          )}
+          placeholder={field.placeholder}
+        />
+      </ConfigFieldShell>
+    )
+  }
+
+  const current = String(config[field.key] ?? field.defaultValue)
+  if (field.control === "buttons") {
+    return (
+      <ConfigFieldShell key={field.key} label={field.label}>
+        <ToggleGroup
+          value={current ? [current] : []}
+          onValueChange={(values) => {
+            const next = values[0]
+            if (!next) return
+            if ("valueAsNumber" in field && field.valueAsNumber) {
+              setConfigValue(field.key, Number(next))
+              return
+            }
+            updateConfig(field.key, next)
+          }}
+          variant="outline"
+          spacing={0}
+          size={compact ? "sm" : "default"}
+          className="flex w-full flex-wrap"
+        >
+          {field.options.map((option) => (
+            <ToggleGroupItem
+              key={option.value}
+              value={option.value}
+              className={cn("min-w-0 flex-1 px-2", configControlClass(compact))}
+            >
+              {option.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </ConfigFieldShell>
+    )
+  }
+
+  const selectedLabel =
+    field.options.find((option) => option.value === current)?.label ?? current
+
+  return (
+    <ConfigFieldShell key={field.key} label={field.label}>
+      <Select
+        value={current}
+        onValueChange={(value) => {
+          if (value) updateConfig(field.key, value)
+        }}
+      >
+        <SelectTrigger className={triggerClass} size={compact ? "sm" : "default"}>
+          <SelectValue>{selectedLabel}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {field.options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </ConfigFieldShell>
+  )
+}
+
 export function WorkflowNodeConfigFields({
   canvasType,
   config,
@@ -390,7 +537,7 @@ export function WorkflowNodeConfigFields({
   workflowId,
   nodeId,
 }: WorkflowNodeConfigFieldsProps) {
-  const { t, i18n: i18nInstance } = useTranslation("workflow")
+  const { i18n: i18nInstance } = useTranslation("workflow")
   const fieldDefs = useMemo(
     () => getWorkflowNodeFieldDefs(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh labels on locale change
@@ -402,178 +549,62 @@ export function WorkflowNodeConfigFields({
       ? String(config.mode ?? "cinematic")
       : ""
 
-  const configFields = (fieldDefs[canvasType] ?? []).filter(
-    (field) => {
-      if (!field.visibleWhen) return true
-      const current =
-        field.visibleWhen.key === "mode" && canvasType === "video"
-          ? mode
-          : String(config[field.visibleWhen.key] ?? "")
-      return current === field.visibleWhen.value
-    },
-  )
+  const allFields = fieldDefs[canvasType] ?? []
+  const visibleFields = filterVisibleFields(allFields, canvasType, config, mode)
+  const modeField =
+    canvasType === "video"
+      ? visibleFields.find((field) => field.key === "mode")
+      : undefined
+  const configFields = visibleFields.filter((field) => field.key !== "mode")
+
+  function patchConfig(patch: Record<string, unknown>) {
+    onChange({ ...config, ...patch })
+  }
 
   function updateConfig(key: string, value: string) {
-    onChange({ ...config, [key]: value })
+    patchConfig({ [key]: value })
   }
 
   function setConfigValue(key: string, value: unknown) {
-    onChange({ ...config, [key]: value })
+    patchConfig({ [key]: value })
   }
 
-  const labelClass = cn(
-    "mb-1.5 block font-bold",
-    compact ? "text-[10px]" : "text-[11px]",
+  const triggerClass = cn(
+    "w-full bg-background",
+    compact ? "h-8 text-xs" : "h-9",
   )
 
-  const controlClass = compact ? "text-[10px]" : "text-[11px]"
-
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div className={cn("flex flex-col gap-4", className)}>
+      {modeField
+        ? renderConfigField(
+            modeField,
+            config,
+            compact,
+            triggerClass,
+            setConfigValue,
+            updateConfig,
+          )
+        : null}
       {canvasType === "video" && mode === "presenter" && nodeId ? (
         <WorkflowVideoPresenterSettings
           workflowId={workflowId}
           nodeId={nodeId}
           config={config}
-          onPatch={(patch) =>
-            onChange(mergeHeygenVideoConfig(config, patch))
-          }
+          onPatch={(patch) => patchConfig(patch)}
           compact={compact}
         />
       ) : null}
-      {configFields.map((field) => {
-        if (field.control === "toggle") {
-          const on = Boolean(config[field.key] ?? field.defaultValue)
-          return (
-            <div key={field.key}>
-              <label className={labelClass} style={{ color: T.textPrimary }}>
-                {field.label}
-              </label>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => setConfigValue(field.key, true)}
-                  className={cn(
-                    "flex-1 cursor-pointer rounded-md border py-1",
-                    controlClass,
-                  )}
-                  style={{
-                    borderColor: on ? T.accent : T.surfaceBorder,
-                    background: on ? T.accentLight : "white",
-                    color: on ? T.accent : T.textSecondary,
-                    fontWeight: on ? 700 : 400,
-                  }}
-                >
-                  {t("fields.shared.on")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfigValue(field.key, false)}
-                  className={cn(
-                    "flex-1 cursor-pointer rounded-md border py-1",
-                    controlClass,
-                  )}
-                  style={{
-                    borderColor: !on ? T.accent : T.surfaceBorder,
-                    background: !on ? T.accentLight : "white",
-                    color: !on ? T.accent : T.textSecondary,
-                    fontWeight: !on ? 700 : 400,
-                  }}
-                >
-                  {t("fields.shared.off")}
-                </button>
-              </div>
-            </div>
-          )
-        }
-
-        if (field.control === "textarea") {
-          const val = String(config[field.key] ?? field.defaultValue ?? "")
-          return (
-            <div key={field.key}>
-              <label className={labelClass} style={{ color: T.textPrimary }}>
-                {field.label}
-              </label>
-              <Textarea
-                value={val}
-                onChange={(e) => setConfigValue(field.key, e.target.value)}
-                rows={field.rows ?? 3}
-                className={cn(
-                  "resize-y bg-[#FDFCFA] leading-relaxed",
-                  compact ? "text-[11px]" : "text-xs",
-                )}
-                style={{ color: T.textPrimary }}
-                placeholder={field.placeholder}
-              />
-            </div>
-          )
-        }
-
-        const current = String(config[field.key] ?? field.defaultValue)
-        if (field.control === "buttons") {
-          return (
-            <div key={field.key}>
-              <label className={labelClass} style={{ color: T.textPrimary }}>
-                {field.label}
-              </label>
-              <div className="flex flex-wrap gap-1">
-                {field.options.map((option) => {
-                  const active = current === option.value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() =>
-                        "valueAsNumber" in field && field.valueAsNumber
-                          ? setConfigValue(field.key, Number(option.value))
-                          : updateConfig(field.key, option.value)
-                      }
-                      className={cn(
-                        "min-w-13 flex-1 cursor-pointer rounded-md border py-1",
-                        controlClass,
-                      )}
-                      style={{
-                        borderColor: active ? T.accent : T.surfaceBorder,
-                        background: active ? T.accentLight : "white",
-                        color: active ? T.accent : T.textSecondary,
-                        fontWeight: active ? 700 : 400,
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        }
-        return (
-          <div key={field.key}>
-            <label className={labelClass} style={{ color: T.textPrimary }}>
-              {field.label}
-            </label>
-            <select
-              value={current}
-              onChange={(e) => updateConfig(field.key, e.target.value)}
-              className={cn(
-                "w-full rounded-md border px-2.5 py-1.5 outline-none",
-                compact ? "text-[11px]" : "text-xs",
-              )}
-              style={{
-                borderColor: T.surfaceBorder,
-                color: T.textPrimary,
-                background: "var(--nt-surface)",
-              }}
-            >
-              {field.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )
-      })}
+      {configFields.map((field) =>
+        renderConfigField(
+          field,
+          config,
+          compact,
+          triggerClass,
+          setConfigValue,
+          updateConfig,
+        ),
+      )}
     </div>
   )
 }

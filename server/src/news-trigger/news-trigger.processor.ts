@@ -62,6 +62,9 @@ type TriggerLockOpts = {
   dayKey: string;
 };
 
+/** How many GPT-ranked articles to evaluate per news run before skipping. */
+const NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT = 5;
+
 @Processor(NEWS_TRIGGER_QUEUE)
 @Injectable()
 export class NewsTriggerProcessor extends WorkerHost {
@@ -162,7 +165,10 @@ export class NewsTriggerProcessor extends WorkerHost {
         return;
       }
 
-      const topArticles = await this.newsPicker.pickTopArticles(articles, 2);
+      const topArticles = await this.newsPicker.pickTopArticles(
+        articles,
+        NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT,
+      );
       await log.updateOne({ topArticlesPicked: topArticles.length });
 
       if (!topArticles.length) {
@@ -364,7 +370,10 @@ export class NewsTriggerProcessor extends WorkerHost {
         return;
       }
 
-      const topArticles = await this.newsPicker.pickTopArticles(articles, 2);
+      const topArticles = await this.newsPicker.pickTopArticles(
+        articles,
+        NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT,
+      );
       await log.updateOne({ topArticlesPicked: topArticles.length });
 
       if (!topArticles.length) {

@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
 import { Pipeline, type PipelineDocument } from '../../pipeline/schemas/pipeline.schema';
+import { UserPlan, type UserPlanDocument } from '../../plan/schemas/user-plan.schema';
 import { Rule, type RuleDocument } from '../../rule/schemas/rule.schema';
 import {
   User,
@@ -43,6 +44,8 @@ export class AdminUsersService {
     private readonly workflowModel: Model<WorkflowDocument>,
     @InjectModel(CostEntry.name)
     private readonly costModel: Model<CostEntryDocument>,
+    @InjectModel(UserPlan.name)
+    private readonly userPlanModel: Model<UserPlanDocument>,
   ) {}
 
   async listUsers(query: {
@@ -88,7 +91,7 @@ export class AdminUsersService {
     const mStart = monthStart();
     const userIds = users.map((u) => u.userId).filter(Boolean) as string[];
 
-    const [costAgg, pipelineAgg] = await Promise.all([
+    const [costAgg, pipelineAgg, userPlans] = await Promise.all([
       this.costModel.aggregate([
         { $match: { userId: { $in: userIds }, billingPeriod: mStart } },
         { $group: { _id: '$userId', total: { $sum: '$costUsd' } } },
@@ -102,6 +105,10 @@ export class AdminUsersService {
         },
         { $group: { _id: '$userId', count: { $sum: 1 } } },
       ]),
+      this.userPlanModel
+        .find({ userId: { $in: userIds }, status: 'active' })
+        .select({ userId: 1, creditsRemaining: 1, creditsPerMonth: 1 })
+        .lean(),
     ]);
 
     const costMap = Object.fromEntries(
@@ -109,6 +116,9 @@ export class AdminUsersService {
     );
     const pipelineMap = Object.fromEntries(
       pipelineAgg.map((r) => [r._id as string, r.count]),
+    );
+    const planMap = Object.fromEntries(
+      userPlans.map((p) => [p.userId, p]),
     );
 
     return {
@@ -123,6 +133,8 @@ export class AdminUsersService {
         role: u.role,
         costThisMonthUsd: costMap[u.userId] ?? 0,
         pipelinesThisMonth: pipelineMap[u.userId] ?? 0,
+        creditsRemaining: planMap[u.userId]?.creditsRemaining ?? null,
+        creditsPerMonth: planMap[u.userId]?.creditsPerMonth ?? null,
       })),
       total,
       page,

@@ -11,15 +11,6 @@ import { toast } from "sonner"
 import i18n from "@/i18n"
 
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { PromptArea, type Attachment } from "@/components/core/prompt-area"
 import {
   WorkflowFlowCanvas,
@@ -28,6 +19,7 @@ import {
 import { WorkflowFlowSkeleton } from "@/features/workflow/components/workflow-flow-skeleton"
 import { WorkflowGenerationProgress } from "@/features/workflow/components/workflow-generation-progress"
 import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-content-drawer"
+import { WorkflowPromptModeSwitch } from "@/features/workflow/components/workflow-prompt-mode-switch"
 import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
 import { PipelineStopConfirmDialog } from "@/features/pipeline/components/pipeline-stop-confirm-dialog"
 import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
@@ -104,6 +96,7 @@ type RouteState = {
   contentPrompt?: string
 }
 type ProcessingMode = "edit" | "processing" | "failed"
+type PromptExecutionMode = "useCurrentWorkflow" | "generateWorkflow"
 
 type SnapshotBaseline = {
   nodes: WorkflowNode[]
@@ -127,7 +120,6 @@ function normalizeBranchNodesForSave(nodes: WfRfNode[]): WfRfNode[] {
 
 export default function WorkflowPage() {
   const { t } = useTranslation("workflow")
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -149,10 +141,9 @@ export default function WorkflowPage() {
     undefined
   )
   const [workflowPrompt, setWorkflowPrompt] = useState(initialNavContentPrompt)
-  const [showWorkflowPrompt, setShowWorkflowPrompt] = useState(false)
-  const [rebuildDialogOpen, setRebuildDialogOpen] = useState(false)
+  const [promptMode, setPromptMode] =
+    useState<PromptExecutionMode>("generateWorkflow")
   const [stopPipelineDialogOpen, setStopPipelineDialogOpen] = useState(false)
-  const [rebuildBrief, setRebuildBrief] = useState("")
   const [apiNodes, setApiNodes] = useState<WorkflowNode[] | undefined>(
     undefined
   )
@@ -196,8 +187,13 @@ export default function WorkflowPage() {
   )
 
   const canvasRef = useRef<WorkflowFlowCanvasHandle>(null)
+  const [canvasShellEl, setCanvasShellEl] = useState<HTMLDivElement | null>(
+    null,
+  )
   /** True after submit until completed/failed or nodes arrive (matches rule page processingRuleId pattern). */
   const generationInFlightRef = useRef(false)
+  /** When set, start pipeline with this prompt after workflow generation completes. */
+  const pendingPipelineAfterWorkflowRef = useRef<string | null>(null)
   /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
   const workflowEventTargetRef = useRef<string | undefined>(undefined)
   const committedWfNameRef = useRef(i18n.t("workflow:toolbar.untitledWorkflow"))
@@ -400,6 +396,13 @@ export default function WorkflowPage() {
       setApiEdges(data.edges ?? [])
       setGenerationStep(null)
       generationInFlightRef.current = false
+      const pendingPrompt = pendingPipelineAfterWorkflowRef.current
+      if (pendingPrompt && wf.workflowId) {
+        pendingPipelineAfterWorkflowRef.current = null
+        queueMicrotask(() => {
+          runStartPipelineMutation(pendingPrompt, wf.workflowId)
+        })
+      }
       return
     }
 
@@ -620,10 +623,16 @@ export default function WorkflowPage() {
         }
         void workflowByRuleQuery.refetch()
         setGenerationStep(null)
+        const pendingPrompt = pendingPipelineAfterWorkflowRef.current
+        if (pendingPrompt) {
+          pendingPipelineAfterWorkflowRef.current = null
+          queueMicrotask(() => runStartPipelineMutation(pendingPrompt, id))
+        }
       }),
       onWorkflowFailed(({ workflowId: id, message }) => {
         if (!allowsWorkflowSocket(id)) return
         generationInFlightRef.current = false
+        pendingPipelineAfterWorkflowRef.current = null
         setFailureMessage(
           message ?? t("errors.generateWorkflowFailed")
         )
@@ -786,6 +795,10 @@ export default function WorkflowPage() {
 
   function handleSave() {
     if (!ruleId) return
+    if (configDraftDirty) {
+      const applied = canvasRef.current?.applyOpenPropertiesPanel()
+      if (applied === false) return
+    }
     const rfNodes = canvasRef.current?.getRfNodes() ?? []
     const rfEdges = canvasRef.current?.getRfEdges() ?? []
     let nodesToSave = rfNodes
@@ -864,10 +877,15 @@ export default function WorkflowPage() {
     )
   }
 
-  function runStartPipelineMutation(contentPrompt: string) {
+  function runStartPipelineMutation(
+    contentPrompt: string,
+    workflowIdOverride?: string,
+  ) {
+    const workflowId = workflowIdOverride ?? activeWorkflowId
+    if (!workflowId || !ruleId) return
     const useLearnings = searchParams.get("useLearnings") === "1"
     startPipelineMutation.mutate(
-      { workflowId: activeWorkflowId!, ruleId: ruleId!, contentPrompt, useLearnings },
+      { workflowId, ruleId, contentPrompt, useLearnings },
       {
         onSuccess: ({ pipelineId: id }) => {
           pipelineCompletionHandledRef.current = false
@@ -900,6 +918,14 @@ export default function WorkflowPage() {
       return
     }
 
+    const hadDraftChanges = configDraftDirty
+    const hadCanvasEdits = canvasEdited
+
+    if (configDraftDirty) {
+      const applied = canvasRef.current?.applyOpenPropertiesPanel()
+      if (applied === false) return
+    }
+
     const rfNodes = canvasRef.current?.getRfNodes() ?? []
     const presenterErrors = getVideoPresenterErrorsFromRfNodes(rfNodes)
     if (presenterErrors.length > 0) {
@@ -909,7 +935,7 @@ export default function WorkflowPage() {
 
     const startAfterSave = () => runStartPipelineMutation(contentPrompt)
 
-    if (!canvasEdited && !configDraftDirty) {
+    if (!hadCanvasEdits && !hadDraftChanges) {
       startAfterSave()
       return
     }
@@ -944,15 +970,26 @@ export default function WorkflowPage() {
     )
   }
 
-  function handleBottomPromptSubmit(text: string, _attachments: Attachment[]) {
-    if (generationUiLocked) return
-    if (canvasMode === "empty") {
-      handleWorkflowGenerateSubmit(text, _attachments)
+  function handleWorkflowGenerateAndRun(
+    text: string,
+    attachments: Attachment[],
+  ) {
+    const contentPrompt = text.trim()
+    if (!contentPrompt) {
+      toast.error(t("toasts.enterPostTopic"))
       return
     }
-    if (canvasMode === "ready") {
-      handleStartPipeline(text.trim())
+    pendingPipelineAfterWorkflowRef.current = contentPrompt
+    handleWorkflowGenerateSubmit(text, attachments)
+  }
+
+  function handlePrimaryAction(text: string, attachments: Attachment[]) {
+    if (generationUiLocked) return
+    if (promptMode === "generateWorkflow") {
+      handleWorkflowGenerateAndRun(text, attachments)
+      return
     }
+    handleStartPipeline(text.trim())
   }
 
   function resetPipelineProcessingState() {
@@ -1046,7 +1083,7 @@ export default function WorkflowPage() {
     const contentPrompt = text.trim()
     if (!ruleId) return
     if (!contentPrompt) {
-      toast.error(t("toasts.describeWorkflow"))
+      toast.error(t("toasts.enterPostTopic"))
       return
     }
     generationInFlightRef.current = true
@@ -1076,16 +1113,6 @@ export default function WorkflowPage() {
     }
 
     generateWorkflow.mutate({ contentPrompt, ruleId }, { onSuccess })
-  }
-
-  function handleConfirmRebuild() {
-    if (!ruleId) return
-    const contentPrompt =
-      rebuildBrief.trim() ||
-      t("rebuildTooltip")
-    setRebuildDialogOpen(false)
-    setRebuildBrief("")
-    handleWorkflowGenerateSubmit(contentPrompt, [])
   }
 
   function restoreWorkflowCanvasBaseline() {
@@ -1160,10 +1187,10 @@ export default function WorkflowPage() {
   ])
 
   useEffect(() => {
-    if (canvasMode === "ready") {
-      setShowWorkflowPrompt(true)
-    } else if (canvasMode === "empty") {
-      setShowWorkflowPrompt(false)
+    if (canvasMode === "empty") {
+      setPromptMode("generateWorkflow")
+    } else if (canvasMode === "ready") {
+      setPromptMode("useCurrentWorkflow")
     }
   }, [canvasMode])
 
@@ -1191,16 +1218,19 @@ export default function WorkflowPage() {
   const generationUiLocked = useMemo(() => {
     if (promptInputDisabled) return true
     if (selectedSnapshotPipelineId) return true
+    if (promptMode === "generateWorkflow") return false
     if (canvasEdited || configDraftDirty) return true
     return false
   }, [
     canvasEdited,
     configDraftDirty,
     promptInputDisabled,
+    promptMode,
     selectedSnapshotPipelineId,
   ])
 
   const generationBlockedByDrafts =
+    promptMode === "useCurrentWorkflow" &&
     !promptInputDisabled &&
     (canvasEdited || configDraftDirty || Boolean(selectedSnapshotPipelineId))
 
@@ -1238,19 +1268,12 @@ export default function WorkflowPage() {
         onRuleClick={() =>
           navigate("/rules", { state: { selectedRuleId: ruleId } })
         }
-        onToggleStructurePrompt={
-          canvasMode === "empty" && processingMode === "edit"
-            ? () => setShowWorkflowPrompt((v) => !v)
-            : undefined
+        onRun={() => handlePrimaryAction(workflowPrompt, [])}
+        runLabel={
+          promptMode === "generateWorkflow"
+            ? t("toolbar.generateWorkflowAndContent")
+            : t("toolbar.generateContent")
         }
-        structurePromptOpen={canvasMode === "empty" ? showWorkflowPrompt : undefined}
-        onRebuildWorkflow={
-          canvasMode === "ready" && processingMode === "edit"
-            ? () => setRebuildDialogOpen(true)
-            : undefined
-        }
-        onRun={handleStartPipeline}
-        runLabel={t("toolbar.generateContent")}
         onSave={processingMode === "edit" ? handleSave : undefined}
         isSaving={saveNodesMutation.isPending || saveByRuleMutation.isPending}
         readOnly={processingMode === "processing"}
@@ -1361,12 +1384,16 @@ export default function WorkflowPage() {
         </div>
       ) : null}
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div
+        ref={setCanvasShellEl}
+        className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
+      >
         {canvasMode === "loading" ? (
           <WorkflowFlowSkeleton />
         ) : (
           <WorkflowFlowCanvas
             ref={canvasRef}
+            overlayRoot={canvasShellEl}
             workflowId={activeWorkflowId ?? undefined}
             apiNodes={pipelineCanvasOverride ? undefined : apiNodes}
             apiEdges={pipelineCanvasOverride ? undefined : apiEdges}
@@ -1388,42 +1415,48 @@ export default function WorkflowPage() {
           />
         )}
         {processingMode === "edit" &&
-        showWorkflowPrompt &&
         (canvasMode === "empty" || canvasMode === "ready") ? (
-          <div className="absolute bottom-0 left-1/2 z-50 w-full max-w-[760px] -translate-x-1/2 px-4 pb-4">
-            <div className="w-full rounded-2xl border border-border bg-card/95 p-2 shadow-lg backdrop-blur">
-              <p className="px-2 pb-1 text-xs font-medium text-canvas-500">
-                {canvasMode === "empty"
-                  ? t("promptBar.describeStructure")
-                  : t("promptBar.postTopic")}
-              </p>
+          <div className="absolute bottom-0 left-1/2 z-40 w-full max-w-[760px] -translate-x-1/2 px-4 pb-4">
+            <div className="w-full space-y-2 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
+              <div className="flex justify-center">
+                <WorkflowPromptModeSwitch
+                  value={promptMode}
+                  onChange={setPromptMode}
+                  useCurrentLabel={t("promptBar.modeTabCurrent")}
+                  autoGenerateLabel={t("promptBar.modeTabAuto")}
+                  useCurrentTitle={t("promptBar.modeUseCurrentWorkflow")}
+                  autoGenerateTitle={t("promptBar.modeGenerateWorkflow")}
+                  useCurrentDisabled={canvasMode === "empty"}
+                />
+              </div>
               <PromptArea
                 value={workflowPrompt}
                 onChange={setWorkflowPrompt}
-                onSubmit={handleBottomPromptSubmit}
+                onSubmit={handlePrimaryAction}
                 disabled={promptInputDisabled}
                 submitDisabled={generationUiLocked}
-                placeholder={
-                  canvasMode === "empty"
-                    ? t("promptBar.structurePlaceholder")
-                    : t("promptBar.postPlaceholder")
-                }
+                placeholder={t("promptBar.postPlaceholder")}
                 className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
               />
               {generationBlockedByDrafts ? (
-                <p className="px-2 pt-1 text-[11px] text-amber-700">
+                <p className="px-1 pt-0.5 text-[11px] text-amber-700">
                   {selectedSnapshotPipelineId
                     ? t("promptBar.exitPreviewHint")
                     : t("promptBar.saveBeforeGenerateHint")}
                 </p>
               ) : null}
-              {canvasMode === "ready" ? (
-                <p className="px-2 pt-1 text-[11px] text-canvas-500">
+              {promptMode === "useCurrentWorkflow" && canvasMode === "ready" ? (
+                <p className="px-1 pt-0.5 text-[11px] text-canvas-500">
                   {t("promptBar.usingWorkflow", {
                     name: wfName,
                     count: apiNodes?.length ?? 0,
                     nodesLabel: t("nodesLabel", { count: apiNodes?.length ?? 0 }),
                   })}
+                </p>
+              ) : null}
+              {promptMode === "generateWorkflow" ? (
+                <p className="px-1 pt-0.5 text-[11px] text-canvas-500">
+                  {t("promptBar.autoWorkflowHint")}
                 </p>
               ) : null}
             </div>
@@ -1465,6 +1498,11 @@ export default function WorkflowPage() {
                     return
                   }
                   setFailureMessage("")
+                  const trimmed = workflowPrompt.trim()
+                  pendingPipelineAfterWorkflowRef.current =
+                    promptMode === "generateWorkflow" && trimmed
+                      ? trimmed
+                      : null
                   handleWorkflowGenerateSubmit(workflowPrompt, [])
                 }
               : undefined
@@ -1514,36 +1552,6 @@ export default function WorkflowPage() {
         }}
         onError={(message) => toast.error(message)}
       />
-
-      <Dialog open={rebuildDialogOpen} onOpenChange={setRebuildDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("dialogs.rebuildTitle")}</DialogTitle>
-            <DialogDescription>{t("dialogs.rebuildDescription")}</DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={rebuildBrief}
-            onChange={(e) => setRebuildBrief(e.target.value)}
-            rows={5}
-            placeholder={t("dialogs.rebuildPlaceholder")}
-            className="text-sm"
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setRebuildDialogOpen(false)}>
-              {tCommon("actions.cancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmRebuild}
-              disabled={regenerateWorkflowByRule.isPending}
-            >
-              {regenerateWorkflowByRule.isPending
-                ? t("dialogs.rebuilding")
-                : t("dialogs.rebuild")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <WorkflowContentDrawer
         open={contentDrawerOpen}

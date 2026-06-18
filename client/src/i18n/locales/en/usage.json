@@ -1,0 +1,35 @@
+{
+  "title": "Usage",
+  "subtitle": "Credits and generation activity for your account",
+  "planBanner": {
+    "plan": "Plan",
+    "creditsUsed": "{{used}} / {{total}} credits used",
+    "remaining": "{{count}} remaining",
+    "resetDate": "Resets {{date}}",
+    "lowBalance": "Low credit balance — less than 10% remaining"
+  },
+  "summary": {
+    "usedThisMonth": "Credits used (MTD)",
+    "topOperation": "Most-used operation",
+    "totalGenerations": "Total generations",
+    "rateTooltip": "{{count}} credits ≈ $1.00 at the current public rate"
+  },
+  "charts": {
+    "byType": "Usage by operation",
+    "daily": "Daily credits"
+  },
+  "ledger": {
+    "title": "Activity log",
+    "date": "Date",
+    "pipeline": "Pipeline",
+    "operation": "Operation",
+    "provider": "Provider",
+    "credits": "Credits"
+  },
+  "range": {
+    "month": "This month",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "all": "All time"
+  }
+}

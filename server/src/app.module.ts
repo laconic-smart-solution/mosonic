@@ -24,6 +24,9 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { CostModule } from './cost/cost.module';
+import { CreditModule } from './credit/credit.module';
+import { PlanModule } from './plan/plan.module';
+import { UsageModule } from './usage/usage.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -42,6 +45,9 @@ import {
     LlmModule,
     PreprocessingModule,
     CostModule,
+    CreditModule,
+    PlanModule,
+    UsageModule,
     EventsModule,
     NodesModule,
     LoggingModule,

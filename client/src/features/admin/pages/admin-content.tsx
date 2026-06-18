@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -11,14 +19,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 
-import { AdminLayout } from "../components/admin-layout"
 import { useAdminContent } from "../hooks/use-admin-content"
+
+const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
 const STATUS_CLASS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
+  in_review: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   rejected: "bg-destructive/15 text-destructive",
+}
+
+type DatePreset = "month" | "year" | null
+
+function toDateInputValue(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function getThisMonthRange() {
+  const now = new Date()
+  return {
+    from: toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to: toDateInputValue(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  }
+}
+
+function getThisYearRange() {
+  const now = new Date()
+  return {
+    from: toDateInputValue(new Date(now.getFullYear(), 0, 1)),
+    to: toDateInputValue(new Date(now.getFullYear(), 11, 31)),
+  }
+}
+
+function statusLabel(t: (key: string) => string, status: string) {
+  const keys = ["draft", "in_review", "approved", "rejected"] as const
+  if ((keys as readonly string[]).includes(status)) {
+    return t(`content.${status}`)
+  }
+  return status.replace(/_/g, " ")
 }
 
 export default function AdminContentPage() {
@@ -29,6 +73,7 @@ export default function AdminContentPage() {
   const [status, setStatus] = useState<string | undefined>()
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
+  const [datePreset, setDatePreset] = useState<DatePreset>(null)
 
   const { data, isLoading } = useAdminContent({
     page,
@@ -38,61 +83,110 @@ export default function AdminContentPage() {
     to: to || undefined,
   })
 
-  return (
-    <AdminLayout>
-      <div className="space-y-6 p-6 md:p-8">
-        <h1 className="text-2xl font-bold tracking-tight">{t("content.title")}</h1>
+  const applyDatePreset = (preset: Exclude<DatePreset, null>) => {
+    const range = preset === "month" ? getThisMonthRange() : getThisYearRange()
+    setFrom(range.from)
+    setTo(range.to)
+    setDatePreset(preset)
+    setPage(1)
+  }
 
-        <div className="flex flex-wrap gap-3">
-          <select
-            value={status ?? ""}
-            onChange={(e) => {
-              setStatus(e.target.value || undefined)
-              setPage(1)
-            }}
-            className="border-input bg-background h-9 rounded-md border px-3 text-sm shadow-xs"
+  return (
+    <div className="min-h-full bg-background px-7 py-8 pb-20">
+      <div className="mx-auto max-w-[1180px] space-y-6">
+        <div>
+          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
+            {t("content.title")}
+          </h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">{t("content.pageSubtitle")}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={datePreset === "month" ? "default" : "outline"}
+            onClick={() => applyDatePreset("month")}
           >
-            <option value="">{t("content.allStatuses")}</option>
-            <option value="draft">{t("content.draft")}</option>
-            <option value="approved">{t("content.approved")}</option>
-            <option value="rejected">{t("content.rejected")}</option>
-          </select>
-          <input
+            {t("content.rangeThisMonth")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={datePreset === "year" ? "default" : "outline"}
+            onClick={() => applyDatePreset("year")}
+          >
+            {t("content.rangeThisYear")}
+          </Button>
+          <Input
             type="date"
             value={from}
             onChange={(e) => {
               setFrom(e.target.value)
+              setDatePreset(null)
               setPage(1)
             }}
-            className="border-input bg-background h-9 rounded-md border px-3 text-sm shadow-xs"
+            className="w-40 [color-scheme:light] dark:[color-scheme:dark]"
           />
-          <input
+          <Input
             type="date"
             value={to}
             onChange={(e) => {
               setTo(e.target.value)
+              setDatePreset(null)
               setPage(1)
             }}
-            className="border-input bg-background h-9 rounded-md border px-3 text-sm shadow-xs"
+            className="w-40 [color-scheme:light] dark:[color-scheme:dark]"
           />
+          <Select
+            value={status ?? "all"}
+            onValueChange={(value) => {
+              setStatus(value === "all" ? undefined : value)
+              setPage(1)
+            }}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder={t("content.allStatuses")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("content.allStatuses")}</SelectItem>
+              <SelectItem value="draft">{t("content.draft")}</SelectItem>
+              <SelectItem value="in_review">{t("content.in_review")}</SelectItem>
+              <SelectItem value="approved">{t("content.approved")}</SelectItem>
+              <SelectItem value="rejected">{t("content.rejected")}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="rounded-lg border">
-          <Table>
+        <section className={panelClass}>
+          <Table className="table-fixed min-w-[920px]">
             <TableHeader>
-              <TableRow>
-                <TableHead>{t("content.tableUser")}</TableHead>
-                <TableHead>{t("content.tableChannels")}</TableHead>
-                <TableHead className="text-center">{t("content.tableStatus")}</TableHead>
-                <TableHead className="text-right">{t("content.tableCost")}</TableHead>
-                <TableHead>{t("content.tableDate")}</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[30%] whitespace-normal">
+                  {t("content.tableCampaign")}
+                </TableHead>
+                <TableHead className="w-[18%] whitespace-normal">
+                  {t("content.tableUser")}
+                </TableHead>
+                <TableHead className="w-[16%] whitespace-normal">
+                  {t("content.tableChannels")}
+                </TableHead>
+                <TableHead className="w-[12%] text-center">{t("content.tableStatus")}</TableHead>
+                <TableHead className="w-[12%] text-right">{t("content.tableCost")}</TableHead>
+                <TableHead className="w-[12%]">{t("content.tableDate")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="whitespace-normal py-8 text-center text-muted-foreground">
                     {t("content.loading")}
+                  </TableCell>
+                </TableRow>
+              ) : (data?.contents ?? []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="whitespace-normal py-8 text-center text-muted-foreground">
+                    {t("content.tableEmpty")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -101,6 +195,8 @@ export default function AdminContentPage() {
                     contentId: string
                     userEmail: string
                     displayName?: string
+                    ruleName?: string
+                    preview?: string
                     channels: string[]
                     status: string
                     costUsd: number
@@ -111,32 +207,52 @@ export default function AdminContentPage() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/admin/content/${c.contentId}`)}
                     >
-                      <TableCell>
-                        <div>{c.userEmail}</div>
-                        {c.displayName ? (
-                          <div className="text-muted-foreground text-xs">{c.displayName}</div>
+                      <TableCell className="whitespace-normal align-top">
+                        <div className="line-clamp-2 font-medium text-foreground">
+                          {c.ruleName || t("content.untitledCampaign")}
+                        </div>
+                        {c.preview ? (
+                          <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {c.preview}
+                          </div>
                         ) : null}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-normal align-top">
+                        <div className="truncate text-sm">{c.userEmail}</div>
+                        {c.displayName ? (
+                          <div className="truncate text-xs text-muted-foreground">{c.displayName}</div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="whitespace-normal align-top">
                         <div className="flex flex-wrap gap-1">
-                          {(c.channels ?? []).map((ch) => (
-                            <span key={ch} className="bg-muted rounded px-2 py-0.5 text-xs">
-                              {ch}
-                            </span>
-                          ))}
+                          {(c.channels ?? []).length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            c.channels.map((ch) => (
+                              <span
+                                key={ch}
+                                className="rounded-md bg-muted px-2 py-0.5 text-xs capitalize text-muted-foreground"
+                              >
+                                {ch}
+                              </span>
+                            ))
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="whitespace-normal text-center align-top">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[c.status] ?? "bg-muted text-muted-foreground"}`}
+                          className={cn(
+                            "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                            STATUS_CLASS[c.status] ?? "bg-muted text-muted-foreground",
+                          )}
                         >
-                          {["draft", "approved", "rejected"].includes(c.status)
-                            ? t(`content.${c.status}`)
-                            : c.status}
+                          {statusLabel(t, c.status)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">${Number(c.costUsd).toFixed(6)}</TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-right font-mono tabular-nums align-top">
+                        ${Number(c.costUsd).toFixed(4)}
+                      </TableCell>
+                      <TableCell className="whitespace-normal text-muted-foreground align-top">
                         {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
                       </TableCell>
                     </TableRow>
@@ -145,34 +261,35 @@ export default function AdminContentPage() {
               )}
             </TableBody>
           </Table>
-        </div>
-
-        {data ? (
-          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span>{t("content.total", { total: data.total })}</span>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                {tc("actions.previous")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page >= (data.totalPages ?? 1)}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {tc("actions.next")}
-              </Button>
+          {data ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3 text-sm">
+              <span className="text-muted-foreground">
+                {t("content.total", { total: data.total })}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  {tc("actions.previous")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= (data.totalPages ?? 1)}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  {tc("actions.next")}
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </section>
       </div>
-    </AdminLayout>
+    </div>
   )
 }

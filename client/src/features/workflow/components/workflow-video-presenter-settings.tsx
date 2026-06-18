@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { T } from "@/lib/tokens"
 import { mergeHeygenVideoConfig } from "@/features/workflow/lib/workflow-node-validation"
@@ -48,8 +49,9 @@ export function WorkflowVideoPresenterSettings({
     staleTime: 5 * 60 * 1000,
   })
 
-  const canUpload = Boolean(workflowId?.trim())
+  const canSyncToServer = Boolean(workflowId?.trim())
   const selectedAvatarId = String(config.heygenAvatarId ?? "")
+  const motionPrompt = String(config.heygenMotionPrompt ?? "")
 
   const persistPatch = useCallback(
     async (patch: Record<string, unknown>) => {
@@ -137,12 +139,14 @@ export function WorkflowVideoPresenterSettings({
       try {
         if (kind === "avatar") {
           const result = await heygenService.uploadAvatar(workflowId, nodeId, file)
-          onPatch({
-            mode: "presenter",
-            heygenAvatarId: result.heygenAvatarId,
-            heygenAvatarAssetId: result.heygenAvatarAssetId,
-            heygenAvatarPhotoUrl: result.previewUrl,
-          })
+          onPatch(
+            mergeHeygenVideoConfig(config, {
+              mode: "presenter",
+              heygenAvatarId: result.heygenAvatarId,
+              heygenAvatarAssetId: result.heygenAvatarAssetId,
+              heygenAvatarPhotoUrl: result.previewUrl,
+            }),
+          )
           await queryClient.invalidateQueries({ queryKey: ["heygen", "avatars"] })
         } else {
           const result = await heygenService.uploadBackground(
@@ -164,8 +168,12 @@ export function WorkflowVideoPresenterSettings({
         setUploading(null)
       }
     },
-    [workflowId, nodeId, onPatch, queryClient, t],
+    [config, workflowId, nodeId, onPatch, queryClient, t],
   )
+
+  const handleMotionPromptBlur = useCallback(() => {
+    void persistPatch({ heygenMotionPrompt: motionPrompt })
+  }, [motionPrompt, persistPatch])
 
   const labelClass = cn(
     "mb-1.5 block font-bold",
@@ -178,9 +186,9 @@ export function WorkflowVideoPresenterSettings({
 
   return (
     <div className="flex flex-col gap-3">
-      {!canUpload ? (
+      {!canSyncToServer ? (
         <p className="text-[11px] text-amber-700">
-          {t("presenter.saveWorkflowFirst")}
+          {t("presenter.saveWorkflowToSync")}
         </p>
       ) : null}
 
@@ -288,7 +296,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={avatarUrl && !selectedAvatarId ? avatarUrl : ""}
-        disabled={!canUpload || uploading !== null}
+        disabled={!canSyncToServer || uploading !== null}
         busy={uploading === "avatar"}
         inputRef={avatarInputRef}
         onPick={() => avatarInputRef.current?.click()}
@@ -301,7 +309,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={bgUrl}
-        disabled={!canUpload || uploading !== null}
+        disabled={!canSyncToServer || uploading !== null}
         busy={uploading === "background"}
         inputRef={bgInputRef}
         onPick={() => bgInputRef.current?.click()}
@@ -322,7 +330,7 @@ export function WorkflowVideoPresenterSettings({
         </p>
         <HeygenVoicePicker
           value={voiceId}
-          selectionDisabled={!canUpload}
+          selectionDisabled={false}
           compact={compact}
           onChange={(nextVoice) => {
             const patch: Record<string, unknown> = { heygenVoiceId: nextVoice }
@@ -331,14 +339,34 @@ export function WorkflowVideoPresenterSettings({
             }
             const merged = mergeHeygenVideoConfig(config, patch)
             onPatch(merged)
-            if (workflowId?.trim() && nextVoice) {
+            if (canSyncToServer && nextVoice) {
               void heygenService
-                .patchPresenterConfig(workflowId, nodeId, patch)
+                .patchPresenterConfig(workflowId!, nodeId, patch)
                 .catch(() => {
                   setUploadError(t("presenter.voiceSaveFailed"))
                 })
             }
           }}
+        />
+      </div>
+
+      <div>
+        <label className={labelClass} style={{ color: T.textPrimary }}>
+          {t("fields.video.heygenMotionPrompt.label")}
+        </label>
+        <Textarea
+          value={motionPrompt}
+          onChange={(e) => onPatch({ heygenMotionPrompt: e.target.value })}
+          onBlur={handleMotionPromptBlur}
+          rows={2}
+          maxLength={500}
+          className={cn(
+            "mt-1 min-h-[56px] resize-y bg-background leading-relaxed",
+            compact ? "text-xs" : "text-sm",
+          )}
+          placeholder={t("fields.video.heygenMotionPrompt.placeholder", {
+            defaultValue: "",
+          })}
         />
       </div>
 

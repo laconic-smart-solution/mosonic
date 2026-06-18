@@ -134,12 +134,35 @@ export type ReplaceInitialPlaceholderArgs = {
   branchChannels?: BranchChannelHandle[]
 }
 
+export function materializeBranchSubgraph(
+  nodes: WfRfNode[],
+  edges: Edge[],
+  branchId: string,
+  branchChannels: BranchChannelHandle[],
+): { nodes: WfRfNode[]; edges: Edge[] } {
+  if (branchChannels.length === 0) {
+    return { nodes, edges }
+  }
+  const { nodes: nextNodes, edges: nextEdges } = applySpawnLaneAdapts(
+    nodes,
+    edges,
+    branchId,
+    branchChannels,
+  )
+  return { nodes: nextNodes, edges: nextEdges }
+}
+
 export function replaceInitialPlaceholder({
   wfType,
   setNodes,
-  branchChannels,
+  branchChannels = [],
 }: ReplaceInitialPlaceholderArgs): WfRfNode {
   const newNode = createRfNode(wfType, { x: 0, y: 0 }, { branchChannels })
+  if (wfType === "branch") {
+    const { nodes } = materializeBranchSubgraph([newNode], [], newNode.id, branchChannels)
+    setNodes(nodes)
+    return newNode
+  }
   setNodes([newNode])
   return newNode
 }
@@ -544,6 +567,46 @@ export function addNodeAfter({
     return created[0] ?? null
   }
 
+  if (wfType === "branch") {
+    const validationNodes: ValidationGraphNode[] = nodes
+      .filter((n) => n.type !== "plus_placeholder")
+      .map((n) => {
+        const d = workflowNodeData(n)
+        return {
+          id: n.id,
+          data: { wfType: d?.wfType ?? "", lane: d?.lane },
+        }
+      })
+    const validationEdges = edges.map((e) => ({
+      source: e.source,
+      target: e.target,
+    }))
+
+    const placeAt = positionOverride ?? positionAfterSource(source)
+    const newNode = createRfNode("branch", placeAt, { branchChannels })
+
+    if (
+      wouldCreateCycle(validationNodes, validationEdges, sourceId, newNode.id)
+    ) {
+      return null
+    }
+
+    let workingNodes = [
+      ...nodes.filter((n) => n.type !== "plus_placeholder"),
+      newNode,
+    ]
+    let workingEdges = [...edges, buildPlusEdge(sourceId, newNode.id)]
+    const materialized = materializeBranchSubgraph(
+      workingNodes,
+      workingEdges,
+      newNode.id,
+      branchChannels,
+    )
+    setNodes(materialized.nodes)
+    setEdges(materialized.edges)
+    return newNode
+  }
+
   const validationNodes: ValidationGraphNode[] = nodes
     .filter((n) => n.type !== "plus_placeholder")
     .map((n) => {
@@ -677,24 +740,33 @@ export function insertNodeBetween({
   const toShift = collectDescendants(edge.target, validationEdges)
   toShift.add(edge.target)
 
-  setNodes((nds) => {
-    const filtered = nds.filter((n) => n.type !== "plus_placeholder")
-    const shifted = filtered.map((n) =>
-      toShift.has(n.id)
-        ? { ...n, position: { ...n.position, x: n.position.x + shiftX } }
-        : n,
-    )
-    return [...shifted, newNode]
-  })
+  const filtered = nodes.filter((n) => n.type !== "plus_placeholder")
+  const shifted = filtered.map((n) =>
+    toShift.has(n.id)
+      ? { ...n, position: { ...n.position, x: n.position.x + shiftX } }
+      : n,
+  )
+  let workingNodes = [...shifted, newNode]
+  let workingEdges = [
+    ...edges.filter((e) => e.id !== edgeId),
+    buildPlusEdge(edge.source, newNode.id),
+    buildPlusEdge(newNode.id, edge.target),
+  ]
 
-  setEdges((eds) => {
-    const rest = eds.filter((e) => e.id !== edgeId)
-    return [
-      ...rest,
-      buildPlusEdge(edge.source, newNode.id),
-      buildPlusEdge(newNode.id, edge.target),
-    ]
-  })
+  if (wfType === "branch") {
+    const materialized = materializeBranchSubgraph(
+      workingNodes,
+      workingEdges,
+      newNode.id,
+      branchChannels ?? [],
+    )
+    setNodes(materialized.nodes)
+    setEdges(materialized.edges)
+    return newNode
+  }
+
+  setNodes(workingNodes)
+  setEdges(workingEdges)
 
   return newNode
 }

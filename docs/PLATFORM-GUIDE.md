@@ -53,6 +53,7 @@ Understanding these separations is essential:
 | **Upload** | Per-channel publish package (preview, schedule, publish) | Created when content is approved (or ensured from content) |
 | **Post** | Record of published or scheduled items on platforms | Updated as publishing completes |
 | **Analytics** | Performance metrics and rule-improvement suggestions | Pulled per rule/campaign; feeds back into rules |
+| **News trigger** | Automated content runs from trending headlines matched to a rule | Configured per rule; cron or manual run starts pipelines |
 
 **Rule vs content prompt:** The rule describes *who the brand is* and *how* to speak. The content prompt describes *what to write about today*. One rule powers many generation runs with different content prompts.
 
@@ -118,6 +119,7 @@ flowchart TD
 | Posts | `/posts` | `GET /posts`, bulk publish/retry |
 | Cost | `/cost`, `/cost/budget` | `GET /cost/dashboard`, `PUT /cost/budget` |
 | Campaign | (API + schedules) | `/campaign/schedules/*`, `/campaign/autonomy/*` |
+| News trigger | `/rules/:ruleId/news-trigger` | `GET/PUT /rules/:ruleId/news-trigger`, `POST .../run` |
 
 ### Typical pipeline context flow
 
@@ -148,6 +150,7 @@ Node types supported in the engine include: `keyword_planner`, `text_generation`
 | Workflow UI | React Flow (`@xyflow/react`) |
 | UI kit | shadcn/ui, Tailwind, Framer Motion |
 | Charts | Recharts |
+| i18n | i18next + react-i18next (English, Thai, Simplified Chinese) |
 | HTTP | Axios with JWT refresh interceptor |
 
 **Client environment:** `VITE_API_BASE_URL` — base URL for REST and Socket.IO (e.g. `http://localhost:3000`).
@@ -173,6 +176,7 @@ Node types supported in the engine include: `keyword_planner`, `text_generation`
 | **Redis** | BullMQ job queues; optional `PIPELINE_EVENTS_BRIDGE` pub/sub for Socket events |
 | **SSO service** | Login, signup, OTP, token refresh (`/auth/*` proxied) |
 | **Zernio** | OAuth for social accounts; MCP tools for publish and analytics pull |
+| **NewsData.io** | Headline fetch for news trigger automation (`NEWSDATA_API_KEY`) |
 | **File service** | Optional external service for media storage (`FILE_SERVICE_URL`) |
 
 ### LLM providers
@@ -240,7 +244,7 @@ flowchart LR
 From `server/src/app.module.ts`:
 
 - **Core product:** `rule`, `workflow`, `pipeline`, `orchestration`, `content`, `upload`, `post`, `analytics`, `logging`, `events`, `llm`, `nodes`, `preprocessing`
-- **Platform:** `auth`, `users`, `admin`, `cost`, `campaign`, `dashboard`
+- **Platform:** `auth`, `users`, `admin`, `cost`, `campaign`, `dashboard`, `news-trigger`
 - **Integrations:** `mcp`, `webhook`, `integrations`
 
 A separate **worker** entry (`WorkerModule`) can run Bull processors without the full HTTP app when `RUN_WORKERS_IN_API=false`.
@@ -265,6 +269,8 @@ Controlled by environment variables (see `server/.env.example`):
 | `PIPELINE_EVENTS_BRIDGE=true` | Workers publish Socket events via Redis when API and workers are split |
 | `LANE_SCOPED_PAUSE` | Pause individual branch lanes on failure |
 | `CAMPAIGN_AUTONOMY_ENABLED` | Auto-publish when policy allows |
+| `NEWSDATA_API_KEY` | NewsData.io API key for news trigger headline fetch |
+| `NEWS_TRIGGER_CONCURRENCY` | BullMQ worker concurrency for the `news_trigger` queue |
 
 **Queue path (default):**
 
@@ -294,6 +300,7 @@ Controlled by environment variables (see `server/.env.example`):
 | `campaign_autonomy_policies` | Auto-publish rules |
 | `cost_entries`, `budget_settings` | Spend tracking and limits |
 | `integration_api_keys`, `webhook_*` | API keys and outbound webhooks |
+| `news_trigger_logs` | News trigger run history (articles, relevance, pipeline refs) |
 
 ---
 
@@ -339,6 +346,7 @@ Clients join rooms before navigation so events are not missed:
 | Content | `content_{contentId}` | Approval, node re-run |
 | Analytics | `analytics_{ruleId}` | Metric pull, suggestions |
 | Upload | `upload_{uploadId}` | Publish status |
+| User | `user:{userId}` | In-app notifications (`notification` event) |
 
 Gateway handlers: `join` / `leave` with `{ room }`.
 
@@ -354,6 +362,9 @@ Gateway handlers: `join` / `leave` with `{ room }`.
 | Content | `content:step_approved`, `content:approval_required`, `content:approved`, `content:rejected`, `node:rerun_completed` |
 | Analytics | `analytics:pull_started`, `analytics:pull_completed`, `analytics:pull_failed`, `analytics:suggestion_ready` |
 | Upload | `upload:started`, `upload:updated`, `upload:completed`, `upload:scheduled`, `upload:failed`, `upload:all_completed` |
+| News trigger | `news:run_update` (rule room) |
+| Notifications | `notification` (user room; pipeline, news, cost, etc.) |
+| Pipeline logs | `pipeline:log` (when persisted to DB) |
 
 ### Content lifecycle
 
@@ -400,6 +411,38 @@ Gateway handlers: `join` / `leave` with `{ room }`.
 - **Schedules:** upcoming runs per rule (`/campaign/schedules/*`).
 - **Autonomy policies:** optional auto-publish when content meets policy (`CAMPAIGN_AUTONOMY_ENABLED`).
 
+### News trigger automation
+
+News trigger turns trending headlines into generation runs without manual content prompts. Settings live on each rule and are edited at `/rules/:ruleId/news-trigger` (also reachable from **News auto-generate** on the Rules page).
+
+**Configuration (stored on `rule.newsTrigger`):**
+
+| Setting | Purpose |
+|---------|---------|
+| `enabled` | Turn scheduled news runs on or off |
+| `schedule` | `daily` (08:00 only) or `twice_daily` (08:00 and 18:00, server local time) |
+| `country`, `language`, `category` | NewsData.io source filters |
+| `keywords` | Extra relevance keywords (merged with rule campaign keywords) |
+| `minRelevanceScore` | LLM relevance threshold (60–90; default 70) |
+| `maxPostsPerDay` | Cap pipelines started per rule per day (1–3) |
+| `autoApprove` | When enabled, auto-approve content after a news-triggered pipeline completes |
+
+**Run flow:**
+
+1. **Scheduled:** cron at 08:00 and 18:00 groups enabled rules by country/language/category, fetches headlines via NewsData.io, and enqueues BullMQ jobs on the `news_trigger` queue.
+2. **Manual:** `POST /rules/:ruleId/news-trigger/run` (202) enqueues a single-rule job; progress streams on the rule Socket room as `news:run_update`.
+3. For each candidate article, the processor scores relevance against the rule (LLM), picks the best match, builds a **content prompt** from the headline, and calls `orchestration.startPipeline` using the rule’s latest **ready workflow**.
+4. Pipeline metadata includes `source: 'news'` and article details. User notifications (`news.pipeline_started`, `news.run_completed`, `news.content_ready`) appear in the topbar bell and optional browser alerts.
+5. If `autoApprove` is on, content is approved automatically after generation; otherwise the user reviews at `/content/:contentId` as usual.
+
+**Requirements:** `NEWSDATA_API_KEY` in `server/.env`, a saved workflow for the rule, and (when `RUN_WORKERS_IN_API=false`) a worker process that registers `NewsTriggerProcessor`.
+
+**API:** `GET/PUT /rules/:ruleId/news-trigger`, `POST /rules/:ruleId/news-trigger/run`, `GET .../runs/latest`, `GET .../runs/:runId`.
+
+### In-app notifications
+
+The topbar **notification bell** subscribes to Socket room `user:{userId}` and receives `notification` events for pipeline completion, news trigger activity, cost warnings, and related actions. Optional browser push alerts are supported when permitted. The `NotificationProvider` in `AppLayout` also shows toasts for background events.
+
 ### Authentication
 
 - Login/signup/refresh proxied to SSO; tokens stored client-side (Zustand, persisted).
@@ -432,7 +475,7 @@ From `client/src/components/core/sidebar.tsx`:
 
 - Home (`/`)
 - Dashboard
-- Rules
+- Rules (also highlights when on `/workflow/:ruleId`)
 - Workflows
 - Pipelines
 - Content
@@ -442,7 +485,7 @@ From `client/src/components/core/sidebar.tsx`:
 - Account settings
 - **Admin** (visible only when `role === ADMIN`)
 
-**Routed but not in sidebar:** `/workflow/:ruleId`, `/upload/:uploadId`, `/run`, `/logs`, `/components`, `/cost/budget`.
+**Routed but not in sidebar:** `/rules/:ruleId/news-trigger`, `/workflow/:ruleId`, `/upload`, `/upload/:uploadId`, `/run`, `/logs`, `/components`, `/cost/budget`, `/contents/:contentId` (alias).
 
 ### Route catalog
 
@@ -464,12 +507,15 @@ From `client/src/components/core/sidebar.tsx`:
 |-------|---------|
 | `/dashboard` | Stats, charts, quick links |
 | `/rules` | Create and manage campaign rules |
+| `/rules/:ruleId/news-trigger` | News trigger settings, manual run, live run status |
 | `/workflows` | List saved workflows |
 | `/workflow/:ruleId` | **Main workspace:** canvas, start pipeline, live progress |
 | `/pipelines` | Pipeline run history and actions |
 | `/run` | Mock live-run UI (not connected to API) |
 | `/content` | Content library |
 | `/content/:contentId` | Review, edit, approve, rerun nodes |
+| `/contents/:contentId` | Alias for content detail (same page) |
+| `/upload` | Upload list / entry when no ID in URL |
 | `/upload/:uploadId` | Channel preview and publishing |
 | `/posts` | Published and scheduled posts |
 | `/settings/accounts` | Connect social accounts (Zernio) |
@@ -504,7 +550,7 @@ On 401, the client refreshes the access token via `/auth/refresh` once, then ret
 
 Swagger at `http://localhost:3000/docs` when the server is running. Major groups:
 
-- `auth`, `rules`, `workflow`, `pipeline`, `contents`, `upload`, `posts`, `analytics`, `cost`, `dashboard`, `campaign`, `zernio`, `mcp`, `integrations/v1`, `webhooks`, `admin/*`
+- `auth`, `rules`, `workflow`, `pipeline`, `contents`, `upload`, `posts`, `analytics`, `cost`, `dashboard`, `campaign`, `zernio`, `mcp`, `integrations/v1`, `webhooks`, `admin/*` (news trigger settings and runs are under `rules/:ruleId/news-trigger`)
 
 ---
 
@@ -547,9 +593,18 @@ flowchart LR
 ### Returning user
 
 - Reuse existing **rules** and **workflow templates**.
-- Only change the **content prompt** per run.
+- Only change the **content prompt** per run (or enable **news trigger** for hands-off runs).
 - Check **pending analytics suggestions** (sidebar badge on Analytics).
 - Manage **cost budget** if spend limits matter.
+- Watch the **notification bell** for completed news-triggered pipelines and publish-ready content.
+
+### News-driven journey (optional)
+
+1. Create a rule and build a workflow as usual.
+2. Open `/rules/:ruleId/news-trigger` — configure country, language, keywords, and schedule.
+3. Enable news trigger or click **Run now** for a manual fetch.
+4. When a headline matches, a pipeline starts automatically; follow progress via notifications or `/pipelines`.
+5. Review content (unless **auto-approve** is enabled), then publish from upload.
 
 ---
 
@@ -574,6 +629,28 @@ This section describes what a **customer** (`CUSTOMER` role) can do in the UI.
 2. Wait for extraction to complete (Socket progress).
 3. Review JSON summary; adjust brand, audience, channels, keywords.
 4. Confirm and save.
+
+**News auto-generate:** From the Rules toolbar, open **News auto-generate** (or navigate to `/rules/:ruleId/news-trigger`) to configure automated headline-driven runs. See [News trigger automation](#news-trigger-automation) above.
+
+### News trigger (`/rules/:ruleId/news-trigger`)
+
+**What you can do:**
+
+- Enable or disable scheduled news runs (`daily` or `twice_daily`).
+- Set news source country, language, and category.
+- Add keyword tags for tighter relevance matching.
+- Set minimum relevance score and max posts per day.
+- Choose draft review vs **auto-approve** after generation.
+- Trigger a **manual run** and watch live status (`news:run_update`).
+- Jump to the started pipeline from the last-run panel.
+
+**How:**
+
+1. Select a rule on `/rules`, then click **News auto-generate**.
+2. Configure settings and save.
+3. Click **Run now** to test, or wait for the scheduled cron (08:00 / 18:00 server time).
+4. Ensure the rule has a ready workflow — otherwise runs skip with “no ready workflow”.
+5. Review generated content at `/content` unless auto-approve is enabled.
 
 ### Workflows (`/workflows`, `/workflow/:ruleId`)
 
@@ -674,6 +751,14 @@ Applying updates the rule for future content generation.
 
 Publishing and analytics depend on connected accounts.
 
+### Notifications (topbar bell)
+
+**What you can do:**
+
+- See in-app alerts for pipeline completion, news trigger runs, and related actions.
+- Click notification actions to open content, pipelines, or upload pages.
+- Optionally enable browser push alerts (when supported and permitted).
+
 ---
 
 ## 9. Admin guide (ADMIN)
@@ -767,6 +852,7 @@ Customers use `/settings/accounts` and `/zernio/*` for their own OAuth connectio
 | MCP platform setup (`/mcp/setup`, etc.) | No | Yes |
 | DLQ job replay | No | Yes |
 | Connect own social accounts (Zernio) | Yes | Yes |
+| Configure news trigger on own rules | Yes | Yes |
 
 Both roles use the same SSO login. Admin access is determined by the `role` field on the local `users` document (bootstrapped via env or updated in admin UI).
 
@@ -778,11 +864,12 @@ These are current implementation limitations worth knowing:
 
 | Area | Status |
 |------|--------|
-| `/logs` page | Placeholder UI (“coming soon”) |
+| `/logs` page | Placeholder UI (“coming soon”); links to dashboard |
 | `/run` page | Mock data; not wired to live pipeline API |
-| `pipeline_logs` persistence | Schema and timeline API exist; `LoggingService.appendLog` is not yet called from orchestration — live UX relies primarily on Socket events |
-| Logging module vs product spec | Spec describes 90-day TTL logs; DB TTL is supported, but population from orchestration is incomplete |
+| `pipeline_logs` persistence | Partial — `LoggingService.appendLog` is used for some video-generation milestones (`media-node-completion.service`); most node lifecycle events are Socket-only, not yet written to MongoDB |
+| Logging module vs product spec | Spec describes 90-day TTL logs for all nodes; DB TTL is supported, but full orchestration coverage is incomplete |
 | Orphan lazy routes | `workflow-prompt.tsx`, `workflow-generate.tsx` exist but are not registered in the router (logic merged into `workflow.tsx`) |
+| News trigger | Requires `NEWSDATA_API_KEY` and a ready workflow per rule; cron uses server local timezone |
 
 For API details beyond this guide, use Swagger at `/docs` on a running server instance.
 
@@ -796,4 +883,5 @@ For API details beyond this guide, use Swagger at `/docs` on a running server in
 | [.cursor/rules/Project-flow-and-funtionalities.mdc](../.cursor/rules/Project-flow-and-funtionalities.mdc) | Canonical product specification |
 | `server/src/app.module.ts` | Module wiring |
 | `client/src/app/routes/router.tsx` | Frontend routes |
+| `server/src/news-trigger/` | News trigger queue, cron, and processor |
 | `server/.env.example` | Environment reference |

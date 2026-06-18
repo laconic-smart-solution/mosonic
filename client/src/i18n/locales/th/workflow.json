@@ -217,6 +217,8 @@
     "channel": "ช่องทาง: {{channel}}",
     "fanInBarrier": "จุดรวมสาย",
     "configured": "ตั้งค่าแล้ว",
+    "temperature": "อุณหภูมิ {{value}}",
+    "maxTokens": "{{value}} โทเค็น",
     "intelligenceTypes": {
       "all": "ทั้งหมด",
       "trend": "เทรนด์",
@@ -252,7 +254,9 @@
     "saveChanges": "บันทึกการเปลี่ยนแปลง",
     "runPipeline": "รันไปป์ไลน์",
     "stopPipeline": "หยุดไปป์ไลน์",
-    "generateContent": "สร้างเนื้อหา"
+    "generateContent": "สร้างเนื้อหา",
+    "generateWorkflow": "สร้างเวิร์กโฟลว์",
+    "generateWorkflowAndContent": "สร้างเวิร์กโฟลว์และเนื้อหา"
   },
   "palette": {
     "title": "โหนด",
@@ -292,6 +296,7 @@
   },
   "presenter": {
     "saveWorkflowFirst": "บันทึกเวิร์กโฟลว์ก่อนอัปโหลดอวตาร",
+    "saveWorkflowToSync": "บันทึกเวิร์กโฟลว์เพื่ออัปโหลดอวตารใหม่หรือซิงก์การตั้งค่าผู้นำเสนอกับเซิร์ฟเวอร์ คุณยังเลือกอวตารและเสียงในเครื่องได้",
     "saveFailed": "บันทึกการตั้งค่าผู้นำเสนอไม่ได้ บันทึกเวิร์กโฟลว์แล้วลองอีกครั้ง",
     "deleteConfirm": "ลบ \"{{name}}\" จากบัญชี HeyGen ของคุณ? ไม่สามารถยกเลิกได้",
     "deleteFailed": "ลบอวตารไม่ได้ ลองอีกครั้ง",
@@ -373,7 +378,13 @@
     "postPlaceholder": "เช่น ลดราคาคริสต์มาส 50% จนถึง 25 ธ.ค.…",
     "exitPreviewHint": "ล้างหรือคลิกไปป์ไลน์ที่เลือกอีกครั้งเพื่อออกจากตัวอย่างและสร้าง",
     "saveBeforeGenerateHint": "บันทึกการแก้เวิร์กโฟลว์หรือใช้การตั้งค่าโหนดก่อนสร้าง ยังแก้พรอมpt นี้ได้",
-    "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}"
+    "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}",
+    "modeUseCurrentWorkflow": "ใช้เวิร์กโฟลว์ปัจจุบัน",
+    "modeGenerateWorkflow": "สร้างเวิร์กโฟลว์อัตโนมัติ",
+    "modeTabCurrent": "ปัจจุบัน",
+    "modeTabAuto": "อัตโนมัติ",
+    "generateWorkflowPlaceholder": "เช่น คำบรรยาย Instagram + Facebook แปลภาษาไทย รูปหลัก…",
+    "autoWorkflowHint": "AI จะสร้างเวิร์กโฟลว์จากโพสต์และกฎแคมเปญของคุณ แล้วสร้างเนื้อหาต่อ"
   },
   "nodesLabel_one": "โหนด",
   "nodesLabel_other": "โหนด",
@@ -479,6 +490,7 @@
     "defaultVideoSettings": "ตั้งค่าวิดีโอเริ่มต้น",
     "defaultSummarySettings": "ตั้งค่าสรุปเริ่มต้น",
     "reflowOk": "จัดรูปแบบใหม่ได้",
+    "backgroundKept": "คงพื้นหลัง",
     "presenter": "ผู้นำเสนอ",
     "cinematic": "ภาพยนตร์"
   },

@@ -5,6 +5,7 @@ import enCommon from "./locales/en/common.json"
 import enComponentsLib from "./locales/en/componentsLib.json"
 import enContent from "./locales/en/content.json"
 import enCost from "./locales/en/cost.json"
+import enUsage from "./locales/en/usage.json"
 import enDashboard from "./locales/en/dashboard.json"
 import enHome from "./locales/en/home.json"
 import enLogs from "./locales/en/logs.json"
@@ -24,6 +25,7 @@ import thCommon from "./locales/th/common.json"
 import thComponentsLib from "./locales/th/componentsLib.json"
 import thContent from "./locales/th/content.json"
 import thCost from "./locales/th/cost.json"
+import thUsage from "./locales/th/usage.json"
 import thDashboard from "./locales/th/dashboard.json"
 import thHome from "./locales/th/home.json"
 import thLogs from "./locales/th/logs.json"
@@ -43,6 +45,7 @@ import zhCommon from "./locales/zh-CN/common.json"
 import zhComponentsLib from "./locales/zh-CN/componentsLib.json"
 import zhContent from "./locales/zh-CN/content.json"
 import zhCost from "./locales/zh-CN/cost.json"
+import zhUsage from "./locales/zh-CN/usage.json"
 import zhDashboard from "./locales/zh-CN/dashboard.json"
 import zhHome from "./locales/zh-CN/home.json"
 import zhLogs from "./locales/zh-CN/logs.json"
@@ -69,6 +72,7 @@ export const I18N_NAMESPACES = [
   "posts",
   "analytics",
   "cost",
+  "usage",
   "logs",
   "notifications",
   "settings",
@@ -93,6 +97,7 @@ export const resources = {
     posts: enPosts,
     analytics: enAnalytics,
     cost: enCost,
+    usage: enUsage,
     logs: enLogs,
     notifications: enNotifications,
     settings: enSettings,
@@ -113,6 +118,7 @@ export const resources = {
     posts: thPosts,
     analytics: thAnalytics,
     cost: thCost,
+    usage: thUsage,
     logs: thLogs,
     notifications: thNotifications,
     settings: thSettings,
@@ -133,6 +139,7 @@ export const resources = {
     posts: zhPosts,
     analytics: zhAnalytics,
     cost: zhCost,
+    usage: zhUsage,
     logs: zhLogs,
     notifications: zhNotifications,
     settings: zhSettings,

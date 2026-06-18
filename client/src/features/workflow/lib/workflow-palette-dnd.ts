@@ -6,6 +6,7 @@ import {
   getAllowedInsertTypes,
   getAllowedNextTypes,
   hasBlockingOutgoingEdge,
+  PLUS_POPOVER_TYPES,
   toValidationEdges,
   toValidationNodes,
   type PlusPopoverType,
@@ -25,6 +26,11 @@ export type PaletteDropTarget =
   | { mode: "after"; sourceId: string }
   | { mode: "between"; edgeId: string }
   | { mode: "append"; sourceId: string }
+
+export type PaletteDropHint =
+  | { mode: "initial" }
+  | { mode: "after"; sourceId: string }
+  | { mode: "between"; edgeId: string }
 
 /** Max flow-space distance from pointer to an edge segment to count as "on edge". */
 export const EDGE_HIT_THRESHOLD = 40
@@ -207,6 +213,91 @@ export function resolvePaletteDropTarget(
   return null
 }
 
+function isAfterEligibleNode(node: WfRfNode): boolean {
+  if (node.type === "plus_placeholder" || node.type === "branchNode") {
+    return false
+  }
+  if (node.type === "mergeNode") return false
+  const wfType = node.data?.wfType
+  return wfType !== "merge"
+}
+
+/**
+ * Lists every valid palette placement for a dragged type (not pointer-based).
+ */
+export function listPaletteDropHints(
+  wfType: PlusPopoverType,
+  nodes: WfRfNode[],
+  edges: Edge[],
+  channelCount: number,
+): PaletteDropHint[] {
+  const ctx = validationContext(nodes, edges, channelCount)
+  const hints: PaletteDropHint[] = []
+
+  if (isEmptyGraph(nodes)) {
+    if (canPlaceInitial(ctx, wfType)) {
+      hints.push({ mode: "initial" })
+    }
+    return hints
+  }
+
+  const nodesById = new Map(nodes.map((n) => [n.id, n]))
+
+  for (const vnode of ctx.nodes) {
+    if (hasBlockingOutgoingEdge(vnode.id, edges, ctx.nodes)) continue
+    const allowed = getAllowedNextTypes(ctx, vnode.id)
+    if (!allowed.includes(wfType)) continue
+
+    const rf = nodesById.get(vnode.id)
+    if (!rf || !isAfterEligibleNode(rf)) continue
+    hints.push({ mode: "after", sourceId: vnode.id })
+  }
+
+  for (const edge of edges) {
+    if (!edge.source || !edge.target) continue
+    const source = nodesById.get(edge.source)
+    const target = nodesById.get(edge.target)
+    if (!source || !target) continue
+    if (source.type === "plus_placeholder" || target.type === "plus_placeholder") {
+      continue
+    }
+
+    const allowed = getAllowedInsertTypes(ctx, edge.source, edge.target)
+    if (!allowed.includes(wfType)) continue
+    hints.push({ mode: "between", edgeId: edge.id })
+  }
+
+  return hints
+}
+
+/** Source node id when target is after or append placement. */
+export function afterSourceIdFromTarget(
+  target: PaletteDropTarget | null,
+): string | null {
+  if (!target) return null
+  if (target.mode === "after" || target.mode === "append") {
+    return target.sourceId
+  }
+  return null
+}
+
+/** Whether an active drop target matches a static hint for highlighting. */
+export function paletteDropHintsMatch(
+  hint: PaletteDropHint,
+  target: PaletteDropTarget | null,
+): boolean {
+  if (!target) return false
+  if (hint.mode === "initial" && target.mode === "initial") return true
+  if (hint.mode === "between" && target.mode === "between") {
+    return hint.edgeId === target.edgeId
+  }
+  if (hint.mode === "after") {
+    const sourceId = afterSourceIdFromTarget(target)
+    return sourceId === hint.sourceId
+  }
+  return false
+}
+
 export function paletteDragIdForType(wfType: PlusPopoverType): string {
   return `${PALETTE_DRAG_ID_PREFIX}${wfType}`
 }
@@ -215,20 +306,7 @@ export function parsePaletteDragId(id: string | number): PlusPopoverType | null 
   const s = String(id)
   if (!s.startsWith(PALETTE_DRAG_ID_PREFIX)) return null
   const wfType = s.slice(PALETTE_DRAG_ID_PREFIX.length)
-  const valid = [
-    "keywords",
-    "intelligence",
-    "text",
-    "transcription",
-    "branch",
-    "adapt",
-    "image",
-    "video",
-    "summarization",
-    "translation",
-    "merge",
-  ] as const
-  if ((valid as readonly string[]).includes(wfType)) {
+  if ((PLUS_POPOVER_TYPES as readonly string[]).includes(wfType)) {
     return wfType as PlusPopoverType
   }
   return null

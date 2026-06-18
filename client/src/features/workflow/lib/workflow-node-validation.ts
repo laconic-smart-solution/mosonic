@@ -10,14 +10,11 @@ export const PLUS_POPOVER_TYPES = [
   "keywords",
   "intelligence",
   "text",
-  "transcription",
   "branch",
-  "adapt",
   "image",
   "video",
   "summarization",
   "translation",
-  "merge",
 ] as const
 
 export type PlusPopoverType = (typeof PLUS_POPOVER_TYPES)[number]
@@ -44,20 +41,17 @@ const STARTER_NODES: readonly PlusPopoverType[] = [
   "keywords",
   "intelligence",
   "text",
-  "transcription",
 ]
 
 const TRUNK_ONLY = new Set<PlusPopoverType>([
   "keywords",
   "intelligence",
   "branch",
-  "merge",
 ])
 
 const ENRICHMENT_BEFORE_TEXT: readonly PlusPopoverType[] = [
   "keywords",
   "intelligence",
-  "transcription",
 ]
 
 const NEXT_MATRIX: Record<string, readonly PlusPopoverType[]> =
@@ -427,16 +421,23 @@ export function getBranchSubgraphLaneErrors(
   return errors
 }
 
-/** Merge HeyGen/video patch without marking presenter until an avatar exists. */
+/** Merge HeyGen/video patch; coerce incomplete presenter setup only when setting presenter or clearing avatar. */
 export function mergeHeygenVideoConfig(
   current: Record<string, unknown>,
   patch: Record<string, unknown>,
 ): Record<string, unknown> {
-  const hasAvatar = Boolean(
-    String(patch.heygenAvatarId ?? current.heygenAvatarId ?? "").trim(),
-  )
   const next: Record<string, unknown> = { ...current, ...patch }
-  if (next.mode === "presenter" && !hasAvatar) {
+  const hasAvatar = Boolean(String(next.heygenAvatarId ?? "").trim())
+  const settingPresenterMode = patch.mode === "presenter"
+  const clearingAvatar =
+    "heygenAvatarId" in patch &&
+    !String(patch.heygenAvatarId ?? "").trim()
+
+  if (
+    next.mode === "presenter" &&
+    !hasAvatar &&
+    (settingPresenterMode || clearingAvatar)
+  ) {
     next.mode = "cinematic"
   }
   return next

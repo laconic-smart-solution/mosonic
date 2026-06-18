@@ -732,6 +732,30 @@ function runStatusLabel(
   if (run.status === "running") return t("newsTrigger.runStatusRunning")
   if (run.status === "failed") return t("newsTrigger.runStatusFailed")
   if (run.outcome === "triggered") return t("newsTrigger.runStatusStarted")
+
+  const reason = run.skipReason?.toLowerCase() ?? ""
+  if (reason.includes("keyword pre-filter")) {
+    return t("newsTrigger.runStatusKeywordSkip")
+  }
+  if (reason.includes("below threshold") || reason.includes("score")) {
+    return t("newsTrigger.runStatusRelevanceSkip")
+  }
+  if (reason.includes("max posts per day")) {
+    return t("newsTrigger.runStatusDailyLimit")
+  }
+  if (reason.includes("max concurrent")) {
+    return t("newsTrigger.runStatusConcurrentLimit")
+  }
+  if (reason.includes("no ready workflow")) {
+    return t("newsTrigger.runStatusNoWorkflow")
+  }
+  if (
+    reason.includes("no articles") ||
+    (run.articlesFetched ?? 0) === 0
+  ) {
+    return t("newsTrigger.runStatusNoArticles")
+  }
+
   return t("newsTrigger.runStatusNoMatch")
 }
 

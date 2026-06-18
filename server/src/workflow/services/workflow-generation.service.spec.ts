@@ -246,7 +246,10 @@ describe('WorkflowGenerationService', () => {
     const llm = {
       getChatModel: jest.fn().mockReturnValue({ invoke }),
     } as unknown as LlmService;
-    const svc = new WorkflowGenerationService(llm);
+    const creditBilling = {
+      recordAndDeduct: jest.fn().mockResolvedValue(undefined),
+    } as unknown as import('../../credit/credit-billing.service').CreditBillingService;
+    const svc = new WorkflowGenerationService(llm, creditBilling);
     const rule = minimalRule('linkedin');
     const nodes = await svc.generate(rule, 'Thought leadership post on AI ethics');
     expect(nodes).toHaveLength(2);

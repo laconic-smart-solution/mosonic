@@ -41,4 +41,82 @@ export const adminApi = {
 
   getContentDetail: (contentId: string) =>
     apiClient.get(`/admin/content/${contentId}`).then((r) => r.data),
+
+  getCreditConfig: () => apiClient.get("/admin/credit/config").then((r) => r.data),
+
+  updateCreditConfig: (body: {
+    creditPriceUsd?: number
+    marginTarget?: number
+    basicUsersPerMonth?: number
+  }) => apiClient.put("/admin/credit/config", body).then((r) => r.data),
+
+  getCreditConfigHistory: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/admin/credit/config/history", { params }).then((r) => r.data),
+
+  recalculateCreditOverhead: () =>
+    apiClient.post("/admin/credit/recalculate-overhead").then((r) => r.data),
+
+  listFixedCosts: () =>
+    apiClient.get("/admin/credit/fixed-costs").then((r) => r.data),
+
+  createFixedCost: (body: { name: string; amountUsd: number }) =>
+    apiClient.post("/admin/credit/fixed-costs", body).then((r) => r.data),
+
+  updateFixedCost: (
+    id: string,
+    body: { name?: string; amountUsd?: number; isActive?: boolean },
+  ) => apiClient.put(`/admin/credit/fixed-costs/${id}`, body).then((r) => r.data),
+
+  deleteFixedCost: (id: string) =>
+    apiClient.delete(`/admin/credit/fixed-costs/${id}`).then((r) => r.data),
+
+  listServiceRates: () =>
+    apiClient.get("/admin/credit/service-rates").then((r) => r.data),
+
+  createServiceRate: (body: Record<string, unknown>) =>
+    apiClient.post("/admin/credit/service-rates", body).then((r) => r.data),
+
+  updateServiceRate: (id: string, body: Record<string, unknown>) =>
+    apiClient.put(`/admin/credit/service-rates/${id}`, body).then((r) => r.data),
+
+  deleteServiceRate: (id: string) =>
+    apiClient.delete(`/admin/credit/service-rates/${id}`).then((r) => r.data),
+
+  previewCreditWorkflow: (body: {
+    nodes: Array<{
+      serviceType: "text" | "image" | "video"
+      model: string
+      provider?: string
+      count?: number
+      durationSec?: number
+    }>
+  }) => apiClient.post("/admin/credit/preview", body).then((r) => r.data),
+
+  listPlans: () => apiClient.get("/admin/plans").then((r) => r.data),
+
+  createPlan: (body: Record<string, unknown>) =>
+    apiClient.post("/admin/plans", body).then((r) => r.data),
+
+  updatePlan: (planId: string, body: Record<string, unknown>) =>
+    apiClient.put(`/admin/plans/${planId}`, body).then((r) => r.data),
+
+  deletePlan: (planId: string) =>
+    apiClient.delete(`/admin/plans/${planId}`).then((r) => r.data),
+
+  getPlanUsers: (planId: string, params?: { page?: number; limit?: number }) =>
+    apiClient.get(`/admin/plans/${planId}/users`, { params }).then((r) => r.data),
+
+  assignPlan: (planId: string, userId: string) =>
+    apiClient.post(`/admin/plans/${planId}/assign`, { userId }).then((r) => r.data),
+
+  getUsageHistory: (params?: Record<string, string | number | undefined>) =>
+    apiClient.get("/admin/usage/history", { params }).then((r) => r.data),
+
+  getUsageSummary: (params?: { from?: string; to?: string; userId?: string }) =>
+    apiClient.get("/admin/usage/summary", { params }).then((r) => r.data),
+
+  getUserUsageHistory: (
+    userId: string,
+    params?: { from?: string; to?: string; page?: number; limit?: number },
+  ) => apiClient.get(`/admin/usage/user/${userId}`, { params }).then((r) => r.data),
 }

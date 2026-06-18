@@ -70,6 +70,7 @@
     "posts": "帖子",
     "analytics": "分析",
     "cost": "费用",
+    "usage": "用量",
     "settingsAccounts": "账户设置",
     "admin": "管理"
   },
@@ -86,6 +87,7 @@
     "components": "组件",
     "pipelines": "流水线",
     "cost": "费用",
+    "usage": "用量",
     "settings": "设置",
     "admin": "管理"
   },

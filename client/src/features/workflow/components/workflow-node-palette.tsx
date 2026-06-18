@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import { WF_NODE_TYPES } from "@/features/workflow/data/workflow-model"
 import {
   getNodePopoverDescription,
+  PLUS_POPOVER_TYPES,
   type PlusPopoverType,
 } from "@/features/workflow/lib/workflow-node-validation"
 import {
@@ -15,19 +16,7 @@ import {
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
-const PALETTE_TYPES: PlusPopoverType[] = [
-  "keywords",
-  "intelligence",
-  "text",
-  "transcription",
-  "branch",
-  "adapt",
-  "image",
-  "video",
-  "summarization",
-  "translation",
-  "merge",
-]
+const PALETTE_TYPES: PlusPopoverType[] = [...PLUS_POPOVER_TYPES]
 
 type PaletteRowProps = {
   wfType: PlusPopoverType

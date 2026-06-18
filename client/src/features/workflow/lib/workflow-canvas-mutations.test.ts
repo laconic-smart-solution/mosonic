@@ -6,6 +6,7 @@ import {
   addNodeAfter,
   buildPlusEdge,
   insertNodeBetween,
+  materializeBranchSubgraph,
   repairOrphanLaneAdapts,
   replaceInitialPlaceholder,
 } from "./workflow-canvas-mutations"
@@ -114,6 +115,55 @@ describe("workflow-canvas-mutations", () => {
     expect(shiftedB?.position.x).toBe(step + step)
     expect(shiftedB?.position.y).toBe(100)
     expect(edges).toHaveLength(2)
+  })
+
+  it("addNodeAfter branch spawns adapt and merge nodes per channel", () => {
+    const channels = [
+      { id: "instagram", label: "Instagram" },
+      { id: "facebook", label: "Facebook" },
+    ]
+    const source = textNode("t", 0, 140)
+    let nodes: WfRfNode[] = [source]
+    let edges: ReturnType<typeof buildPlusEdge>[] = []
+
+    addNodeAfter({
+      sourceId: "t",
+      wfType: "branch",
+      nodes,
+      edges,
+      setNodes: (u) => {
+        nodes = typeof u === "function" ? u(nodes) : u
+      },
+      setEdges: (u) => {
+        edges = typeof u === "function" ? u(edges) : u
+      },
+      branchChannels: channels,
+    })
+
+    expect(nodes.some((n) => n.type === "branchNode")).toBe(true)
+    expect(nodes.filter((n) => n.data.wfType === "adapt")).toHaveLength(2)
+    expect(nodes.some((n) => n.type === "mergeNode")).toBe(true)
+    expect(edges.some((e) => e.sourceHandle === "instagram")).toBe(true)
+    expect(edges.some((e) => e.targetHandle === "facebook")).toBe(true)
+  })
+
+  it("materializeBranchSubgraph is a no-op without channels", () => {
+    const branch: WfRfNode = {
+      id: "branch",
+      type: "branchNode",
+      position: { x: 320, y: 140 },
+      data: {
+        label: "Branch",
+        wfType: "branch",
+        status: "idle",
+        locked: false,
+        config: {},
+      },
+      draggable: true,
+    }
+    const result = materializeBranchSubgraph([branch], [], "branch", [])
+    expect(result.nodes).toHaveLength(1)
+    expect(result.edges).toHaveLength(0)
   })
 
   it("repairOrphanLaneAdapts removes unassigned adapts and spawns per channel", () => {

@@ -9,9 +9,6 @@ type WorkflowToolbarProps = {
   onWfNameCommit?: () => void
   ruleName?: string
   onRuleClick?: () => void
-  onToggleStructurePrompt?: () => void
-  structurePromptOpen?: boolean
-  onRebuildWorkflow?: () => void
   onRun: () => void
   runLabel?: string
   onSave?: () => void
@@ -28,9 +25,6 @@ export function WorkflowToolbar({
   onWfNameCommit,
   ruleName,
   onRuleClick,
-  onToggleStructurePrompt,
-  structurePromptOpen,
-  onRebuildWorkflow,
   onRun,
   runLabel,
   onSave,
@@ -103,28 +97,6 @@ export function WorkflowToolbar({
       </div>
 
       <div className="flex gap-2">
-        {onRebuildWorkflow && !readOnly ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRebuildWorkflow}
-            disabled={generationDisabled}
-          >
-            {t("toolbar.rebuildNodes")}
-          </Button>
-        ) : null}
-        {onToggleStructurePrompt && !readOnly ? (
-          <Button
-            type="button"
-            variant={structurePromptOpen ? "default" : "outline"}
-            size="sm"
-            onClick={onToggleStructurePrompt}
-            disabled={generationDisabled}
-          >
-            {t("toolbar.describeWorkflow")}
-          </Button>
-        ) : null}
         {onSave && !readOnly ? (
           <Button
             type="button"

@@ -35,12 +35,14 @@ import {
   RuleStatus,
   VersionChangedBy,
 } from './schemas/rule.schema';
+import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { ContentReaderService } from '../preprocessing/content-reader.service';
 import { PreprocessingService } from '../preprocessing/preprocessing.service';
 import { RuleExtractionService } from './rule-extraction.service';
-import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
+import { CreditBillingService } from '../credit/credit-billing.service';
+import { LlmProvider, WorkflowNodeType } from '../nodes/workflow-node-llm.enums';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -80,6 +82,7 @@ export class RuleService {
     private readonly events: EventsService,
     @Inject(forwardRef(() => AnalyticsService))
     private readonly analyticsService: AnalyticsService,
+    private readonly creditBilling: CreditBillingService,
   ) {}
 
   async requestExtraction(
@@ -408,6 +411,8 @@ export class RuleService {
     }
     if (dto.filter?.status !== undefined) {
       filter.status = dto.filter.status;
+    } else {
+      filter.status = { $ne: RuleStatus.Failed };
     }
 
     const sortDir = sortOrder === 'asc' ? 1 : -1;
@@ -503,7 +508,22 @@ export class RuleService {
         message: 'Analyzing your strategy...',
       });
 
-      const extracted = await this.ruleExtraction.extractRuleFromInput(summary);
+      const { draft: extracted, usage } =
+        await this.ruleExtraction.extractRuleFromInput(summary);
+
+      await this.creditBilling.recordAndDeduct({
+        userId: auth.userId,
+        pipelineRef: `rule:${ruleId}`,
+        campaignRef: ruleId,
+        nodeId: 'rule-extraction',
+        nodeType: WorkflowNodeType.TextGeneration,
+        provider: LlmProvider.OpenAI,
+        providerModel: 'gpt-4o',
+        entryType: 'openai_llm',
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+      });
+
       const streamSource = JSON.stringify(extracted);
       for (const chunk of streamSource.split(/\s+/).filter(Boolean)) {
         this.events.emitToRule(ruleId, 'rule:streaming', { ruleId, chunk });

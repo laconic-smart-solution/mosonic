@@ -1,13 +1,29 @@
 import type { LucideIcon } from "lucide-react"
-import { ArrowLeft, Coins, FileText, LayoutDashboard, Users } from "lucide-react"
+import {
+  ArrowLeft,
+  Coins,
+  CreditCard,
+  FileText,
+  Gauge,
+  History,
+  LayoutDashboard,
+  Users,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useLocation } from "react-router-dom"
+import { Link, Outlet, useLocation } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
 
-const NAV_ITEMS: { key: "dashboard" | "users" | "cost" | "content"; href: string; icon: LucideIcon }[] = [
+const NAV_ITEMS: {
+  key: "dashboard" | "users" | "cost" | "credit" | "plans" | "usage" | "content"
+  href: string
+  icon: LucideIcon
+}[] = [
   { key: "dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { key: "users", href: "/admin/users", icon: Users },
+  { key: "credit", href: "/admin/credit", icon: Gauge },
+  { key: "plans", href: "/admin/plans", icon: CreditCard },
+  { key: "usage", href: "/admin/usage", icon: History },
   { key: "cost", href: "/admin/cost", icon: Coins },
   { key: "content", href: "/admin/content", icon: FileText },
 ]
@@ -17,12 +33,12 @@ function pathActive(pathname: string, href: string) {
   return pathname.startsWith(`${href}/`)
 }
 
-export function AdminLayout({ children }: { children: React.ReactNode }) {
+export function AdminLayout() {
   const { t } = useTranslation("admin")
   const { pathname } = useLocation()
 
   return (
-    <div className="flex min-h-[calc(100dvh-4rem)] w-full max-w-[100vw]">
+    <div className="flex h-dvh min-h-0 w-full max-w-[100vw] overflow-hidden">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-muted/40">
         <div className="border-b border-border px-4 py-4">
           <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -60,7 +76,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto">
+        <Outlet />
+      </main>
     </div>
   )
 }

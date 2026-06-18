@@ -76,6 +76,10 @@ import {
 type RuleViewMode = "tree" | "detail"
 const RULES_DRAWER_PAGE_LIMIT = 8
 
+function isVisibleRuleListItem(rule: { status: string }): boolean {
+  return rule.status !== "failed"
+}
+
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     const data = error.response?.data as unknown
@@ -177,7 +181,10 @@ export default function RulesPage() {
   const extractRuleMutation = useExtractRuleMutation()
   const putRuleMutation = usePutRuleMutation()
 
-  const pageList = rulesPageQuery.data?.data
+  const pageList = useMemo(
+    () => (rulesPageQuery.data?.data ?? []).filter(isVisibleRuleListItem),
+    [rulesPageQuery.data?.data],
+  )
   const drawerRulesPageQuery = useRulesPageQuery(
     {
       page: drawerPage,
@@ -196,7 +203,9 @@ export default function RulesPage() {
 
   useEffect(() => {
     if (!rulesDrawerOpen) return
-    const pageData = drawerRulesPageQuery.data?.data ?? []
+    const pageData = (drawerRulesPageQuery.data?.data ?? []).filter(
+      isVisibleRuleListItem,
+    )
     if (!pageData.length && drawerPage !== 1) return
     setDrawerSummaries((prev) => {
       const base = drawerPage === 1 ? [] : prev
@@ -221,7 +230,11 @@ export default function RulesPage() {
   }, [drawerPage, drawerRulesPageQuery.data?.data, rulesDrawerOpen, t])
 
   useEffect(() => {
-    if (!pageList?.length) return
+    if (processingRuleId) return
+    if (!pageList.length) {
+      setSelectedRuleId(undefined)
+      return
+    }
     const ids = pageList.map((r) => r.ruleId)
     setSelectedRuleId((prev) => {
       if (prev && ids.includes(prev)) return prev
@@ -233,11 +246,34 @@ export default function RulesPage() {
       }
       return ids[0]
     })
-  }, [pageList, routeState.selectedRuleId])
+  }, [pageList, processingRuleId, routeState.selectedRuleId])
+
+  const showExtractionOverlay =
+    Boolean(processingRuleId) ||
+    (progressStep === "failed" && Boolean(failureMessage))
+
+  const dismissExtractionFailure = useCallback(() => {
+    const failedRuleId = processingRuleId
+    setProcessingRuleId(null)
+    setProgressStep("idle")
+    setFailureMessage("")
+    setStreamedContent("")
+    if (failedRuleId) leaveRuleRoom(failedRuleId)
+    setSelectedRuleId((prev) => {
+      if (!pageList.length) return undefined
+      if (prev && pageList.some((r) => r.ruleId === prev)) return prev
+      return pageList[0]?.ruleId
+    })
+  }, [pageList, processingRuleId])
+
+  const handleExtractionTryAgain = useCallback(() => {
+    dismissExtractionFailure()
+    setCreateDialogOpen(true)
+  }, [dismissExtractionFailure])
 
   const summaries = useMemo(
     () =>
-      (pageList ?? []).map((rule: RuleListItem) => ({
+      pageList.map((rule: RuleListItem) => ({
         ruleId: rule.ruleId,
         name: rule.name,
         tones: rule.tones,
@@ -501,7 +537,6 @@ export default function RulesPage() {
       setFailureMessage(message ?? t("toast.generationFailed"))
       void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
       void queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
-      setProcessingRuleId(null)
       leaveRuleRoom(ruleId)
     })
 
@@ -656,12 +691,14 @@ export default function RulesPage() {
           </Tabs>
         </div>
 
-        {processingRuleId ? (
+        {showExtractionOverlay ? (
           <RuleExtractionProgress
-            ruleId={processingRuleId}
+            ruleId={processingRuleId ?? ""}
             progressStep={progressStep}
             failureMessage={failureMessage}
             streamedContent={streamedContent}
+            onDismiss={failureMessage ? dismissExtractionFailure : undefined}
+            onTryAgain={failureMessage ? handleExtractionTryAgain : undefined}
           />
         ) : null}
 
@@ -687,6 +724,18 @@ export default function RulesPage() {
           ) : showRuleSkeleton && viewMode === "detail" ? (
             <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-4 pt-1 pb-4">
               <RuleDetailViewSkeleton />
+            </div>
+          ) : selectedRule?.status === "failed" ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <p className="text-sm font-medium text-destructive">
+                {t("extraction.titleFailed")}
+              </p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {t("extraction.failedHint")}
+              </p>
+              <Button type="button" onClick={handleExtractionTryAgain}>
+                {t("extraction.tryAgain")}
+              </Button>
             </div>
           ) : selectedRule && viewMode === "tree" ? (
             <div className="relative min-h-0 flex-1">

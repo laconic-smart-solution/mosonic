@@ -217,6 +217,8 @@
     "channel": "渠道：{{channel}}",
     "fanInBarrier": "汇聚屏障",
     "configured": "已配置",
+    "temperature": "温度 {{value}}",
+    "maxTokens": "{{value}} tokens",
     "intelligenceTypes": {
       "all": "全部",
       "trend": "趋势",
@@ -252,7 +254,9 @@
     "saveChanges": "保存更改",
     "runPipeline": "运行流水线",
     "stopPipeline": "停止流水线",
-    "generateContent": "生成内容"
+    "generateContent": "生成内容",
+    "generateWorkflow": "生成工作流",
+    "generateWorkflowAndContent": "生成工作流和内容"
   },
   "palette": {
     "title": "节点",
@@ -292,6 +296,7 @@
   },
   "presenter": {
     "saveWorkflowFirst": "上传形象前请先保存工作流。",
+    "saveWorkflowToSync": "保存工作流后可上传新形象或将数字人设置同步到服务器。您仍可在本地选择形象和语音。",
     "saveFailed": "无法保存数字人设置。请保存工作流后重试。",
     "deleteConfirm": "从您的 HeyGen 账户删除「{{name}}」？此操作无法撤销。",
     "deleteFailed": "无法删除形象。请重试。",
@@ -373,7 +378,13 @@
     "postPlaceholder": "例如：圣诞促销 — 12 月 25 日前全场五折…",
     "exitPreviewHint": "清除或再次点击所选流水线以退出预览并生成。",
     "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
-    "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}"
+    "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}",
+    "modeUseCurrentWorkflow": "使用当前工作流",
+    "modeGenerateWorkflow": "自动生成工作流",
+    "modeTabCurrent": "当前",
+    "modeTabAuto": "自动",
+    "generateWorkflowPlaceholder": "例如：Instagram + Facebook 文案、泰语翻译、主图…",
+    "autoWorkflowHint": "AI 将根据您的帖子和活动规则构建工作流，然后生成内容。"
   },
   "nodesLabel_one": "节点",
   "nodesLabel_other": "节点",
@@ -479,6 +490,7 @@
     "defaultVideoSettings": "默认视频设置",
     "defaultSummarySettings": "默认摘要设置",
     "reflowOk": "可重排格式",
+    "backgroundKept": "保留背景",
     "presenter": "数字人",
     "cinematic": "电影感"
   },
