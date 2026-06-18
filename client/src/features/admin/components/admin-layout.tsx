@@ -8,6 +8,7 @@ import {
   History,
   LayoutDashboard,
   Users,
+  Workflow,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, Outlet, useLocation } from "react-router-dom"
@@ -15,13 +16,14 @@ import { Link, Outlet, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS: {
-  key: "dashboard" | "users" | "cost" | "credit" | "plans" | "usage" | "content"
+  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "content"
   href: string
   icon: LucideIcon
 }[] = [
   { key: "dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { key: "users", href: "/admin/users", icon: Users },
   { key: "credit", href: "/admin/credit", icon: Gauge },
+  { key: "nodeCredits", href: "/admin/node-credits", icon: Workflow },
   { key: "plans", href: "/admin/plans", icon: CreditCard },
   { key: "usage", href: "/admin/usage", icon: History },
   { key: "cost", href: "/admin/cost", icon: Coins },

@@ -26,6 +26,17 @@ export function useSessionBootstrap() {
         if (cancelled || !lu || typeof lu !== "object") {
           return
         }
+        const role = lu.role
+        if (role === "ADMIN" || role === "CUSTOMER") {
+          const { accessToken, refreshToken } = useAuthStore.getState()
+          if (accessToken && refreshToken) {
+            useAuthStore.getState().setSession({
+              accessToken,
+              refreshToken,
+              role,
+            })
+          }
+        }
         useUserStore
           .getState()
           .setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))

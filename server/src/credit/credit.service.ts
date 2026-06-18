@@ -6,6 +6,7 @@ import { userRoom } from '../events/notification.util';
 import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
 import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
+import { NodeCreditPriceService } from './node-credit-price.service';
 import {
   CreditLedger,
   type CreditLedgerDocument,
@@ -21,15 +22,39 @@ export class CreditService {
     @InjectModel(UserPlan.name)
     private readonly userPlanModel: Model<UserPlanDocument>,
     private readonly calculation: CreditCalculationService,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly events: EventsService,
   ) {}
 
   async deductCredits(dto: DeductCreditsDto): Promise<void> {
     try {
-      if (dto.rawCostUsd <= 0) return;
+      const billableCostUsd =
+        await this.nodeCreditPriceService.getActiveCostUsd(dto.nodeType);
 
-      const calc = await this.calculation.calculateCredits(dto.rawCostUsd);
-      if (calc.creditsCharged <= 0) return;
+      let creditsCharged: number;
+      let rawCostUsd: number;
+      let overheadUsd: number;
+      let marginAppliedUsd: number;
+      let creditPriceUsdSnapshot: number;
+
+      if (billableCostUsd != null) {
+        const calc = await this.calculation.calculateCredits(billableCostUsd);
+        if (calc.creditsCharged <= 0) return;
+        creditsCharged = calc.creditsCharged;
+        rawCostUsd = calc.rawCostUsd;
+        overheadUsd = calc.overheadUsd;
+        marginAppliedUsd = calc.marginAppliedUsd;
+        creditPriceUsdSnapshot = calc.creditPriceUsdSnapshot;
+      } else {
+        if (dto.rawCostUsd <= 0) return;
+        const calc = await this.calculation.calculateCredits(dto.rawCostUsd);
+        if (calc.creditsCharged <= 0) return;
+        creditsCharged = calc.creditsCharged;
+        rawCostUsd = calc.rawCostUsd;
+        overheadUsd = calc.overheadUsd;
+        marginAppliedUsd = calc.marginAppliedUsd;
+        creditPriceUsdSnapshot = calc.creditPriceUsdSnapshot;
+      }
 
       await new this.ledgerModel({
         userId: dto.userId,
@@ -40,11 +65,11 @@ export class CreditService {
         nodeType: dto.nodeType,
         provider: dto.provider,
         model: dto.model ?? '',
-        rawCostUsd: calc.rawCostUsd,
-        overheadUsd: calc.overheadUsd,
-        marginAppliedUsd: calc.marginAppliedUsd,
-        creditPriceUsdSnapshot: calc.creditPriceUsdSnapshot,
-        creditsCharged: calc.creditsCharged,
+        rawCostUsd,
+        overheadUsd,
+        marginAppliedUsd,
+        creditPriceUsdSnapshot,
+        creditsCharged,
         billingPeriod: dto.billingPeriod,
       }).save();
 
@@ -53,8 +78,8 @@ export class CreditService {
           { userId: dto.userId, status: 'active' },
           {
             $inc: {
-              creditsUsed: calc.creditsCharged,
-              creditsRemaining: -calc.creditsCharged,
+              creditsUsed: creditsCharged,
+              creditsRemaining: -creditsCharged,
             },
           },
           { new: true },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   ArrowDown,
   ArrowUp,
@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -103,13 +104,29 @@ export default function AdminCreditConfigPage() {
   const [basicUsers, setBasicUsers] = useState("50")
   const [newFixedName, setNewFixedName] = useState("")
   const [newFixedAmount, setNewFixedAmount] = useState("")
+  const [formDirty, setFormDirty] = useState(false)
+  const lastSyncedConfigRef = useRef<string>("")
+
+  const serverCreditPrice = config?.creditPriceUsd
+  const serverMarginTarget = config?.marginTarget
+  const serverBasicUsers = config?.basicUsersPerMonth
 
   useEffect(() => {
-    if (!config) return
-    setCreditPrice(String(config.creditPriceUsd ?? 0.01))
-    setMarginTarget(String(config.marginTarget ?? 3))
-    setBasicUsers(String(config.basicUsersPerMonth ?? 50))
-  }, [config])
+    if (
+      serverCreditPrice == null ||
+      serverMarginTarget == null ||
+      serverBasicUsers == null
+    ) {
+      return
+    }
+    const fingerprint = `${serverCreditPrice}|${serverMarginTarget}|${serverBasicUsers}`
+    if (formDirty) return
+    if (lastSyncedConfigRef.current === fingerprint) return
+    lastSyncedConfigRef.current = fingerprint
+    setCreditPrice(String(serverCreditPrice))
+    setMarginTarget(String(serverMarginTarget))
+    setBasicUsers(String(serverBasicUsers))
+  }, [serverCreditPrice, serverMarginTarget, serverBasicUsers, formDirty])
 
   const creditsPerDollar = useMemo(() => {
     const p = Number(creditPrice) || 0.01
@@ -146,11 +163,31 @@ export default function AdminCreditConfigPage() {
   const marginIsLow = derivedMargin > 0 && derivedMargin < 1
 
   const handleSaveConfig = () => {
-    update.mutate({
-      creditPriceUsd: Number(creditPrice),
-      marginTarget: Number(marginTarget),
-      basicUsersPerMonth: Number(basicUsers),
-    })
+    const creditPriceUsd = Number(creditPrice)
+    const margin = Number(marginTarget)
+    const basicUsersPerMonth = Number(basicUsers)
+    if (
+      !Number.isFinite(creditPriceUsd) ||
+      creditPriceUsd <= 0 ||
+      !Number.isFinite(margin) ||
+      margin <= 0 ||
+      !Number.isFinite(basicUsersPerMonth) ||
+      basicUsersPerMonth < 1
+    ) {
+      toast.error(t("credit.invalidConfig"))
+      return
+    }
+    update.mutate(
+      { creditPriceUsd, marginTarget: margin, basicUsersPerMonth },
+      {
+        onSuccess: () => {
+          setFormDirty(false)
+          lastSyncedConfigRef.current = `${creditPriceUsd}|${margin}|${basicUsersPerMonth}`
+          toast.success(t("credit.saved"))
+        },
+        onError: () => toast.error(t("credit.saveFailed")),
+      },
+    )
   }
 
   const handleAddFixed = () => {
@@ -225,21 +262,33 @@ export default function AdminCreditConfigPage() {
               id="creditPrice"
               label={t("credit.creditPriceUsd")}
               value={creditPrice}
-              onChange={setCreditPrice}
+              onChange={(v) => {
+                setFormDirty(true)
+                setCreditPrice(v)
+              }}
               step="0.001"
             />
             <HeroField
               id="margin"
               label={t("credit.marginTarget")}
               value={marginTarget}
-              onChange={setMarginTarget}
+              onChange={(v) => {
+                setFormDirty(true)
+                setMarginTarget(v)
+              }}
               step="0.1"
+              min="0.01"
             />
             <HeroField
               id="basicUsers"
               label={t("credit.basicUsers")}
               value={basicUsers}
-              onChange={setBasicUsers}
+              onChange={(v) => {
+                setFormDirty(true)
+                setBasicUsers(v)
+              }}
+              min="1"
+              step="1"
             />
           </div>
         </div>
@@ -444,12 +493,14 @@ function HeroField({
   value,
   onChange,
   step,
+  min,
 }: {
   id: string
   label: string
   value: string
   onChange: (v: string) => void
   step?: string
+  min?: string
 }) {
   return (
     <div className="min-w-[130px] flex-1">
@@ -460,6 +511,7 @@ function HeroField({
         id={id}
         type="number"
         step={step}
+        min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 font-mono text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-teal-300 focus:bg-white/15 dark:border-white/25 dark:bg-white/10 dark:focus:border-teal-400 dark:focus:bg-white/15"
