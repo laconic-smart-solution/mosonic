@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,38 @@ import {
 
 const ACCEPT = "image/png,image/jpeg,image/jpg"
 const MAX_BYTES = 32 * 1024 * 1024
+const HEYGEN_AVATARS_QUERY_KEY = ["heygen", "avatars"] as const
+
+function removeAvatarFromCache(queryClient: QueryClient, lookId: string) {
+  queryClient.setQueryData<HeygenAvatarLook[]>(HEYGEN_AVATARS_QUERY_KEY, (old) =>
+    (old ?? []).filter((avatar) => avatar.lookId !== lookId),
+  )
+}
+
+function upsertAvatarInCache(queryClient: QueryClient, look: HeygenAvatarLook) {
+  queryClient.setQueryData<HeygenAvatarLook[]>(HEYGEN_AVATARS_QUERY_KEY, (old) => {
+    const list = old ?? []
+    const index = list.findIndex((avatar) => avatar.lookId === look.lookId)
+    if (index === -1) return [look, ...list]
+    const next = [...list]
+    next[index] = { ...next[index], ...look }
+    return next
+  })
+}
+
+function uploadResultToAvatarLook(
+  result: { heygenAvatarId: string; previewUrl: string },
+  fileName: string,
+): HeygenAvatarLook {
+  const baseName = fileName.replace(/\.[^.]+$/, "").trim()
+  return {
+    lookId: result.heygenAvatarId,
+    name: baseName || "Uploaded avatar",
+    avatarType: "photo_avatar",
+    previewImageUrl: result.previewUrl,
+    deletable: true,
+  }
+}
 
 type WorkflowVideoPresenterSettingsProps = {
   workflowId: string | undefined
@@ -22,6 +55,8 @@ type WorkflowVideoPresenterSettingsProps = {
   config: Record<string, unknown>
   onPatch: (patch: Record<string, unknown>) => void
   compact?: boolean
+  /** When false, skip workflow-node API calls (Generate more before node is saved). */
+  persistToServer?: boolean
 }
 
 function isAvatarSelectable(look: HeygenAvatarLook): boolean {
@@ -35,6 +70,7 @@ export function WorkflowVideoPresenterSettings({
   config,
   onPatch,
   compact = false,
+  persistToServer = true,
 }: WorkflowVideoPresenterSettingsProps) {
   const { t } = useTranslation("workflow")
   const queryClient = useQueryClient()
@@ -42,14 +78,32 @@ export function WorkflowVideoPresenterSettings({
   const bgInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<"avatar" | "background" | null>(null)
   const [deletingLookId, setDeletingLookId] = useState<string | null>(null)
+  const [removedLookIds, setRemovedLookIds] = useState<string[]>([])
+  const [pendingUploadedAvatars, setPendingUploadedAvatars] = useState<
+    HeygenAvatarLook[]
+  >([])
   const [uploadError, setUploadError] = useState<string | null>(null)
   const avatarsQuery = useQuery({
-    queryKey: ["heygen", "avatars"],
+    queryKey: HEYGEN_AVATARS_QUERY_KEY,
     queryFn: () => heygenService.listAvatars(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   })
 
-  const canSyncToServer = Boolean(workflowId?.trim())
+  const visibleAvatars = useMemo(() => {
+    const removed = new Set(removedLookIds)
+    const fromQuery = (avatarsQuery.data ?? []).filter(
+      (avatar) => !removed.has(avatar.lookId),
+    )
+    const queryIds = new Set(fromQuery.map((avatar) => avatar.lookId))
+    const pending = pendingUploadedAvatars.filter(
+      (avatar) => !removed.has(avatar.lookId) && !queryIds.has(avatar.lookId),
+    )
+    return [...pending, ...fromQuery]
+  }, [avatarsQuery.data, removedLookIds, pendingUploadedAvatars])
+
+  const canSyncToServer =
+    persistToServer && Boolean(workflowId?.trim()) && Boolean(nodeId?.trim())
+  const canUploadAssets = persistToServer ? canSyncToServer : true
   const selectedAvatarId = String(config.heygenAvatarId ?? "")
   const motionPrompt = String(config.heygenMotionPrompt ?? "")
 
@@ -57,14 +111,14 @@ export function WorkflowVideoPresenterSettings({
     async (patch: Record<string, unknown>) => {
       const merged = mergeHeygenVideoConfig(config, patch)
       onPatch(merged)
-      if (!workflowId?.trim()) return
+      if (!canSyncToServer) return
       try {
-        await heygenService.patchPresenterConfig(workflowId, nodeId, patch)
+        await heygenService.patchPresenterConfig(workflowId!, nodeId, patch)
       } catch {
         setUploadError(t("presenter.saveFailed"))
       }
     },
-    [config, workflowId, nodeId, onPatch, t],
+    [canSyncToServer, config, workflowId, nodeId, onPatch, t],
   )
 
   const handleSelectAvatar = useCallback(
@@ -96,11 +150,6 @@ export function WorkflowVideoPresenterSettings({
 
   const handleDeleteAvatar = useCallback(
     async (look: HeygenAvatarLook) => {
-      const confirmed = window.confirm(
-        t("presenter.deleteConfirm", { name: look.name }),
-      )
-      if (!confirmed) return
-
       setUploadError(null)
       setDeletingLookId(look.lookId)
       try {
@@ -115,11 +164,21 @@ export function WorkflowVideoPresenterSettings({
             }),
           )
         }
-        await queryClient.invalidateQueries({ queryKey: ["heygen", "avatars"] })
-      } catch (e) {
-        setUploadError(
-          e instanceof Error ? e.message : t("presenter.deleteFailed"),
+        setRemovedLookIds((prev) =>
+          prev.includes(look.lookId) ? prev : [...prev, look.lookId],
         )
+        setPendingUploadedAvatars((prev) =>
+          prev.filter((avatar) => avatar.lookId !== look.lookId),
+        )
+        removeAvatarFromCache(queryClient, look.lookId)
+        await queryClient.refetchQueries({ queryKey: HEYGEN_AVATARS_QUERY_KEY })
+        removeAvatarFromCache(queryClient, look.lookId)
+        toast.success(t("presenter.deleteSuccess", { name: look.name }))
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : t("presenter.deleteFailed")
+        setUploadError(message)
+        toast.error(message)
       } finally {
         setDeletingLookId(null)
       }
@@ -129,7 +188,7 @@ export function WorkflowVideoPresenterSettings({
 
   const handleFile = useCallback(
     async (kind: "avatar" | "background", file: File | undefined) => {
-      if (!file || !workflowId) return
+      if (!file || !canUploadAssets) return
       if (file.size > MAX_BYTES) {
         setUploadError(t("presenter.fileTooLarge"))
         return
@@ -138,7 +197,16 @@ export function WorkflowVideoPresenterSettings({
       setUploading(kind)
       try {
         if (kind === "avatar") {
-          const result = await heygenService.uploadAvatar(workflowId, nodeId, file)
+          const result =
+            canSyncToServer && workflowId
+              ? await heygenService.uploadAvatar(workflowId, nodeId, file)
+              : await heygenService.uploadAvatarDraft(file)
+          const optimisticLook = uploadResultToAvatarLook(result, file.name)
+          upsertAvatarInCache(queryClient, optimisticLook)
+          setPendingUploadedAvatars((prev) => [
+            optimisticLook,
+            ...prev.filter((avatar) => avatar.lookId !== optimisticLook.lookId),
+          ])
           onPatch(
             mergeHeygenVideoConfig(config, {
               mode: "presenter",
@@ -147,28 +215,49 @@ export function WorkflowVideoPresenterSettings({
               heygenAvatarPhotoUrl: result.previewUrl,
             }),
           )
-          await queryClient.invalidateQueries({ queryKey: ["heygen", "avatars"] })
+          await queryClient.refetchQueries({ queryKey: HEYGEN_AVATARS_QUERY_KEY })
+          upsertAvatarInCache(queryClient, optimisticLook)
+          const freshAvatars =
+            queryClient.getQueryData<HeygenAvatarLook[]>(
+              HEYGEN_AVATARS_QUERY_KEY,
+            ) ?? []
+          if (freshAvatars.some((avatar) => avatar.lookId === optimisticLook.lookId)) {
+            setPendingUploadedAvatars((prev) =>
+              prev.filter((avatar) => avatar.lookId !== optimisticLook.lookId),
+            )
+          }
+          toast.success(t("presenter.uploadSuccess", { name: optimisticLook.name }))
         } else {
-          const result = await heygenService.uploadBackground(
-            workflowId,
-            nodeId,
-            file,
-          )
+          const result =
+            canSyncToServer && workflowId
+              ? await heygenService.uploadBackground(workflowId, nodeId, file)
+              : await heygenService.uploadBackgroundDraft(file)
           onPatch({
             heygenBackgroundAssetId: result.heygenBackgroundAssetId,
             heygenBackgroundUrl: result.previewUrl,
             removeBackground: true,
           })
+          toast.success(t("presenter.backgroundUploadSuccess"))
         }
       } catch (e) {
-        setUploadError(
-          e instanceof Error ? e.message : t("presenter.uploadFailed"),
-        )
+        const message =
+          e instanceof Error ? e.message : t("presenter.uploadFailed")
+        setUploadError(message)
+        toast.error(message)
       } finally {
         setUploading(null)
       }
     },
-    [config, workflowId, nodeId, onPatch, queryClient, t],
+    [
+      canUploadAssets,
+      canSyncToServer,
+      config,
+      workflowId,
+      nodeId,
+      onPatch,
+      queryClient,
+      t,
+    ],
   )
 
   const handleMotionPromptBlur = useCallback(() => {
@@ -186,7 +275,7 @@ export function WorkflowVideoPresenterSettings({
 
   return (
     <div className="flex flex-col gap-3">
-      {!canSyncToServer ? (
+      {persistToServer && !canSyncToServer ? (
         <p className="text-[11px] text-amber-700">
           {t("presenter.saveWorkflowToSync")}
         </p>
@@ -217,13 +306,13 @@ export function WorkflowVideoPresenterSettings({
           <p className="text-[11px] text-red-600">
             {t("presenter.loadAvatarsFailed")}
           </p>
-        ) : (avatarsQuery.data ?? []).length === 0 ? (
+        ) : visibleAvatars.length === 0 ? (
           <p className="text-[11px] text-gray-500">
             {t("presenter.noAvatars")}
           </p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            {(avatarsQuery.data ?? []).map((look) => {
+            {visibleAvatars.map((look) => {
               const selected = selectedAvatarId === look.lookId
               const selectable = isAvatarSelectable(look)
               const busy = deletingLookId === look.lookId
@@ -296,7 +385,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={avatarUrl && !selectedAvatarId ? avatarUrl : ""}
-        disabled={!canSyncToServer || uploading !== null}
+        disabled={!canUploadAssets || uploading !== null}
         busy={uploading === "avatar"}
         inputRef={avatarInputRef}
         onPick={() => avatarInputRef.current?.click()}
@@ -309,7 +398,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={bgUrl}
-        disabled={!canSyncToServer || uploading !== null}
+        disabled={!canUploadAssets || uploading !== null}
         busy={uploading === "background"}
         inputRef={bgInputRef}
         onPick={() => bgInputRef.current?.click()}

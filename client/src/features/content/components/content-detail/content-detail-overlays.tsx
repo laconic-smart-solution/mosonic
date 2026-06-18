@@ -23,6 +23,7 @@ import {
   ModalTitle,
 } from "@/components/ui/modal"
 import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import { WorkflowNodeGuideSection } from "@/features/workflow/components/workflow-node-guide-section"
 import { backendTypeToCanvas } from "@/features/workflow/data/workflow-model"
 import {
   type OutputKey,
@@ -42,6 +43,7 @@ type WorkflowNodesLite = WorkflowNode[]
 type RerunSheetProps = {
   openNodeId: string | null
   workflowNodes: WorkflowNodesLite
+  workflowId?: string
   globalRerunning: boolean
   configDraft: Record<string, unknown>
   onConfigChange: (next: Record<string, unknown>) => void
@@ -52,6 +54,7 @@ type RerunSheetProps = {
 export function ContentDetailRerunSheet({
   openNodeId,
   workflowNodes,
+  workflowId,
   globalRerunning,
   configDraft,
   onConfigChange,
@@ -102,11 +105,16 @@ export function ContentDetailRerunSheet({
         </DrawerHeader>
         {openNode && canvasType ? (
           <div className="mt-3 max-h-[50vh] overflow-y-auto pr-1">
-            <WorkflowNodeConfigFields
-              canvasType={canvasType}
-              config={configDraft}
-              onChange={onConfigChange}
-            />
+            <WorkflowNodeGuideSection canvasType={canvasType} />
+            <div className="mt-3">
+              <WorkflowNodeConfigFields
+                canvasType={canvasType}
+                config={configDraft}
+                onChange={onConfigChange}
+                workflowId={workflowId}
+                nodeId={openNodeId ?? undefined}
+              />
+            </div>
           </div>
         ) : null}
         <div className="mt-4 flex justify-end gap-2">

@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { AnalyticsRepository } from '../analytics/analytics.repository';
-import { FeedbackSignalStatus } from '../analytics/schemas/analytics.schema';
 import { ContentService } from '../content/content.service';
 import { ContentStatus } from '../content/schemas/content.schema';
 import { allRequiredStepsApproved } from '../content/content-approval.util';
@@ -32,7 +30,6 @@ export class CampaignAutonomyService {
     private readonly contentService: ContentService,
     private readonly uploadService: UploadService,
     private readonly mcpService: McpService,
-    private readonly analyticsRepo: AnalyticsRepository,
     private readonly events: EventsService,
   ) {}
 
@@ -137,16 +134,6 @@ export class CampaignAutonomyService {
     );
     if (failed) {
       return 'Pipeline has failed nodes';
-    }
-
-    if (policy.blockIfPendingSuggestions) {
-      const analytics = await this.analyticsRepo.findByRuleRef(pipeline.ruleRef);
-      const pending = (analytics?.feedbackSignal?.suggestions ?? []).filter(
-        (s) => s.status === FeedbackSignalStatus.Pending,
-      );
-      if (pending.length > 0) {
-        return 'Pending analytics suggestions';
-      }
     }
 
     const accounts = await this.mcpService.getConnectedAccounts(

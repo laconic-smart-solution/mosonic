@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-import { FileServiceImage, FileServiceVideo } from "./upload-display-media"
+import { UploadPreviewMedia } from "./upload-preview-media"
 import { getPlatformMediaConfig, normalizeChannelKey } from "../lib/upload-platform-media"
 import type { MediaTabMode } from "../lib/upload-platform-media"
 
@@ -11,6 +11,7 @@ type UploadPlatformPreviewProps = {
   imageUrls: string[]
   videoUrl: string | null
   youtubeTitle: string
+  variant?: "compact" | "dialog"
 }
 
 export function UploadPlatformPreview({
@@ -20,30 +21,21 @@ export function UploadPlatformPreview({
   imageUrls,
   videoUrl,
   youtubeTitle,
+  variant = "compact",
 }: UploadPlatformPreviewProps) {
   const key = normalizeChannelKey(channel)
   const cfg = getPlatformMediaConfig(channel)
   const label = cfg.displayName
+  const isDialog = variant === "dialog"
 
-  const media =
-    mediaTab === "video" && videoUrl ? (
-      <FileServiceVideo
-        url={videoUrl}
-        className="max-h-40 w-full bg-muted object-cover"
-        muted
-      />
-    ) : imageUrls[0] ? (
-      <FileServiceImage
-        url={imageUrls[0]}
-        alt=""
-        className="max-h-40 w-full bg-muted object-cover"
-        loadingClassName="flex min-h-[140px] max-h-40 w-full items-center justify-center bg-muted/50"
-      />
-    ) : (
-      <div className="flex min-h-[140px] items-center justify-center bg-muted/50 text-xs text-muted-foreground">
-        No media
-      </div>
-    )
+  const media = (
+    <UploadPreviewMedia
+      mediaTab={mediaTab}
+      imageUrls={imageUrls}
+      videoUrl={videoUrl}
+      variant={variant}
+    />
+  )
 
   if (key === "instagram") {
     return (
@@ -127,28 +119,15 @@ export function UploadPlatformPreview({
   }
 
   if (key === "tiktok") {
-    const tiktokMedia =
-      mediaTab === "video" && videoUrl ? (
-        <FileServiceVideo
-          url={videoUrl}
-          className="h-full w-full object-contain"
-          muted
-        />
-      ) : imageUrls[0] ? (
-        <FileServiceImage
-          url={imageUrls[0]}
-          alt=""
-          className="h-full w-full object-contain bg-muted"
-          loadingClassName="flex h-full min-h-[140px] w-full items-center justify-center bg-muted/50"
-        />
-      ) : (
-        <div className="flex h-full min-h-[140px] flex-col items-center justify-center gap-1 px-3 text-center text-[11px] text-muted-foreground">
-          <span>No media yet</span>
-          <span className="max-w-48 text-[10px] leading-snug opacity-90">
-            Add a photo or video in the editor — TikTok supports both.
-          </span>
-        </div>
-      )
+    const tiktokMedia = (
+      <UploadPreviewMedia
+        mediaTab={mediaTab}
+        imageUrls={imageUrls}
+        videoUrl={videoUrl}
+        variant={variant}
+        className={cn(!isDialog && "h-full min-h-[140px]")}
+      />
+    )
 
     return (
       <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
@@ -162,7 +141,7 @@ export function UploadPlatformPreview({
           <div
             className={cn(
               "relative w-full max-w-[220px] overflow-hidden rounded-xl border border-border/70 bg-black shadow-inner",
-              "aspect-9/16 max-h-[min(340px,52vh)]",
+              isDialog ? "aspect-9/16 max-h-[min(480px,60vh)]" : "aspect-9/16 max-h-[min(340px,52vh)]",
             )}
           >
             {tiktokMedia}

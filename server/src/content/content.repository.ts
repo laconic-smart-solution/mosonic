@@ -3,10 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { UserRole } from '../users/schemas/user.schema';
 import {
   Pipeline,
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
+import { flattenNodeOutputsBestEffort } from './content-node-output.util';
 import { mergeResolvedOutputs } from './content-output.utils';
 import type {
   ContentPageItemDto,
@@ -87,6 +89,7 @@ export class ContentRepository {
       $or: [
         { [`outputs.${field}`]: { $regex: /\S/ } },
         { [`userEdits.${field}`]: { $regex: /\S/ } },
+        ...nestedNodeMediaOrClauses(field),
       ],
     });
     if (query.filter?.hasImage === true)
@@ -136,7 +139,7 @@ export class ContentRepository {
     >();
     if (pipelineRefs.length > 0) {
       const pipelines = await this.pipelineModel
-        .find(mergeUserIdFilter({ pipelineId: { $in: pipelineRefs } }, auth))
+        .find(pipelineLookupFilter(pipelineRefs, auth))
         .select('pipelineId nodes.nodeId nodes.type nodes.order')
         .lean()
         .exec();
@@ -158,6 +161,32 @@ export class ContentRepository {
         const laneOutputs = doc.laneOutputs ?? {};
         const hasLaneOutputs = Object.keys(laneOutputs).length > 0;
 
+        const merged = mergeResolvedOutputs(
+          {
+            outputs: doc.outputs,
+            userEdits: doc.userEdits,
+            nodeOutputs: doc.nodeOutputs,
+            nodeUserEdits: doc.nodeUserEdits,
+          },
+          pipelineNodesOrdered.length > 0
+            ? { pipelineNodesOrdered }
+            : undefined,
+        );
+        let outputs = merged;
+        if (
+          pipelineNodesOrdered.length === 0 &&
+          doc.nodeOutputs &&
+          Object.keys(doc.nodeOutputs).length > 0
+        ) {
+          outputs = {
+            ...merged,
+            ...flattenNodeOutputsBestEffort(
+              doc.nodeOutputs,
+              doc.nodeUserEdits ?? {},
+            ),
+          };
+        }
+
         return {
           contentId: doc.contentId,
           pipelineRef: doc.pipelineRef,
@@ -166,22 +195,38 @@ export class ContentRepository {
           status: doc.status,
           createdAt: new Date(doc.createdAt ?? new Date()).toISOString(),
           updatedAt: new Date(doc.updatedAt ?? new Date()).toISOString(),
-          outputs: mergeResolvedOutputs(
-            {
-              outputs: doc.outputs,
-              userEdits: doc.userEdits,
-              nodeOutputs: doc.nodeOutputs,
-              nodeUserEdits: doc.nodeUserEdits,
-            },
-            pipelineNodesOrdered.length > 0
-              ? { pipelineNodesOrdered }
-              : undefined,
-          ),
+          outputs,
           ...(hasLaneOutputs ? { laneOutputs } : {}),
         };
       }),
       total,
     };
+  }
+
+  async getStats(auth: TenancyAuth): Promise<{
+    total: number;
+    byStatus: Partial<Record<ContentStatus, number>>;
+  }> {
+    const scoped = mergeUserIdFilter({}, auth);
+    const agg = await this.contentModel
+      .aggregate<{ _id: ContentStatus | null; count: number }>([
+        { $match: scoped },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ])
+      .exec();
+
+    const byStatus: Partial<Record<ContentStatus, number>> = {};
+    let total = 0;
+    const known = new Set<string>(Object.values(ContentStatus));
+    for (const row of agg) {
+      total += row.count;
+      if (row._id == null) continue;
+      const key = String(row._id);
+      if (known.has(key)) {
+        byStatus[key as ContentStatus] = row.count;
+      }
+    }
+    return { total, byStatus };
   }
 
   async updateEditableState(
@@ -216,4 +261,58 @@ export class ContentRepository {
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Include legacy pipelines missing `userId` when content is already tenant-scoped. */
+function pipelineLookupFilter(
+  pipelineRefs: string[],
+  auth: TenancyAuth,
+): Record<string, unknown> {
+  if (auth.role === UserRole.ADMIN) {
+    return { pipelineId: { $in: pipelineRefs } };
+  }
+  return {
+    pipelineId: { $in: pipelineRefs },
+    $or: [
+      { userId: auth.userId },
+      { userId: { $exists: false } },
+      { userId: null },
+    ],
+  };
+}
+
+function nestedNodeMediaOrClauses(
+  field: 'image' | 'video' | 'summary',
+): Record<string, unknown>[] {
+  const sources = ['$nodeOutputs', '$nodeUserEdits', '$laneOutputs'] as const;
+  const clauses = sources.map((source) => ({
+    $expr: {
+      $gt: [
+        {
+          $size: {
+            $filter: {
+              input: { $objectToArray: { $ifNull: [source, {}] } },
+              as: 'entry',
+              cond: nodeLayerHasField('$$entry.v', field),
+            },
+          },
+        },
+        0,
+      ],
+    },
+  }));
+  return clauses;
+}
+
+function nodeLayerHasField(
+  layerRef: string,
+  field: 'image' | 'video' | 'summary',
+): Record<string, unknown> {
+  const valuePath = `${layerRef}.${field}`;
+  return {
+    $and: [
+      { $eq: [{ $type: valuePath }, 'string'] },
+      { $regexMatch: { input: valuePath, regex: /\S/ } },
+    ],
+  };
 }

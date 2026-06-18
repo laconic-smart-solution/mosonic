@@ -16,6 +16,10 @@ import { EventsService } from '../events/events.service';
 import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
+import {
+  isTikTokPhotoMedia,
+  tiktokPhotoCaptionError,
+} from '../mcp/zernio/tiktok-publish.util';
 import type { ChannelEntry } from '../rule/schemas/rule.schema';
 import type {
   ChannelPublishDto,
@@ -586,8 +590,15 @@ export class UploadService {
     const hasScheduleUpdate =
       body.scheduledAt !== undefined && body.scheduledAt !== null;
     const hasTitleUpdate = body.youtubeTitle !== undefined;
+    const hasMediaUpdate =
+      body.mediaUrl !== undefined || body.mediaUrls !== undefined;
 
-    if (!hasCaptionUpdate && !hasScheduleUpdate && !hasTitleUpdate) {
+    if (
+      !hasCaptionUpdate &&
+      !hasScheduleUpdate &&
+      !hasTitleUpdate &&
+      !hasMediaUpdate
+    ) {
       throw new BadRequestException('No fields to update');
     }
 
@@ -674,6 +685,31 @@ export class UploadService {
         : (body.youtubeTitle ?? '')
       : undefined;
 
+    if (hasMediaUpdate) {
+      for (const ch of scheduledChannels) {
+        if (body.mediaUrls !== undefined) {
+          ch.mediaUrls = [...(body.mediaUrls ?? [])];
+          ch.mediaUrl = ch.mediaUrls[0] ?? null;
+        } else if (body.mediaUrl !== undefined) {
+          ch.mediaUrl = body.mediaUrl;
+          ch.mediaUrls = body.mediaUrl ? [body.mediaUrl] : [];
+        }
+      }
+    }
+
+    for (const ch of scheduledChannels) {
+      const caption = hasCaptionUpdate
+        ? (content ?? '')
+        : this.rowCaption(ch, roFallback);
+      const mediaUrls = this.resolveRowMediaForPublish(ch, roFallback);
+      if (hasCaptionUpdate || hasMediaUpdate) {
+        this.assertTikTokPhotoCaption(ch.channel, caption, mediaUrls);
+      }
+      if (hasMediaUpdate) {
+        this.assertChannelMediaForPublish(ch.channel, mediaUrls);
+      }
+    }
+
     const matchingPosts = channelFilter
       ? scheduledPosts.filter((p) =>
           (p.channels ?? []).some(
@@ -695,12 +731,41 @@ export class UploadService {
       );
     }
 
-    for (const postId of postIds) {
+    for (const post of matchingPosts) {
+      const postId = post.zernioPostId?.trim();
+      if (!postId) continue;
+
+      const postChannelKeys = (post.channels ?? []).map((c) =>
+        String(c).trim().toLowerCase(),
+      );
+      const postChannels =
+        postChannelKeys.length > 0
+          ? scheduledChannels.filter((ch) =>
+              postChannelKeys.includes(ch.channel.toLowerCase()),
+            )
+          : scheduledChannels;
+      const primaryChannel = postChannels[0];
+
+      let mediaUrlsForPost: string[] | undefined;
+      if (hasMediaUpdate && primaryChannel) {
+        mediaUrlsForPost = this.resolveRowMediaForPublish(
+          primaryChannel,
+          roFallback,
+        );
+      }
+
+      const titleForPost =
+        hasTitleUpdate &&
+        postChannels.some((ch) => ch.channel.toLowerCase() === 'youtube')
+          ? title
+          : undefined;
+
       await this.mcpService.updatePost({
         postId,
         content,
         scheduledFor: scheduledIso,
-        title: hasTitleUpdate ? title : undefined,
+        title: titleForPost,
+        ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
       });
     }
 
@@ -847,6 +912,7 @@ export class UploadService {
 
       const mediaUrls = this.resolveRowMediaForPublish(row, roFallback);
       this.assertChannelMediaForPublish(row.channel, mediaUrls);
+      this.assertTikTokPhotoCaption(row.channel, caption, mediaUrls);
       const mediaUrl = mediaUrls[0] ?? null;
       const youtubeTitle = key === 'youtube' ? this.rowYoutubeTitle(row) : null;
 
@@ -867,6 +933,7 @@ export class UploadService {
     }
 
     const channelsSucceeded: string[] = [];
+    const channelKeys = workList.map((w) => w.row.channel.toLowerCase());
 
     for (const w of workList) {
       const chKey = w.row.channel.toLowerCase();
@@ -880,39 +947,43 @@ export class UploadService {
         uploadId: doc.uploadId,
         channel: chKey,
       });
-      doc.status = recomputeUploadJobStatus(doc.channels);
-      await doc.save();
+    }
+    doc.status = recomputeUploadJobStatus(doc.channels);
+    await doc.save();
 
-      try {
-        const { postId } = await this.mcpService.publishCreatePostBatch(
-          auth.userId,
-          {
-            platforms: [
-              {
-                platform: chKey,
-                accountId: accountByChannel.get(chKey)!,
-                content: w.caption,
-                mediaUrl: w.mediaUrl,
-                mediaUrls: w.mediaUrls.length ? w.mediaUrls : null,
-                title: w.youtubeTitle,
-              },
-            ],
-            publishNow: body.publishNow,
-            scheduledAt: scheduledIso,
-          },
-        );
-
-        await this.postService.createPostFromSuccessfulPublish({
-          userId: publisherUserId,
-          uploadRef: doc.uploadId,
-          ruleRef: doc.ruleRef,
-          contentRef: doc.contentRef,
-          zernioPostId: postId,
-          channels: [chKey],
+    try {
+      const { postId } = await this.mcpService.publishCreatePostBatch(
+        auth.userId,
+        {
+          platforms: workList.map((w) => {
+            const chKey = w.row.channel.toLowerCase();
+            return {
+              platform: chKey,
+              accountId: accountByChannel.get(chKey)!,
+              content: w.caption,
+              mediaUrl: w.mediaUrl,
+              mediaUrls: w.mediaUrls.length ? w.mediaUrls : null,
+              title: w.youtubeTitle,
+            };
+          }),
           publishNow: body.publishNow,
-          scheduledAt: scheduledDate,
-        });
+          scheduledAt: scheduledIso,
+        },
+      );
 
+      await this.postService.createPostFromSuccessfulPublish({
+        userId: publisherUserId,
+        uploadRef: doc.uploadId,
+        ruleRef: doc.ruleRef,
+        contentRef: doc.contentRef,
+        zernioPostId: postId,
+        channels: channelKeys,
+        publishNow: body.publishNow,
+        scheduledAt: scheduledDate,
+      });
+
+      for (const w of workList) {
+        const chKey = w.row.channel.toLowerCase();
         if (body.publishNow) {
           w.row.status = UploadChannelStatus.Published;
           w.row.publishedAt = now;
@@ -939,8 +1010,11 @@ export class UploadService {
             postId: postId || null,
           });
         }
-      } catch (err: unknown) {
-        const msg = getFriendlyZernioPublishError(err);
+      }
+    } catch (err: unknown) {
+      const msg = getFriendlyZernioPublishError(err);
+      for (const w of workList) {
+        const chKey = w.row.channel.toLowerCase();
         w.row.status = UploadChannelStatus.Failed;
         w.row.failureReason = msg;
         w.row.retryCount = (w.row.retryCount ?? 0) + 1;
@@ -950,10 +1024,10 @@ export class UploadService {
           message: msg,
         });
       }
-
-      doc.status = recomputeUploadJobStatus(doc.channels);
-      await doc.save();
     }
+
+    doc.status = recomputeUploadJobStatus(doc.channels);
+    await doc.save();
 
     const channelsPublished = channelsSucceeded;
     this.emitUploadEvent(doc.uploadId, 'upload:all_completed', {
@@ -1073,6 +1147,17 @@ export class UploadService {
         `${channel} requires a video before publishing.`,
       );
     }
+  }
+
+  private assertTikTokPhotoCaption(
+    channel: string,
+    caption: string,
+    mediaUrls: string[],
+  ): void {
+    const key = channel.trim().toLowerCase();
+    if (key !== 'tiktok' || !isTikTokPhotoMedia(mediaUrls)) return;
+    const err = tiktokPhotoCaptionError(caption);
+    if (err) throw new BadRequestException(err);
   }
 
   private rowYoutubeTitle(row: UploadChannelEntry): string | null {

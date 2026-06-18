@@ -80,6 +80,10 @@ describe('UploadScheduledSyncService', () => {
 
   const postModel = { find: postFindMock };
 
+  const postAnalyticsService = {
+    ensureForPost: jest.fn().mockResolvedValue(null),
+  };
+
   const service = new UploadScheduledSyncService(
     config,
     uploadModel as never,
@@ -87,6 +91,7 @@ describe('UploadScheduledSyncService', () => {
     syncLockModel as never,
     mcpService as never,
     events as never,
+    postAnalyticsService as never,
   );
 
   beforeEach(() => {

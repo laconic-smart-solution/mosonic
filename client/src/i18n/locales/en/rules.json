@@ -9,7 +9,7 @@
     "selectOrCreate": "Select or create a rule",
     "loadRuleError": "Could not load this rule.",
     "viewTree": "Tree",
-    "viewDetail": "Detail",
+    "viewManage": "Manage",
     "pendingChanges": "{{count}} pending",
     "discardAll": "Discard all",
     "saveChanges": "Save changes",
@@ -67,13 +67,12 @@
     "scrollToLoadMore": "Scroll to load more"
   },
   "bubbleNode": {
-    "editTitle": "Edit node content",
     "detailsTitle": "Node details",
-    "editDescription": "Update this node value and save.",
-    "structureDescription": "This node is a structure label.",
-    "saveNode": "Save node",
-    "addItem": "Add item",
-    "removeItem": "Remove item"
+    "viewOnlyDescription": "Read-only preview. Switch to Manage to edit this rule.",
+    "structureDescription": "This node is a structure label."
+  },
+  "channelsDialog": {
+    "atLeastOne": "Select at least one channel."
   },
   "detail": {
     "campaignRule": "Campaign rule",
@@ -93,7 +92,10 @@
     "cancel": "Cancel"
   },
   "form": {
-    "commaListHint": "Comma-separated values",
+    "tagListHint": "Type a value and press + to add it.",
+    "tagListPlaceholder": "Add a value…",
+    "tagListAdd": "Add item",
+    "tagListRemoveAria": "Remove {{value}}",
     "brand": {
       "title": "Brand",
       "subtitle": "Voice, positioning, and how the brand shows up in content.",
@@ -136,9 +138,9 @@
     },
     "channels": {
       "title": "Channels",
-      "subtitle": "Where this rule applies. Enter channel names separated by commas.",
+      "subtitle": "Where this rule applies. Select one or more distribution platforms.",
       "distribution": "Distribution",
-      "distributionHint": "Comma-separated channel names"
+      "distributionHint": "Check each platform where this campaign should publish."
     },
     "guidelines": {
       "title": "Guidelines",

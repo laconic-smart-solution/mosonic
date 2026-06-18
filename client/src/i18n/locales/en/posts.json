@@ -82,7 +82,7 @@
     "loading": "Loading post…",
     "loadFailed": "Could not load post.",
     "zernioWarningTitle": "Limited edit on Zernio",
-    "zernioWarning": "Only caption, title, and schedule can be updated for this post via the API.",
+    "zernioWarning": "Caption, title, schedule, and media can be updated for this post via the API.",
     "timingTitle": "Timing",
     "scheduled": "Scheduled",
     "published": "Published",
@@ -99,6 +99,7 @@
     "publishedNow": "Published now",
     "newPostRecord": "New post record {{id}}…",
     "scheduleInvalid": "Pick a valid schedule time.",
+    "tiktokCaptionHint": "TikTok slideshow title limit",
     "updated": "Post updated",
     "retrySubmitted": "Retry submitted",
     "newLocalPost": "New local post {{id}}…"
@@ -106,5 +107,40 @@
   "toast": {
     "warningWithSkipped": "{{message}}",
     "skippedDescription": "Unpublish not supported for: {{channels}}"
+  },
+  "detail": {
+    "title": "Post detail",
+    "backToPosts": "Back to posts",
+    "mediaTitle": "Media",
+    "noMedia": "No media attached to this post yet.",
+    "editingLockedTitle": "Editing locked",
+    "editingLockedDesc": "This post cannot be edited remotely (it needs a linked Zernio post and status pending, scheduled, or partial).",
+    "analytics": {
+      "title": "Analytics",
+      "lastSynced": "Last synced {{date}}",
+      "notSyncedYet": "Metrics will appear after the first sync.",
+      "awaitingFirstSync": "Tap Refresh metrics to pull data from your connected accounts.",
+      "partialSync": "Some platforms could not be synced. Try refreshing again.",
+      "unavailable": "Analytics are not available for this post.",
+      "afterPublish": "Analytics appear here after the post is published.",
+      "refresh": "Refresh metrics",
+      "syncSuccess": "Analytics updated",
+      "chartTitle": "Performance by channel",
+      "chartEmpty": "No channel data yet.",
+      "byPlatform": "By platform",
+      "noPlatforms": "No published channels to measure yet.",
+      "stats": {
+        "views": "Views",
+        "likes": "Likes",
+        "comments": "Comments",
+        "engagement": "Engagement"
+      },
+      "platformStatus": {
+        "awaiting": "Awaiting platform data",
+        "synced": "Synced",
+        "failed": "Could not load",
+        "unavailable": "Not available"
+      }
+    }
   }
 }

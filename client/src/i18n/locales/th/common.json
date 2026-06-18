@@ -117,10 +117,10 @@
       "subtitle": "บัญชีที่เชื่อมต่อ",
       "keywords": "ตั้งค่า บัญชี โปรไฟล์ settings account"
     },
-    "analytics": {
-      "title": "การวิเคราะห์",
-      "subtitle": "เมตริกและรายงาน",
-      "keywords": "การวิเคราะห์ เมตริก analytics metrics"
+    "posts": {
+      "title": "โพสต์",
+      "subtitle": "โพสต์ที่เผยแพร่และกำหนดเวลา",
+      "keywords": "โพสต์ เผยแพร่ โซเชียล posts publish"
     }
   },
   "status": {

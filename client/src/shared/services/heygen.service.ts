@@ -82,6 +82,28 @@ export const heygenService = {
     await apiClient.delete(`/workflow/heygen/avatars/${encodeURIComponent(lookId)}`)
   },
 
+  uploadAvatarDraft: async (file: File): Promise<HeygenAvatarUploadResult> => {
+    const form = new FormData()
+    form.append("file", file)
+    const response = await apiClient.post<HeygenAvatarUploadResult>(
+      "/workflow/heygen/upload-avatar",
+      form,
+    )
+    return response.data
+  },
+
+  uploadBackgroundDraft: async (
+    file: File,
+  ): Promise<HeygenBackgroundUploadResult> => {
+    const form = new FormData()
+    form.append("file", file)
+    const response = await apiClient.post<HeygenBackgroundUploadResult>(
+      "/workflow/heygen/upload-background",
+      form,
+    )
+    return response.data
+  },
+
   uploadAvatar: async (
     workflowId: string,
     nodeId: string,

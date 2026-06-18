@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 /**
  * PATCH /upload/:uploadId — update an existing scheduled Zernio post.
@@ -20,4 +20,13 @@ export class UpdateUploadDto {
   @IsString()
   @IsOptional()
   youtubeTitle?: string | null;
+
+  @IsString()
+  @IsOptional()
+  mediaUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mediaUrls?: string[] | null;
 }

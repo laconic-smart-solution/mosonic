@@ -157,6 +157,7 @@ export class McpService {
     scheduledFor?: string | null;
     title?: string;
     publishNow?: boolean;
+    mediaUrls?: string[] | null;
   }): Promise<{ success: boolean }> {
     return await this.zernioRest.updatePost(payload);
   }

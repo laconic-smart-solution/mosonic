@@ -16,9 +16,6 @@ import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
   WorkflowNode,
   WorkflowNodeType,
-  NodeAspectRatio,
-  NodeMediaSourceType,
-  NodeSummaryLength,
   type WorkflowNodeConfig,
   type WorkflowNodeDocument,
 } from '../nodes/schemas/workflow-node.schema';
@@ -34,7 +31,10 @@ import {
   nextPendingStepIndex,
 } from './content-approval.util';
 import { WorkflowService } from '../workflow/workflow.service';
-import { parseWorkflowNodeConfigOrThrow } from '../nodes/workflow-node-config.zod';
+import {
+  defaultWorkflowNodeConfigForRule,
+  parseWorkflowNodeConfigOrThrow,
+} from '../nodes/workflow-node-config.zod';
 import { mergeResolvedOutputs } from './content-output.utils';
 import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
 import { ContentRepository } from './content.repository';
@@ -114,6 +114,13 @@ export class ContentService {
         uploadId: uploadMap.get(row.contentId),
       })),
     };
+  }
+
+  async getContentStats(auth: TenancyAuth): Promise<{
+    total: number;
+    byStatus: Partial<Record<ContentStatus, number>>;
+  }> {
+    return this.contentRepository.getStats(auth);
   }
 
   async getContentDetail(
@@ -375,7 +382,6 @@ export class ContentService {
     }
     const candidates: WorkflowNodeType[] = [
       WorkflowNodeType.VideoGeneration,
-      WorkflowNodeType.Transcription,
       WorkflowNodeType.Summarization,
       WorkflowNodeType.Translation,
       WorkflowNodeType.ImageGeneration,
@@ -439,8 +445,8 @@ export class ContentService {
       summary: resolved.summary,
     };
 
-    const nodeId = randomUUID();
-    const baseConfig = this.defaultConfigForGenerateMore(dto.type, rule);
+    const nodeId = dto.nodeId?.trim() || randomUUID();
+    const baseConfig = defaultWorkflowNodeConfigForRule(dto.type, rule);
     let config: WorkflowNodeConfig;
     try {
       config = parseWorkflowNodeConfigOrThrow(dto.type, {
@@ -505,47 +511,6 @@ export class ContentService {
         return v(resolved.keywords);
       default:
         return false;
-    }
-  }
-
-  private defaultConfigForGenerateMore(
-    type: WorkflowNodeType,
-    rule: RuleDocument,
-  ): WorkflowNodeConfig {
-    const channels = rule.channels ?? [];
-    const hasInstagram = channels.some(
-      (c) => (c.channel ?? '').toLowerCase() === 'instagram',
-    );
-    const audienceLang = rule.audience?.language?.trim();
-
-    switch (type) {
-      case WorkflowNodeType.VideoGeneration:
-        return {
-          model: 'sora-2',
-          duration: 8,
-          resolution: '720p',
-          aspectRatio: hasInstagram
-            ? NodeAspectRatio.R9x16
-            : NodeAspectRatio.R16x9,
-        };
-      case WorkflowNodeType.Transcription:
-        return {
-          model: 'whisper-1',
-          sourceType: NodeMediaSourceType.Audio,
-          language: audienceLang && audienceLang.length > 0 ? audienceLang : 'auto',
-        };
-      case WorkflowNodeType.Summarization:
-        return {
-          model: 'gpt-4o',
-          summaryLength: NodeSummaryLength.Medium,
-          sourceNodeRef: 'text_generation',
-        };
-      case WorkflowNodeType.Translation:
-        return { model: 'gpt-4o' };
-      case WorkflowNodeType.ImageGeneration:
-        return { model: 'gpt-image-1' };
-      default:
-        return { model: 'gpt-4o' };
     }
   }
 

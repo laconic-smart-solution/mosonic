@@ -132,6 +132,18 @@ export function useRetryPostMutation() {
   })
 }
 
+export function useSyncPostAnalyticsMutation(postId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => postService.syncAnalytics(postId!),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: postsQueryKeys.detail(postId, true),
+      })
+    },
+  })
+}
+
 export function useDeletePostMutation() {
   const qc = useQueryClient()
   return useMutation({

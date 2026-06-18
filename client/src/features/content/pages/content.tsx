@@ -24,7 +24,7 @@ import { ContentListStatCard } from "@/features/content/components/content-list/
 import { ContentPageShell } from "@/features/content/components/content-list/content-page-shell"
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
-import { useContentPageQuery } from "@/shared/queries/content.query"
+import { useContentPageQuery, useContentStatsQuery } from "@/shared/queries/content.query"
 import type {
   ContentPageQueryPayload,
   ContentStatus,
@@ -163,6 +163,7 @@ export default function ContentPage() {
   ])
 
   const queryEnabled = hydrated
+  const statsQuery = useContentStatsQuery(queryEnabled)
   const { data, isPending, isError, error, refetch } = useContentPageQuery(
     payload,
     queryEnabled
@@ -197,10 +198,21 @@ export default function ContentPage() {
     return list
   }, [items, sortOption])
 
-  const totalAll = meta?.total ?? 0
-  const draftPage = items.filter((i) => i.status === "draft").length
-  const approvedPage = items.filter((i) => i.status === "approved").length
-  const rejectedPage = items.filter((i) => i.status === "rejected").length
+  const totalAll = statsQuery.data?.total ?? meta?.total ?? 0
+  const draftCount = statsQuery.data?.byStatus?.draft ?? 0
+  const approvedCount = statsQuery.data?.byStatus?.approved ?? 0
+  const rejectedCount = statsQuery.data?.byStatus?.rejected ?? 0
+
+  function setStatusTile(next: "all" | ContentStatus) {
+    setStatusFilter(next)
+    resetToFirstPage()
+  }
+
+  function statDisplay(value: number): string | number {
+    if (statsQuery.isPending) return "…"
+    if (statsQuery.isError) return "—"
+    return value
+  }
 
   const empty =
     !isPending &&
@@ -245,28 +257,34 @@ export default function ContentPage() {
 
       {!isPending && !isError && meta ? (
         <div className="mb-6 flex flex-wrap gap-2.5">
-          <ContentListStatCard value={totalAll} label={t("content:stats.total")} />
           <ContentListStatCard
-            value={draftPage}
+            value={statDisplay(totalAll)}
+            label={t("content:stats.total")}
+            active={statusFilter === "all"}
+            onClick={() => setStatusTile("all")}
+          />
+          <ContentListStatCard
+            value={statDisplay(draftCount)}
             label={t("content:status.draft")}
             dotClass="bg-amber-400"
+            active={statusFilter === "draft"}
+            onClick={() => setStatusTile("draft")}
           />
           <ContentListStatCard
-            value={approvedPage}
+            value={statDisplay(approvedCount)}
             label={t("content:status.approved")}
             dotClass="bg-teal-400"
+            active={statusFilter === "approved"}
+            onClick={() => setStatusTile("approved")}
           />
           <ContentListStatCard
-            value={rejectedPage}
+            value={statDisplay(rejectedCount)}
             label={t("content:status.rejected")}
             dotClass="bg-navy-500"
+            active={statusFilter === "rejected"}
+            onClick={() => setStatusTile("rejected")}
           />
         </div>
-      ) : null}
-      {meta && meta.totalPages > 1 ? (
-        <p className="mb-4 text-xs text-muted-foreground">
-          {t("content:stats.pageCountsHint")}
-        </p>
       ) : null}
 
       <div className="mb-5 flex flex-wrap items-center gap-2.5">

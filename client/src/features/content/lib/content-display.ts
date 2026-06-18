@@ -32,6 +32,38 @@ function hasOutput(value: string | undefined): boolean {
   return Boolean(value?.trim())
 }
 
+function mediaFromLaneOutputs(
+  laneOutputs: Record<string, Record<string, unknown>> | undefined,
+  field: "image" | "video",
+): string | null {
+  if (!laneOutputs) return null
+  for (const layer of Object.values(laneOutputs)) {
+    const value = layer?.[field]
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return null
+}
+
+/** Resolved image URL for list cards — merged outputs plus lane fallbacks. */
+export function resolvePageItemImage(item: ContentPageItem): string | null {
+  if (hasOutput(item.outputs?.image)) return item.outputs!.image!.trim()
+  return mediaFromLaneOutputs(item.laneOutputs, "image")
+}
+
+/** Resolved video URL for list cards — merged outputs plus lane fallbacks. */
+export function resolvePageItemVideo(item: ContentPageItem): string | null {
+  if (hasOutput(item.outputs?.video)) return item.outputs!.video!.trim()
+  return mediaFromLaneOutputs(item.laneOutputs, "video")
+}
+
+export function pageItemHasImage(item: ContentPageItem): boolean {
+  return resolvePageItemImage(item) != null
+}
+
+export function pageItemHasVideo(item: ContentPageItem): boolean {
+  return resolvePageItemVideo(item) != null
+}
+
 function captionFromLaneLayer(layer: Record<string, unknown>): string | null {
   if (typeof layer.text === "string" && layer.text.trim()) {
     return layer.text.trim()

@@ -14,12 +14,9 @@ export const ContentPage      = PageLoader(lazy(() => import("@/features/content
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
 export const PostsPage        = PageLoader(lazy(() => import("@/features/posts/pages/posts-page")))
+export const PostDetailPage   = PageLoader(lazy(() => import("@/features/posts/pages/post-detail-page")))
 export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
-)
-export const AnalyticsPage    = PageLoader(lazy(() => import("@/features/analytics/pages/analytics")))
-export const AnalyticsDetailPage = PageLoader(
-  lazy(() => import("@/features/analytics/pages/analytics-detail")),
 )
 export const UsagePage = PageLoader(lazy(() => import("@/features/usage/pages/usage")))
 export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
