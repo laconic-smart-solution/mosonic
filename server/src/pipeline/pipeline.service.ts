@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
@@ -13,6 +13,11 @@ import {
   PipelineStatus,
   type PipelineDocument,
 } from './schemas/pipeline.schema';
+import { defaultPipelineName } from './pipeline-name.util';
+import type {
+  UpdatePipelineDto,
+  UpdatePipelineResponseDto,
+} from './dto/update-pipeline.dto';
 
 function uniquePipelineNodeTypes(nodes: unknown): string[] {
   if (!Array.isArray(nodes)) return [];
@@ -67,6 +72,7 @@ export class PipelineService {
           workflowRef: 1,
           ruleRef: 1,
           status: 1,
+          name: 1,
           contentPrompt: 1,
           startedAt: 1,
           completedAt: 1,
@@ -85,6 +91,9 @@ export class PipelineService {
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
       status: doc.status,
+      name:
+        doc.name?.trim() ||
+        defaultPipelineName(doc.contentPrompt, new Date(doc.startedAt ?? Date.now())),
       contentPrompt: doc.contentPrompt,
       nodeCount: Array.isArray(doc.nodes) ? doc.nodes.length : 0,
       nodeTypes: uniquePipelineNodeTypes(doc.nodes),
@@ -194,5 +203,26 @@ export class PipelineService {
 
   getPipelineTimeline(pipelineId: string, auth: TenancyAuth) {
     return this.orchestration.getPipelineTimeline(pipelineId, auth);
+  }
+
+  async updateName(
+    pipelineId: string,
+    dto: UpdatePipelineDto,
+    auth: TenancyAuth,
+  ): Promise<UpdatePipelineResponseDto> {
+    const name = dto.name.trim();
+    const pipeline = await this.pipelineModel
+      .findOneAndUpdate(
+        mergeUserIdFilter({ pipelineId }, auth),
+        { $set: { name } },
+        { new: true },
+      )
+      .select({ pipelineId: 1, name: 1 })
+      .lean()
+      .exec();
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${pipelineId} not found`);
+    }
+    return { pipelineId: pipeline.pipelineId, name: pipeline.name };
   }
 }

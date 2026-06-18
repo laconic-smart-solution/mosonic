@@ -246,7 +246,8 @@ const keywordPlannerConfigSchema = z
 
 const branchConfigSchema = z
   .object({
-    mode: z.enum(['rule_channels']).optional(),
+    mode: z.enum(['rule_channels', 'wizard_channels']).optional(),
+    channels: z.array(z.string().min(1)).optional(),
   })
   .strict();
 

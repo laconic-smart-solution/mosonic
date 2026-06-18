@@ -379,6 +379,7 @@
     "exitPreviewHint": "清除或再次点击所选流水线以退出预览并生成。",
     "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
     "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}",
+    "emptyWorkflowHint": "通过问答向导配置工作流，然后在每次运行时生成内容。",
     "modeUseCurrentWorkflow": "使用当前工作流",
     "modeGenerateWorkflow": "自动生成工作流",
     "modeTabCurrent": "当前",
@@ -430,8 +431,13 @@
   "usedPipelines": {
     "aria": "已用流水线",
     "title": "已用流水线",
-    "previewing": "预览运行中 · 再次点击或清除以编辑工作流",
-    "clear": "清除",
+    "previewing": "正在预览此运行。应用可将结构复制到工作流编辑器。",
+    "apply": "应用到工作流",
+    "applying": "应用中…",
+    "clear": "清除预览",
+    "rename": "重命名流水线",
+    "applySuccess": "已将流水线结构应用到工作流，可在就绪后保存。",
+    "applyFailed": "无法将流水线应用到工作流。",
     "noPrompt": "无提示词",
     "nodes_one": "节点",
     "nodes_other": "节点",
@@ -495,6 +501,83 @@
     "cinematic": "电影感"
   },
   "rebuildTooltip": "根据当前规则和渠道设置刷新工作流节点。",
+  "qaWizard": {
+    "title": "生成工作流",
+    "yes": "是",
+    "no": "否",
+    "back": "上一步",
+    "next": "下一步",
+    "generate": "生成工作流",
+    "generating": "生成中…",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "validation": {
+      "selectAtLeastOneChannel": "请至少选择一个渠道。",
+      "selectAtLeastOneLanguage": "请至少选择一种目标语言。"
+    },
+    "languages": {
+      "thai": "泰语",
+      "english": "英语",
+      "japanese": "日语",
+      "chinese": "中文",
+      "korean": "韩语",
+      "spanish": "西班牙语",
+      "french": "法语",
+      "german": "德语"
+    },
+    "steps": {
+      "webSearch": {
+        "title": "是否为此内容使用网络搜索？",
+        "description": "在文本生成前添加情报步骤以收集趋势和市场信息。"
+      },
+      "keywordPlanner": {
+        "title": "是否规划目标关键词？",
+        "description": "根据活动规则，在文本生成前添加关键词规划步骤。"
+      },
+      "summary": {
+        "title": "是否生成摘要？",
+        "description": "下一步将选择活动规则中的哪些渠道需要摘要。"
+      },
+      "summaryChannels": {
+        "title": "哪些渠道需要摘要？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "image": {
+        "title": "是否生成图片？",
+        "description": "下一步将选择活动规则中的哪些渠道需要图片。"
+      },
+      "imageChannels": {
+        "title": "哪些渠道需要图片？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "video": {
+        "title": "是否生成视频？",
+        "description": "下一步将选择活动规则中的哪些渠道需要视频。"
+      },
+      "videoChannels": {
+        "title": "哪些渠道需要视频？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "translate": {
+        "title": "是否翻译内容？",
+        "description": "下一步将选择活动规则中的哪些渠道需要翻译。"
+      },
+      "translationChannels": {
+        "title": "哪些渠道需要翻译？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "targetLanguages": {
+        "title": "目标语言",
+        "description": "每种语言将添加一个翻译步骤。"
+      },
+      "additionalMessage": {
+        "title": "还有其他要求吗？",
+        "description": "本次生成的可选说明（语气、主题、行动号召等）。",
+        "placeholder": "例如：紧急宣布黑色星期五五折优惠…"
+      }
+    }
+  },
   "aria": {
     "openNodeSettings": "打开节点设置",
     "addNode": "添加节点",

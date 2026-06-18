@@ -13,8 +13,10 @@ import {
 import { WorkflowController } from './workflow.controller';
 import { WorkflowHeygenController } from './workflow-heygen.controller';
 import { WorkflowHeygenService } from './workflow-heygen.service';
+import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
 import { Workflow, WorkflowSchema } from './schemas/workflow.schema';
 import { WorkflowGenerationService } from './services/workflow-generation.service';
+import { WorkflowConfigGenerationService } from './services/workflow-config-generation.service';
 import { WorkflowService } from './workflow.service';
 import { WorkflowResolveService } from './workflow-resolve.service';
 
@@ -29,12 +31,14 @@ import { WorkflowResolveService } from './workflow-resolve.service';
     MongooseModule.forFeature([
       { name: Workflow.name, schema: WorkflowSchema },
       { name: WorkflowNode.name, schema: WorkflowNodeSchema },
+      { name: Pipeline.name, schema: PipelineSchema },
     ]),
   ],
   controllers: [WorkflowController, WorkflowHeygenController],
   providers: [
     WorkflowService,
     WorkflowGenerationService,
+    WorkflowConfigGenerationService,
     WorkflowResolveService,
     WorkflowHeygenService,
   ],

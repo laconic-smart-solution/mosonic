@@ -119,8 +119,18 @@ export function PipelineListCard({
             </p>
           ) : null}
           <p className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight text-foreground">
-            {truncatePrompt(item.contentPrompt || t("card.noPrompt"), 140)}
+            {truncatePrompt(
+              item.name?.trim() ||
+                item.contentPrompt ||
+                t("card.noName"),
+              140,
+            )}
           </p>
+          {item.name?.trim() && item.contentPrompt?.trim() ? (
+            <p className="line-clamp-1 text-[11px] text-muted-foreground">
+              {truncatePrompt(item.contentPrompt, 100)}
+            </p>
+          ) : null}
         </div>
 
         <div className="min-h-[1.75rem]">
