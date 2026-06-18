@@ -485,6 +485,83 @@ describe('GraphMaterializationService', () => {
     ).toBe(false);
   });
 
+  it('materializes twitter lane templates when rule channel label is Twitter / X', () => {
+    const ruleFour = {
+      channels: [
+        { channel: 'Instagram', priority: 'high', contentStyle: 'visual' },
+        { channel: 'Facebook', priority: 'medium', contentStyle: 'story' },
+        { channel: 'LinkedIn', priority: 'medium', contentStyle: 'professional' },
+        { channel: 'Twitter / X', priority: 'medium', contentStyle: 'short' },
+      ],
+    } as never;
+    const nodes = [
+      {
+        nodeId: 'text',
+        type: WorkflowNodeType.TextGeneration,
+        order: 1,
+        isLocked: true,
+        config: {},
+      },
+      {
+        nodeId: 'branch',
+        type: WorkflowNodeType.Branch,
+        order: 2,
+        isLocked: false,
+        config: { mode: 'rule_channels' },
+      },
+      {
+        nodeId: 'adapt_tw',
+        type: WorkflowNodeType.Adapt,
+        order: 3,
+        isLocked: false,
+        config: { laneId: 'twitter' },
+      },
+      {
+        nodeId: 'sum_tw',
+        type: WorkflowNodeType.Summarization,
+        order: 4,
+        isLocked: false,
+        config: { laneId: 'twitter' },
+      },
+      {
+        nodeId: 'merge',
+        type: WorkflowNodeType.Merge,
+        order: 5,
+        isLocked: false,
+        config: {},
+      },
+    ];
+    const edges = [
+      { from: 'text', to: 'branch' },
+      { from: 'branch', to: 'adapt_tw' },
+      { from: 'adapt_tw', to: 'sum_tw' },
+      { from: 'sum_tw', to: 'merge' },
+    ];
+    const out = service.materialize(nodes, edges, ruleFour, 2);
+    expect(out.lanes).toContain('twitter');
+    expect(
+      out.nodes.some(
+        (n) =>
+          n.lane === 'twitter' &&
+          n.type === WorkflowNodeType.Adapt &&
+          n.nodeId === 'adapt_tw__twitter',
+      ),
+    ).toBe(true);
+    expect(
+      out.nodes.some(
+        (n) =>
+          n.lane === 'twitter' &&
+          n.type === WorkflowNodeType.Summarization &&
+          n.nodeId === 'sum_tw__twitter',
+      ),
+    ).toBe(true);
+    expect(
+      out.edges.some(
+        (e) => e.from === 'adapt_tw__twitter' && e.to === 'sum_tw__twitter',
+      ),
+    ).toBe(true);
+  });
+
   it('mergeWorkflowLaneIntoConfig adds laneId when missing', () => {
     expect(mergeWorkflowLaneIntoConfig({}, 'linkedin')).toEqual({
       laneId: 'linkedin',

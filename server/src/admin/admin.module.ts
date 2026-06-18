@@ -7,6 +7,7 @@ import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
 import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { UserPlan, UserPlanSchema } from '../plan/schemas/user-plan.schema';
+import { Plan, PlanSchema } from '../plan/schemas/plan.schema';
 import { Workflow, WorkflowSchema } from '../workflow/schemas/workflow.schema';
 import { AdminContentController } from './controllers/admin-content.controller';
 import { AdminCostController } from './controllers/admin-cost.controller';
@@ -38,6 +39,7 @@ import { AdminUsersService } from './services/admin-users.service';
       { name: Workflow.name, schema: WorkflowSchema },
       { name: CostEntry.name, schema: CostEntrySchema },
       { name: UserPlan.name, schema: UserPlanSchema },
+      { name: Plan.name, schema: PlanSchema },
     ]),
   ],
   controllers: [

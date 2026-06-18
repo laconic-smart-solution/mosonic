@@ -17,8 +17,23 @@ const LABEL_BY_ID = new Map(
   DISTRIBUTION_CHANNELS.map((c) => [c.id, c.label] as const),
 )
 
+const ID_BY_LABEL = new Map(
+  DISTRIBUTION_CHANNELS.map((c) => [c.label.trim().toLowerCase(), c.id] as const),
+)
+
 export function normalizeChannelId(channel: string): string {
   return channel.trim().toLowerCase()
+}
+
+/** Map rule labels, aliases, or ids to a canonical distribution channel id. */
+export function resolveDistributionChannelId(channel: string): string {
+  const raw = normalizeChannelId(channel)
+  if (!raw) return raw
+  if (LABEL_BY_ID.has(raw)) return raw
+  const fromLabel = ID_BY_LABEL.get(raw)
+  if (fromLabel) return fromLabel
+  if (raw.includes("twitter") || raw === "x") return "twitter"
+  return raw
 }
 
 export function channelLabel(channelId: string): string {
@@ -35,7 +50,7 @@ export function channelIdsToHandles(channelIds: string[]): Array<{ id: string; l
   const seen = new Set<string>()
   const handles: Array<{ id: string; label: string }> = []
   for (const raw of channelIds) {
-    const id = normalizeChannelId(raw)
+    const id = resolveDistributionChannelId(raw)
     if (!id || seen.has(id)) continue
     if (!LABEL_BY_ID.has(id)) continue
     seen.add(id)
@@ -51,7 +66,7 @@ export function ruleChannelNamesToIds(
   const ids: string[] = []
   const seen = new Set<string>()
   for (const row of ruleChannels ?? []) {
-    const id = normalizeChannelId(row.channel ?? "")
+    const id = resolveDistributionChannelId(row.channel ?? "")
     if (!id || seen.has(id) || !LABEL_BY_ID.has(id)) continue
     seen.add(id)
     ids.push(id)

@@ -1,7 +1,10 @@
 import type { Edge } from "@xyflow/react"
 
 import { NODE_W, PIPE_GAP, type WfRfNode } from "@/features/workflow/data/workflow-model"
-import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import {
+  normalizeLaneId,
+  type BranchChannelHandle,
+} from "@/features/workflow/lib/branch-channels"
 
 export const LANE_GAP = 140
 
@@ -57,12 +60,23 @@ export function findBranchNode(nodes: WfRfNode[]): WfRfNode | undefined {
   return nodes.find((n) => n.type === "branchNode")
 }
 
+/** Canonical lane id from RF node `data.lane` or `config.laneId`. */
+export function laneKeyFromRfNode(node: WfRfNode): string {
+  if (node.type === "plus_placeholder") return ""
+  const fromLane = node.data.lane?.trim()
+  if (fromLane) return normalizeLaneId(fromLane)
+  const laneId = (node.data.config as { laneId?: string } | undefined)?.laneId
+  return typeof laneId === "string" && laneId.trim()
+    ? normalizeLaneId(laneId)
+    : ""
+}
+
 export function adaptNodesByLane(nodes: WfRfNode[]): Map<string, WfRfNode> {
   const map = new Map<string, WfRfNode>()
   for (const node of nodes) {
     if (node.type === "plus_placeholder") continue
     if (node.data.wfType !== "adapt") continue
-    const lane = node.data.lane?.trim()
+    const lane = laneKeyFromRfNode(node)
     if (lane) map.set(lane, node)
   }
   return map
@@ -72,7 +86,7 @@ export function channelsMissingAdapt(
   channels: BranchChannelHandle[],
   byLane: Map<string, WfRfNode>,
 ): BranchChannelHandle[] {
-  return channels.filter((ch) => !byLane.has(ch.id))
+  return channels.filter((ch) => !byLane.has(normalizeLaneId(ch.id)))
 }
 
 export function mergeNodePosition(branchPosition: {
@@ -97,7 +111,7 @@ export function collectBranchCascadeDeleteIds(
 
   for (const node of nodes) {
     if (node.type === "plus_placeholder") continue
-    if (node.data.lane?.trim()) remove.add(node.id)
+    if (laneKeyFromRfNode(node)) remove.add(node.id)
   }
 
   const outgoing = new Map<string, string[]>()

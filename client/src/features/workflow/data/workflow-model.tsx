@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from "react"
 import type { Edge, Node } from "@xyflow/react"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
 import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
-import { channelLabel } from "@/shared/constants/distribution-channels"
+import { channelLabel, normalizeChannelId } from "@/shared/constants/distribution-channels"
 import i18n from "@/i18n"
 import {
   isPreviewEdgeId,
@@ -764,6 +764,8 @@ export function apiNodesToRf(
     const laneFromApi =
       typeof n.lane === "string" && n.lane.trim() ? n.lane.trim() : ""
     const effectiveLaneKey = laneFromApi || laneFromConfig
+      ? normalizeChannelId(laneFromApi || laneFromConfig)
+      : ""
     const channelDisplay =
       effectiveLaneKey && channelHandles.length > 0
         ? (channelHandles.find((ch) => ch.id === effectiveLaneKey)?.label ??

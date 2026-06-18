@@ -1,6 +1,7 @@
 import {
   channelIdsToHandles,
   normalizeChannelId,
+  resolveDistributionChannelId,
   ruleChannelNamesToIds,
 } from "@/shared/constants/distribution-channels"
 
@@ -24,7 +25,7 @@ export const RULE_CHANNELS_BRANCH_CONFIG: BranchNodeConfig = {
 
 /** Canonical lane / merge-handle id (matches server `normalizeLaneId`). */
 export function normalizeLaneId(lane: string): string {
-  return normalizeChannelId(lane)
+  return resolveDistributionChannelId(lane)
 }
 
 /**

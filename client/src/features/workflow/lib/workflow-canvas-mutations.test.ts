@@ -4,12 +4,14 @@ import { NODE_W, PIPE_GAP, type WfRfNode } from "@/features/workflow/data/workfl
 
 import {
   addNodeAfter,
+  applySpawnLaneAdapts,
   buildPlusEdge,
   insertNodeBetween,
   materializeBranchSubgraph,
   repairOrphanLaneAdapts,
   replaceInitialPlaceholder,
 } from "./workflow-canvas-mutations"
+import { adaptNodesByLane } from "./workflow-lane-layout"
 
 function textNode(id: string, x = 0, y = 100): WfRfNode {
   return {
@@ -145,6 +147,128 @@ describe("workflow-canvas-mutations", () => {
     expect(nodes.some((n) => n.type === "mergeNode")).toBe(true)
     expect(edges.some((e) => e.sourceHandle === "instagram")).toBe(true)
     expect(edges.some((e) => e.targetHandle === "facebook")).toBe(true)
+  })
+
+  it("addNodeAfter branch spawns adapt for every channel including the last lane", () => {
+    const channels = [
+      { id: "instagram", label: "Instagram" },
+      { id: "facebook", label: "Facebook" },
+      { id: "linkedin", label: "LinkedIn" },
+    ]
+    const source = textNode("t", 0, 140)
+    let nodes: WfRfNode[] = [source]
+    let edges: ReturnType<typeof buildPlusEdge>[] = []
+
+    addNodeAfter({
+      sourceId: "t",
+      wfType: "branch",
+      nodes,
+      edges,
+      setNodes: (u) => {
+        nodes = typeof u === "function" ? u(nodes) : u
+      },
+      setEdges: (u) => {
+        edges = typeof u === "function" ? u(edges) : u
+      },
+      branchChannels: channels,
+    })
+
+    expect(nodes.filter((n) => n.data.wfType === "adapt")).toHaveLength(3)
+    expect(edges.some((e) => e.sourceHandle === "linkedin")).toBe(true)
+    expect(edges.some((e) => e.targetHandle === "linkedin")).toBe(true)
+  })
+
+  it("applySpawnLaneAdapts fills only the missing last lane", () => {
+    const channels = [
+      { id: "instagram", label: "Instagram" },
+      { id: "facebook", label: "Facebook" },
+      { id: "linkedin", label: "LinkedIn" },
+    ]
+    const branch: WfRfNode = {
+      id: "branch",
+      type: "branchNode",
+      position: { x: 320, y: 140 },
+      data: {
+        label: "Branch",
+        wfType: "branch",
+        status: "idle",
+        locked: false,
+        config: {},
+        channelHandles: channels,
+      },
+      draggable: true,
+    }
+    const merge: WfRfNode = {
+      id: "merge",
+      type: "mergeNode",
+      position: { x: 880, y: 140 },
+      data: {
+        label: "Merge",
+        wfType: "merge",
+        status: "idle",
+        locked: false,
+        config: {},
+        channelHandles: channels,
+      },
+      draggable: true,
+    }
+    const adapt = (id: string, lane: string, y: number): WfRfNode => ({
+      id,
+      type: "wfNode",
+      position: { x: 560, y },
+      data: {
+        label: `Adapt ${lane}`,
+        wfType: "adapt",
+        status: "idle",
+        locked: false,
+        config: { laneId: lane },
+        lane,
+      },
+      draggable: true,
+    })
+
+    const nodes = [
+      textNode("t", 0, 140),
+      branch,
+      adapt("adapt-ig", "instagram", 80),
+      adapt("adapt-fb", "facebook", 140),
+      merge,
+    ]
+    const edges = [
+      buildPlusEdge("t", "branch"),
+      buildPlusEdge("branch", "adapt-ig", { sourceHandle: "instagram" }),
+      buildPlusEdge("adapt-ig", "merge", { targetHandle: "instagram" }),
+      buildPlusEdge("branch", "adapt-fb", { sourceHandle: "facebook" }),
+      buildPlusEdge("adapt-fb", "merge", { targetHandle: "facebook" }),
+    ]
+
+    const result = applySpawnLaneAdapts(nodes, edges, "branch", channels)
+    expect(result.created.filter((n) => n.data.wfType === "adapt")).toHaveLength(1)
+    expect(result.created[0]?.data.lane).toBe("linkedin")
+    expect(
+      result.edges.some((e) => e.source === "branch" && e.sourceHandle === "linkedin"),
+    ).toBe(true)
+    expect(
+      result.edges.some((e) => e.target === "merge" && e.targetHandle === "linkedin"),
+    ).toBe(true)
+  })
+
+  it("adaptNodesByLane matches config.laneId when data.lane is unset", () => {
+    const node: WfRfNode = {
+      id: "adapt-li",
+      type: "wfNode",
+      position: { x: 0, y: 0 },
+      data: {
+        label: "Adapt",
+        wfType: "adapt",
+        status: "idle",
+        locked: false,
+        config: { laneId: "linkedin" },
+        lane: null,
+      },
+      draggable: true,
+    }
+    expect(adaptNodesByLane([node]).has("linkedin")).toBe(true)
   })
 
   it("materializeBranchSubgraph is a no-op without channels", () => {

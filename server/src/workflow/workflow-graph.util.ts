@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { resolveDistributionChannelId } from './distribution-channels.util';
 
 export interface WorkflowGraphEdge {
   from: string;
@@ -336,7 +337,7 @@ export function areAllDependenciesMet(
 }
 
 export function normalizeLaneId(channel: string): string {
-  return channel.trim().toLowerCase();
+  return resolveDistributionChannelId(channel);
 }
 
 export type PipelineNodeLaneLike = {
@@ -352,11 +353,13 @@ export function getAncestorsForLane(
   nodesById: Map<string, PipelineNodeLaneLike>,
 ): Set<string> {
   const all = getAncestors(edges, nodeId);
-  const lane = nodeLane?.trim() || null;
+  const lane = nodeLane?.trim() ? normalizeLaneId(nodeLane) : null;
   const filtered = new Set<string>();
   for (const ancestorId of all) {
     const ancestor = nodesById.get(ancestorId);
-    const ancestorLane = ancestor?.lane?.trim() || null;
+    const ancestorLane = ancestor?.lane?.trim()
+      ? normalizeLaneId(ancestor.lane)
+      : null;
     if (ancestorLane === null || ancestorLane === lane) {
       filtered.add(ancestorId);
     }

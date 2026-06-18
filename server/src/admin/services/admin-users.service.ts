@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
 import { Pipeline, type PipelineDocument } from '../../pipeline/schemas/pipeline.schema';
 import { UserPlan, type UserPlanDocument } from '../../plan/schemas/user-plan.schema';
+import { Plan, type PlanDocument } from '../../plan/schemas/plan.schema';
 import { Rule, type RuleDocument } from '../../rule/schemas/rule.schema';
 import {
   User,
@@ -46,6 +47,8 @@ export class AdminUsersService {
     private readonly costModel: Model<CostEntryDocument>,
     @InjectModel(UserPlan.name)
     private readonly userPlanModel: Model<UserPlanDocument>,
+    @InjectModel(Plan.name)
+    private readonly planModel: Model<PlanDocument>,
   ) {}
 
   async listUsers(query: {
@@ -164,6 +167,7 @@ export class AdminUsersService {
       pipelineThisMonth,
       costThisMonth,
       costByProvider,
+      userPlan,
     ] = await Promise.all([
       this.ruleModel.countDocuments({ userId }),
       this.workflowModel.countDocuments({ userId }),
@@ -182,17 +186,42 @@ export class AdminUsersService {
         { $match: { userId, billingPeriod: mStart } },
         { $group: { _id: '$provider', total: { $sum: '$costUsd' } } },
       ]),
+      this.userPlanModel
+        .findOne({ userId, status: 'active' })
+        .select({
+          creditsRemaining: 1,
+          creditsPerMonth: 1,
+          creditsUsed: 1,
+          planId: 1,
+        })
+        .lean(),
     ]);
 
+    const planDoc = userPlan?.planId
+      ? await this.planModel
+          .findOne({ planId: userPlan.planId })
+          .select({ name: 1 })
+          .lean()
+      : null;
+
     const safeUser = {
-      ...user,
+      userId: user.userId,
+      email: user.email,
       displayName: displayName(user),
+      role: user.role,
       isSuspended: user.status === UserStatus.DISABLED,
+      createdAt: (user as { createdAt?: Date }).createdAt,
       lastActiveAt: user.lastLoginAt ?? null,
     };
 
     return {
       user: safeUser,
+      credits: {
+        remaining: userPlan?.creditsRemaining ?? null,
+        perMonth: userPlan?.creditsPerMonth ?? null,
+        used: userPlan?.creditsUsed ?? null,
+        planName: planDoc?.name ?? null,
+      },
       stats: {
         ruleCount,
         workflowCount,

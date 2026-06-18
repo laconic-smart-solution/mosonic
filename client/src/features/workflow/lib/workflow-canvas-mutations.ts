@@ -26,6 +26,7 @@ import {
   findBranchNode,
   findMergeNode,
   laneAdaptPosition,
+  laneKeyFromRfNode,
   mergeNodePosition,
 } from "@/features/workflow/lib/workflow-lane-layout"
 import { randomUuid } from "@/lib/random-uuid"
@@ -212,11 +213,7 @@ export function deleteBranchCascade({
 }
 
 function adaptHasLane(node: WfRfNode): boolean {
-  const d = workflowNodeData(node)
-  if (!d) return false
-  if (d.lane?.trim()) return true
-  const laneId = (d.config as { laneId?: string } | undefined)?.laneId
-  return typeof laneId === "string" && laneId.trim().length > 0
+  return laneKeyFromRfNode(node).length > 0
 }
 
 function unassignedAdaptNodes(nodes: WfRfNode[]): WfRfNode[] {
@@ -304,10 +301,19 @@ export function applySpawnLaneAdapts(
       return { nodes, edges, created: [] }
     }
     validationEdges.push({ source: edge.source, target: edge.target })
-    validationNodes.push({
-      id: edge.target,
-      data: { wfType: "adapt", lane: edge.targetHandle ?? null },
-    })
+    if (!validationNodes.some((n) => n.id === edge.target)) {
+      const targetNode =
+        workingNodes.find((n) => n.id === edge.target) ??
+        created.find((n) => n.id === edge.target)
+      const targetData = targetNode ? workflowNodeData(targetNode) : null
+      validationNodes.push({
+        id: edge.target,
+        data: {
+          wfType: targetData?.wfType ?? "",
+          lane: targetData?.lane ?? edge.targetHandle ?? null,
+        },
+      })
+    }
   }
 
   return {
@@ -375,22 +381,13 @@ export function repairOrphanLaneAdapts(
   return { nodes: nextNodes, edges: nextEdges, repaired: true }
 }
 
-function laneIdFromNode(node: WfRfNode): string {
-  const data = workflowNodeData(node)
-  if (!data) return ""
-  const fromLane = data.lane?.trim()
-  if (fromLane) return fromLane
-  const config = data.config as { laneId?: string } | undefined
-  return typeof config?.laneId === "string" ? config.laneId.trim() : ""
-}
-
 function relabelLaneNode(
   node: WfRfNode,
   branchChannels: BranchChannelHandle[],
 ): WfRfNode {
   const data = workflowNodeData(node)
   if (!data) return node
-  const laneKey = laneIdFromNode(node)
+  const laneKey = laneKeyFromRfNode(node)
   const handle = branchChannels.find((ch) => ch.id === laneKey)
   if (!handle) return node
   const label = formatLaneNodeLabel(data.wfType, handle.label)
@@ -442,7 +439,7 @@ export function syncBranchLanesToChannels(
     if (node.type === "mergeNode" || workflowNodeData(node)?.wfType === "merge") {
       continue
     }
-    const laneKey = laneIdFromNode(node)
+    const laneKey = laneKeyFromRfNode(node)
     if (!laneKey) continue
     if (!selected.has(laneKey)) {
       removeIds.add(node.id)
@@ -498,7 +495,7 @@ export function syncBranchLanesToChannels(
         data: { ...data, channelHandles: branchChannels },
       } as WfRfNode
     }
-    const laneKey = laneIdFromNode(n)
+    const laneKey = laneKeyFromRfNode(n)
     if (!laneKey || !selected.has(laneKey)) return n
     return relabelLaneNode(n, branchChannels)
   })

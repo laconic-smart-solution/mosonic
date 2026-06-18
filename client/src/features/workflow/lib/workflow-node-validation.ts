@@ -2,6 +2,8 @@ import type { Edge } from "@xyflow/react"
 
 import i18n from "@/i18n"
 import type { WfNodeData, WfRfNode } from "@/features/workflow/data/workflow-model"
+import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
+import { laneKeyFromRfNode } from "@/features/workflow/lib/workflow-lane-layout"
 
 import { canvasNextMatrix } from "@workflow-next-matrix"
 
@@ -150,7 +152,7 @@ function adaptNodeByLane(ctx: ValidationContext): Map<string, string> {
   for (const node of ctx.nodes) {
     if (node.data.wfType !== "adapt") continue
     const lane = node.data.lane?.trim()
-    if (lane) map.set(lane, node.id)
+    if (lane) map.set(normalizeLaneId(lane), node.id)
   }
   return map
 }
@@ -324,7 +326,7 @@ export function toValidationNodes(rfNodes: WfRfNode[]): ValidationGraphNode[] {
       id: n.id,
       data: {
         wfType: n.data.wfType,
-        lane: n.data.lane,
+        lane: laneKeyFromRfNode(n) || null,
       },
     }))
 }
@@ -361,12 +363,7 @@ function wfTypeLabel(wfType: string): string {
 }
 
 function laneIdFromRfNode(node: WfRfNode): string {
-  if (node.type === "plus_placeholder") return ""
-  const data = node.data as WfNodeData
-  const fromLane = data.lane?.trim()
-  if (fromLane) return fromLane
-  const config = data.config as { laneId?: string } | undefined
-  return typeof config?.laneId === "string" ? config.laneId.trim() : ""
+  return laneKeyFromRfNode(node)
 }
 
 /**
