@@ -62,6 +62,11 @@ export type ContentPageResponse = {
   }
 }
 
+export type ContentStatsResponse = {
+  total: number
+  byStatus: Partial<Record<ContentStatus, number>>
+}
+
 export type ContentOutputs = {
   keywords?: string
   text?: string
@@ -103,6 +108,7 @@ export type AvailableNodeTypesResponse = {
 
 export type GenerateNodeBody = {
   type: WorkflowNodeType
+  nodeId?: string
   config?: Record<string, unknown>
   /** @deprecated Use `config` instead. */
   userPrompt?: string

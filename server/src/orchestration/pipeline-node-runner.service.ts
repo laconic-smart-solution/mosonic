@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { UnrecoverableError } from 'bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { AnalyticsRepository } from '../analytics/analytics.repository';
-import { buildIntelligenceContextFromAnalytics } from '../analytics/intelligence-context.util';
+import { buildIntelligenceContextFromPostMetrics } from '../analytics/intelligence-context.util';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -35,7 +35,7 @@ export class PipelineNodeRunnerService {
     private readonly events: EventsService,
     @InjectModel(Rule.name)
     private readonly ruleModel: Model<RuleDocument>,
-    private readonly analyticsRepo: AnalyticsRepository,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {
     this.laneScopedPause =
       config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() === 'true';
@@ -89,8 +89,16 @@ export class PipelineNodeRunnerService {
     const executionRule = resolveExecutionRule(pipeline, rule);
     let intelligenceContext;
     if (node.type === WorkflowNodeType.Intelligence) {
-      const analytics = await this.analyticsRepo.findByRuleRef(payload.ruleId);
-      intelligenceContext = buildIntelligenceContextFromAnalytics(analytics);
+      const rows = await this.postAnalyticsService.aggregateMetricsForRule(
+        payload.ruleId,
+      );
+      intelligenceContext = buildIntelligenceContextFromPostMetrics(
+        rows.map((row) => ({
+          channel: row.platform,
+          contentRef: row.contentRef,
+          metrics: row.metrics,
+        })),
+      );
     }
 
     const executorInput: NodeExecutorInput = {

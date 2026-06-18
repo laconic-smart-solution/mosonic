@@ -14,22 +14,23 @@ import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import { WorkflowNodeGuideSection } from "@/features/workflow/components/workflow-node-guide-section"
 import {
   backendTypeToCanvas,
   buildGenerateMoreDefaultConfig,
   type GenerateMoreRuleHint,
 } from "@/features/workflow/data/workflow-model"
+import { randomUuid } from "@/lib/random-uuid"
 
 import {
   type OutputKey,
@@ -94,8 +95,6 @@ export type UploadContentReviewPanelProps = {
   embedInUpload?: boolean
   /** Middle column when embedded in the Upload workspace (caption, media, publish) */
   preview?: ReactNode
-  /** Left column when embedded: scheduled/post status + platform card preview */
-  channelPreview?: ReactNode
   /** Fired whenever per-node outputs / edits change (used to resolve pinned drag-drop captions). */
   onWorkflowLayersChange?: (layers: WorkflowNodeLayersSnapshot) => void
   /** Channel keys (tabs) to show in Generated contents header filter. */
@@ -109,7 +108,6 @@ export function UploadContentReviewPanel({
   uploadId,
   embedInUpload = false,
   preview,
-  channelPreview,
   onWorkflowLayersChange,
   generationChannelKeys,
   generationDefaultKey = "all",
@@ -184,6 +182,9 @@ export function UploadContentReviewPanel({
   const [genMoreConfigDraft, setGenMoreConfigDraft] = useState<
     Record<string, unknown>
   >({})
+  const [genMoreDraftNodeId, setGenMoreDraftNodeId] = useState<string | null>(
+    null,
+  )
   const [isGeneratingMore, setIsGeneratingMore] = useState(false)
   const [generateMorePending, setGenerateMorePending] = useState<{
     nodeId: string
@@ -280,7 +281,6 @@ export function UploadContentReviewPanel({
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
       "video_generation",
-      "transcription",
       "summarization",
       "translation",
       "image_generation",
@@ -485,6 +485,7 @@ export function UploadContentReviewPanel({
     if (!genMoreOpen || !contentId) return
     setSelectedGenType(null)
     setGenMoreConfigDraft({})
+    setGenMoreDraftNodeId(null)
     let cancelled = false
     setAvailableTypesLoading(true)
     void contentService
@@ -528,7 +529,9 @@ export function UploadContentReviewPanel({
         const { nodeId } = await contentService.generateNode(contentId, {
           type,
           config,
+          ...(genMoreDraftNodeId ? { nodeId: genMoreDraftNodeId } : {}),
         })
+        setGenMoreDraftNodeId(null)
         setRunState(nodeId, { phase: "running", stream: "", errorMessage: "" })
         generateMoreRetryRef.current = { type, config, nodeId }
         setGenerateMorePending({ nodeId, type, config })
@@ -543,7 +546,7 @@ export function UploadContentReviewPanel({
         setIsGeneratingMore(false)
       }
     },
-    [contentId, data?.workflowRef, queryClient, setRunState]
+    [contentId, data?.workflowRef, genMoreDraftNodeId, queryClient, setRunState]
   )
 
   const approveMutation = useMutation({
@@ -722,6 +725,13 @@ export function UploadContentReviewPanel({
     }
   }, [])
 
+  const closeGenMore = useCallback(() => {
+    setGenMoreOpen(false)
+    setSelectedGenType(null)
+    setGenMoreConfigDraft({})
+    setGenMoreDraftNodeId(null)
+  }, [])
+
   if (!contentId) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
@@ -757,43 +767,39 @@ export function UploadContentReviewPanel({
     )
   }
 
-  const genMorePopover = (
-    <Popover
+  const genMoreButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-9 border-[#EDE9E1] bg-card text-xs text-[#0F1F3D] shadow-sm"
+      disabled={blockPipeline || saveLoading}
+      onClick={() => setGenMoreOpen(true)}
+    >
+      <Sparkles className="mr-1.5 size-3.5 text-[#00A589]" />
+      Generate more
+    </Button>
+  )
+
+  const genMoreDialog = (
+    <Dialog
       open={genMoreOpen}
       onOpenChange={(open) => {
-        setGenMoreOpen(open)
-        if (!open) {
-          setSelectedGenType(null)
-          setGenMoreConfigDraft({})
+        if (open) {
+          setGenMoreOpen(true)
+          return
         }
+        closeGenMore()
       }}
     >
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 border-[#EDE9E1] bg-card text-xs text-[#0F1F3D] shadow-sm"
-            disabled={blockPipeline || saveLoading}
-          >
-            <Sparkles className="mr-1.5 size-3.5 text-[#00A589]" />
-            Generate more
-          </Button>
-        }
-      />
-      <PopoverContent
-        className="w-[min(100vw-2rem,300px)] p-4"
-        side="bottom"
-        align="start"
-      >
-        <PopoverHeader className="space-y-0 pb-3">
-          <PopoverTitle className="text-sm font-semibold text-[#0F1F3D]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-[#0F1F3D]">
             {selectedGenType
               ? pipelineStepLabel(selectedGenType)
               : "Add another output"}
-          </PopoverTitle>
-        </PopoverHeader>
+          </DialogTitle>
+        </DialogHeader>
         {availableTypesLoading ? (
           <p className="text-xs text-[#A89D8E]">Loading…</p>
         ) : !selectedGenType ? (
@@ -802,7 +808,7 @@ export function UploadContentReviewPanel({
               No output types are available.
             </p>
           ) : (
-            <div className="flex max-h-[280px] flex-col gap-2 overflow-y-auto pr-1">
+            <div className="flex max-h-[min(60vh,360px)] flex-col gap-2 overflow-y-auto pr-1">
               {availableTypes.map((t) => (
                 <button
                   key={t}
@@ -810,6 +816,7 @@ export function UploadContentReviewPanel({
                   className="flex w-full items-center gap-2.5 rounded-xl border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2.5 text-left text-sm text-[#0F1F3D] transition-colors hover:border-[#00C9A7]/50 hover:bg-[#E0FAF5]/30"
                   onClick={() => {
                     setSelectedGenType(t)
+                    setGenMoreDraftNodeId(randomUuid())
                     setGenMoreConfigDraft(
                       buildGenerateMoreDefaultConfig(t, ruleHint)
                     )
@@ -830,19 +837,24 @@ export function UploadContentReviewPanel({
               variant="ghost"
               size="sm"
               className="-ml-2 h-8 justify-start text-xs text-[#857A6C]"
-              onClick={() => setSelectedGenType(null)}
+              onClick={() => {
+                setSelectedGenType(null)
+                setGenMoreDraftNodeId(null)
+              }}
             >
               ← Change type
             </Button>
-            <p className="text-[11px] leading-relaxed text-[#857A6C]">
-              Tune how this step runs. The campaign brief from the original run
-              is reused automatically.
-            </p>
-            <div className="max-h-[min(50vh,320px)] overflow-y-auto pr-1">
+            <WorkflowNodeGuideSection
+              canvasType={backendTypeToCanvas(selectedGenType)}
+            />
+            <div className="max-h-[min(55vh,420px)] overflow-y-auto pr-1">
               <WorkflowNodeConfigFields
                 canvasType={backendTypeToCanvas(selectedGenType)}
                 config={genMoreConfigDraft}
                 onChange={setGenMoreConfigDraft}
+                workflowId={data?.workflowRef}
+                nodeId={genMoreDraftNodeId ?? undefined}
+                persistPresenterToServer={false}
                 compact
               />
             </div>
@@ -859,8 +871,8 @@ export function UploadContentReviewPanel({
             </Button>
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+      </DialogContent>
+    </Dialog>
   )
 
   return (
@@ -873,17 +885,7 @@ export function UploadContentReviewPanel({
         ) : null}
 
         {embedInUpload && preview !== undefined ? (
-          <div className="grid max-h-[100vh] min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-4 py-4 md:px-5 lg:grid-cols-3 lg:gap-5">
-            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-xl border border-[#EDE9E1] bg-card p-4 shadow-sm">
-              <div className="max-h-[70vh] min-w-0 flex-1 space-y-3">
-                {channelPreview ?? (
-                  <p className="text-xs text-muted-foreground">
-                    Select a channel to see how the post will look.
-                  </p>
-                )}
-              </div>
-            </div>
-
+          <div className="grid max-h-[100vh] min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-5">
             <div className="h-full min-w-0 overflow-y-auto">{preview}</div>
 
             <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-[#EDE9E1] bg-card shadow-sm">
@@ -899,7 +901,7 @@ export function UploadContentReviewPanel({
               </div>
               <div className="h-full min-h-0 flex-1 overflow-y-auto">
                 <div className="w-full border-b border-[#EDE9E1] px-4 py-3 [&_button]:w-full">
-                  {genMorePopover}
+                  {genMoreButton}
                 </div>
                 <div className="px-4 py-3">
                   <div className="mb-3 space-y-2.5">
@@ -1051,7 +1053,7 @@ export function UploadContentReviewPanel({
                 <ContentNewsSourceBanner newsMeta={data.newsMeta} />
               ) : null}
 
-              <div className="mb-4">{genMorePopover}</div>
+              <div className="mb-4">{genMoreButton}</div>
 
               <div className="flex flex-col gap-4">
                 {generationNodes.map((wfNode, cardIndex) => {
@@ -1190,6 +1192,7 @@ export function UploadContentReviewPanel({
         <ContentDetailRerunSheet
           openNodeId={rerunNodeId}
           workflowNodes={workflowNodes}
+          workflowId={data?.workflowRef}
           globalRerunning={blockPipeline}
           configDraft={rerunConfigDraft}
           onConfigChange={setRerunConfigDraft}
@@ -1212,6 +1215,8 @@ export function UploadContentReviewPanel({
           onApproveConfirm={handleApproveConfirm}
           onRejectConfirm={() => rejectMutation.mutateAsync()}
         />
+
+        {genMoreDialog}
       </div>
     </TooltipProvider>
   )

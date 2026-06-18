@@ -117,10 +117,10 @@
       "subtitle": "Linked accounts",
       "keywords": "settings account profile users"
     },
-    "analytics": {
-      "title": "Analytics",
-      "subtitle": "Metrics and reports",
-      "keywords": "analytics metrics stats"
+    "posts": {
+      "title": "Posts",
+      "subtitle": "Published and scheduled posts",
+      "keywords": "posts publish social metrics analytics"
     }
   },
   "status": {

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { FormSection, FullRow } from "./rule-form-helpers"
-import { RuleFormCommaList } from "./rule-form-comma-list"
+import { RuleFormTagList } from "./rule-form-tag-list"
 import { RuleFormInput } from "./rule-form-input"
 import { RuleFormTextarea } from "./rule-form-textarea"
 
@@ -32,13 +32,12 @@ export function BrandSectionForm() {
         />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList name="brand.brandTone" label={t("form.brand.tone")} className="min-h-16" />
+        <RuleFormTagList name="brand.brandTone" label={t("form.brand.tone")} />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList
+        <RuleFormTagList
           name="brand.brandRestrictions"
           label={t("form.brand.restrictions")}
-          className="min-h-16"
         />
       </FullRow>
       <RuleFormInput name="brand.callToAction" label={t("form.brand.callToAction")} />

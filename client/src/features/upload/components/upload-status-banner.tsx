@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-type BannerVariant =
+export type BannerVariant =
   | "hidden"
   | "not_connected"
   | "failed"

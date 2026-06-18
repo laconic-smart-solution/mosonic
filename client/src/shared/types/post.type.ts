@@ -29,6 +29,11 @@ export type PostListSort =
   | "scheduled_asc"
   | "status_asc"
 
+export type PostMediaItem = {
+  url: string
+  kind: "image" | "video"
+}
+
 /** Mongo `posts` document shape as returned by the API */
 export type PostRecord = {
   postId: string
@@ -53,6 +58,10 @@ export type PostRecord = {
   /** First image or video URL from upload channel media (list enrichment) */
   mediaPreviewUrl?: string | null
   mediaKind?: "image" | "video" | null
+  /** Full caption from upload (detail enrichment) */
+  detailCaption?: string | null
+  /** All media from upload channels (detail enrichment) */
+  mediaItems?: PostMediaItem[]
 }
 
 export type PostsListQueryParams = {
@@ -83,14 +92,46 @@ export type PostsListResponse = {
 export type PostDetailHydrated = {
   local: PostRecord
   remote: Record<string, unknown> | null
+  analytics?: PostAnalyticsSnapshot | null
 }
 
-export type PostDetailResponse = PostRecord | PostDetailHydrated
+export type PostAnalyticsSnapshot = {
+  postId: string
+  zernioPostId: string
+  syncStatus: "pending" | "synced" | "partial" | "unavailable"
+  pulledAt: string
+  period: { from: string; to: string }
+  platformMetrics: PostPlatformMetric[]
+}
+
+export type PostPlatformMetric = {
+  platform: string
+  metrics: {
+    views: number
+    clicks: number
+    engagement: number
+    conversions: number
+    likes: number
+    comments: number
+    shares: number
+    reach: number
+    engagementRate: number
+  } | null
+  syncStatus: "pending" | "synced" | "failed" | "unavailable"
+  platformPostUrl: string | null
+  errorMessage: string | null
+}
+
+export type PostDetailResponse =
+  | (PostRecord & { analytics?: PostAnalyticsSnapshot | null })
+  | PostDetailHydrated
 
 export type PatchPostBody = {
   scheduledAt?: string
   content?: string
   title?: string
+  mediaUrl?: string | null
+  mediaUrls?: string[]
 }
 
 export type BulkPostIdsBody = {

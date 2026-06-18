@@ -19,7 +19,6 @@ import {
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/shared/stores/auth.store"
-import { useAnalyticsPendingSummary } from "@/shared/queries/analytics.query"
 
 type NavItem = {
   id: string
@@ -180,22 +179,6 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    id: "analytics",
-    labelKey: "nav.analytics",
-    path: "/analytics",
-    icon: (active) => (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path
-          d="M2 12l3-4 3 2 3-5 3 3"
-          stroke={active ? "#fff" : "currentColor"}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
     id: "usage",
     labelKey: "nav.usage",
     path: "/usage",
@@ -289,7 +272,6 @@ export function SidebarPanel() {
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
   const role = useAuthStore((s) => s.role)
-  const { data: analyticsPending = 0 } = useAnalyticsPendingSummary()
 
   const navItems = useMemo(
     () => (role === "ADMIN" ? NAV : NAV.filter((item) => item.id !== "admin")),
@@ -363,10 +345,7 @@ export function SidebarPanel() {
             <SidebarMenu>
               {navItems.map((item) => {
                 const active = navItemActive(item, location.pathname)
-                const displayBadge =
-                  item.id === "analytics" && analyticsPending > 0
-                    ? String(analyticsPending > 99 ? "99+" : analyticsPending)
-                    : (item.badge ?? null)
+                const displayBadge = item.badge ?? null
                 return (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
@@ -404,10 +383,7 @@ export function SidebarPanel() {
                       <SidebarMenuBadge
                         className="rounded-[10px] px-[5px] py-px text-[9px] font-bold text-white"
                         style={{
-                          background:
-                            item.id === "analytics"
-                              ? T.accent
-                              : (item.badgeColor ?? T.accent),
+                          background: item.badgeColor ?? T.accent,
                         }}
                       >
                         {displayBadge}

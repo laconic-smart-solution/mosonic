@@ -246,7 +246,8 @@ const keywordPlannerConfigSchema = z
 
 const branchConfigSchema = z
   .object({
-    mode: z.enum(['rule_channels']).optional(),
+    mode: z.enum(['rule_channels', 'wizard_channels']).optional(),
+    channels: z.array(z.string().min(1)).optional(),
   })
   .strict();
 
@@ -477,4 +478,38 @@ export function parseWorkflowNodeConfigOrThrow(
     throw new Error(r.errors.join('; '));
   }
   return r.data;
+}
+
+/** Rule fields used for campaign-aware node defaults (e.g. Instagram → 9:16 video). */
+export type RuleNodeConfigHint = {
+  channels?: Array<{ channel?: string }>;
+  audience?: { language?: string };
+};
+
+/**
+ * Full workflow node defaults plus rule-aware overrides (Generate more, append node).
+ */
+export function defaultWorkflowNodeConfigForRule(
+  type: WorkflowNodeType,
+  rule?: RuleNodeConfigHint | null,
+): WorkflowNodeConfig {
+  const channels = rule?.channels ?? [];
+  const hasInstagram = channels.some(
+    (c) => (c.channel ?? '').toLowerCase() === 'instagram',
+  );
+  const audienceLang = rule?.audience?.language?.trim();
+
+  const overrides: Record<string, unknown> = {};
+  if (type === WorkflowNodeType.VideoGeneration && hasInstagram) {
+    overrides.aspectRatio = NodeAspectRatio.R9x16;
+  }
+  if (
+    type === WorkflowNodeType.Transcription &&
+    audienceLang &&
+    audienceLang.length > 0
+  ) {
+    overrides.language = audienceLang;
+  }
+
+  return mergeWithDefaults(type, overrides);
 }

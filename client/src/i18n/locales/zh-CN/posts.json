@@ -80,7 +80,7 @@
     "loading": "正在加载帖子…",
     "loadFailed": "无法加载帖子。",
     "zernioWarningTitle": "Zernio 编辑受限",
-    "zernioWarning": "此帖子仅可通过 API 更新文案、标题和定时。",
+    "zernioWarning": "此帖子可通过 API 更新文案、标题、定时和媒体。",
     "timingTitle": "时间",
     "scheduled": "已定时",
     "published": "已发布",
@@ -97,6 +97,7 @@
     "publishedNow": "已立即发布",
     "newPostRecord": "新帖子记录 {{id}}…",
     "scheduleInvalid": "请选择有效的定时时间。",
+    "tiktokCaptionHint": "TikTok 幻灯片标题限制",
     "updated": "帖子已更新",
     "retrySubmitted": "已提交重试",
     "newLocalPost": "新本地帖子 {{id}}…"
@@ -104,5 +105,40 @@
   "toast": {
     "warningWithSkipped": "{{message}}",
     "skippedDescription": "不支持取消发布：{{channels}}"
+  },
+  "detail": {
+    "title": "帖子详情",
+    "backToPosts": "返回帖子列表",
+    "mediaTitle": "媒体",
+    "noMedia": "此帖子尚未附加媒体。",
+    "editingLockedTitle": "无法编辑",
+    "editingLockedDesc": "此帖子无法远程编辑（需要关联 Zernio 帖子且状态为 pending、scheduled 或 partial）。",
+    "analytics": {
+      "title": "分析数据",
+      "lastSynced": "上次同步 {{date}}",
+      "notSyncedYet": "首次同步后将显示指标。",
+      "awaitingFirstSync": "点击刷新指标从已连接账号拉取数据。",
+      "partialSync": "部分平台同步失败，请重试刷新。",
+      "unavailable": "此帖子暂无分析数据。",
+      "afterPublish": "帖子发布后将在此显示分析数据。",
+      "refresh": "刷新指标",
+      "syncSuccess": "分析数据已更新",
+      "chartTitle": "各渠道表现",
+      "chartEmpty": "暂无渠道数据。",
+      "byPlatform": "按平台",
+      "noPlatforms": "尚无已发布渠道可统计。",
+      "stats": {
+        "views": "浏览",
+        "likes": "点赞",
+        "comments": "评论",
+        "engagement": "互动"
+      },
+      "platformStatus": {
+        "awaiting": "等待平台数据",
+        "synced": "已同步",
+        "failed": "加载失败",
+        "unavailable": "不可用"
+      }
+    }
   }
 }

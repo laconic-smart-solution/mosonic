@@ -79,6 +79,57 @@ export class WorkflowHeygenService {
     return file;
   }
 
+  private async createAvatarFromUpload(
+    file: Express.Multer.File | undefined,
+    avatarName: string,
+  ): Promise<{
+    heygenAvatarId: string;
+    heygenAvatarAssetId: string;
+    previewUrl: string;
+  }> {
+    const uploadFile = this.assertImageFile(file);
+    const { assetId, url } = await this.heygen.uploadAsset(
+      uploadFile.buffer,
+      uploadFile.mimetype,
+      uploadFile.originalname || 'avatar.jpg',
+    );
+
+    const { avatarId, previewImageUrl } = await this.heygen.createPhotoAvatar({
+      name: avatarName,
+      assetId,
+    });
+
+    const avatarPhotoUrl = previewImageUrl || url;
+
+    return {
+      heygenAvatarId: avatarId,
+      heygenAvatarAssetId: assetId,
+      previewUrl: avatarPhotoUrl,
+    };
+  }
+
+  /** Upload avatar to HeyGen without requiring a saved workflow node (Generate more draft). */
+  uploadAvatarDraft(file: Express.Multer.File | undefined) {
+    return this.createAvatarFromUpload(file, `draft-${Date.now()}`);
+  }
+
+  /** Upload background asset without requiring a saved workflow node. */
+  async uploadBackgroundDraft(file: Express.Multer.File | undefined): Promise<{
+    heygenBackgroundAssetId: string;
+    previewUrl: string;
+  }> {
+    const uploadFile = this.assertImageFile(file);
+    const { assetId, url } = await this.heygen.uploadAsset(
+      uploadFile.buffer,
+      uploadFile.mimetype,
+      uploadFile.originalname || 'background.jpg',
+    );
+    return {
+      heygenBackgroundAssetId: assetId,
+      previewUrl: url,
+    };
+  }
+
   async uploadAvatar(
     workflowId: string,
     nodeId: string,
@@ -89,28 +140,18 @@ export class WorkflowHeygenService {
     heygenAvatarAssetId: string;
     previewUrl: string;
   }> {
-    const uploadFile = this.assertImageFile(file);
     const node = await this.getVideoNode(workflowId, nodeId, auth);
-
-    const { assetId, url } = await this.heygen.uploadAsset(
-      uploadFile.buffer,
-      uploadFile.mimetype,
-      uploadFile.originalname || 'avatar.jpg',
+    const result = await this.createAvatarFromUpload(
+      file,
+      `workflow-${workflowId}-${nodeId}`,
     );
-
-    const { avatarId, previewImageUrl } = await this.heygen.createPhotoAvatar({
-      name: `workflow-${workflowId}-${nodeId}`,
-      assetId,
-    });
-
-    const avatarPhotoUrl = previewImageUrl || url;
 
     const merged = coerceVideoConfigForPersist({
       ...(node.config ?? {}),
       mode: 'presenter',
-      heygenAvatarId: avatarId,
-      heygenAvatarAssetId: assetId,
-      heygenAvatarPhotoUrl: avatarPhotoUrl,
+      heygenAvatarId: result.heygenAvatarId,
+      heygenAvatarAssetId: result.heygenAvatarAssetId,
+      heygenAvatarPhotoUrl: result.previewUrl,
     });
     const config = parseWorkflowNodeConfigOrThrow(
       WorkflowNodeType.VideoGeneration,
@@ -124,11 +165,7 @@ export class WorkflowHeygenService {
       )
       .exec();
 
-    return {
-      heygenAvatarId: avatarId,
-      heygenAvatarAssetId: assetId,
-      previewUrl: avatarPhotoUrl,
-    };
+    return result;
   }
 
   async uploadBackground(

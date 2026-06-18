@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsDateString,
   IsOptional,
   IsString,
@@ -19,4 +20,13 @@ export class PatchPostDto {
   @IsString()
   @MaxLength(500)
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  mediaUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mediaUrls?: string[] | null;
 }

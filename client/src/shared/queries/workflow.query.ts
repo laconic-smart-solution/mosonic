@@ -30,8 +30,13 @@ export const useGenerateWorkflow = () => {
 export const useRegenerateWorkflowByRuleMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ ruleId, contentPrompt }: { ruleId: string; contentPrompt: string }) =>
-      workflowService.regenerateByRule(ruleId, { contentPrompt }),
+    mutationFn: ({
+      ruleId,
+      answers,
+    }: {
+      ruleId: string
+      answers: GenerateWorkflowPayload["answers"]
+    }) => workflowService.regenerateByRule(ruleId, { answers }),
     onSuccess: (_data, { ruleId }) => {
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
@@ -138,6 +143,23 @@ export const useSaveWorkflowNodesByRuleMutation = () => {
     },
     onError: () => {
       toast.error(i18n.t("workflow:toast.saveFailed"))
+    },
+  })
+}
+
+export const useApplyPipelineToWorkflowMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      ruleId,
+      pipelineId,
+    }: {
+      ruleId: string
+      pipelineId: string
+    }) => workflowService.applyPipelineToWorkflow(ruleId, pipelineId),
+    onSuccess: (_data, { ruleId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
   })
 }

@@ -378,6 +378,8 @@ export type WorkflowNodeConfigFieldsProps = {
   /** Required for presenter avatar/background uploads (workflow editor). */
   workflowId?: string
   nodeId?: string
+  /** When false, presenter assets update local config only (Generate more draft). */
+  persistPresenterToServer?: boolean
 }
 
 function ConfigFieldShell({
@@ -536,6 +538,7 @@ export function WorkflowNodeConfigFields({
   className,
   workflowId,
   nodeId,
+  persistPresenterToServer = true,
 }: WorkflowNodeConfigFieldsProps) {
   const { i18n: i18nInstance } = useTranslation("workflow")
   const fieldDefs = useMemo(
@@ -593,6 +596,7 @@ export function WorkflowNodeConfigFields({
           config={config}
           onPatch={(patch) => patchConfig(patch)}
           compact={compact}
+          persistToServer={persistPresenterToServer}
         />
       ) : null}
       {configFields.map((field) =>

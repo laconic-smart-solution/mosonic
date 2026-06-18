@@ -28,6 +28,7 @@ import {
   SaveWorkflowNodesRequestDto,
   SaveWorkflowNodesResponseDto,
 } from './dto/save-workflow-nodes.dto';
+import type { ApplyPipelineToWorkflowResponseDto } from './dto/apply-pipeline-to-workflow.dto';
 import {
   WorkflowPageQueryDto,
   WorkflowPageResponseDto,
@@ -143,6 +144,20 @@ export class WorkflowController {
   ): Promise<RegenerateWorkflowByRuleResponseDto> {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.regenerateWorkflowByRuleId(ruleId, body, auth);
+  }
+
+  @Post('rule/:ruleId/apply-pipeline/:pipelineId')
+  applyPipelineToWorkflow(
+    @Req() req: Request,
+    @Param('ruleId') ruleId: string,
+    @Param('pipelineId') pipelineId: string,
+  ): Promise<ApplyPipelineToWorkflowResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.workflowService.applyPipelineToWorkflow(
+      ruleId,
+      pipelineId,
+      auth,
+    );
   }
 
   @Put('rule/:ruleId/nodes')

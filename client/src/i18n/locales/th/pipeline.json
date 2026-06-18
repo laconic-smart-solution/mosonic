@@ -28,6 +28,7 @@
   "toolbar": {
     "workflow": "เวิร์กโฟลว์",
     "allWorkflows": "เวิร์กโฟลว์ทั้งหมด",
+    "unnamedWorkflow": "เวิร์กโฟลว์ไม่มีชื่อ",
     "workflowFallback": "เวิร์กโฟลว์",
     "sort": "เรียงลำดับ",
     "perPage": "ต่อหน้า",
@@ -47,11 +48,13 @@
     "failed": "ล้มเหลว"
   },
   "card": {
+    "campaign": "แคมเปญ",
     "news": "ข่าว",
     "noPrompt": "ไม่มีพรอมต์",
+    "noName": "รันที่ไม่มีชื่อ",
     "noSteps": "ไม่มีขั้นตอนที่บันทึก",
-    "node_one": "{{count}} โหนด",
-    "node_other": "{{count}} โหนด",
+    "node_one": "{{count}} ขั้นตอน",
+    "node_other": "{{count}} ขั้นตอน",
     "openRun": "เปิดการรัน",
     "stop": "หยุด"
   },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
 import { HomeFooter } from "@/features/home/components/home-footer"
@@ -15,12 +16,16 @@ import {
   PROMPT_SUGGESTION_KEYS,
 } from "@/features/home/data/home-constants"
 import { buildHomeRecentSlots } from "@/features/home/lib/home-recent-slots"
+import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
+import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { useContentPageQuery } from "@/shared/queries/content.query"
 import { useRulesPageQuery } from "@/shared/queries/rule.query"
 import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
+import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
+
 export default function HomePage() {
   const { t } = useTranslation("home")
   const navigate = useNavigate()
@@ -44,6 +49,8 @@ export default function HomePage() {
   const [rulesPage, setRulesPage] = useState(1)
   const [ruleOptions, setRuleOptions] = useState<RuleListItem[]>([])
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
+  const [qaWizardOpen, setQaWizardOpen] = useState(false)
+  const [qaInitialMessage, setQaInitialMessage] = useState("")
 
   const rulesPageQuery = useRulesPageQuery(
     {
@@ -75,6 +82,14 @@ export default function HomePage() {
 
   const generateWorkflow = useGenerateWorkflow()
 
+  const selectedRuleChannelIds = useMemo(() => {
+    const rule = ruleOptions.find((r) => r.ruleId === selectedRuleId)
+    if (!rule?.channels?.length) return []
+    return ruleChannelNamesToIds(
+      rule.channels.map((channel) => ({ channel })),
+    )
+  }, [ruleOptions, selectedRuleId])
+
   useEffect(() => {
     const t1 = setTimeout(() => setMounted(true), 50)
     const t2 = setInterval(
@@ -105,31 +120,41 @@ export default function HomePage() {
     }
   }, [ruleOptions, selectedRuleId])
 
-  async function handlePromptSubmit(text: string, attachments: Attachment[]) {
+  function handlePromptSubmit(text: string, attachments: Attachment[]) {
     const combined = buildStrategyInput(text, attachments)
-    if (!combined.trim()) return
-    setOrbPulse(true)
-
-    const payload: { contentPrompt: string; ruleId?: string } = {
-      contentPrompt: combined,
+    if (!selectedRuleId) {
+      toast.error(t("toast.selectRuleFirst"))
+      return
     }
-    if (selectedRuleId) payload.ruleId = selectedRuleId
+    setQaInitialMessage(combined.trim())
+    setQaWizardOpen(true)
+  }
 
-    generateWorkflow.mutate(payload, {
-      onSuccess: (data) => {
-        const { workflowId, ruleId } = data
-        // Join the socket room NOW — before React re-renders for navigation —
-        // so no events are missed while WorkflowPage is mounting.
-        joinWorkflowRoom(workflowId)
-        const ruleName = ruleOptions.find((r) => r.ruleId === ruleId)?.name
-        navigate(`/workflow/${ruleId}`, {
-          state: { generating: true, ruleName, contentPrompt: combined },
-        })
+  function handleQaSubmit(answers: WorkflowQAAnswers) {
+    if (!selectedRuleId) return
+    setOrbPulse(true)
+    setQaWizardOpen(false)
+
+    generateWorkflow.mutate(
+      { ruleId: selectedRuleId, answers },
+      {
+        onSuccess: (data) => {
+          const { workflowId, ruleId } = data
+          joinWorkflowRoom(workflowId)
+          const ruleName = ruleOptions.find((r) => r.ruleId === ruleId)?.name
+          navigate(`/workflow/${ruleId}`, {
+            state: {
+              generating: true,
+              ruleName,
+              contentPrompt: answers.additionalMessage.trim(),
+            },
+          })
+        },
+        onSettled: () => {
+          setOrbPulse(false)
+        },
       },
-      onSettled: () => {
-        setOrbPulse(false)
-      },
-    })
+    )
   }
 
   function handleSelectRule(ruleId: string) {
@@ -194,11 +219,14 @@ export default function HomePage() {
 
       <HomeFooter />
 
-      {generateWorkflow.isPending ? (
-        <div className="pointer-events-none fixed right-6 bottom-6 rounded-full bg-black/80 px-4 py-2 text-xs text-white">
-          {t("prompt.generatingWorkflow")}
-        </div>
-      ) : null}
+      <WorkflowQaWizard
+        open={qaWizardOpen}
+        onOpenChange={setQaWizardOpen}
+        ruleChannelIds={selectedRuleChannelIds}
+        initialMessage={qaInitialMessage}
+        isSubmitting={generateWorkflow.isPending}
+        onSubmit={handleQaSubmit}
+      />
     </div>
   )
 }

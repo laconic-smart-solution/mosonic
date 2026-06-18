@@ -1,3 +1,5 @@
+import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
+
 export type WorkflowNodeType =
   | "keyword_planner"
   | "text_generation"
@@ -33,9 +35,10 @@ export type WorkflowNode = {
   lane?: string
 }
 
+
 export type GenerateWorkflowPayload = {
-  contentPrompt: string
-  ruleId?: string
+  ruleId: string
+  answers: WorkflowQAAnswers
 }
 
 export type GenerateWorkflowResponse = {
@@ -73,6 +76,13 @@ export type SaveWorkflowNodesByRulePayload = SaveWorkflowNodesPayload & {
 export type SaveWorkflowNodesByRuleResponse = {
   workflowId: string
   success: boolean
+}
+
+export type ApplyPipelineToWorkflowResponse = {
+  workflowId: string
+  contentPrompt: string
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
 }
 
 export type WorkflowPageFilter = {

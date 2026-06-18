@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import i18n from "@/i18n"
 import { pipelineService } from "../services/pipeline.service"
 import type {
@@ -109,5 +109,21 @@ export const useReplanPipelineMutation = () => {
 export const useCancelPipelineMutation = () => {
   return useMutation({
     mutationFn: (pipelineId: string) => pipelineService.cancel(pipelineId),
+  })
+}
+
+export const useUpdatePipelineNameMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      pipelineId,
+      name,
+    }: {
+      pipelineId: string
+      name: string
+    }) => pipelineService.updateName(pipelineId, { name }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["pipeline"] })
+    },
   })
 }

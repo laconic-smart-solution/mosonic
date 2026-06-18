@@ -11,6 +11,7 @@ export type GraphNodeSpec = {
   order: number;
   isLocked: boolean;
   config: Record<string, unknown>;
+  userPrompt?: string;
   lane?: string | null;
 };
 
@@ -102,6 +103,7 @@ export function expandGraphLaneTemplates(
           ...template.config,
           laneId: lane,
         },
+        userPrompt: template.userPrompt,
         lane,
       });
     }
@@ -122,12 +124,14 @@ export function assignNodeIds(
     order: number;
     isLocked: boolean;
     config: Record<string, unknown>;
+    userPrompt?: string;
     lane?: string | null;
   }>,
 ): GraphNodeSpec[] {
   return nodes.map((n) => ({
     ...n,
     nodeId: randomUUID(),
+    userPrompt: n.userPrompt ?? '',
     lane: n.lane ?? null,
   }));
 }

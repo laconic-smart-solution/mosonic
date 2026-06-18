@@ -10,6 +10,10 @@ import { mergeUserIdFilter } from '../auth/tenancy.util';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { UserRole } from '../users/schemas/user.schema';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
+import {
+  assertTikTokPhotoCaptionForPublish,
+  resolvePlatformMediaUrls,
+} from '../mcp/zernio/tiktok-publish.util';
 import { McpService } from '../mcp/mcp.service';
 import {
   Upload,
@@ -18,6 +22,7 @@ import {
   type UploadDocument,
 } from '../upload/schemas/upload.schema';
 import { recomputeUploadJobStatus } from '../upload/upload-status.util';
+import { PostAnalyticsService } from './post-analytics.service';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { PostListSort } from './dto/post-list-sort.enum';
 import type { PatchPostDto } from './dto/patch-post.dto';
@@ -67,7 +72,12 @@ export class PostService {
     @InjectModel(Upload.name)
     private readonly uploadModel: Model<UploadDocument>,
     private readonly mcpService: McpService,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
+
+  private async ensurePostAnalyticsRecord(post: PostDocument): Promise<void> {
+    await this.postAnalyticsService.ensureForPost(post);
+  }
 
   async createPostFromSuccessfulPublish(params: {
     userId: string;
@@ -307,6 +317,78 @@ export class PostService {
     }
   }
 
+  private resolveDetailMediaItems(
+    postChannels: string[],
+    uploadChannels: UploadChannelEntry[],
+  ): Array<{ url: string; kind: 'image' | 'video' }> {
+    const keys = new Set(
+      postChannels.map((c) => c.trim().toLowerCase()).filter(Boolean),
+    );
+    const seen = new Set<string>();
+    const out: Array<{ url: string; kind: 'image' | 'video' }> = [];
+
+    for (const row of uploadChannels) {
+      const key = row.channel.trim().toLowerCase();
+      if (!keys.has(key)) continue;
+      for (const url of this.rowAllMedia(row)) {
+        if (seen.has(url)) continue;
+        seen.add(url);
+        out.push({
+          url,
+          kind: isVideoMediaUrl(url) ? 'video' : 'image',
+        });
+      }
+    }
+
+    return out;
+  }
+
+  private async enrichPostDetail(
+    local: Record<string, unknown>,
+  ): Promise<void> {
+    const ref = String(local['uploadRef'] ?? '').trim();
+    if (!ref) return;
+
+    const upload = await this.uploadModel
+      .findOne({ uploadId: ref })
+      .select('channels resolvedOutputs')
+      .lean()
+      .exec();
+    if (!upload) return;
+
+    const postChannels = (local['channels'] as string[] | undefined) ?? [];
+    const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+
+    let caption = '';
+    for (const plat of postChannels) {
+      const key = plat.trim().toLowerCase();
+      const row = upload.channels?.find(
+        (c) => c.channel.trim().toLowerCase() === key,
+      );
+      if (!row) continue;
+      const c = this.rowCaption(row, ro);
+      if (c.trim()) {
+        caption = c;
+        break;
+      }
+    }
+
+    let youtubeTitlePreview: string | null = null;
+    if (postChannels.some((plat) => plat.trim().toLowerCase() === 'youtube')) {
+      const ytRow = upload.channels?.find(
+        (c) => c.channel.trim().toLowerCase() === 'youtube',
+      );
+      if (ytRow) youtubeTitlePreview = this.rowYoutubeTitle(ytRow);
+    }
+
+    local['detailCaption'] = caption.trim() || null;
+    local['youtubeTitlePreview'] = youtubeTitlePreview;
+    local['mediaItems'] = this.resolveDetailMediaItems(
+      postChannels,
+      upload.channels ?? [],
+    );
+  }
+
   private resolveListMediaPreview(
     postChannels: string[],
     uploadChannels: UploadChannelEntry[],
@@ -349,18 +431,41 @@ export class PostService {
     auth: TenancyAuth,
     hydrate?: string,
   ): Promise<
-    | Record<string, unknown>
-    | { local: Record<string, unknown>; remote: unknown | null }
+    | (Record<string, unknown> & { analytics?: unknown })
+    | {
+        local: Record<string, unknown>;
+        remote: unknown | null;
+        analytics?: unknown;
+      }
   > {
-    const local = await this.getPostById(postId, auth);
+    const filter = mergeUserIdFilter({ postId }, auth);
+    const postDoc = await this.postModel.findOne(filter).exec();
+    if (!postDoc) {
+      throw new NotFoundException(`Post ${postId} not found`);
+    }
+    const local = postDoc.toObject() as unknown as Record<string, unknown>;
+    await this.enrichPostDetail(local);
+    const analytics = await this.postAnalyticsService.getDtoForPost(postDoc);
+
     const h = hydrate?.trim().toLowerCase();
     if (h !== 'zernio') {
-      return local;
+      return analytics ? { ...local, analytics } : local;
     }
     const zid = String(local['zernioPostId'] ?? '').trim();
     const remote =
       zid.length > 0 ? await this.mcpService.getZernioPost(zid) : null;
-    return { local, remote };
+    return analytics ? { local, remote, analytics } : { local, remote };
+  }
+
+  async syncPostAnalytics(
+    postId: string,
+    auth: TenancyAuth,
+  ): Promise<{ analytics: ReturnType<PostAnalyticsService['toDto']> }> {
+    const analytics = await this.postAnalyticsService.syncFromZernio(
+      postId,
+      auth,
+    );
+    return { analytics };
   }
 
   async patchPost(
@@ -372,9 +477,11 @@ export class PostService {
       typeof dto.scheduledAt === 'string' && dto.scheduledAt.trim().length > 0;
     const hasContent = dto.content !== undefined;
     const hasTitle = dto.title !== undefined;
-    if (!hasScheduled && !hasContent && !hasTitle) {
+    const hasMediaUpdate =
+      dto.mediaUrl !== undefined || dto.mediaUrls !== undefined;
+    if (!hasScheduled && !hasContent && !hasTitle && !hasMediaUpdate) {
       throw new BadRequestException(
-        'Provide at least one field: scheduledAt, content, or title.',
+        'Provide at least one field: scheduledAt, content, title, or media.',
       );
     }
 
@@ -395,12 +502,45 @@ export class PostService {
       );
     }
 
+    const mediaUrlsForZernio = await this.syncUploadFromPostPatch(post, dto, {
+      hasContent,
+      hasTitle,
+      hasMediaUpdate,
+      hasScheduled,
+    });
+
+    const captionForValidation = hasContent
+      ? (dto.content ?? '')
+      : await this.resolvePostCaptionForValidation(post);
+    const mediaForValidation = hasMediaUpdate
+      ? (mediaUrlsForZernio ?? resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls))
+      : await this.resolvePostMediaForValidation(post);
+
+    for (const plat of post.channels ?? []) {
+      const key = plat.trim().toLowerCase();
+      if (hasMediaUpdate) {
+        this.assertChannelMediaForPatch(key, mediaForValidation);
+      }
+      try {
+        assertTikTokPhotoCaptionForPublish(
+          key,
+          captionForValidation,
+          mediaForValidation[0] ?? null,
+          mediaForValidation,
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg) throw new BadRequestException(msg);
+      }
+    }
+
     try {
       await this.mcpService.updatePost({
         postId: zid,
         ...(hasContent ? { content: dto.content } : {}),
         ...(hasTitle ? { title: dto.title ?? '' } : {}),
         ...(hasScheduled ? { scheduledFor: dto.scheduledAt!.trim() } : {}),
+        ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForZernio ?? [] } : {}),
       });
     } catch (err: unknown) {
       const msg = getFriendlyZernioPublishError(err);
@@ -416,6 +556,138 @@ export class PostService {
 
     await post.save();
     return this.getPostById(postId, auth);
+  }
+
+  private assertChannelMediaForPatch(
+    channelKey: string,
+    mediaUrls: string[],
+  ): void {
+    if (channelKey !== 'youtube' && channelKey !== 'tiktok') return;
+    if (mediaUrls.length === 0) {
+      throw new BadRequestException(
+        `${channelKey} requires media (image or video).`,
+      );
+    }
+    if (
+      channelKey === 'youtube' &&
+      !mediaUrls.some((u) => isVideoMediaUrl(u))
+    ) {
+      throw new BadRequestException(`${channelKey} requires a video.`);
+    }
+  }
+
+  private async syncUploadFromPostPatch(
+    post: PostDocument,
+    dto: PatchPostDto,
+    flags: {
+      hasContent: boolean;
+      hasTitle: boolean;
+      hasMediaUpdate: boolean;
+      hasScheduled: boolean;
+    },
+  ): Promise<string[] | undefined> {
+    const uploadRef = post.uploadRef?.trim();
+    if (!uploadRef) {
+      if (!flags.hasMediaUpdate) return undefined;
+      return resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls);
+    }
+
+    const upload = await this.uploadModel.findOne({ uploadId: uploadRef }).exec();
+    if (!upload) {
+      if (!flags.hasMediaUpdate) return undefined;
+      return resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls);
+    }
+
+    for (const plat of post.channels ?? []) {
+      const key = plat.trim().toLowerCase();
+      const row = upload.channels.find(
+        (c) => c.channel.trim().toLowerCase() === key,
+      );
+      if (!row) continue;
+
+      if (flags.hasContent && dto.content !== undefined) {
+        row.caption = dto.content ?? '';
+      }
+      if (flags.hasTitle && key === 'youtube' && dto.title !== undefined) {
+        row.youtubeTitle = dto.title?.trim() || null;
+      }
+      if (flags.hasMediaUpdate) {
+        if (dto.mediaUrls !== undefined) {
+          row.mediaUrls = [...(dto.mediaUrls ?? [])];
+          row.mediaUrl = row.mediaUrls[0] ?? null;
+        } else if (dto.mediaUrl !== undefined) {
+          row.mediaUrl = dto.mediaUrl;
+          row.mediaUrls = dto.mediaUrl ? [dto.mediaUrl] : [];
+        }
+      }
+      if (flags.hasScheduled && dto.scheduledAt) {
+        const d = new Date(dto.scheduledAt.trim());
+        if (!Number.isNaN(d.getTime())) row.scheduledAt = d;
+      }
+    }
+
+    upload.status = recomputeUploadJobStatus(upload.channels);
+    upload.markModified('channels');
+    await upload.save();
+
+    if (!flags.hasMediaUpdate) return undefined;
+
+    const primaryKey = post.channels[0]?.trim().toLowerCase();
+    const primaryRow = upload.channels.find(
+      (c) => c.channel.trim().toLowerCase() === primaryKey,
+    );
+    if (primaryRow) return this.rowAllMedia(primaryRow);
+    return resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls);
+  }
+
+  private async resolvePostCaptionForValidation(
+    post: PostDocument,
+  ): Promise<string> {
+    const uploadRef = post.uploadRef?.trim();
+    if (!uploadRef) return '';
+    const upload = await this.uploadModel
+      .findOne({ uploadId: uploadRef })
+      .select('channels resolvedOutputs')
+      .lean()
+      .exec();
+    if (!upload) return '';
+    const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    for (const plat of post.channels ?? []) {
+      const key = plat.trim().toLowerCase();
+      const row = upload.channels?.find(
+        (c) => c.channel.trim().toLowerCase() === key,
+      );
+      if (!row) continue;
+      const caption = this.rowCaption(row, ro);
+      if (caption.trim()) return caption;
+    }
+    return '';
+  }
+
+  private async resolvePostMediaForValidation(
+    post: PostDocument,
+  ): Promise<string[]> {
+    const uploadRef = post.uploadRef?.trim();
+    if (!uploadRef) return [];
+    const upload = await this.uploadModel
+      .findOne({ uploadId: uploadRef })
+      .select('channels resolvedOutputs')
+      .lean()
+      .exec();
+    if (!upload) return [];
+    const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    for (const plat of post.channels ?? []) {
+      const key = plat.trim().toLowerCase();
+      const row = upload.channels?.find(
+        (c) => c.channel.trim().toLowerCase() === key,
+      );
+      if (!row) continue;
+      const urls = this.rowAllMedia(row);
+      if (urls.length > 0) return urls;
+      const fallback = (ro.image?.trim() || ro.video?.trim() || '').trim();
+      if (fallback) return [fallback];
+    }
+    return [];
   }
 
   async bulkSchedulePosts(
@@ -617,6 +889,8 @@ export class PostService {
     }));
     await post.save();
 
+    await this.ensurePostAnalyticsRecord(post);
+
     await this.patchUploadChannelsFromPost(post.uploadRef, channelKeys, (ch) => {
       ch.status = UploadChannelStatus.Published;
       ch.publishedAt = now;
@@ -664,6 +938,8 @@ export class PostService {
       }));
       await post.save();
 
+      await this.ensurePostAnalyticsRecord(post);
+
       await this.markUploadChannelsPublished(upload, work);
 
       return { postId: post.postId };
@@ -683,7 +959,7 @@ export class PostService {
     const ro = upload.resolvedOutputs ?? {};
     const work: PublishWorkItem[] = [];
 
-    for (const plat of post.channels) {
+    for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
       const row = upload.channels.find(
         (c) => c.channel.trim().toLowerCase() === key,
@@ -768,6 +1044,9 @@ export class PostService {
         publishedAt: now,
         failureReason: null,
       })),
+    }).then(async (created) => {
+      await this.ensurePostAnalyticsRecord(created);
+      return created;
     });
   }
 

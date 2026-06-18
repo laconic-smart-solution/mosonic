@@ -1,8 +1,6 @@
 import {
   BadRequestException,
-  forwardRef,
   HttpException,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,7 +8,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
-import { AnalyticsService } from '../analytics/analytics.service';
 import { EventsService } from '../events/events.service';
 import type { ExtractRuleResponseDto } from './dto/extract-rule.dto';
 import type { RuleExtractRequest } from './extract-request.types';
@@ -80,8 +77,6 @@ export class RuleService {
     private readonly preprocessing: PreprocessingService,
     private readonly contentReader: ContentReaderService,
     private readonly events: EventsService,
-    @Inject(forwardRef(() => AnalyticsService))
-    private readonly analyticsService: AnalyticsService,
     private readonly creditBilling: CreditBillingService,
   ) {}
 
@@ -154,15 +149,6 @@ export class RuleService {
       status: RuleStatus.Processing,
       versions: [],
     });
-
-    try {
-      await this.analyticsService.ensureForRule(ruleId);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Failed to seed analytics doc for rule ${ruleId}: ${msg}`,
-      );
-    }
 
     void this.runExtraction(ruleId, args, auth);
     return { ruleId };

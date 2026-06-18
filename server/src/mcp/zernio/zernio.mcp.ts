@@ -247,7 +247,7 @@ export class ZernioMcpClient implements OnModuleInit {
 
   /**
    * Update editable fields for an existing draft / scheduled Zernio post.
-   * Zernio does not support changing media, platform, or already-published posts.
+   * Published posts can only have recycling config updated (not handled here).
    */
   async updatePost(payload: {
     postId: string;

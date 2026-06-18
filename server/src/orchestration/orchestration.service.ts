@@ -40,6 +40,7 @@ import {
   PipelineStatus,
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
+import { defaultPipelineName } from '../pipeline/pipeline-name.util';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import { UserRole } from '../users/schemas/user.schema';
 import {
@@ -219,11 +220,13 @@ export class OrchestrationService {
         ? `exp_${randomUUID().slice(0, 8)}`
         : undefined;
 
+    const startedAt = new Date();
     const pipeline = await this.pipelineModel.create({
       userId: input.auth.userId,
       workflowRef: workflow.workflowId,
       ruleRef: rule.ruleId,
       contentPrompt,
+      name: defaultPipelineName(contentPrompt, startedAt),
       graph: {
         edges: materialized.edges,
         lanes: materialized.lanes,
@@ -248,7 +251,7 @@ export class OrchestrationService {
         executedAt: null,
       })),
       status: PipelineStatus.Running,
-      startedAt: new Date(),
+      startedAt,
       completedAt: null,
       pausedNodeId: null,
       pausedLaneId: null,
@@ -666,6 +669,7 @@ export class OrchestrationService {
       pipelineId: string;
       workflowRef: string;
       ruleRef: string;
+      name: string;
       contentPrompt: string;
       status: string;
       pausedNodeId: string | null;
@@ -710,6 +714,7 @@ export class OrchestrationService {
         pipelineId: pipeline.pipelineId,
         workflowRef: pipeline.workflowRef,
         ruleRef: pipeline.ruleRef,
+        name: pipeline.name?.trim() || defaultPipelineName(pipeline.contentPrompt, pipeline.startedAt),
         contentPrompt: pipeline.contentPrompt,
         status: pipeline.status,
         pausedNodeId: pipeline.pausedNodeId ?? null,

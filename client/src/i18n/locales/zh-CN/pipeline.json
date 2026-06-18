@@ -28,6 +28,7 @@
   "toolbar": {
     "workflow": "工作流",
     "allWorkflows": "所有工作流",
+    "unnamedWorkflow": "未命名工作流",
     "workflowFallback": "工作流",
     "sort": "排序",
     "perPage": "每页",
@@ -47,11 +48,13 @@
     "failed": "失败"
   },
   "card": {
+    "campaign": "活动",
     "news": "新闻",
     "noPrompt": "无提示",
+    "noName": "未命名运行",
     "noSteps": "无记录步骤",
-    "node_one": "{{count}} 个节点",
-    "node_other": "{{count}} 个节点",
+    "node_one": "{{count}} 个步骤",
+    "node_other": "{{count}} 个步骤",
     "openRun": "打开运行",
     "stop": "停止"
   },

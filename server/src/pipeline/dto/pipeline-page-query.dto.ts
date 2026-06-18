@@ -55,6 +55,7 @@ export class PipelinePageItemDto {
   workflowRef!: string;
   ruleRef!: string;
   status!: string;
+  name!: string;
   contentPrompt!: string;
   nodeCount!: number;
   nodeTypes!: string[];
@@ -62,6 +63,7 @@ export class PipelinePageItemDto {
   completedAt!: string | null;
   metadataSource?: string;
   newsTitle?: string;
+  ruleName?: string;
 }
 
 export class PipelinePageResponseDto {

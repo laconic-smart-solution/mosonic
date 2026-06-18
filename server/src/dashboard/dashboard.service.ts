@@ -3,8 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, type PipelineStage } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
-import { AnalyticsRepository } from '../analytics/analytics.repository';
 import { aggregateMetrics } from '../analytics/analytics-metrics.util';
+import type { ContentPerformanceEntry } from '../analytics/schemas/analytics.schema';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import { Content, ContentStatus, type ContentDocument } from '../content/schemas/content.schema';
 import {
   Upload,
@@ -38,7 +39,7 @@ export class DashboardService {
     private readonly contentModel: Model<ContentDocument>,
     @InjectModel(Upload.name)
     private readonly uploadModel: Model<UploadDocument>,
-    private readonly analyticsRepository: AnalyticsRepository,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
   async getDashboard(auth: TenancyAuth): Promise<DashboardResponseDto> {
@@ -60,7 +61,7 @@ export class DashboardService {
       this.countScheduledChannelsFromNow(auth, now),
       this.countFailedChannels(auth),
       this.listUpcomingScheduled(auth, now, 5),
-      this.analyticsRepository.countPendingSuggestionsForRules(auth),
+      Promise.resolve(0),
       this.computeWeeklyPerformance(auth),
       this.buildRecentActivity(auth, now, 10),
     ]);
@@ -226,12 +227,15 @@ export class DashboardService {
   private async computeWeeklyPerformance(
     auth: TenancyAuth,
   ): Promise<DashboardWeeklyPerformanceDto> {
-    // This repository stores one doc per rule (updated at pull time).
-    const { items } = await this.analyticsRepository.listForRules(auth, {
-      page: 1,
-      limit: 2000,
-    });
-    const entries = items.flatMap((doc) => doc.contentPerformance ?? []);
+    const rows = await this.postAnalyticsService.aggregateMetricsForAuth(auth);
+    const entries: ContentPerformanceEntry[] = rows.map((row) => ({
+      contentRef: row.contentRef,
+      pipelineRef: '',
+      uploadRef: '',
+      zernioPostId: '',
+      channel: row.platform,
+      metrics: row.metrics,
+    }));
     const summary = aggregateMetrics(entries);
 
     let bestContentLabel = summary.bestPerformingContent;

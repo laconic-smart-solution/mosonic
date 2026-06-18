@@ -301,22 +301,6 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-3 px-6 py-4">
                       <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium leading-snug">
-                          {t("dashboard:actionQueue.ruleSuggestions", {
-                            count: actionItems?.pendingSuggestionsCount ?? 0,
-                          })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t("dashboard:actionQueue.ruleSuggestionsHint")}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate("/analytics")}>
-                        {t("dashboard:actionQueue.open")}
-                      </Button>
-                    </div>
-                    <Separator />
-                    <div className="flex items-start justify-between gap-3 px-6 py-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-snug">
                           {t("dashboard:actionQueue.failedPublishes", {
                             count: actionItems?.failedPostsCount ?? 0,
                           })}
@@ -413,9 +397,9 @@ export default function DashboardPage() {
                       variant="outline"
                       size="sm"
                       className="mt-1 w-full sm:w-auto"
-                      onClick={() => navigate("/analytics")}
+                      onClick={() => navigate("/posts")}
                     >
-                      {t("dashboard:highlights.fullAnalytics")}
+                      {t("dashboard:highlights.viewPosts")}
                     </Button>
                   </CardContent>
                 </Card>

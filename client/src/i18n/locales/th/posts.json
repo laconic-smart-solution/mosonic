@@ -80,7 +80,7 @@
     "loading": "กำลังโหลดโพสต์…",
     "loadFailed": "โหลดโพสต์ไม่ได้",
     "zernioWarningTitle": "แก้ไขจำกัดบน Zernio",
-    "zernioWarning": "อัปเดตได้เฉพาะคำบรรยาย ชื่อ และกำหนดเวลาผ่าน API",
+    "zernioWarning": "อัปเดตคำบรรยาย ชื่อ กำหนดเวลา และสื่อได้ผ่าน API",
     "timingTitle": "เวลา",
     "scheduled": "กำหนดเวลา",
     "published": "เผยแพร่",
@@ -97,6 +97,7 @@
     "publishedNow": "เผยแพร่แล้ว",
     "newPostRecord": "บันทึกโพสต์ใหม่ {{id}}…",
     "scheduleInvalid": "เลือกเวลาที่กำหนดให้ถูกต้อง",
+    "tiktokCaptionHint": "ขีดจำกัดชื่อสไลด์โชว์ TikTok",
     "updated": "อัปเดตโพสต์แล้ว",
     "retrySubmitted": "ส่งคำขอลองใหม่แล้ว",
     "newLocalPost": "โพสต์ท้องถิ่นใหม่ {{id}}…"
@@ -104,5 +105,40 @@
   "toast": {
     "warningWithSkipped": "{{message}}",
     "skippedDescription": "ไม่รองรับยกเลิกเผยแพร่สำหรับ: {{channels}}"
+  },
+  "detail": {
+    "title": "รายละเอียดโพสต์",
+    "backToPosts": "กลับไปโพสต์",
+    "mediaTitle": "สื่อ",
+    "noMedia": "ยังไม่มีสื่อแนบกับโพสต์นี้",
+    "editingLockedTitle": "แก้ไขไม่ได้",
+    "editingLockedDesc": "โพสต์นี้แก้ไขจากระยะไกลไม่ได้ (ต้องมี Zernio post และสถานะ pending, scheduled หรือ partial)",
+    "analytics": {
+      "title": "การวิเคราะห์",
+      "lastSynced": "ซิงก์ล่าสุด {{date}}",
+      "notSyncedYet": "เมตริกจะแสดงหลังซิงก์ครั้งแรก",
+      "awaitingFirstSync": "กดรีเฟรชเมตริกเพื่อดึงข้อมูลจากบัญชีที่เชื่อมต่อ",
+      "partialSync": "ซิงก์บางแพลตฟอร์มไม่สำเร็จ ลองรีเฟรชอีกครั้ง",
+      "unavailable": "ไม่มีการวิเคราะห์สำหรับโพสต์นี้",
+      "afterPublish": "การวิเคราะห์จะแสดงหลังโพสต์ถูกเผยแพร่",
+      "refresh": "รีเฟรชเมตริก",
+      "syncSuccess": "อัปเดตการวิเคราะห์แล้ว",
+      "chartTitle": "ประสิทธิภาพตามช่องทาง",
+      "chartEmpty": "ยังไม่มีข้อมูลช่องทาง",
+      "byPlatform": "ตามแพลตฟอร์ม",
+      "noPlatforms": "ยังไม่มีช่องทางที่เผยแพร่ให้วัด",
+      "stats": {
+        "views": "การดู",
+        "likes": "ถูกใจ",
+        "comments": "ความคิดเห็น",
+        "engagement": "การมีส่วนร่วม"
+      },
+      "platformStatus": {
+        "awaiting": "รอข้อมูลจากแพลตฟอร์ม",
+        "synced": "ซิงก์แล้ว",
+        "failed": "โหลดไม่สำเร็จ",
+        "unavailable": "ไม่พร้อมใช้งาน"
+      }
+    }
   }
 }

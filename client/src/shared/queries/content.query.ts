@@ -14,6 +14,15 @@ export const useContentPageQuery = (
   })
 }
 
+export const useContentStatsQuery = (enabled = true) => {
+  return useQuery({
+    queryKey: ["contents", "stats"],
+    queryFn: () => contentService.stats(),
+    enabled,
+    retry: false,
+  })
+}
+
 export const useGetContentQuery = (contentId: string | undefined) => {
   return useQuery({
     queryKey: ["content", contentId],

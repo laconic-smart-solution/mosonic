@@ -40,6 +40,56 @@ describe('GraphMaterializationService', () => {
     expect(out.edges).toHaveLength(1);
   });
 
+  it('materializes wizard_channels branch using explicit channel list', () => {
+    const sparseRule = {
+      channels: [{ channel: 'twitter', priority: 'low', contentStyle: 'short' }],
+    } as never;
+
+    const nodes = [
+      {
+        nodeId: 'text',
+        type: WorkflowNodeType.TextGeneration,
+        order: 1,
+        isLocked: true,
+        config: {},
+      },
+      {
+        nodeId: 'branch',
+        type: WorkflowNodeType.Branch,
+        order: 2,
+        isLocked: false,
+        config: {
+          mode: 'wizard_channels',
+          channels: ['instagram', 'facebook'],
+        },
+      },
+      {
+        nodeId: 'adapt',
+        type: WorkflowNodeType.Adapt,
+        order: 3,
+        isLocked: false,
+        config: {},
+      },
+      {
+        nodeId: 'merge',
+        type: WorkflowNodeType.Merge,
+        order: 4,
+        isLocked: false,
+        config: {},
+      },
+    ];
+    const edges = [
+      { from: 'text', to: 'branch' },
+      { from: 'branch', to: 'adapt' },
+      { from: 'adapt', to: 'merge' },
+    ];
+    const out = service.materialize(nodes, edges, sparseRule, 1);
+    expect(out.lanes.sort()).toEqual(['facebook', 'instagram']);
+    expect(out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
+      2,
+    );
+  });
+
   it('materializes branch into per-channel adapt lanes', () => {
     const nodes = [
       {

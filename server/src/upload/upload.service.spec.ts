@@ -94,7 +94,7 @@ describe('UploadService', () => {
     postService.updateScheduledPostForChannel.mockResolvedValue(undefined);
   });
 
-  it('calls Zernio once per included channel and marks published', async () => {
+  it('calls Zernio once with all included channels and marks published', async () => {
     const save = jest.fn().mockResolvedValue(undefined);
     const doc = {
       uploadId: 'u1',
@@ -259,6 +259,51 @@ describe('UploadService', () => {
         { userId: 'user-1', role: 'CUSTOMER' as never },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(mcpService.publishCreatePostBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects TikTok photo publish when caption exceeds slideshow title limit', async () => {
+    const longCaption = 'x'.repeat(120);
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      ruleRef: 'rule-1',
+      workflowRef: 'wf-1',
+      userId: 'user-1',
+      channels: [
+        mockChannel({
+          channel: 'tiktok',
+          caption: longCaption,
+          mediaUrl: 'https://example.com/photo.png',
+          mediaUrls: ['https://example.com/photo.png'],
+        }),
+      ],
+      resolvedOutputs: { text: longCaption },
+      status: UploadJobStatus.Pending,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [
+        { channel: 'tiktok', accountId: 'acc_tt', connectedAt: new Date() },
+      ],
+    });
+
+    await expect(
+      service.publishUpload(
+        'u1',
+        {
+          publishNow: true,
+          channels: [{ channel: 'tiktok', included: true }],
+        },
+        { userId: 'user-1', role: 'CUSTOMER' as never },
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringMatching(/90 characters max/),
+    });
 
     expect(mcpService.publishCreatePostBatch).not.toHaveBeenCalled();
   });
@@ -438,7 +483,7 @@ describe('UploadService', () => {
     expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(1);
   });
 
-  it('calls Zernio once per channel when multiple are included', async () => {
+  it('calls Zernio once with all included channels when multiple are selected', async () => {
     const save = jest.fn().mockResolvedValue(undefined);
     const doc = {
       uploadId: 'u1',
@@ -463,9 +508,10 @@ describe('UploadService', () => {
         { channel: 'facebook', accountId: 'acc_fb', connectedAt: new Date() },
       ],
     });
-    mcpService.publishCreatePostBatch
-      .mockResolvedValueOnce({ postId: 'post_ig', raw: {} })
-      .mockResolvedValueOnce({ postId: 'post_fb', raw: {} });
+    mcpService.publishCreatePostBatch.mockResolvedValue({
+      postId: 'post_multi',
+      raw: {},
+    });
 
     await service.publishUpload(
       'u1',
@@ -479,29 +525,32 @@ describe('UploadService', () => {
       { userId: 'user-1', role: 'CUSTOMER' as never },
     );
 
-    expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(2);
-    expect(mcpService.publishCreatePostBatch).toHaveBeenNthCalledWith(
-      1,
+    expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(1);
+    expect(mcpService.publishCreatePostBatch).toHaveBeenCalledWith(
       'user-1',
       expect.objectContaining({
-        platforms: [expect.objectContaining({ platform: 'instagram' })],
+        publishNow: true,
+        scheduledAt: null,
+        platforms: [
+          expect.objectContaining({
+            platform: 'instagram',
+            accountId: 'acc_ig',
+            content: 'ig',
+          }),
+          expect.objectContaining({
+            platform: 'facebook',
+            accountId: 'acc_fb',
+            content: 'fb',
+          }),
+        ],
       }),
     );
-    expect(mcpService.publishCreatePostBatch).toHaveBeenNthCalledWith(
-      2,
-      'user-1',
+    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(1);
+    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledWith(
       expect.objectContaining({
-        platforms: [expect.objectContaining({ platform: 'facebook' })],
+        channels: ['instagram', 'facebook'],
+        zernioPostId: 'post_multi',
       }),
-    );
-    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(2);
-    expect(postService.createPostFromSuccessfulPublish).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ channels: ['instagram'], zernioPostId: 'post_ig' }),
-    );
-    expect(postService.createPostFromSuccessfulPublish).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ channels: ['facebook'], zernioPostId: 'post_fb' }),
     );
     expect(doc.channels[0].status).toBe(UploadChannelStatus.Published);
     expect(doc.channels[1].status).toBe(UploadChannelStatus.Published);

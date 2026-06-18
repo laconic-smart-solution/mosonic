@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { OrchestrationService } from '../orchestration/orchestration.service';
+import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import type {
   PipelinePageItemDto,
   PipelinePageQueryDto,
@@ -13,6 +14,11 @@ import {
   PipelineStatus,
   type PipelineDocument,
 } from './schemas/pipeline.schema';
+import { defaultPipelineName } from './pipeline-name.util';
+import type {
+  UpdatePipelineDto,
+  UpdatePipelineResponseDto,
+} from './dto/update-pipeline.dto';
 
 function uniquePipelineNodeTypes(nodes: unknown): string[] {
   if (!Array.isArray(nodes)) return [];
@@ -33,6 +39,8 @@ export class PipelineService {
     private readonly orchestration: OrchestrationService,
     @InjectModel(Pipeline.name)
     private readonly pipelineModel: Model<PipelineDocument>,
+    @InjectModel(Rule.name)
+    private readonly ruleModel: Model<RuleDocument>,
   ) {}
 
   async findPage(
@@ -67,10 +75,12 @@ export class PipelineService {
           workflowRef: 1,
           ruleRef: 1,
           status: 1,
+          name: 1,
           contentPrompt: 1,
           startedAt: 1,
           completedAt: 1,
           nodes: 1,
+          metadata: 1,
         })
         .sort(sort)
         .skip(skip)
@@ -80,11 +90,35 @@ export class PipelineService {
       this.pipelineModel.countDocuments(filter).exec(),
     ]);
 
+    const ruleIds = [
+      ...new Set(
+        docs
+          .map((doc) => String(doc.ruleRef ?? '').trim())
+          .filter((id) => id.length > 0),
+      ),
+    ];
+    const ruleNameById = new Map<string, string>();
+    if (ruleIds.length > 0) {
+      const ruleFilter = mergeUserIdFilter({ ruleId: { $in: ruleIds } }, auth);
+      const rules = await this.ruleModel
+        .find(ruleFilter)
+        .select({ ruleId: 1, name: 1 })
+        .lean()
+        .exec();
+      for (const rule of rules) {
+        const name = rule.name?.trim();
+        if (name) ruleNameById.set(rule.ruleId, name);
+      }
+    }
+
     const data: PipelinePageItemDto[] = docs.map((doc) => ({
       pipelineId: doc.pipelineId,
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
       status: doc.status,
+      name:
+        doc.name?.trim() ||
+        defaultPipelineName(doc.contentPrompt, new Date(doc.startedAt ?? Date.now())),
       contentPrompt: doc.contentPrompt,
       nodeCount: Array.isArray(doc.nodes) ? doc.nodes.length : 0,
       nodeTypes: uniquePipelineNodeTypes(doc.nodes),
@@ -94,6 +128,7 @@ export class PipelineService {
         : null,
       metadataSource: doc.metadata?.source,
       newsTitle: doc.metadata?.newsMeta?.title,
+      ruleName: ruleNameById.get(doc.ruleRef),
     }));
 
     return { data, total };
@@ -194,5 +229,26 @@ export class PipelineService {
 
   getPipelineTimeline(pipelineId: string, auth: TenancyAuth) {
     return this.orchestration.getPipelineTimeline(pipelineId, auth);
+  }
+
+  async updateName(
+    pipelineId: string,
+    dto: UpdatePipelineDto,
+    auth: TenancyAuth,
+  ): Promise<UpdatePipelineResponseDto> {
+    const name = dto.name.trim();
+    const pipeline = await this.pipelineModel
+      .findOneAndUpdate(
+        mergeUserIdFilter({ pipelineId }, auth),
+        { $set: { name } },
+        { new: true },
+      )
+      .select({ pipelineId: 1, name: 1 })
+      .lean()
+      .exec();
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${pipelineId} not found`);
+    }
+    return { pipelineId: pipeline.pipelineId, name: pipeline.name };
   }
 }

@@ -16,6 +16,7 @@ import {
   pipelineSortLabel,
   type PipelineSortParam,
 } from "@/features/pipeline/lib/pipeline-list-format"
+import { displayWorkflowLabel } from "@/features/pipeline/lib/pipeline-display"
 
 export type PipelinesToolbarProps = {
   workflowId: string | null
@@ -45,8 +46,9 @@ export function PipelinesToolbar({
 
   const workflowLabel = !workflowId
     ? t("toolbar.allWorkflows")
-    : (workflowOptions.find((o) => o.workflowId === workflowId)?.name ??
-      t("toolbar.workflowFallback"))
+    : displayWorkflowLabel(
+        workflowOptions.find((o) => o.workflowId === workflowId)?.name,
+      )
 
   return (
     <ToolbarShell>
@@ -63,7 +65,7 @@ export function PipelinesToolbar({
               <SelectItem value="all">{t("toolbar.allWorkflows")}</SelectItem>
               {workflowOptions.map((row) => (
                 <SelectItem key={row.workflowId} value={row.workflowId}>
-                  {row.name}
+                  {displayWorkflowLabel(row.name)}
                 </SelectItem>
               ))}
             </SelectContent>

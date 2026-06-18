@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router-dom"
 import { FileText } from "lucide-react"
@@ -7,6 +7,12 @@ import {
   useGenerateWorkflow,
   useGetWorkflowByRuleIdQuery,
 } from "@/shared/queries/workflow.query"
+import { useRuleByIdQuery } from "@/shared/queries/rule.query"
+import type { RuleEntity } from "@/features/rules/data/rules-mock"
+import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
+import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
+import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
+import { toast } from "sonner"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { T } from "@/lib/tokens"
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
@@ -25,11 +31,17 @@ export default function WorkflowPromptPage() {
   const { ruleId, ruleName } = (location.state ?? {}) as RouteState
 
   const [prompt, setPrompt] = useState("")
+  const [qaWizardOpen, setQaWizardOpen] = useState(false)
 
   const generateWorkflow = useGenerateWorkflow()
 
   // Check if a workflow already exists for this rule
   const existingWorkflowQuery = useGetWorkflowByRuleIdQuery(ruleId)
+  const ruleQuery = useRuleByIdQuery<RuleEntity>(ruleId)
+  const ruleChannelIds = useMemo(
+    () => ruleChannelNamesToIds(ruleQuery.data?.channels),
+    [ruleQuery.data?.channels],
+  )
   const existingWorkflow = existingWorkflowQuery.data
 
   // If an existing ready workflow is found, offer to navigate to it
@@ -42,20 +54,32 @@ export default function WorkflowPromptPage() {
   const isCheckingExisting = !!ruleId && existingWorkflowQuery.isLoading
 
   function handleSubmit(text: string, _attachments: Attachment[]) {
-    const contentPrompt = text.trim()
-    if (!contentPrompt) return
+    if (!ruleId) {
+      toast.error(t("toasts.selectRule", { defaultValue: "Select a rule first." }))
+      return
+    }
+    setPrompt(text)
+    setQaWizardOpen(true)
+  }
 
+  function handleQaSubmit(answers: WorkflowQAAnswers) {
+    if (!ruleId) return
+    setQaWizardOpen(false)
     generateWorkflow.mutate(
-      { contentPrompt, ruleId },
+      { ruleId, answers },
       {
         onSuccess: (data) => {
           const { workflowId } = data
           joinWorkflowRoom(workflowId)
-          navigate(ruleId ? `/workflow/${ruleId}` : "/rules", {
-            state: { generating: true, ruleName, contentPrompt },
+          navigate(`/workflow/${ruleId}`, {
+            state: {
+              generating: true,
+              ruleName,
+              contentPrompt: answers.additionalMessage.trim(),
+            },
           })
         },
-      }
+      },
     )
   }
 
@@ -128,6 +152,15 @@ export default function WorkflowPromptPage() {
       {!isCheckingExisting && existingWorkflowId && (
         <WorkflowExistingBanner onOpenExisting={goToExisting} />
       )}
+
+      <WorkflowQaWizard
+        open={qaWizardOpen}
+        onOpenChange={setQaWizardOpen}
+        ruleChannelIds={ruleChannelIds}
+        initialMessage={prompt.trim()}
+        isSubmitting={generateWorkflow.isPending}
+        onSubmit={handleQaSubmit}
+      />
     </div>
   )
 }

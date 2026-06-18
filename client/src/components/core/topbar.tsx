@@ -17,7 +17,6 @@ import {
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { initialsFromDisplayName } from "@/shared/lib/user-initials"
-import { useAnalyticsPendingSummary } from "@/shared/queries/analytics.query"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
@@ -29,7 +28,6 @@ const ROUTE_LABEL_KEYS: Record<string, string> = {
   "/content": "routes.content",
   "/upload": "routes.upload",
   "/posts": "routes.posts",
-  "/analytics": "routes.analytics",
   "/logs": "routes.logs",
   "/components": "routes.components",
   "/pipelines": "routes.pipelines",
@@ -44,7 +42,6 @@ export function Topbar() {
   const user = useUserStore((s) => s.user)
   const clearSession = useAuthStore((s) => s.clearSession)
   const clearUser = useUserStore((s) => s.clearUser)
-  const { data: pendingSuggestions = 0 } = useAnalyticsPendingSummary()
 
   const displayName = user?.name?.trim() ? user.name.trim() : t("account")
   const initials = initialsFromDisplayName(user?.name)
@@ -53,8 +50,8 @@ export function Topbar() {
     ? t("routes.workflow")
     : location.pathname.startsWith("/upload/")
       ? t("routes.upload")
-      : location.pathname.startsWith("/analytics/")
-        ? t("routes.analytics")
+      : location.pathname.startsWith("/posts/")
+        ? t("routes.posts")
         : t(ROUTE_LABEL_KEYS[location.pathname] ?? "routes.dashboard")
 
   function handleLogout() {
@@ -90,15 +87,6 @@ export function Topbar() {
         <span className="font-semibold" style={{ color: T.textPrimary }}>
           {label}
         </span>
-        {pendingSuggestions > 0 && location.pathname.startsWith("/analytics") ? (
-          <span
-            className="ml-1.5 rounded-full px-1.5 py-px text-[10px] font-bold text-white"
-            style={{ background: T.accent }}
-            title={t("pendingSuggestions")}
-          >
-            {pendingSuggestions > 99 ? "99+" : pendingSuggestions}
-          </span>
-        ) : null}
       </div>
 
       <div className="flex min-w-0 flex-1 justify-center px-2">

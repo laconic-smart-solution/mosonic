@@ -6,6 +6,11 @@ import type { ChannelEntry } from '../../rule/schemas/rule.schema';
 import { normalizedRuleChannelMapping } from '../../rule/rule-mapping.util';
 import { CaptionMappingSource } from '../../rule/schemas/rule.schema';
 import type { WorkflowNodeConfig } from '../schemas/workflow-node.schema';
+import {
+  adaptChannelHumanReminder,
+  adaptChannelPromptGuardrails,
+  enforceAdaptChannelLimits,
+} from './adapt-channel-guardrails.util';
 import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
 import type {
   NodeExecutionInput,
@@ -74,15 +79,18 @@ export class AdaptNodeService {
       `Brand: ${rule.brand.brandName}`,
       `Tone: ${rule.brand.brandTone.join(', ')}`,
       `CTA: ${rule.brand.callToAction}`,
+      ...adaptChannelPromptGuardrails(channelEntry.channel),
     ]
       .filter(Boolean)
       .join('\n');
 
+    const tiktokReminder = adaptChannelHumanReminder(channelEntry.channel);
     const human = [
       input.contentPrompt?.trim()
         ? `Campaign brief:\n${input.contentPrompt.trim()}`
         : '',
       baseText ? `Base copy to adapt:\n${baseText}` : '',
+      tiktokReminder,
       'Return only the adapted post text for this channel. No quotes or labels.',
     ]
       .filter(Boolean)
@@ -92,10 +100,13 @@ export class AdaptNodeService {
       new SystemMessage(system),
       new HumanMessage(human),
     ]);
-    const adaptedText = sanitizeGeneratedPostText(
-      (typeof res.content === 'string'
-        ? res.content.trim()
-        : String(res.content ?? '').trim()) || '',
+    const adaptedText = enforceAdaptChannelLimits(
+      channelEntry.channel,
+      sanitizeGeneratedPostText(
+        (typeof res.content === 'string'
+          ? res.content.trim()
+          : String(res.content ?? '').trim()) || '',
+      ),
     );
 
     const usage = extractUsageFromAiMessage(res);

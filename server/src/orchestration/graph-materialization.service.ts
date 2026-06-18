@@ -58,7 +58,8 @@ export type MaterializedPipeline = {
 };
 
 type BranchConfig = {
-  mode?: 'rule_channels' | 'ab_test';
+  mode?: 'rule_channels' | 'wizard_channels' | 'ab_test';
+  channels?: string[];
   variants?: Array<{ id: string; weight: number; channel?: string }>;
 };
 
@@ -433,9 +434,16 @@ export class GraphMaterializationService {
   }
 
   private resolveChannels(
-    _branchConfig: BranchConfig,
+    branchConfig: BranchConfig,
     ruleChannels: ChannelEntry[],
   ): ChannelEntry[] {
+    if (
+      branchConfig.mode === 'wizard_channels' &&
+      Array.isArray(branchConfig.channels) &&
+      branchConfig.channels.length > 0
+    ) {
+      return channelIdsToChannelEntries(branchConfig.channels, ruleChannels);
+    }
     const ids = ruleChannelNamesToIds(ruleChannels);
     if (ids.length > 0) {
       return channelIdsToChannelEntries(ids, ruleChannels);

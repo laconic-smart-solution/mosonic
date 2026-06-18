@@ -304,9 +304,12 @@
     "saveWorkflowToSync": "Save the workflow to upload new avatars or sync presenter settings to the server. You can still pick avatars and voices locally.",
     "saveFailed": "Presenter settings could not be saved. Save the workflow and try again.",
     "deleteConfirm": "Delete \"{{name}}\" from your HeyGen account? This cannot be undone.",
+    "deleteSuccess": "Avatar \"{{name}}\" deleted.",
     "deleteFailed": "Could not delete avatar. Try again.",
     "fileTooLarge": "Image must be 32MB or smaller.",
     "uploadFailed": "Upload failed. Try again.",
+    "uploadSuccess": "Avatar \"{{name}}\" uploaded.",
+    "backgroundUploadSuccess": "Background image uploaded.",
     "avatar": "Avatar",
     "clearSelection": "Clear selection",
     "loadingAvatars": "Loading avatars…",
@@ -384,6 +387,7 @@
     "exitPreviewHint": "Clear or click the selected pipeline again to exit preview and generate.",
     "saveBeforeGenerateHint": "Save workflow changes or apply node settings before generating. You can still edit this prompt.",
     "usingWorkflow": "Using workflow: {{name}} · {{count}} {{nodesLabel}}",
+    "emptyWorkflowHint": "Set up your pipeline with the Q&A wizard, then generate content for each run.",
     "modeUseCurrentWorkflow": "Use current workflow",
     "modeGenerateWorkflow": "Auto-generate workflow",
     "modeTabCurrent": "Current",
@@ -435,8 +439,13 @@
   "usedPipelines": {
     "aria": "Used pipelines",
     "title": "Used Pipelines",
-    "previewing": "Previewing run · click again or clear to edit workflow",
-    "clear": "Clear",
+    "previewing": "Previewing this run. Apply to copy its structure into the workflow editor.",
+    "apply": "Apply to workflow",
+    "applying": "Applying…",
+    "clear": "Clear preview",
+    "rename": "Rename pipeline",
+    "applySuccess": "Pipeline structure applied to workflow. Save when ready.",
+    "applyFailed": "Could not apply pipeline to workflow.",
     "noPrompt": "No prompt",
     "nodes_one": "node",
     "nodes_other": "nodes",
@@ -500,6 +509,83 @@
     "cinematic": "Cinematic"
   },
   "rebuildTooltip": "Refresh workflow nodes from the current rule and channel settings.",
+  "qaWizard": {
+    "title": "Generate workflow",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "next": "Next",
+    "generate": "Generate workflow",
+    "generating": "Generating…",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "progress": "Step {{current}} of {{total}}",
+    "validation": {
+      "selectAtLeastOneChannel": "Select at least one channel.",
+      "selectAtLeastOneLanguage": "Select at least one target language."
+    },
+    "languages": {
+      "thai": "Thai",
+      "english": "English",
+      "japanese": "Japanese",
+      "chinese": "Chinese",
+      "korean": "Korean",
+      "spanish": "Spanish",
+      "french": "French",
+      "german": "German"
+    },
+    "steps": {
+      "webSearch": {
+        "title": "Use web search for this content?",
+        "description": "Adds an intelligence step before text generation to gather trends and market context."
+      },
+      "keywordPlanner": {
+        "title": "Plan target keywords?",
+        "description": "Adds a keyword planner step before text generation using your campaign rule."
+      },
+      "summary": {
+        "title": "Summarize content?",
+        "description": "Choose which rule channels should get a summary in the next step."
+      },
+      "summaryChannels": {
+        "title": "Which channels get a summary?",
+        "description": "Only channels from your campaign rule are listed."
+      },
+      "image": {
+        "title": "Generate images?",
+        "description": "Choose which rule channels should get an image in the next step."
+      },
+      "imageChannels": {
+        "title": "Which channels get an image?",
+        "description": "Only channels from your campaign rule are listed."
+      },
+      "video": {
+        "title": "Generate video?",
+        "description": "Choose which rule channels should get a video in the next step."
+      },
+      "videoChannels": {
+        "title": "Which channels get a video?",
+        "description": "Only channels from your campaign rule are listed."
+      },
+      "translate": {
+        "title": "Translate content?",
+        "description": "Choose which rule channels need translation in the next step."
+      },
+      "translationChannels": {
+        "title": "Which channels need translation?",
+        "description": "Only channels from your campaign rule are listed."
+      },
+      "targetLanguages": {
+        "title": "Target language(s)",
+        "description": "One translation step is added per language."
+      },
+      "additionalMessage": {
+        "title": "Anything else?",
+        "description": "Optional instructions for this generation run (tone, topic, CTA, etc.).",
+        "placeholder": "e.g. Announce our Black Friday 50% off sale with urgency…"
+      }
+    }
+  },
   "aria": {
     "openNodeSettings": "Open node settings",
     "addNode": "Add node",
