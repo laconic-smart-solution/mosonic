@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -22,6 +23,10 @@ import { PipelineStatsQueryDto } from './dto/pipeline-stats-query.dto';
 import { RetryNodeDto } from './dto/retry-node.dto';
 import { SkipNodeDto } from './dto/skip-node.dto';
 import { StartPipelineDto } from './dto/start-pipeline.dto';
+import {
+  UpdatePipelineDto,
+  UpdatePipelineResponseDto,
+} from './dto/update-pipeline.dto';
 import { PipelineService } from './pipeline.service';
 
 @UseGuards(JwtAuthGuard)
@@ -167,5 +172,22 @@ export class PipelineController {
   getPipeline(@Req() req: Request, @Param('id') pipelineId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.getPipeline(pipelineId, auth);
+  }
+
+  @Patch(':id')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  updatePipeline(
+    @Req() req: Request,
+    @Param('id') pipelineId: string,
+    @Body() body: UpdatePipelineDto,
+  ): Promise<UpdatePipelineResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.updateName(pipelineId, body, auth);
   }
 }

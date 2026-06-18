@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp, Circle, CircleDot } from "lucide-react"
+import { ChevronDown, ChevronUp, Circle, CircleDot, Pencil } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { PipelineStatusBadge } from "@/features/pipeline/components/pipeline-status-badge"
@@ -7,6 +8,7 @@ import {
   truncatePrompt,
 } from "@/features/pipeline/lib/pipeline-list-format"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { PipelinePageItem } from "@/shared/types/pipeline.type"
 
@@ -18,10 +20,90 @@ type WorkflowUsedPipelinesPanelProps = {
   selectedPipelineId?: string
   onToggleSelect: (item: PipelinePageItem) => void
   onClearSelection: () => void
+  onApplyToWorkflow?: (item: PipelinePageItem) => void
+  onRenamePipeline?: (pipelineId: string, name: string) => void
+  isApplying?: boolean
   isLoading?: boolean
   hasMore?: boolean
   isFetchingMore?: boolean
   onLoadMore?: () => void
+}
+
+function PipelineNameRow({
+  item,
+  onRenamePipeline,
+}: {
+  item: PipelinePageItem
+  onRenamePipeline?: (pipelineId: string, name: string) => void
+}) {
+  const { t } = useTranslation("workflow")
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(item.name || "")
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(item.name || "")
+    }
+  }, [editing, item.name])
+
+  const displayName =
+    item.name?.trim() ||
+    truncatePrompt(item.contentPrompt || t("usedPipelines.noPrompt"), 48)
+
+  if (!onRenamePipeline) {
+    return (
+      <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
+        {displayName}
+      </p>
+    )
+  }
+
+  if (editing) {
+    return (
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const trimmed = draft.trim()
+          setEditing(false)
+          if (trimmed && trimmed !== item.name) {
+            onRenamePipeline(item.pipelineId, trimmed)
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur()
+          }
+          if (e.key === "Escape") {
+            setDraft(item.name || "")
+            setEditing(false)
+          }
+        }}
+        className="h-7 text-xs"
+        autoFocus
+        onClick={(e) => e.stopPropagation()}
+      />
+    )
+  }
+
+  return (
+    <div className="flex items-start gap-1">
+      <p className="min-w-0 flex-1 line-clamp-2 text-xs font-medium leading-snug text-foreground">
+        {displayName}
+      </p>
+      <button
+        type="button"
+        className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label={t("usedPipelines.rename")}
+        onClick={(e) => {
+          e.stopPropagation()
+          setEditing(true)
+        }}
+      >
+        <Pencil className="size-3" />
+      </button>
+    </div>
+  )
 }
 
 export function WorkflowUsedPipelinesPanel({
@@ -32,6 +114,9 @@ export function WorkflowUsedPipelinesPanel({
   selectedPipelineId,
   onToggleSelect,
   onClearSelection,
+  onApplyToWorkflow,
+  onRenamePipeline,
+  isApplying = false,
   isLoading = false,
   hasMore = false,
   isFetchingMore = false,
@@ -67,19 +152,35 @@ export function WorkflowUsedPipelinesPanel({
       {!collapsed ? (
         <div className="flex min-h-0 flex-col px-2 pb-2 pt-1">
           {selectedPipelineId && selectedItem ? (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2">
-              <p className="min-w-0 text-[11px] leading-snug text-foreground">
+            <div className="mb-2 space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2">
+              <p className="text-[11px] leading-snug text-foreground">
                 {t("usedPipelines.previewing")}
               </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-[11px]"
-                onClick={onClearSelection}
-              >
-                {t("usedPipelines.clear")}
-              </Button>
+              <div className="flex flex-wrap gap-1.5">
+                {onApplyToWorkflow ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 flex-1 px-2 text-[11px]"
+                    disabled={isApplying}
+                    onClick={() => onApplyToWorkflow(selectedItem)}
+                  >
+                    {isApplying
+                      ? t("usedPipelines.applying")
+                      : t("usedPipelines.apply")}
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 px-2 text-[11px]"
+                  disabled={isApplying}
+                  onClick={onClearSelection}
+                >
+                  {t("usedPipelines.clear")}
+                </Button>
+              </div>
             </div>
           ) : null}
 
@@ -121,12 +222,17 @@ export function WorkflowUsedPipelinesPanel({
                           {formatRelativeTime(item.startedAt, tPipeline, i18n.language)}
                         </span>
                       </span>
-                      <p className="mt-1.5 line-clamp-2 text-xs leading-snug text-foreground/90">
-                        {truncatePrompt(
-                          item.contentPrompt || t("usedPipelines.noPrompt"),
-                          100,
-                        )}
-                      </p>
+                      <div className="mt-1.5">
+                        <PipelineNameRow
+                          item={item}
+                          onRenamePipeline={onRenamePipeline}
+                        />
+                      </div>
+                      {item.contentPrompt?.trim() ? (
+                        <p className="mt-1 line-clamp-1 text-[10px] leading-snug text-muted-foreground">
+                          {truncatePrompt(item.contentPrompt, 80)}
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-[10px] text-muted-foreground">
                         {t("usedPipelines.nodes", { count: item.nodeCount })}
                       </p>

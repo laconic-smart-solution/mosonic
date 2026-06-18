@@ -29,6 +29,7 @@ import {
   type NodeChange,
   type OnSelectionChangeParams,
   type ReactFlowInstance,
+  type Viewport,
 } from "@xyflow/react"
 
 import {
@@ -67,6 +68,11 @@ import {
 import { workflowConfigsEqual } from "@/features/workflow/lib/config-equality"
 import { normalizeImageCanvasConfig } from "@/features/workflow/lib/openai-image-size"
 import { expandLegacySingleAdapt } from "@/features/workflow/lib/workflow-lane-expand"
+import {
+  applyWorkflowCanvasViewport,
+  defaultWorkflowCanvasViewport,
+  writeWorkflowCanvasViewport,
+} from "@/features/workflow/lib/workflow-canvas-viewport"
 import {
   getAllowedInitialTypes,
   getAllowedInsertTypes,
@@ -272,6 +278,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const { t } = useTranslation("workflow")
     const initialNodes = useMemo(() => [] as WfRfNode[], [])
     const initialEdges = useMemo(() => [] as Edge[], [])
+    const defaultViewport = useMemo(() => defaultWorkflowCanvasViewport(), [])
 
     const [nodes, setNodes, onNodesChange] = useNodesState<WfRfNode>(initialNodes)
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -349,7 +356,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         setPropConfig({})
         setPopover(null)
         endApiGraphSync()
-        queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
+        queueMicrotask(() => {
+          if (rf.current) applyWorkflowCanvasViewport(rf.current)
+        })
         return
       }
       if (!apiNodes || apiNodes.length === 0) return
@@ -372,7 +381,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       setPropConfig({})
       setPopover(null)
       endApiGraphSync()
-      queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
+      queueMicrotask(() => {
+        if (rf.current) applyWorkflowCanvasViewport(rf.current)
+      })
     }, [
       apiNodes,
       apiEdges,
@@ -801,8 +812,15 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const onInit = useCallback((inst: ReactFlowInstance<WfRfNode>) => {
       rf.current = inst
-      queueMicrotask(() => void inst.fitView({ padding: 0.15 }))
+      queueMicrotask(() => applyWorkflowCanvasViewport(inst))
     }, [])
+
+    const onMoveEnd = useCallback(
+      (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+        writeWorkflowCanvasViewport(viewport)
+      },
+      [],
+    )
 
     const deleteNode = useCallback(
       (nodeId: string) => {
@@ -1117,6 +1135,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             onNodeClick={onNodeClick}
             onPaneClick={() => closePanel()}
             onInit={onInit}
+            onMoveEnd={onMoveEnd}
             nodesFocusable={false}
             selectNodesOnDrag={false}
             nodeTypes={nodeTypes}
@@ -1124,7 +1143,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             isValidConnection={isValidConnection}
             minZoom={0.35}
             maxZoom={1.5}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            defaultViewport={defaultViewport}
             className="h-full min-h-0 w-full flex-1 bg-transparent!"
             style={{ width: "100%", height: "100%" }}
           >

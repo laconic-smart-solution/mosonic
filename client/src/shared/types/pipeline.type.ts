@@ -23,6 +23,7 @@ export type PipelinePageItem = {
   workflowRef: string
   ruleRef: string
   status: PipelineStatus
+  name: string
   contentPrompt: string
   nodeCount: number
   nodeTypes: string[]
@@ -47,8 +48,13 @@ export type PipelineStatsResponse = {
   byStatus: Partial<Record<PipelineStatus, number>>
 }
 
-export type StartPipelineResponse = {
+export type UpdatePipelineNamePayload = {
+  name: string
+}
+
+export type UpdatePipelineNameResponse = {
   pipelineId: string
+  name: string
 }
 
 export type RetryNodePayload = {
@@ -94,6 +100,7 @@ export type GetPipelineResponse = {
     pipelineId: string
     workflowRef: string
     ruleRef: string
+    name: string
     contentPrompt: string
     status: PipelineStatus
     pausedNodeId?: string | null

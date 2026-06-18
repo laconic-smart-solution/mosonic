@@ -36,6 +36,9 @@
   "footer": {
     "copyright": "© 2026 NeuralTex Co., Ltd. — 泰国曼谷"
   },
+  "toast": {
+    "selectRuleFirst": "请先生成工作流前选择活动规则。"
+  },
   "userStrip": {
     "loading": "加载中…",
     "admin": "管理员",

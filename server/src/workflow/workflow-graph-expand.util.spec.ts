@@ -73,4 +73,47 @@ describe('expandGraphLaneTemplates', () => {
     expect(igAdapt?.config).toMatchObject({ laneId: 'instagram' });
     expect(out[out.length - 1]?.type).toBe(WorkflowNodeType.Merge);
   });
+
+  it('does not expand lane-specific image templates to other channels', () => {
+    const nodes = assignNodeIds([
+      { type: WorkflowNodeType.TextGeneration, order: 1, isLocked: true, config: {} },
+      {
+        type: WorkflowNodeType.Branch,
+        order: 2,
+        isLocked: false,
+        config: { mode: 'wizard_channels', channels: ['instagram', 'facebook', 'linkedin'] },
+      },
+      { type: WorkflowNodeType.Adapt, order: 3, isLocked: false, config: {} },
+      {
+        type: WorkflowNodeType.ImageGeneration,
+        order: 4,
+        isLocked: false,
+        config: { aspectRatio: '1:1' },
+        lane: 'instagram',
+      },
+      {
+        type: WorkflowNodeType.Merge,
+        order: 5,
+        isLocked: false,
+        config: {},
+      },
+    ]);
+    const withLane = nodes.map((n) =>
+      n.type === WorkflowNodeType.ImageGeneration
+        ? { ...n, config: { ...n.config, laneId: 'instagram' } }
+        : n,
+    );
+    const out = expandGraphLaneTemplates(withLane, [
+      'instagram',
+      'facebook',
+      'linkedin',
+    ]);
+    expect(out.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(3);
+    expect(out.filter((n) => n.type === WorkflowNodeType.ImageGeneration)).toHaveLength(
+      1,
+    );
+    expect(
+      out.find((n) => n.type === WorkflowNodeType.ImageGeneration)?.lane,
+    ).toBe('instagram');
+  });
 });

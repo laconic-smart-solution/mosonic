@@ -10,6 +10,8 @@ import type {
   SkipNodeResponse,
   StartPipelinePayload,
   StartPipelineResponse,
+  UpdatePipelineNamePayload,
+  UpdatePipelineNameResponse,
 } from "../types/pipeline.type"
 
 export const pipelineService = {
@@ -65,6 +67,14 @@ export const pipelineService = {
 
   cancel: async (pipelineId: string): Promise<{ success: boolean }> => {
     const response = await apiClient.post(`/pipeline/${pipelineId}/cancel`)
+    return response.data
+  },
+
+  updateName: async (
+    pipelineId: string,
+    payload: UpdatePipelineNamePayload,
+  ): Promise<UpdatePipelineNameResponse> => {
+    const response = await apiClient.patch(`/pipeline/${pipelineId}`, payload)
     return response.data
   },
 

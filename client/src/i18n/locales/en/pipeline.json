@@ -49,6 +49,7 @@
   "card": {
     "news": "News",
     "noPrompt": "No prompt",
+    "noName": "Untitled run",
     "noSteps": "No steps recorded",
     "node_one": "{{count}} node",
     "node_other": "{{count}} nodes",

@@ -176,4 +176,74 @@ describe("expandLegacySingleAdapt", () => {
       outEdges.some((e) => e.source === "image" || e.target === "image"),
     ).toBe(false)
   })
+
+  it("clones shared downstream nodes when adapts are already per-lane", () => {
+    const { nodes, edges } = baseGraph()
+    const perLaneNodes: WfRfNode[] = [
+      ...nodes.filter((n) => n.id !== "adapt"),
+      {
+        id: "adapt-ig",
+        type: "wfNode",
+        position: { x: 600, y: -40 },
+        data: {
+          label: "Adapt For Instagram",
+          wfType: "adapt",
+          status: "idle",
+          locked: false,
+          config: { laneId: "instagram" },
+          lane: "instagram",
+        },
+        draggable: true,
+      },
+      {
+        id: "adapt-li",
+        type: "wfNode",
+        position: { x: 600, y: 40 },
+        data: {
+          label: "Adapt For LinkedIn",
+          wfType: "adapt",
+          status: "idle",
+          locked: false,
+          config: { laneId: "linkedin" },
+          lane: "linkedin",
+        },
+        draggable: true,
+      },
+    ]
+    const perLaneEdges = buildEdges([
+      ["kw", "text"],
+      ["text", "branch"],
+      ["branch", "adapt-ig"],
+      ["branch", "adapt-li"],
+      ["adapt-ig", "image"],
+      ["adapt-li", "image"],
+      ["image", "merge"],
+    ]).map((edge, index) => ({
+      ...edge,
+      ...(index === 2 ? { sourceHandle: "instagram" } : {}),
+      ...(index === 3 ? { sourceHandle: "linkedin" } : {}),
+      ...(index === 6 ? { targetHandle: "instagram" } : {}),
+    }))
+
+    const { nodes: outNodes, edges: outEdges } = expandLegacySingleAdapt(
+      perLaneNodes,
+      perLaneEdges,
+      channels,
+    )
+
+    expect(outNodes.some((n) => n.id === "image")).toBe(false)
+    expect(
+      outNodes.filter(
+        (n) => n.data.wfType === "image" && n.data.lane === "instagram",
+      ),
+    ).toHaveLength(1)
+    expect(
+      outNodes.filter(
+        (n) => n.data.wfType === "image" && n.data.lane === "linkedin",
+      ),
+    ).toHaveLength(1)
+    expect(
+      outEdges.some((e) => e.source === "image" || e.target === "image"),
+    ).toBe(false)
+  })
 })

@@ -1,12 +1,15 @@
-import { IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import { WorkflowQAAnswersDto } from './workflow-qa-answers.dto';
 
 export class GenerateWorkflowRequestDto {
   @IsString()
-  contentPrompt!: string;
+  @IsNotEmpty()
+  ruleId!: string;
 
-  @IsOptional()
-  @IsString()
-  ruleId?: string;
+  @ValidateNested()
+  @Type(() => WorkflowQAAnswersDto)
+  answers!: WorkflowQAAnswersDto;
 }
 
 export class GenerateWorkflowResponseDto {
@@ -15,8 +18,9 @@ export class GenerateWorkflowResponseDto {
 }
 
 export class RegenerateWorkflowByRuleRequestDto {
-  @IsString()
-  contentPrompt!: string;
+  @ValidateNested()
+  @Type(() => WorkflowQAAnswersDto)
+  answers!: WorkflowQAAnswersDto;
 }
 
 export class RegenerateWorkflowByRuleResponseDto {

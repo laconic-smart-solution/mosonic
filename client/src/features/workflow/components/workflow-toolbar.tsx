@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,11 +11,13 @@ type WorkflowToolbarProps = {
   ruleName?: string
   onRuleClick?: () => void
   onRun: () => void
+  onGenerateWorkflow?: () => void
   runLabel?: string
   onSave?: () => void
   isSaving?: boolean
   readOnly?: boolean
   generationDisabled?: boolean
+  generateWorkflowDisabled?: boolean
   showCancel?: boolean
   onCancel?: () => void
 }
@@ -26,11 +29,13 @@ export function WorkflowToolbar({
   ruleName,
   onRuleClick,
   onRun,
+  onGenerateWorkflow,
   runLabel,
   onSave,
   isSaving,
   readOnly,
   generationDisabled = false,
+  generateWorkflowDisabled = false,
   showCancel,
   onCancel,
 }: WorkflowToolbarProps) {
@@ -106,6 +111,19 @@ export function WorkflowToolbar({
             disabled={isSaving}
           >
             {isSaving ? t("toolbar.saving") : t("toolbar.saveChanges")}
+          </Button>
+        ) : null}
+        {!readOnly && onGenerateWorkflow ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onGenerateWorkflow}
+            disabled={generateWorkflowDisabled}
+            className="gap-1.5"
+          >
+            <Sparkles className="size-3.5 shrink-0" aria-hidden />
+            {t("toolbar.generateWorkflow")}
           </Button>
         ) : null}
         {!readOnly ? (

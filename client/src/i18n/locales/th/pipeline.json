@@ -49,6 +49,7 @@
   "card": {
     "news": "ข่าว",
     "noPrompt": "ไม่มีพรอมต์",
+    "noName": "รันที่ไม่มีชื่อ",
     "noSteps": "ไม่มีขั้นตอนที่บันทึก",
     "node_one": "{{count}} โหนด",
     "node_other": "{{count}} โหนด",

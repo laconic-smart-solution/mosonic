@@ -16,6 +16,7 @@ import {
   type WorkflowNodeDocument,
 } from '../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
+import { Pipeline, type PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { EventsService } from '../events/events.service';
 import { workflowCompletedNotification } from '../events/notification.util';
 import { RuleService } from '../rule/rule.service';
@@ -44,11 +45,14 @@ import {
   type WorkflowDocument,
   WorkflowStatus,
 } from './schemas/workflow.schema';
-import {
-  type GeneratedWorkflowNode,
-  WorkflowGenerationService,
-} from './services/workflow-generation.service';
+import { WorkflowGenerationService } from './services/workflow-generation.service';
 import { LlmService } from '../llm/llm.service';
+import {
+  resolveQaNodeChannels,
+  resolveRuleChannelIds,
+} from './workflow-qa-channels.constants';
+import type { WorkflowQAAnswersDto } from './dto/workflow-qa-answers.dto';
+import type { GeneratedWorkflowNode } from './workflow-structure.builder';
 import { assertValidWorkflowNodeOrder } from './workflow-node-order.util';
 import {
   assignNodeIds,
@@ -64,6 +68,11 @@ import {
   validateWorkflowGraph,
   type WorkflowGraphEdge,
 } from './workflow-graph.util';
+import {
+  collapsePipelineToWorkflowTemplate,
+  dedupeAdaptNodesPerLane,
+} from './pipeline-to-workflow-template.util';
+import type { ApplyPipelineToWorkflowResponseDto } from './dto/apply-pipeline-to-workflow.dto';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -78,6 +87,8 @@ export class WorkflowService {
     private readonly workflowModel: Model<WorkflowDocument>,
     @InjectModel(WorkflowNode.name)
     private readonly workflowNodeModel: Model<WorkflowNodeDocument>,
+    @InjectModel(Pipeline.name)
+    private readonly pipelineModel: Model<PipelineDocument>,
     private readonly workflowGeneration: WorkflowGenerationService,
     private readonly llm: LlmService,
     private readonly ruleService: RuleService,
@@ -88,28 +99,12 @@ export class WorkflowService {
     body: GenerateWorkflowRequestDto,
     auth: TenancyAuth,
   ): Promise<GenerateWorkflowResponseDto> {
-    const prompt = body.contentPrompt.trim();
-    if (!prompt) {
-      throw new BadRequestException('contentPrompt must not be empty');
+    const ruleId = body.ruleId.trim();
+    if (!ruleId) {
+      throw new BadRequestException('ruleId must not be empty');
     }
 
-    const ruleId = body.ruleId?.trim();
-    if (ruleId) {
-      return this.regenerateWorkflowByRuleId(ruleId, { contentPrompt: prompt }, auth);
-    }
-
-    const resolvedRuleId = await this.ruleService.extractAndAwaitReady(
-      prompt,
-      auth,
-    );
-    const workflow = await this.createWorkflow(
-      resolvedRuleId,
-      prompt,
-      auth.userId,
-    );
-
-    void this.runGeneration(workflow.workflowId, prompt, resolvedRuleId, auth);
-    return { workflowId: workflow.workflowId, ruleId: resolvedRuleId };
+    return this.regenerateWorkflowByRuleId(ruleId, { answers: body.answers }, auth);
   }
 
   async regenerateWorkflowByRuleId(
@@ -121,35 +116,53 @@ export class WorkflowService {
     if (!normalizedRuleId) {
       throw new BadRequestException('ruleId must not be empty');
     }
-    const prompt = body.contentPrompt.trim();
-    if (!prompt) {
-      throw new BadRequestException('contentPrompt must not be empty');
+
+    const answers = body.answers;
+
+    const rule = await this.ruleService.getRuleById(normalizedRuleId, auth);
+    const ruleChannelIds = resolveRuleChannelIds(rule.channels);
+    if (!ruleChannelIds.length) {
+      throw new BadRequestException(
+        'Rule must include at least one distribution channel before generating a workflow',
+      );
     }
 
-    await this.ruleService.getRuleById(normalizedRuleId, auth);
+    const normalizedAnswers = this.normalizeWorkflowQaAnswers(
+      answers,
+      ruleChannelIds,
+    );
 
     const existing = await this.workflowModel
       .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
       .sort({ createdAt: -1 })
       .exec();
+    const workflowName = this.workflowNameFromAnswers(
+      normalizedAnswers.additionalMessage,
+      normalizedRuleId,
+    );
     const workflow =
       existing ??
-      (await this.createWorkflow(normalizedRuleId, prompt, auth.userId));
+      (await this.createWorkflow(
+        normalizedRuleId,
+        workflowName,
+        auth.userId,
+      ));
 
     if (existing?.workflowId) {
       await this.workflowModel
         .updateOne(
           mergeUserIdFilter({ workflowId: existing.workflowId }, auth),
-          { $set: { status: WorkflowStatus.Generating } },
+          { $set: { status: WorkflowStatus.Generating, name: workflowName } },
         )
         .exec();
     }
 
     void this.runGeneration(
       workflow.workflowId,
-      prompt,
+      normalizedAnswers,
       normalizedRuleId,
       auth,
+      ruleChannelIds,
     );
     return { workflowId: workflow.workflowId, ruleId: normalizedRuleId };
   }
@@ -528,6 +541,127 @@ export class WorkflowService {
     return { success: true };
   }
 
+  async applyPipelineToWorkflow(
+    ruleId: string,
+    pipelineId: string,
+    auth: TenancyAuth,
+  ): Promise<ApplyPipelineToWorkflowResponseDto> {
+    const normalizedRuleId = ruleId.trim();
+    const normalizedPipelineId = pipelineId.trim();
+    if (!normalizedRuleId || !normalizedPipelineId) {
+      throw new BadRequestException('ruleId and pipelineId must not be empty');
+    }
+
+    const workflow = await this.workflowModel
+      .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
+      .sort({ createdAt: -1 })
+      .exec();
+    if (!workflow) {
+      throw new NotFoundException(
+        `No workflow found for rule ${normalizedRuleId}`,
+      );
+    }
+
+    const pipeline = await this.pipelineModel
+      .findOne(mergeUserIdFilter({ pipelineId: normalizedPipelineId }, auth))
+      .lean()
+      .exec();
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${normalizedPipelineId} not found`);
+    }
+    if (pipeline.workflowRef !== workflow.workflowId) {
+      throw new BadRequestException(
+        'Pipeline does not belong to the workflow for this rule',
+      );
+    }
+
+    const collapsed = collapsePipelineToWorkflowTemplate(
+      (pipeline.nodes ?? []).map((node) => ({
+        nodeId: node.nodeId,
+        type: node.type,
+        order: node.order,
+        isLocked: node.isLocked,
+        userPrompt: node.userPrompt ?? '',
+        config: (node.config ?? {}) as Record<string, unknown>,
+        lane: node.lane ?? null,
+      })),
+      {
+        edges: (pipeline.graph?.edges ?? []).map((edge) => ({
+          from: edge.from,
+          to: edge.to,
+          ...(edge.sourceHandle ? { sourceHandle: edge.sourceHandle } : {}),
+          ...(edge.targetHandle ? { targetHandle: edge.targetHandle } : {}),
+        })),
+        lanes: pipeline.graph?.lanes ?? [],
+        layout:
+          (pipeline.graph?.layout as
+            | Record<string, { x: number; y: number }>
+            | undefined) ?? {},
+      },
+    );
+
+    const rule = await this.ruleService.getRuleById(pipeline.ruleRef, auth);
+    const ruleChannelIds = resolveRuleChannelIds(rule.channels);
+    const pipelineLaneIds = (pipeline.graph?.lanes ?? []).map((lane) =>
+      normalizeLaneId(lane),
+    );
+    const channelIds = [
+      ...new Set(
+        [...ruleChannelIds, ...pipelineLaneIds]
+          .map((lane) => normalizeLaneId(lane))
+          .filter(Boolean),
+      ),
+    ];
+    const graphNodes = dedupeAdaptNodesPerLane(
+      expandGraphLaneTemplates(
+        collapsed.nodes,
+        channelIds.length >= 2 ? channelIds : [],
+      ),
+    );
+    const edges = buildWorkflowEdges(graphNodes);
+
+    const saveNodes = graphNodes.map((node) => {
+      const pos = collapsed.layout[node.nodeId];
+      return {
+        nodeId: node.nodeId,
+        type: node.type,
+        order: node.order,
+        isLocked: node.isLocked,
+        config: node.config,
+        ...(typeof node.lane === 'string' && node.lane.trim()
+          ? { lane: node.lane.trim() }
+          : {}),
+        ...(pos ? { x: pos.x, y: pos.y } : {}),
+      };
+    });
+
+    await this.saveNodes(
+      workflow.workflowId,
+      { nodes: saveNodes, edges },
+      auth,
+    );
+
+    return {
+      workflowId: workflow.workflowId,
+      contentPrompt: pipeline.contentPrompt,
+      nodes: graphNodes.map((node) => {
+        const pos = collapsed.layout[node.nodeId];
+        return {
+          nodeId: node.nodeId,
+          type: node.type,
+          order: node.order,
+          isLocked: node.isLocked,
+          config: node.config,
+          ...(typeof node.lane === 'string' && node.lane.trim()
+            ? { lane: node.lane.trim() }
+            : {}),
+          ...(pos ? { x: pos.x, y: pos.y } : {}),
+        };
+      }),
+      edges,
+    };
+  }
+
   async saveNodesForRule(
     ruleId: string,
     body: SaveWorkflowNodesByRuleRequestDto,
@@ -695,18 +829,20 @@ export class WorkflowService {
 
   private async runGeneration(
     workflowId: string,
-    contentPrompt: string,
-    incomingRuleId: string | undefined,
+    answers: RegenerateWorkflowByRuleRequestDto['answers'],
+    incomingRuleId: string,
     auth: TenancyAuth,
+    publishChannelIds: string[],
   ): Promise<void> {
     try {
       this.events.emitToWorkflow(workflowId, 'workflow:started', {
         workflowId,
       });
 
-      const ruleId = incomingRuleId?.trim()
-        ? incomingRuleId.trim()
-        : await this.ruleService.extractAndAwaitReady(contentPrompt, auth);
+      const ruleId = incomingRuleId.trim();
+      if (!ruleId) {
+        throw new BadRequestException('ruleId must not be empty');
+      }
 
       await this.workflowModel
         .updateOne(
@@ -722,11 +858,8 @@ export class WorkflowService {
       const rule = await this.ruleService.getRuleById(ruleId, auth);
       const generatedNodes = await this.workflowGeneration.generate(
         rule,
-        contentPrompt,
+        answers,
         { userId: auth.userId, workflowId },
-      );
-      const channelIds = (rule.channels ?? []).map((ch) =>
-        normalizeLaneId(ch.channel),
       );
       const { nodeIds, edges: persistedEdges } =
         await this.persistGeneratedNodes(
@@ -734,7 +867,7 @@ export class WorkflowService {
           generatedNodes,
           auth.userId,
           auth,
-          channelIds,
+          publishChannelIds,
         );
 
       await this.workflowModel
@@ -801,17 +934,75 @@ export class WorkflowService {
 
   private async createWorkflow(
     ruleRef: string,
-    prompt: string,
+    name: string,
     userId: string,
   ): Promise<WorkflowDocument> {
     return this.workflowModel.create({
-      name: `Workflow for: ${prompt.slice(0, 64)}`,
+      name,
       ruleRef,
       userId,
       status: WorkflowStatus.Generating,
       nodes: [],
       versions: [],
     });
+  }
+
+  private normalizeWorkflowQaAnswers(
+    answers: WorkflowQAAnswersDto,
+    ruleChannelIds: string[],
+  ): WorkflowQAAnswersDto {
+    const imageChannels = answers.generateImage
+      ? resolveQaNodeChannels(answers.imageChannels, ruleChannelIds)
+      : [];
+    const videoChannels = answers.generateVideo
+      ? resolveQaNodeChannels(answers.videoChannels, ruleChannelIds)
+      : [];
+    const translationChannels = answers.translate
+      ? resolveQaNodeChannels(answers.translationChannels, ruleChannelIds)
+      : [];
+    const summaryChannels = answers.generateSummary
+      ? resolveQaNodeChannels(answers.summaryChannels, ruleChannelIds)
+      : [];
+
+    if (answers.generateSummary && !summaryChannels.length) {
+      throw new BadRequestException(
+        'Select at least one rule channel for summarization',
+      );
+    }
+    if (answers.generateImage && !imageChannels.length) {
+      throw new BadRequestException(
+        'Select at least one rule channel for image generation',
+      );
+    }
+    if (answers.generateVideo && !videoChannels.length) {
+      throw new BadRequestException(
+        'Select at least one rule channel for video generation',
+      );
+    }
+    if (answers.translate && !translationChannels.length) {
+      throw new BadRequestException(
+        'Select at least one rule channel for translation',
+      );
+    }
+
+    return {
+      ...answers,
+      summaryChannels,
+      imageChannels,
+      videoChannels,
+      translationChannels,
+    };
+  }
+
+  private workflowNameFromAnswers(
+    additionalMessage: string,
+    ruleId: string,
+  ): string {
+    const trimmed = additionalMessage.trim();
+    if (trimmed) {
+      return `Workflow: ${trimmed.slice(0, 64)}`;
+    }
+    return `Workflow for rule ${ruleId.slice(0, 8)}`;
   }
 
   private async persistGeneratedNodes(
@@ -833,7 +1024,7 @@ export class WorkflowService {
         return {
           ...n,
           order: idx + 1,
-          isLocked: false,
+          isLocked: n.isLocked,
           config: parsed.data as Record<string, unknown>,
         };
       });
@@ -871,6 +1062,7 @@ export class WorkflowService {
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,
+        userPrompt: n.userPrompt?.trim() ?? '',
         config: n.config as WorkflowNodeConfig,
         lane: n.lane ?? undefined,
       });

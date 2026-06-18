@@ -204,6 +204,10 @@ export class Pipeline {
   @Prop({ required: true })
   contentPrompt: string;
 
+  /** User-visible label; defaults from content prompt or run timestamp. */
+  @Prop({ type: String, default: '' })
+  name: string;
+
   @Prop({ type: [PipelineNodeExecutionSchema], default: [] })
   nodes: PipelineNodeExecution[];
 

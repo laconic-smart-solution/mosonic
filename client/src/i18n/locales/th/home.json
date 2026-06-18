@@ -36,6 +36,9 @@
   "footer": {
     "copyright": "© 2026 NeuralTex Co., Ltd. — กรุงเทพฯ ประเทศไทย"
   },
+  "toast": {
+    "selectRuleFirst": "กรุณาเลือกกฎแคมเปญก่อนสร้างเวิร์กโฟลว์"
+  },
   "userStrip": {
     "loading": "กำลังโหลด…",
     "admin": "ผู้ดูแล",
