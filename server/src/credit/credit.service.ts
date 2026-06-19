@@ -52,6 +52,20 @@ export class CreditService {
   }
 
   /**
+   * Self-serve topup entry point for the client. Returns instant credits while
+   * Payni integration is not wired; later this can return payniResponse instead.
+   */
+  async initiateTopup(
+    userId: string,
+    packageId: string,
+  ): Promise<{
+    instant: { creditsRemaining: number; creditsAdded: number };
+  }> {
+    const result = await this.topup(userId, packageId);
+    return { instant: result };
+  }
+
+  /**
    * Mock self-serve topup: instantly grants the package's credits to the user's
    * active plan. No real payment is processed.
    */
