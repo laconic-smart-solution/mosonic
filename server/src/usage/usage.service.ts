@@ -101,10 +101,10 @@ export class UsageService {
 
     const byNodeTypeMap = new Map<string, { creditsCharged: number; count: number }>();
     const byDayMap = new Map<string, number>();
-    let creditsUsed = 0;
+    let ledgerCreditsUsed = 0;
 
     for (const e of entries) {
-      creditsUsed += e.creditsCharged;
+      ledgerCreditsUsed += e.creditsCharged;
       const nt = e.nodeType ?? 'unknown';
       const cur = byNodeTypeMap.get(nt) ?? { creditsCharged: 0, count: 0 };
       cur.creditsCharged += e.creditsCharged;
@@ -121,9 +121,10 @@ export class UsageService {
       ? await this.planService.getCreditsForPlan(plan)
       : userPlan?.creditsPerMonth ?? 0;
     const creditsRemaining = userPlan?.creditsRemaining ?? 0;
+    const creditsUsed = userPlan?.creditsUsed ?? ledgerCreditsUsed;
     const percentUsed =
       creditsPerMonth > 0
-        ? Math.round((creditsUsed / creditsPerMonth) * 100)
+        ? Math.min(100, Math.round((creditsUsed / creditsPerMonth) * 100))
         : 0;
 
     return {
@@ -135,7 +136,7 @@ export class UsageService {
             priceThb: plan.priceThb,
           }
         : null,
-      creditsUsed: userPlan?.creditsUsed ?? creditsUsed,
+      creditsUsed,
       creditsRemaining,
       creditsPerMonth,
       percentUsed,

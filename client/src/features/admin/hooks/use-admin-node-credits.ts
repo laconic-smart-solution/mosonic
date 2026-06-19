@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { creditQueryKeys } from "@/shared/queries/credit.query"
 import { adminApi } from "../api/admin.api"
 
 export const useAdminNodeCredits = () =>
@@ -27,6 +28,8 @@ export const useAdminNodeCreditUpdate = () => {
     }) => adminApi.updateNodeCredit(nodeType, { costUsd }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin-node-credits"] })
+      void qc.invalidateQueries({ queryKey: creditQueryKeys.generationCosts })
+      void qc.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
     },
   })
 }

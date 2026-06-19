@@ -202,6 +202,12 @@ export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
           toast.success(t("toast.extractionStarted"))
         }
       } catch (err) {
+        if (isAxiosError(err) && err.response?.status === 402) {
+          toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+          setProgressStep("failed")
+          setFailureMessage(i18n.t("credit:runConfirm.insufficientTitle"))
+          return
+        }
         const message = apiErrorMessage(
           err,
           t("toast.couldNotStartExtraction"),

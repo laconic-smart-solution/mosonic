@@ -172,6 +172,7 @@ export default function RulesPage() {
     showOverlay: showExtractionOverlay,
     runExtract: runRuleExtract,
     dismissFailure,
+    isPending: isExtracting,
   } = useRuleExtraction({
     onExtractStarted: handleExtractStarted,
     onCompleted: handleExtractCompleted,
@@ -522,6 +523,7 @@ export default function RulesPage() {
         onPromptChange={setCreatePrompt}
         promptAreaKey={createDialogKey}
         onExtract={runRuleExtract}
+        isExtracting={isExtracting}
       />
     </div>
   )

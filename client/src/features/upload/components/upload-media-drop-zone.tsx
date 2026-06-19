@@ -1,6 +1,7 @@
 import { useDroppable } from "@dnd-kit/core"
 import { ImageIcon, Upload, Video, X } from "lucide-react"
 import { useCallback, useId, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { buttonVariants } from "@/lib/button-variants"
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
 
 import { FileServiceImage, FileServiceVideo } from "./upload-display-media"
+import { UploadMediaDetailDialog } from "./upload-media-detail-dialog"
 import type { MediaTabMode } from "../lib/upload-platform-media"
 import type { UploadPaletteDragPayload } from "./upload-dnd-payload"
 
@@ -64,10 +66,18 @@ export function UploadMediaDropZone({
   onClear,
   onUploadedUrls,
 }: UploadMediaDropZoneProps) {
+  const { t } = useTranslation("upload")
   const visual = mediaDropVisual(mode, disabled ? null : activeDrag)
   const { isOver, setNodeRef } = useDroppable({ id: "drop-media", disabled })
   const fileInputId = useId()
   const [uploading, setUploading] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailImageIndex, setDetailImageIndex] = useState(0)
+
+  const openMediaDetail = useCallback((imageIndex = 0) => {
+    setDetailImageIndex(imageIndex)
+    setDetailOpen(true)
+  }, [])
 
   const atCapacity =
     mode === "multiple" && imageUrls.length >= maxImages && maxImages > 0
@@ -245,21 +255,41 @@ export function UploadMediaDropZone({
       ) : null}
 
       {mode === "video" && videoUrl ? (
-        <FileServiceVideo
-          url={videoUrl}
-          controls
-          muted={false}
-          className="max-h-48 w-full rounded-md border bg-background"
-        />
+        <button
+          type="button"
+          className="block w-full cursor-zoom-in overflow-hidden rounded-md border bg-background text-left"
+          onClick={(e) => {
+            e.stopPropagation()
+            openMediaDetail(0)
+          }}
+          aria-label={t("mediaDetail.openHint")}
+        >
+          <FileServiceVideo
+            url={videoUrl}
+            controls
+            muted={false}
+            className="max-h-48 w-full"
+          />
+        </button>
       ) : null}
 
       {mode === "single" && imageUrls[0] ? (
-        <FileServiceImage
-          url={imageUrls[0]}
-          alt=""
-          className="max-h-48 w-full rounded-md border object-cover"
-          loadingClassName="max-h-48 w-full min-h-[8rem] rounded-md border"
-        />
+        <button
+          type="button"
+          className="block w-full cursor-zoom-in overflow-hidden rounded-md border text-left transition-opacity hover:opacity-95"
+          onClick={(e) => {
+            e.stopPropagation()
+            openMediaDetail(0)
+          }}
+          aria-label={t("mediaDetail.openHint")}
+        >
+          <FileServiceImage
+            url={imageUrls[0]}
+            alt=""
+            className="max-h-48 w-full object-cover"
+            loadingClassName="max-h-48 w-full min-h-[8rem] rounded-md border"
+          />
+        </button>
       ) : null}
 
       {mode === "multiple" && imageUrls.length > 0 ? (
@@ -273,12 +303,22 @@ export function UploadMediaDropZone({
                 key={`${url}-${i}`}
                 className="group/slot relative size-[52px] overflow-hidden rounded-md border"
               >
-                <FileServiceImage
-                  url={url}
-                  alt=""
-                  className="size-full object-cover"
-                  loadingClassName="size-full"
-                />
+                <button
+                  type="button"
+                  className="block size-full cursor-zoom-in"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openMediaDetail(i)
+                  }}
+                  aria-label={t("mediaDetail.openHint")}
+                >
+                  <FileServiceImage
+                    url={url}
+                    alt=""
+                    className="size-full object-cover"
+                    loadingClassName="size-full"
+                  />
+                </button>
                 {!disabled ? (
                   <Button
                     type="button"
@@ -317,6 +357,15 @@ export function UploadMediaDropZone({
           <X className="size-3.5" />
         </Button>
       ) : null}
+
+      <UploadMediaDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        mediaTab={mode}
+        imageUrls={imageUrls}
+        videoUrl={videoUrl}
+        initialImageIndex={detailImageIndex}
+      />
     </div>
   )
 }

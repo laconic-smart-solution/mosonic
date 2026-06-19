@@ -1,12 +1,17 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { HeygenAssetsService } from '../nodes/services/heygen-assets.service';
+import { PrismaService } from '../database/prisma.service';
+import {
+  HeygenAssetsService,
+  type HeygenAvatarLook,
+} from '../nodes/services/heygen-assets.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import {
   coerceVideoConfigForPersist,
@@ -34,6 +39,7 @@ export class WorkflowHeygenService {
     @Inject(WORKFLOW_NODE_REPOSITORY)
     private readonly workflowNodes: IWorkflowNodeRepository,
     private readonly heygen: HeygenAssetsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async getVideoNode(
@@ -70,6 +76,65 @@ export class WorkflowHeygenService {
     return file;
   }
 
+  private async recordUserAvatar(args: {
+    userId: string;
+    lookId: string;
+    name: string;
+    previewImageUrl?: string;
+    assetId?: string;
+  }): Promise<void> {
+    const userId = args.userId.trim();
+    const lookId = args.lookId.trim();
+    if (!userId || !lookId) return;
+
+    await this.prisma.heygenUserAvatar.upsert({
+      where: { lookId },
+      create: {
+        userId,
+        lookId,
+        name: args.name.trim() || 'Avatar',
+        previewImageUrl: args.previewImageUrl?.trim() || null,
+        avatarType: 'photo_avatar',
+        assetId: args.assetId?.trim() || null,
+      },
+      update: {
+        userId,
+        name: args.name.trim() || 'Avatar',
+        previewImageUrl: args.previewImageUrl?.trim() || null,
+        assetId: args.assetId?.trim() || null,
+      },
+    });
+  }
+
+  private async assertAvatarOwnedByUser(
+    userId: string,
+    lookId: string,
+  ): Promise<void> {
+    const row = await this.prisma.heygenUserAvatar.findUnique({
+      where: { lookId },
+      select: { userId: true },
+    });
+    if (!row || row.userId !== userId) {
+      throw new ForbiddenException('Avatar not found');
+    }
+  }
+
+  private mapStoredAvatar(row: {
+    lookId: string;
+    name: string;
+    previewImageUrl: string | null;
+    avatarType: string;
+  }): HeygenAvatarLook {
+    return {
+      lookId: row.lookId,
+      name: row.name,
+      avatarType: row.avatarType,
+      previewImageUrl: row.previewImageUrl ?? undefined,
+      deletable: true,
+      status: 'completed',
+    };
+  }
+
   private async createAvatarFromUpload(
     file: Express.Multer.File | undefined,
     avatarName: string,
@@ -99,9 +164,24 @@ export class WorkflowHeygenService {
     };
   }
 
-  /** Upload avatar to HeyGen without requiring a saved workflow node (Generate more draft). */
-  uploadAvatarDraft(file: Express.Multer.File | undefined) {
-    return this.createAvatarFromUpload(file, `draft-${Date.now()}`);
+  /** Upload avatar to HeyGen without requiring a saved workflow node. */
+  async uploadAvatarDraft(
+    file: Express.Multer.File | undefined,
+    auth: TenancyAuth,
+  ) {
+    const result = await this.createAvatarFromUpload(
+      file,
+      `user-${auth.userId}-${Date.now()}`,
+    );
+    await this.recordUserAvatar({
+      userId: auth.userId,
+      lookId: result.heygenAvatarId,
+      name:
+        file?.originalname?.replace(/\.[^.]+$/, '').trim() || 'Uploaded avatar',
+      previewImageUrl: result.previewUrl,
+      assetId: result.heygenAvatarAssetId,
+    });
+    return result;
   }
 
   /** Upload background asset without requiring a saved workflow node. */
@@ -136,6 +216,15 @@ export class WorkflowHeygenService {
       file,
       `workflow-${workflowId}-${nodeId}`,
     );
+
+    await this.recordUserAvatar({
+      userId: auth.userId,
+      lookId: result.heygenAvatarId,
+      name:
+        file?.originalname?.replace(/\.[^.]+$/, '').trim() || 'Uploaded avatar',
+      previewImageUrl: result.previewUrl,
+      assetId: result.heygenAvatarAssetId,
+    });
 
     const merged = coerceVideoConfigForPersist({
       ...((node.config ?? {}) as Record<string, unknown>),
@@ -218,12 +307,24 @@ export class WorkflowHeygenService {
     return this.heygen.fetchVoicePreviewAudio(voiceId);
   }
 
-  listAvatarLooks() {
-    return this.heygen.listAvatarLooks();
+  async listAvatarLooksForUser(userId: string): Promise<HeygenAvatarLook[]> {
+    const rows = await this.prisma.heygenUserAvatar.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((row) => this.mapStoredAvatar(row));
   }
 
-  deleteAvatarLook(lookId: string) {
-    return this.heygen.deleteAvatarLook(lookId);
+  async deleteAvatarLookForUser(
+    userId: string,
+    lookId: string,
+  ): Promise<{ lookId: string }> {
+    await this.assertAvatarOwnedByUser(userId, lookId);
+    const deleted = await this.heygen.deleteAvatarLook(lookId);
+    await this.prisma.heygenUserAvatar.deleteMany({
+      where: { lookId, userId },
+    });
+    return deleted;
   }
 
   /** Merge presenter / video config into the saved workflow node (e.g. voice selection). */
