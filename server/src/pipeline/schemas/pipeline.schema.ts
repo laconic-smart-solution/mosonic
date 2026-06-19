@@ -178,6 +178,22 @@ export class PipelineMetadata {
 export const PipelineMetadataSchema =
   SchemaFactory.createForClass(PipelineMetadata);
 
+/** Per-node-type snapshot of credits charged up-front, used for refund reconciliation. */
+@Schema({ _id: false })
+export class PipelineCreditChargeEntry {
+  @Prop({ type: String, required: true })
+  nodeType: string;
+
+  @Prop({ type: Number, required: true, min: 0 })
+  count: number;
+
+  @Prop({ type: Number, required: true, min: 0 })
+  creditsEach: number;
+}
+export const PipelineCreditChargeEntrySchema = SchemaFactory.createForClass(
+  PipelineCreditChargeEntry,
+);
+
 @Schema({
   collection: 'pipelines',
   timestamps: false,
@@ -252,6 +268,18 @@ export class Pipeline {
 
   @Prop({ type: PipelineMetadataSchema, default: () => ({}) })
   metadata: PipelineMetadata;
+
+  /** Credits deducted up-front when the run started. */
+  @Prop({ type: Number, default: 0 })
+  creditsCharged?: number;
+
+  /** Snapshot of billable nodes charged, for refund reconciliation. */
+  @Prop({ type: [PipelineCreditChargeEntrySchema], default: [] })
+  creditChargeBreakdown?: PipelineCreditChargeEntry[];
+
+  /** True once unused-node credits have been refunded (idempotency guard). */
+  @Prop({ type: Boolean, default: false })
+  creditsReconciled?: boolean;
 }
 
 export const PipelineSchema = SchemaFactory.createForClass(Pipeline);

@@ -18,6 +18,14 @@ import { UserPlan, type UserPlanDocument } from './schemas/user-plan.schema';
 
 const DEFAULT_PLANS: CreatePlanDto[] = [
   {
+    name: 'Free',
+    priceThb: 0,
+    priceUsd: 0,
+    creditsOverride: 1000,
+    description: 'Free starter plan with monthly credits.',
+    features: ['1,000 credits / month', 'Community support'],
+  },
+  {
     name: 'Basic',
     priceThb: 1200,
     priceUsd: 35,
@@ -57,7 +65,12 @@ export class PlanService implements OnModuleInit {
     await this.bootstrapExistingUsers();
   }
 
-  async getCreditsForPlan(plan: Pick<Plan, 'priceUsd'>): Promise<number> {
+  async getCreditsForPlan(
+    plan: Pick<Plan, 'priceUsd' | 'creditsOverride'>,
+  ): Promise<number> {
+    if (plan.creditsOverride != null && plan.creditsOverride >= 0) {
+      return Math.floor(plan.creditsOverride);
+    }
     const config = await this.calculation.getConfig();
     if (config.creditPriceUsd <= 0) return 0;
     return Math.floor(plan.priceUsd / config.creditPriceUsd);

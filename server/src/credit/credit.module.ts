@@ -11,6 +11,7 @@ import { CreditBillingService } from './credit-billing.service';
 import { CreditCalculationService } from './credit-calculation.service';
 import { CreditConfigController } from './credit-config.controller';
 import { CreditConfigService } from './credit-config.service';
+import { CreditTopupController } from './credit-topup.controller';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
@@ -23,6 +24,10 @@ import {
   CreditLedger,
   CreditLedgerSchema,
 } from './schemas/credit-ledger.schema';
+import {
+  CreditTopup,
+  CreditTopupSchema,
+} from './schemas/credit-topup.schema';
 import {
   FixedCost,
   FixedCostSchema,
@@ -62,6 +67,7 @@ const DEFAULT_SERVICE_RATES = [
     MongooseModule.forFeature([
       { name: CreditConfig.name, schema: CreditConfigSchema },
       { name: CreditLedger.name, schema: CreditLedgerSchema },
+      { name: CreditTopup.name, schema: CreditTopupSchema },
       { name: UserPlan.name, schema: UserPlanSchema },
       { name: FixedCost.name, schema: FixedCostSchema },
       { name: ServiceRate.name, schema: ServiceRateSchema },
@@ -69,7 +75,11 @@ const DEFAULT_SERVICE_RATES = [
       { name: Plan.name, schema: PlanSchema },
     ]),
   ],
-  controllers: [CreditConfigController, AdminNodeCreditController],
+  controllers: [
+    CreditConfigController,
+    AdminNodeCreditController,
+    CreditTopupController,
+  ],
   providers: [
     CreditConfigService,
     CreditBillingService,

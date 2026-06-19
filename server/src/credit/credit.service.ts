@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
@@ -6,11 +11,21 @@ import { userRoom } from '../events/notification.util';
 import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
 import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
+import { currentBillingPeriod } from './lib/billing-period.util';
+import {
+  CREDIT_PACKAGES,
+  type CreditPackage,
+  findCreditPackage,
+} from './lib/credit-packages';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import {
   CreditLedger,
   type CreditLedgerDocument,
 } from './schemas/credit-ledger.schema';
+import {
+  CreditTopup,
+  type CreditTopupDocument,
+} from './schemas/credit-topup.schema';
 
 @Injectable()
 export class CreditService {
@@ -19,12 +34,160 @@ export class CreditService {
   constructor(
     @InjectModel(CreditLedger.name)
     private readonly ledgerModel: Model<CreditLedgerDocument>,
+    @InjectModel(CreditTopup.name)
+    private readonly topupModel: Model<CreditTopupDocument>,
     @InjectModel(UserPlan.name)
     private readonly userPlanModel: Model<UserPlanDocument>,
     private readonly calculation: CreditCalculationService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly events: EventsService,
   ) {}
+
+  getPackages(): ReadonlyArray<CreditPackage> {
+    return CREDIT_PACKAGES;
+  }
+
+  /**
+   * Mock self-serve topup: instantly grants the package's credits to the user's
+   * active plan. No real payment is processed.
+   */
+  async topup(
+    userId: string,
+    packageId: string,
+  ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
+    const pkg = findCreditPackage(packageId);
+    if (!pkg) {
+      throw new BadRequestException(`Unknown credit package: ${packageId}`);
+    }
+
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId, status: 'active' },
+        {
+          $inc: { creditsRemaining: pkg.credits },
+          $set: { lowBalanceNotifiedAt: null },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException('No active plan found for user');
+    }
+
+    await new this.topupModel({
+      userId,
+      packageId: pkg.id,
+      credits: pkg.credits,
+      priceUsd: pkg.priceUsd,
+    }).save();
+
+    return {
+      creditsRemaining: updated.creditsRemaining,
+      creditsAdded: pkg.credits,
+    };
+  }
+
+  /**
+   * Charge a fixed number of credits up-front for a workflow run. Atomic
+   * decrement of the active plan plus a ledger audit row.
+   */
+  async chargePipelineRun(args: {
+    userId: string;
+    pipelineId: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+    try {
+      await new this.ledgerModel({
+        userId: args.userId,
+        pipelineRef: args.pipelineId,
+        nodeId: args.pipelineId,
+        nodeType: 'pipeline_run',
+        provider: 'system',
+        model: '',
+        rawCostUsd: 0,
+        overheadUsd: 0,
+        marginAppliedUsd: 0,
+        creditPriceUsdSnapshot: args.creditPriceUsd,
+        creditsCharged: args.credits,
+        billingPeriod: currentBillingPeriod(),
+      }).save();
+
+      const updated = await this.userPlanModel
+        .findOneAndUpdate(
+          { userId: args.userId, status: 'active' },
+          {
+            $inc: {
+              creditsUsed: args.credits,
+              creditsRemaining: -args.credits,
+            },
+          },
+          { new: true },
+        )
+        .exec();
+
+      if (!updated) {
+        this.logger.warn(
+          `No active user_plan for userId=${args.userId}; pipeline charge logged without balance update`,
+        );
+        return;
+      }
+
+      await this.maybeEmitLowBalance(updated);
+    } catch (err) {
+      this.logger.warn(
+        `Pipeline credit charge failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Refund credits for a workflow run (e.g. nodes that never executed). Atomic
+   * increment of the active plan plus a ledger audit row.
+   */
+  async refundPipelineRun(args: {
+    userId: string;
+    pipelineId: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+    try {
+      await new this.ledgerModel({
+        userId: args.userId,
+        pipelineRef: args.pipelineId,
+        nodeId: args.pipelineId,
+        nodeType: 'pipeline_refund',
+        provider: 'system',
+        model: '',
+        rawCostUsd: 0,
+        overheadUsd: 0,
+        marginAppliedUsd: 0,
+        creditPriceUsdSnapshot: args.creditPriceUsd,
+        creditsCharged: -args.credits,
+        billingPeriod: currentBillingPeriod(),
+      }).save();
+
+      await this.userPlanModel
+        .findOneAndUpdate(
+          { userId: args.userId, status: 'active' },
+          {
+            $inc: {
+              creditsUsed: -args.credits,
+              creditsRemaining: args.credits,
+            },
+            $set: { lowBalanceNotifiedAt: null },
+          },
+        )
+        .exec();
+    } catch (err) {
+      this.logger.warn(
+        `Pipeline credit refund failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   async deductCredits(dto: DeductCreditsDto): Promise<void> {
     try {

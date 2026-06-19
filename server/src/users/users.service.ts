@@ -21,6 +21,23 @@ export type ConnectedAccountRecord = {
   connectedAt: Date;
 };
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Case-insensitive exact match for a string field. */
+function caseInsensitiveExact(value: string): RegExp {
+  return new RegExp(`^${escapeRegex(value)}$`, 'i');
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: number }).code === 11000
+  );
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -55,29 +72,69 @@ export class UsersService {
 
     const now = new Date();
 
-    const existing = await this.userModel.findOne({ authServerUserId }).exec();
+    // 1) Primary lookup by the SSO id.
+    let existing = await this.userModel.findOne({ authServerUserId }).exec();
+
+    // 2) Fallback: the SSO id can rotate between logins, so match an existing
+    //    account by email/username to avoid creating a duplicate user.
+    if (!existing) {
+      const or: Array<Record<string, unknown>> = [];
+      if (email) or.push({ email: caseInsensitiveExact(email) });
+      if (username) or.push({ username: caseInsensitiveExact(username) });
+      if (or.length > 0) {
+        existing = await this.userModel
+          .findOne({ $or: or })
+          .sort({ createdAt: 1 })
+          .exec();
+      }
+    }
+
     if (existing) {
+      // Adopt the current SSO id (it may have changed since last login).
+      existing.authServerUserId = authServerUserId;
       // Do not overwrite role/status from SSO.
       existing.email = email ?? existing.email;
       existing.username = username ?? existing.username;
       existing.firstName = firstName ?? existing.firstName;
       existing.lastName = lastName ?? existing.lastName;
       existing.lastLoginAt = now;
-      return await existing.save();
+      try {
+        return await existing.save();
+      } catch (err) {
+        // Another concurrent request may already own this authServerUserId.
+        if (isDuplicateKeyError(err)) {
+          const winner = await this.userModel
+            .findOne({ authServerUserId })
+            .exec();
+          if (winner) return winner;
+        }
+        throw err;
+      }
     }
 
-    const user = await this.userModel.create({
-      authServerUserId,
-      email,
-      username,
-      firstName,
-      lastName,
-      role: UserRole.CUSTOMER,
-      status: UserStatus.ACTIVE,
-      lastLoginAt: now,
-    });
-    await this.assignDefaultPlanForUser(user.userId);
-    return user;
+    try {
+      const user = await this.userModel.create({
+        authServerUserId,
+        email,
+        username,
+        firstName,
+        lastName,
+        role: UserRole.CUSTOMER,
+        status: UserStatus.ACTIVE,
+        lastLoginAt: now,
+      });
+      await this.assignDefaultPlanForUser(user.userId);
+      return user;
+    } catch (err) {
+      // Concurrent first-request race: re-read the row that won.
+      if (isDuplicateKeyError(err)) {
+        const winner = await this.userModel
+          .findOne({ authServerUserId })
+          .exec();
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
   async findByUserId(userId: string): Promise<User | null> {

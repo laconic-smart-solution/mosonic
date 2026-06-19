@@ -4,8 +4,6 @@ import { Model } from 'mongoose';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
-import { CreditService } from '../credit/credit.service';
-import { currentBillingPeriod } from '../credit/lib/billing-period.util';
 import { EventsService } from '../events/events.service';
 import { LoggingService } from '../logging/logging.service';
 import {
@@ -52,7 +50,6 @@ export class MediaNodeCompletionService {
     private readonly pipelineNodeRunner: PipelineNodeRunnerService,
     private readonly events: EventsService,
     private readonly costService: CostService,
-    private readonly creditService: CreditService,
     private readonly loggingService: LoggingService,
     @InjectModel(Rule.name)
     private readonly ruleModel: Model<RuleDocument>,
@@ -303,18 +300,9 @@ export class MediaNodeCompletionService {
       videoResolution: vc.videoResolution,
     };
     try {
-      const { costUsd } = await this.costService.recordNodeCost(dto);
-      await this.creditService.deductCredits({
-        userId: dto.userId,
-        pipelineRef: dto.pipelineRef,
-        campaignRef: dto.campaignRef,
-        nodeId: dto.nodeId!,
-        nodeType: dto.nodeType!,
-        provider: dto.provider,
-        model: dto.providerModel,
-        rawCostUsd: costUsd,
-        billingPeriod: currentBillingPeriod(),
-      });
+      // Credits are charged up-front at pipeline start and reconciled on
+      // completion; only record raw cost here for analytics/budget tracking.
+      await this.costService.recordNodeCost(dto);
     } catch (e) {
       if (e instanceof PipelineBudgetExceededError) {
         throw e;

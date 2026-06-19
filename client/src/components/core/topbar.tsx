@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router-dom"
 
 import { TopbarSearch } from "@/components/core/topbar-search"
+import { TopbarCreditBalance } from "@/components/core/topbar-credit-balance"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/features/notifications/components/notification-bell"
@@ -94,6 +95,7 @@ export function Topbar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <TopbarCreditBalance />
         <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell />

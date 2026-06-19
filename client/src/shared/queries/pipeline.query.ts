@@ -28,6 +28,20 @@ export const useStartPipelineMutation = () => {
   })
 }
 
+export const usePipelineEstimateQuery = (
+  workflowId: string | undefined,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["pipeline", "estimate", workflowId ?? ""],
+    queryFn: () => pipelineService.estimate({ workflowId: workflowId! }),
+    enabled: enabled && !!workflowId,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  })
+}
+
 export const useRetryNodeMutation = () => {
   return useMutation({
     mutationFn: ({

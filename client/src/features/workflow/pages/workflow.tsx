@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   useLocation,
   useNavigate,
@@ -24,6 +25,7 @@ import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar
 import { PipelineStopConfirmDialog } from "@/features/pipeline/components/pipeline-stop-confirm-dialog"
 import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
 import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
+import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
 import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { rfNodesToApiPayload } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
@@ -123,6 +125,7 @@ export default function WorkflowPage() {
   const { t } = useTranslation("workflow")
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const { ruleId } = useParams<{ ruleId: string }>()
   const routeState = (location.state ?? {}) as RouteState
@@ -197,6 +200,8 @@ export default function WorkflowPage() {
   const lastQaAnswersRef = useRef<WorkflowQAAnswers | null>(null)
   const [qaWizardOpen, setQaWizardOpen] = useState(false)
   const [qaInitialMessage, setQaInitialMessage] = useState("")
+  const [runConfirmOpen, setRunConfirmOpen] = useState(false)
+  const [pendingRunPrompt, setPendingRunPrompt] = useState<string | null>(null)
   /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
   const workflowEventTargetRef = useRef<string | undefined>(undefined)
   const committedWfNameRef = useRef(i18n.t("workflow:toolbar.untitledWorkflow"))
@@ -891,6 +896,12 @@ export default function WorkflowPage() {
         onSuccess: ({ pipelineId: id }) => {
           pipelineCompletionHandledRef.current = false
           stuckFinalizeAttemptedRef.current = false
+          setRunConfirmOpen(false)
+          setPendingRunPrompt(null)
+          void queryClient.invalidateQueries({ queryKey: ["usage", "summary"] })
+          void queryClient.invalidateQueries({
+            queryKey: ["pipeline", "estimate"],
+          })
           setPipelineId(id)
           setSearchParams((params) => {
             params.set("pipelineId", id)
@@ -904,7 +915,13 @@ export default function WorkflowPage() {
           setNodeRuntimeById({})
           joinPipelineRoom(id)
         },
-        onError: () => {
+        onError: (err) => {
+          const status = (err as { response?: { status?: number } })?.response
+            ?.status
+          if (status === 402) {
+            toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+            return
+          }
           toast.error(t("toasts.pipelineStartFailed"))
         },
       },
@@ -934,7 +951,10 @@ export default function WorkflowPage() {
       return
     }
 
-    const startAfterSave = () => runStartPipelineMutation(contentPrompt)
+    const startAfterSave = () => {
+      setPendingRunPrompt(contentPrompt)
+      setRunConfirmOpen(true)
+    }
 
     if (!hadCanvasEdits && !hadDraftChanges) {
       startAfterSave()
@@ -1565,6 +1585,21 @@ export default function WorkflowPage() {
           toast.success(t("toasts.pipelineStopped"))
         }}
         onError={(message) => toast.error(message)}
+      />
+
+      <WorkflowRunConfirmDialog
+        open={runConfirmOpen}
+        onOpenChange={(open) => {
+          setRunConfirmOpen(open)
+          if (!open) setPendingRunPrompt(null)
+        }}
+        workflowId={activeWorkflowId}
+        isStarting={startPipelineMutation.isPending}
+        onConfirm={() => {
+          if (pendingRunPrompt != null) {
+            runStartPipelineMutation(pendingRunPrompt)
+          }
+        }}
       />
 
       <WorkflowQaWizard

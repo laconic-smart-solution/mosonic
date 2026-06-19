@@ -19,6 +19,7 @@ import {
   PipelinePageQueryDto,
   PipelinePageResponseDto,
 } from './dto/pipeline-page-query.dto';
+import { EstimatePipelineDto } from './dto/estimate-pipeline.dto';
 import { PipelineStatsQueryDto } from './dto/pipeline-stats-query.dto';
 import { RetryNodeDto } from './dto/retry-node.dto';
 import { SkipNodeDto } from './dto/skip-node.dto';
@@ -73,6 +74,19 @@ export class PipelineController {
         totalPages,
       },
     };
+  }
+
+  @Post('estimate')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  estimatePipeline(@Req() req: Request, @Body() dto: EstimatePipelineDto) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.estimatePipeline(dto.workflowId, auth);
   }
 
   @Post('start')

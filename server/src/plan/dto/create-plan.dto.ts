@@ -20,6 +20,11 @@ export class CreatePlanDto {
   priceUsd: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  creditsOverride?: number;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

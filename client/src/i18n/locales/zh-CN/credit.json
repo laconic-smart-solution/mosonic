@@ -1,0 +1,40 @@
+{
+  "runConfirm": {
+    "title": "运行工作流？",
+    "description": "运行此工作流前请查看预计消耗的积分。",
+    "estimatedCost": "预计消耗",
+    "currentBalance": "当前余额",
+    "balanceAfter": "运行后余额",
+    "credits": "积分",
+    "noBillableNodes": "此工作流没有计费节点 — 运行免费。",
+    "breakdownTitle": "费用明细",
+    "perRun": "每个",
+    "loading": "正在计算预估…",
+    "estimateError": "无法计算预估，请重试。",
+    "insufficientTitle": "积分不足",
+    "insufficientDescription": "需要 {{required}} 积分，但您只有 {{remaining}} 积分。",
+    "refill": "充值积分",
+    "cancel": "取消",
+    "confirm": "运行工作流",
+    "starting": "正在启动…"
+  },
+  "topup": {
+    "title": "充值积分",
+    "description": "选择一个套餐，立即为您的余额添加积分。",
+    "credits": "积分",
+    "confirm": "添加积分",
+    "processing": "正在添加…",
+    "cancel": "取消",
+    "success": "已添加 {{credits}} 积分",
+    "error": "无法添加积分，请重试。",
+    "loadError": "无法加载积分套餐。",
+    "loading": "正在加载套餐…"
+  },
+  "nodeType": {
+    "text_generation": "文本生成",
+    "translation": "翻译",
+    "summarization": "摘要",
+    "image_generation": "图像生成",
+    "video_generation": "视频生成"
+  }
+}

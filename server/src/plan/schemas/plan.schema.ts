@@ -25,6 +25,13 @@ export class Plan {
   @Prop()
   creditsPerMonth?: number;
 
+  /**
+   * Explicit monthly credit allowance. When set, overrides the
+   * priceUsd / creditPriceUsd derivation (used for the free plan).
+   */
+  @Prop({ type: Number, default: null })
+  creditsOverride?: number | null;
+
   @Prop({ required: true, default: true, index: true })
   isActive: boolean;
 
