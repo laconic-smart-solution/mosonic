@@ -21,6 +21,7 @@ import {
   useSyncZernioAccountsMutation,
   useZernioAccountsQuery,
   useZernioConnectionCreditQuery,
+  useZernioConnectMutation,
   useZernioUnlockMutation,
   zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
@@ -38,6 +39,7 @@ export default function SettingsAccountsPage() {
   const accountsQuery = useZernioAccountsQuery()
   const connectionCreditQuery = useZernioConnectionCreditQuery()
   const unlockMutation = useZernioUnlockMutation()
+  const connectMutation = useZernioConnectMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
@@ -118,10 +120,10 @@ export default function SettingsAccountsPage() {
   function confirmUnlock() {
     if (!pendingPlatform) return
     unlockMutation.mutate(pendingPlatform, {
-      onSuccess: ({ connectUrl }) => {
+      onSuccess: () => {
         setConfirmOpen(false)
         setPendingPlatform(null)
-        window.location.href = connectUrl
+        toast.success(t("oauth.unlockedToast"))
       },
       onError: (err) => {
         const status = (err as { response?: { status?: number } })?.response
@@ -132,6 +134,24 @@ export default function SettingsAccountsPage() {
           return
         }
         toast.error(t("oauth.unlockFailed"))
+      },
+    })
+  }
+
+  function connect(platform: string) {
+    connectMutation.mutate(platform, {
+      onSuccess: ({ connectUrl }) => {
+        window.location.href = connectUrl
+      },
+      onError: (err) => {
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status
+        if (status === 403) {
+          toast.error(t("oauth.unlockRequired"))
+          void accountsQuery.refetch()
+          return
+        }
+        toast.error(t("oauth.connectUrlFailed"))
       },
     })
   }
@@ -195,10 +215,13 @@ export default function SettingsAccountsPage() {
 
               <AccountChannelsSection
                 accounts={accountsQuery.data?.accounts}
+                unlockedChannels={accountsQuery.data?.unlockedChannels}
                 loading={accountsQuery.isLoading}
                 onUnlock={requestUnlock}
+                onConnect={connect}
                 onDisconnect={disconnect}
                 unlockPending={unlockMutation.isPending}
+                connectPending={connectMutation.isPending}
                 disconnectPending={disconnectMutation.isPending}
                 creditsEach={creditsEach}
                 hideHeader

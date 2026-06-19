@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -46,8 +47,36 @@ export class McpService {
     return { zernioProfileId: id };
   }
 
-  /** Charge unlock credits, then return the OAuth URL for the publishing channel. */
-  async unlockChannelForConnect(
+  /** Charge unlock credits and persist the channel slot (no OAuth redirect). */
+  async unlockChannel(
+    platform: string,
+    userId: string,
+  ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
+    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    if (this.isChannelConnected(accounts, platform)) {
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is already connected`,
+      );
+    }
+
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+    const config = await this.creditCalculation.getConfig();
+    const channel = platform.trim().toLowerCase();
+    const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
+      userId,
+      channel,
+      credits: creditsEach,
+      creditPriceUsd: config.creditPriceUsd,
+    });
+
+    return { unlocked: true, alreadyUnlocked };
+  }
+
+  /** OAuth redirect URL for an already-unlocked publishing channel. */
+  async connectChannel(
     platform: string,
     userId: string,
   ): Promise<{ connectUrl: string }> {
@@ -62,24 +91,29 @@ export class McpService {
       (await this.nodeCreditPriceService.getActiveCostCredit(
         SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       )) ?? 0;
-
     if (creditsEach > 0) {
-      await this.creditService.assertCreditsForNodeType(
+      const unlocked = await this.creditService.hasSocialChannelUnlock(
         userId,
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+        platform,
       );
-      const config = await this.creditCalculation.getConfig();
-      const channel = platform.trim().toLowerCase();
-      await this.creditService.chargeSocialAccountConnect({
-        userId,
-        channel,
-        credits: creditsEach,
-        creditPriceUsd: config.creditPriceUsd,
-      });
+      if (!unlocked) {
+        throw new ForbiddenException(
+          `Unlock "${platform}" before connecting your account`,
+        );
+      }
     }
 
     const connectUrl = await this.buildConnectUrl(platform, userId);
     return { connectUrl };
+  }
+
+  /** @deprecated Use `unlockChannel` then `connectChannel`. */
+  async unlockChannelForConnect(
+    platform: string,
+    userId: string,
+  ): Promise<{ connectUrl: string }> {
+    await this.unlockChannel(platform, userId);
+    return await this.connectChannel(platform, userId);
   }
 
   /** OAuth redirect URL only (no credit charge). Prefer `unlockChannelForConnect`. */
@@ -151,10 +185,15 @@ export class McpService {
 
   async getConnectedAccounts(userId: string): Promise<{
     accounts: ConnectedAccountRecord[];
-  }> {    
+    unlockedChannels: string[];
+  }> {
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    this.logger.log(`getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`);
-    return { accounts };
+    const unlockedChannels =
+      await this.creditService.listUnlockedSocialChannels(userId);
+    this.logger.log(
+      `getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`,
+    );
+    return { accounts, unlockedChannels };
   }
 
   async getConnectionCreditQuote(userId: string): Promise<{

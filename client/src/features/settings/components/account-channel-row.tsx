@@ -1,4 +1,4 @@
-import { Loader2, LockOpen, Unlink } from "lucide-react"
+import { Link2, Loader2, LockOpen, Unlink } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { formatCreditAmount } from "@/components/core/credit-usage-badge"
@@ -11,9 +11,12 @@ import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 type AccountChannelRowProps = {
   def: AccountChannelDef
   connected: ZernioConnectedAccount | undefined
+  unlocked: boolean
   onUnlock: (apiKey: string) => void
+  onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
   unlockPending: boolean
+  connectPending: boolean
   disconnectPending: boolean
   creditsEach?: number
 }
@@ -21,9 +24,12 @@ type AccountChannelRowProps = {
 export function AccountChannelRow({
   def,
   connected,
+  unlocked,
   onUnlock,
+  onConnect,
   onDisconnect,
   unlockPending,
+  connectPending,
   disconnectPending,
   creditsEach = 0,
 }: AccountChannelRowProps) {
@@ -34,7 +40,7 @@ export function AccountChannelRow({
   const label = t(`channels.${def.id}.label`)
   const description = t(`channels.${def.id}.description`)
   const unlockCostLabel =
-    creditsEach > 0
+    !isLinked && !unlocked && creditsEach > 0
       ? t("channels.unlockCost", { count: formatCreditAmount(creditsEach) })
       : null
 
@@ -59,12 +65,16 @@ export function AccountChannelRow({
               <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 {t("channels.connected")}
               </span>
+            ) : unlocked ? (
+              <span className="text-xs font-medium text-sky-700 dark:text-sky-400">
+                {t("channels.unlocked")}
+              </span>
             ) : (
               <span className="text-xs text-muted-foreground">{t("channels.notConnected")}</span>
             )}
           </div>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
-          {!isLinked && unlockCostLabel ? (
+          {unlockCostLabel ? (
             <p className="mt-1 text-[11px] text-muted-foreground">{unlockCostLabel}</p>
           ) : null}
           {isLinked && connected ? (
@@ -94,6 +104,24 @@ export function AccountChannelRow({
               <Unlink className="size-3.5" aria-hidden />
             )}
             {t("channels.disconnect")}
+          </Button>
+        ) : unlocked ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-w-[104px] gap-1.5"
+            style={{ borderColor: T.accentBorder }}
+            disabled={connectPending}
+            onClick={() => onConnect(def.apiKey)}
+            aria-label={t("channels.connectAria", { channel: label })}
+          >
+            {connectPending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Link2 className="size-3.5" aria-hidden />
+            )}
+            {t("channels.connect")}
           </Button>
         ) : (
           <Button

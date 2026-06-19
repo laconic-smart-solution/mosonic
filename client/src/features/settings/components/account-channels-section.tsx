@@ -4,15 +4,18 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AccountChannelRow } from "@/features/settings/components/account-channel-row"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
-import { buildAccountChannelMap, findConnectedForChannel } from "@/features/settings/lib/account-channel-lookup"
+import { buildAccountChannelMap, findConnectedForChannel, isChannelUnlocked } from "@/features/settings/lib/account-channel-lookup"
 import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 
 type AccountChannelsSectionProps = {
   accounts: ZernioConnectedAccount[] | undefined
+  unlockedChannels: string[] | undefined
   loading: boolean
   onUnlock: (apiKey: string) => void
+  onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
   unlockPending: boolean
+  connectPending: boolean
   disconnectPending: boolean
   hideHeader?: boolean
   creditsEach?: number
@@ -20,10 +23,13 @@ type AccountChannelsSectionProps = {
 
 export function AccountChannelsSection({
   accounts,
+  unlockedChannels,
   loading,
   onUnlock,
+  onConnect,
   onDisconnect,
   unlockPending,
+  connectPending,
   disconnectPending,
   hideHeader = false,
   creditsEach = 0,
@@ -71,9 +77,12 @@ export function AccountChannelsSection({
             key={def.id}
             def={def}
             connected={findConnectedForChannel(def, byChannel)}
+            unlocked={isChannelUnlocked(def, unlockedChannels)}
             onUnlock={onUnlock}
+            onConnect={onConnect}
             onDisconnect={onDisconnect}
             unlockPending={unlockPending}
+            connectPending={connectPending}
             disconnectPending={disconnectPending}
             creditsEach={creditsEach}
           />

@@ -2,6 +2,8 @@ import apiClient from "../api/api-client"
 import type {
   ZernioConnectedAccountsResponse,
   ZernioConnectionCreditResponse,
+  ZernioConnectChannelResponse,
+  ZernioUnlockChannelResponse,
 } from "../types/zernio.type"
 
 export const zernioService = {
@@ -15,8 +17,13 @@ export const zernioService = {
     return response.data
   },
 
-  unlockChannel: async (platform: string): Promise<{ connectUrl: string }> => {
+  unlockChannel: async (platform: string): Promise<ZernioUnlockChannelResponse> => {
     const response = await apiClient.post(`/zernio/unlock/${platform}`)
+    return response.data
+  },
+
+  connectChannel: async (platform: string): Promise<ZernioConnectChannelResponse> => {
+    const response = await apiClient.post(`/zernio/connect/${platform}`)
     return response.data
   },
 
