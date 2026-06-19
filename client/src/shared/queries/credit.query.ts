@@ -4,6 +4,7 @@ import { creditService } from "@/shared/services/credit.service"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import type { TopupCreditsPayload } from "@/shared/types/credit.type"
 import { usageQueryKeys } from "./usage.query"
+import { zernioQueryKeys } from "./zernio.query"
 
 export const creditQueryKeys = {
   packages: ["credit", "packages"] as const,
@@ -22,10 +23,11 @@ export function useCreditPackagesQuery(enabled = true) {
 export function useCreditTopupMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: TopupCreditsPayload) => creditService.topup(payload),
+    mutationFn: (payload: TopupCreditsPayload) => creditService.initiateTopup(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
+      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
     },
   })
 }

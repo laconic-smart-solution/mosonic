@@ -20,15 +20,19 @@
   },
   "topup": {
     "title": "充值积分",
-    "description": "选择一个套餐，立即为您的余额添加积分。",
+    "description": "选择套餐后，通过 Payni 安全完成支付。",
     "credits": "积分",
-    "confirm": "添加积分",
-    "processing": "正在添加…",
+    "confirm": "Payni 支付",
+    "processing": "正在发起支付…",
     "cancel": "取消",
+    "close": "关闭",
     "success": "已添加 {{credits}} 积分",
-    "error": "无法添加积分，请重试。",
+    "error": "无法发起支付，请重试。",
     "loadError": "无法加载积分套餐。",
-    "loading": "正在加载套餐…"
+    "loading": "正在加载套餐…",
+    "awaitingPayment": "请在 Payni 窗口中完成支付。",
+    "paymentWindowHint": "请在我们打开的新标签页中完成 Payni 支付，支持 PayNow 和银行转账。",
+    "balanceUpdatesAutomatically": "支付成功后，余额将自动更新。"
   },
   "nodeType": {
     "keyword_planner": "关键词规划",
