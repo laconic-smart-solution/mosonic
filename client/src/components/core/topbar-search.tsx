@@ -14,11 +14,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { displayLinkedRef } from "@/features/content/lib/content-display"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
-import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
-import { useContentPageQuery } from "@/shared/queries/content.query"
 
 import {
   filterTopbarSearchRoutes,
@@ -31,7 +28,6 @@ const SEARCH_DEBOUNCE_MS = 300
 export function TopbarSearch() {
   const { t, i18n } = useTranslation("common")
   const navigate = useNavigate()
-  const hydrated = useAuthStoreHydrated()
 
   const topbarRoutes = useMemo(
     () => resolveTopbarSearchRoutes(TOPBAR_SEARCH_ROUTE_DEFS, t),
@@ -68,24 +64,6 @@ export function TopbarSearch() {
     return () => window.removeEventListener("keydown", onKey)
   }, [])
 
-  const contentPayload = useMemo(
-    () => ({
-      page: 1,
-      limit: 8,
-      search: debounced,
-      sortBy: "updatedAt" as const,
-      sortOrder: "desc" as const,
-    }),
-    [debounced],
-  )
-
-  const contentEnabled = hydrated && open && debounced.length > 0
-  const { data: contentPage, isPending: contentLoading } = useContentPageQuery(
-    contentPayload,
-    contentEnabled,
-  )
-  const contentItems = contentPage?.data ?? []
-
   const routeMatches = useMemo(
     () => filterTopbarSearchRoutes(topbarRoutes, debounced),
     [debounced, topbarRoutes],
@@ -106,11 +84,7 @@ export function TopbarSearch() {
     }
   }
 
-  const showGlobalEmpty =
-    debounced.length > 0 &&
-    routeMatches.length === 0 &&
-    !contentLoading &&
-    contentItems.length === 0
+  const showGlobalEmpty = debounced.length > 0 && routeMatches.length === 0
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -190,84 +164,26 @@ export function TopbarSearch() {
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 {t("search.noMatches")}
               </div>
-            ) : (
-              <>
-                {routeMatches.length > 0 ? (
-                  <CommandGroup heading={t("search.goTo")}>
-                    {routeMatches.map((r) => (
-                      <CommandItem
-                        key={r.id}
-                        value={`route-${r.id}`}
-                        onSelect={() => go(r.path)}
-                        className="flex flex-col items-start gap-0.5 py-2"
-                      >
-                        <span className="font-medium">{r.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {r.subtitle}
-                        </span>
-                        <span className="font-mono text-[11px] text-muted-foreground">
-                          {r.path}
-                        </span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                ) : null}
-
-                {debounced.length > 0 ? (
-                  <CommandGroup heading={t("search.content")}>
-                    {contentLoading ? (
-                      <div className="px-3 py-3 text-xs text-muted-foreground">
-                        {t("search.searching")}
-                      </div>
-                    ) : (
-                      <>
-                        {contentItems.length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-muted-foreground">
-                            {t("search.noContentMatches")}
-                          </div>
-                        ) : null}
-                        {contentItems.map((item) => {
-                          const label = displayLinkedRef(item.ruleRef, "campaign")
-                          return (
-                            <CommandItem
-                              key={item.contentId}
-                              value={`content-${item.contentId}`}
-                              onSelect={() =>
-                                go(
-                                  item.uploadId
-                                    ? `/upload/${item.uploadId}`
-                                    : `/content/${item.contentId}`
-                                )
-                              }
-                              className="flex flex-col items-start gap-0.5 py-2"
-                            >
-                              <span className="font-mono text-[11px] text-muted-foreground">
-                                {item.contentId}
-                              </span>
-                              <span className="font-medium">
-                                {label !== "—" ? label : item.status}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {item.workflowRef}
-                              </span>
-                            </CommandItem>
-                          )
-                        })}
-                        <CommandItem
-                          value="content-view-all"
-                          onSelect={() =>
-                            go(`/content?search=${encodeURIComponent(debounced)}`)
-                          }
-                          className="text-primary"
-                        >
-                          {t("search.viewAllContent")}
-                        </CommandItem>
-                      </>
-                    )}
-                  </CommandGroup>
-                ) : null}
-              </>
-            )}
+            ) : routeMatches.length > 0 ? (
+              <CommandGroup heading={t("search.goTo")}>
+                {routeMatches.map((r) => (
+                  <CommandItem
+                    key={r.id}
+                    value={`route-${r.id}`}
+                    onSelect={() => go(r.path)}
+                    className="flex flex-col items-start gap-0.5 py-2"
+                  >
+                    <span className="font-medium">{r.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {r.subtitle}
+                    </span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {r.path}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
           </CommandList>
         </Command>
       </PopoverContent>
