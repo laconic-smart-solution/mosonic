@@ -16,7 +16,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import Logo from "@/assets/icon/logo"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/shared/stores/auth.store"
