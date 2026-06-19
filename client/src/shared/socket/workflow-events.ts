@@ -1,6 +1,6 @@
 import type { WorkflowEdge, WorkflowNode } from "../types/workflow.type"
 
-import { getSharedSocket } from "./socket-client"
+import { getSharedSocket, joinSocketRoom, leaveSocketRoom } from "./socket-client"
 
 export type WorkflowStartedEvent = { workflowId: string }
 export type WorkflowGeneratingEvent = { workflowId: string }
@@ -12,14 +12,11 @@ export type WorkflowCompletedEvent = {
 export type WorkflowFailedEvent = { workflowId: string; message?: string }
 
 export function joinWorkflowRoom(workflowId: string) {
-  const socket = getSharedSocket()
-  socket.emit("join", { room: `workflow_${workflowId}` })
-  return socket
+  return joinSocketRoom(`workflow_${workflowId}`)
 }
 
 export function leaveWorkflowRoom(workflowId: string) {
-  const socket = getSharedSocket()
-  socket.emit("leave", { room: `workflow_${workflowId}` })
+  leaveSocketRoom(`workflow_${workflowId}`)
 }
 
 export function onWorkflowStarted(handler: (payload: WorkflowStartedEvent) => void) {

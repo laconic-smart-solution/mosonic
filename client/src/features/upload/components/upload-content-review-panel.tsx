@@ -122,17 +122,13 @@ export function UploadContentReviewPanel({
   const ruleQuery = useRuleByIdQuery<GenerateMoreRuleHint>(data?.ruleRef)
   const ruleHint = ruleQuery.data
 
-  const workflowQuery = useGetWorkflowQuery(data?.workflowRef, {
-    refetchInterval: false,
-  })
+  const workflowQuery = useGetWorkflowQuery(data?.workflowRef)
   const workflowNodes = useMemo(
     () => workflowQuery.data?.nodes ?? [],
     [workflowQuery.data?.nodes]
   )
 
-  const pipelineQuery = useGetPipelineQuery(data?.pipelineRef, {
-    refetchInterval: false,
-  })
+  const pipelineQuery = useGetPipelineQuery(data?.pipelineRef)
 
   const sortedWorkflowNodes = useMemo(
     () => [...workflowNodes].sort((a, b) => a.order - b.order),
