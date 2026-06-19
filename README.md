@@ -1,6 +1,6 @@
-# Neutral Tex Monorepo
+# Mosonic Monorepo
 
-**NeuralTex** (product) is a cloud SaaS platform for AI-driven marketing content: campaign strategy, multi-step generation pipelines, review, multi-channel publishing, and analytics-driven rule improvements. This repository (**Neutral Tex**) contains the full-stack implementation.
+**Mosonic** is a cloud SaaS platform for AI-driven marketing content: campaign strategy, multi-step generation pipelines, review, multi-channel publishing, and analytics-driven rule improvements. This repository contains the full-stack implementation.
 
 - **Frontend:** React 19 + Vite + TypeScript (`client/`)
 - **Backend:** NestJS + MongoDB + Redis/BullMQ orchestration (`server/`)

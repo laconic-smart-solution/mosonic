@@ -17,7 +17,7 @@ export function AuthOtpBlock({
   return (
     <div className={cn("space-y-3", className)}>
       <Label className="text-foreground">{label}</Label>
-      <div className="flex justify-center sm:justify-start">{children}</div>
+      <div className="flex w-full justify-center">{children}</div>
     </div>
   )
 }

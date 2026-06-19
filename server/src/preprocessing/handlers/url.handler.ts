@@ -46,7 +46,7 @@ export class UrlHandler {
       const res = await fetch(url, {
         signal: ac.signal,
         redirect: 'follow',
-        headers: { 'User-Agent': 'NeutralTex-RuleExtract/1.0' },
+        headers: { 'User-Agent': 'Mosonic-RuleExtract/1.0' },
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);

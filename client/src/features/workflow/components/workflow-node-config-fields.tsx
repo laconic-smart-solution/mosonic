@@ -12,6 +12,10 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { WorkflowVideoPresenterSettings } from "@/features/workflow/components/workflow-video-presenter-settings"
+import {
+  effectiveVideoMode,
+  VIDEO_CINEMATIC_UI_ENABLED,
+} from "@/features/workflow/lib/video-generation-ui"
 import i18n from "@/i18n"
 import { cn } from "@/lib/utils"
 
@@ -151,16 +155,20 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
     },
   ],
   video: [
-    {
-      key: "mode",
-      label: fl("video", "mode"),
-      control: "buttons",
-      options: [
-        { label: fo("cinematic"), value: "cinematic" },
-        { label: fo("presenter"), value: "presenter" },
-      ],
-      defaultValue: "cinematic",
-    },
+    ...(VIDEO_CINEMATIC_UI_ENABLED
+      ? [
+          {
+            key: "mode",
+            label: fl("video", "mode"),
+            control: "buttons" as const,
+            options: [
+              { label: fo("cinematic"), value: "cinematic" },
+              { label: fo("presenter"), value: "presenter" },
+            ],
+            defaultValue: "cinematic",
+          },
+        ]
+      : []),
     {
       key: "aspectRatio",
       label: fl("video", "aspectRatio"),
@@ -548,20 +556,22 @@ export function WorkflowNodeConfigFields({
   )
 
   const mode =
-    canvasType === "video"
-      ? String(config.mode ?? "cinematic")
-      : ""
+    canvasType === "video" ? effectiveVideoMode(config) : ""
 
   const allFields = fieldDefs[canvasType] ?? []
   const visibleFields = filterVisibleFields(allFields, canvasType, config, mode)
   const modeField =
-    canvasType === "video"
+    canvasType === "video" && VIDEO_CINEMATIC_UI_ENABLED
       ? visibleFields.find((field) => field.key === "mode")
       : undefined
   const configFields = visibleFields.filter((field) => field.key !== "mode")
 
   function patchConfig(patch: Record<string, unknown>) {
-    onChange({ ...config, ...patch })
+    const merged =
+      canvasType === "video" && !VIDEO_CINEMATIC_UI_ENABLED
+        ? { ...patch, mode: "presenter" }
+        : patch
+    onChange({ ...config, ...merged })
   }
 
   function updateConfig(key: string, value: string) {

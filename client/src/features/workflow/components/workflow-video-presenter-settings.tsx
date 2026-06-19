@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { T } from "@/lib/tokens"
 import { mergeHeygenVideoConfig } from "@/features/workflow/lib/workflow-node-validation"
+import { VIDEO_CINEMATIC_UI_ENABLED } from "@/features/workflow/lib/video-generation-ui"
 import { HeygenVoicePicker } from "@/features/workflow/components/heygen-voice-picker"
 import {
   heygenService,
@@ -143,7 +144,7 @@ export function WorkflowVideoPresenterSettings({
         heygenAvatarId: "",
         heygenAvatarPhotoUrl: "",
         heygenAvatarAssetId: "",
-        mode: "cinematic",
+        mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
       }),
     )
   }, [config, onPatch])
@@ -160,7 +161,7 @@ export function WorkflowVideoPresenterSettings({
               heygenAvatarId: "",
               heygenAvatarPhotoUrl: "",
               heygenAvatarAssetId: "",
-              mode: "cinematic",
+              mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
             }),
           )
         }

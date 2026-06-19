@@ -13,7 +13,6 @@ type HomeRecentRailProps = {
   hovRight: number | null
   onHover: (i: number | null) => void
   onOpenContent: (contentId: string, uploadId?: string) => void
-  onOpenLibrary: () => void
 }
 
 function RecentSkeletonRow() {
@@ -30,7 +29,6 @@ export function HomeRecentRail({
   hovRight,
   onHover,
   onOpenContent,
-  onOpenLibrary,
 }: HomeRecentRailProps) {
   const { t } = useTranslation("home")
 
@@ -50,58 +48,37 @@ export function HomeRecentRail({
   return (
     <div className="flex flex-col items-center gap-2.5">
       {slots.map((slot, i) => {
-        const key = slot.kind === "content" ? slot.contentId : `empty-${i}`
-        const item = slot.kind === "content" ? slot : null
-        const borderColor = item && hovRight === i ? `${item.color}50` : undefined
+        const borderColor = hovRight === i ? `${slot.color}50` : undefined
         const shadow =
-          item && hovRight === i
-            ? `0 4px 16px ${item.color}20, 0 1px 3px rgba(0,0,0,0.06)`
+          hovRight === i
+            ? `0 4px 16px ${slot.color}20, 0 1px 3px rgba(0,0,0,0.06)`
             : "0 1px 3px rgba(0,0,0,0.05)"
-        const scale = item && hovRight === i ? "scale(1.06)" : "scale(1)"
-
-        const tooltipTitle =
-          slot.kind === "content" ? slot.label : t("recent.noItem")
-        const tooltipSub =
-          slot.kind === "content" ? slot.updated : t("recent.openLibrary")
+        const scale = hovRight === i ? "scale(1.06)" : "scale(1)"
 
         return (
-          <Tooltip key={key}>
+          <Tooltip key={slot.contentId}>
             <TooltipTrigger
               type="button"
-              onClick={() =>
-                slot.kind === "content"
-                  ? onOpenContent(slot.contentId, slot.uploadId)
-                  : onOpenLibrary()
-              }
+              onClick={() => onOpenContent(slot.contentId, slot.uploadId)}
               onMouseEnter={() => onHover(i)}
               onMouseLeave={() => onHover(null)}
               className="flex size-[52px] cursor-pointer items-center justify-center rounded-xl border border-border bg-card transition-all duration-150"
               style={{
-                borderColor:
-                  slot.kind === "empty" && hovRight === i
-                    ? "var(--muted-foreground)"
-                    : borderColor,
-                boxShadow:
-                  slot.kind === "empty" && hovRight === i
-                    ? "0 4px 12px rgba(0,0,0,0.08)"
-                    : shadow,
-                transform: slot.kind === "empty" && hovRight === i ? "scale(1.06)" : scale,
+                borderColor,
+                boxShadow: shadow,
+                transform: scale,
               }}
             >
-              {slot.kind === "content" ? (
-                <div
-                  className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
-                  style={{
-                    background: `linear-gradient(135deg,${slot.color}20,${slot.color}35)`,
-                    border: `1.5px solid ${slot.color}40`,
-                    color: slot.color,
-                  }}
-                >
-                  {slot.initial}
-                </div>
-              ) : (
-                <div className="text-lg leading-none font-semibold text-muted-foreground">+</div>
-              )}
+              <div
+                className="flex size-[30px] items-center justify-center rounded-lg text-xs font-bold"
+                style={{
+                  background: `linear-gradient(135deg,${slot.color}20,${slot.color}35)`,
+                  border: `1.5px solid ${slot.color}40`,
+                  color: slot.color,
+                }}
+              >
+                {slot.initial}
+              </div>
             </TooltipTrigger>
             <TooltipContent
               side="left"
@@ -109,8 +86,8 @@ export function HomeRecentRail({
               sideOffset={10}
               className="flex max-w-[min(280px,calc(100vw-6rem))] flex-col items-stretch gap-0.5 px-3 py-2"
             >
-              <span className="font-semibold">{tooltipTitle}</span>
-              <span className="text-[11px] text-background/80">{tooltipSub}</span>
+              <span className="font-semibold">{slot.label}</span>
+              <span className="text-[11px] text-background/80">{slot.updated}</span>
             </TooltipContent>
           </Tooltip>
         )

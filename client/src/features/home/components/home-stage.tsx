@@ -18,7 +18,6 @@ type HomeStageProps = {
   recentSlots: readonly HomeRecentSlot[]
   isRecentLoading: boolean
   onOpenRecentContent: (contentId: string, uploadId?: string) => void
-  onOpenRecentLibrary: () => void
   children?: ReactNode
 }
 
@@ -34,7 +33,6 @@ export function HomeStage({
   recentSlots,
   isRecentLoading,
   onOpenRecentContent,
-  onOpenRecentLibrary,
   children,
 }: HomeStageProps) {
   return (
@@ -57,7 +55,6 @@ export function HomeStage({
             hovRight={hovRight}
             onHover={setHovRight}
             onOpenContent={onOpenRecentContent}
-            onOpenLibrary={onOpenRecentLibrary}
           />
         </div>
       </div>
