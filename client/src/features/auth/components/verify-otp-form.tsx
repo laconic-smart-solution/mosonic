@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -19,6 +19,7 @@ import {
 import { AuthFormRootError } from "@/features/auth/components/auth-form-root-error"
 import { AuthOtpBlock } from "@/features/auth/components/auth-otp-block"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
+import { refreshQueriesAfterLogin } from "@/shared/queries/auth.query"
 import {
   createVerifyOtpSchema,
   type VerifyOtpFormValues,
@@ -30,18 +31,17 @@ type VerifyOtpFormProps = {
   defaultEmail?: string
   emailLocked?: boolean
   isForgotPasswordFlow?: boolean
-  next?: string
 }
 
 export function VerifyOtpForm({
   defaultEmail = "",
   emailLocked = false,
   isForgotPasswordFlow = false,
-  next = "/dashboard",
 }: VerifyOtpFormProps) {
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const setSession = useAuthStore((s) => s.setSession)
   const setUser = useUserStore((s) => s.setUser)
 
@@ -116,7 +116,8 @@ export function VerifyOtpForm({
       }
 
       toast.success(t("verifyOtp.emailVerified"))
-      navigate(next, { replace: true })
+      await refreshQueriesAfterLogin(queryClient)
+      navigate("/dashboard", { replace: true })
     },
     onError: (err: unknown) => {
       setAuthFormApiError(form.setError, err, t("verifyOtp.failed"))

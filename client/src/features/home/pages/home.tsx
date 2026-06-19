@@ -215,7 +215,7 @@ export default function HomePage() {
       navigate(path)
       return
     }
-    navigate(`/login?next=${encodeURIComponent(path)}`)
+    navigate("/login")
   }
 
   function handlePromptSubmit(text: string, attachments: Attachment[]) {
@@ -224,7 +224,7 @@ export default function HomePage() {
 
     if (!isAuthenticated) {
       saveHomePendingPrompt(trimmed)
-      navigate("/login?next=/")
+      navigate("/login")
       return
     }
 

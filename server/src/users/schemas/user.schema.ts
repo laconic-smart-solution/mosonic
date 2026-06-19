@@ -82,8 +82,8 @@ export class User {
   lastLoginAt?: Date;
 
   /** Zernio profile id (REST); created lazily on first connect/publish. */
-  @Prop({ type: String, default: null })
-  zernioProfileId?: string | null;
+  @Prop({ type: String })
+  zernioProfileId?: string;
 
   /** Connected Zernio accounts by channel (e.g. instagram). */
   @Prop({ type: [ZernioConnectedAccountSchema], default: [] })
@@ -95,3 +95,4 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 });
 UserSchema.index({ username: 1 });
+UserSchema.index({ zernioProfileId: 1 }, { unique: true, sparse: true });

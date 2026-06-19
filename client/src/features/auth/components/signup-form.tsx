@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 import FormInputText from "@/components/common/form/form-input-text"
@@ -20,8 +20,6 @@ export function SignupForm() {
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const nextParam = searchParams.get("next")?.trim()
 
   const signupSchema = useMemo(() => createSignupSchema(tv), [tv])
 
@@ -55,9 +53,7 @@ export function SignupForm() {
     },
     onSuccess: (email) => {
       toast.success(t("signUp.success"))
-      const emailQ = `email=${encodeURIComponent(email)}`
-      const nextQ = nextParam ? `&next=${encodeURIComponent(nextParam)}` : ""
-      navigate(`/verify-otp?${emailQ}${nextQ}`, { replace: true })
+      navigate(`/verify-otp?email=${encodeURIComponent(email)}`, { replace: true })
     },
     onError: (err: unknown) => {
       setAuthFormApiError(form.setError, err, t("signUp.failed"))
