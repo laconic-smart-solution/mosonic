@@ -6,6 +6,7 @@ export type ZernioProfileDto = {
   _id: string;
   name: string;
   isDefault?: boolean;
+  overLimit?: boolean;
 };
 
 type ZernioCreateProfileResponse = { profile: ZernioProfileDto };
@@ -125,7 +126,28 @@ export class ZernioClient {
           headers: this.headers,
         },
       );
-      return Array.isArray(res.data.profiles) ? res.data.profiles : [];
+      const raw = res.data.profiles;
+      if (!Array.isArray(raw)) return [];
+      const profiles: ZernioProfileDto[] = [];
+      for (const item of raw) {
+        if (!item || typeof item !== 'object') continue;
+        const record = item as Record<string, unknown>;
+        const id = typeof record._id === 'string' ? record._id.trim() : '';
+        if (!id) continue;
+        profiles.push({
+          _id: id,
+          name:
+            typeof record.name === 'string' && record.name.trim()
+              ? record.name.trim()
+              : 'Profile',
+          isDefault: record.isDefault === true,
+          overLimit:
+            record.overLimit === true ||
+            record.isOverLimit === true ||
+            record.over_limit === true,
+        });
+      }
+      return profiles;
     } catch (err: unknown) {
       this.wrapAxiosError(err, 'listProfiles');
     }

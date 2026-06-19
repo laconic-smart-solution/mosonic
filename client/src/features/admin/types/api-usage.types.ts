@@ -11,6 +11,8 @@ export type ApiProviderBillingSummary = {
   totalSpentUsd: number | null
   totalAvailableUsd: number | null
   spendDays: number
+  spendFrom: string
+  spendTo: string
   dailySpend: DailySpendRow[]
   apiKeyConfigured: boolean
   syncError: string | null
@@ -22,6 +24,19 @@ export type ApiProviderBillingSummary = {
   connectedAccountsCount?: number | null
   adminKeyConfigured?: boolean
   projectKeyConfigured?: boolean
+  zernioProfiles?: ZernioProfileSummary[]
+  zernioProfilesTotal?: number | null
+  zernioDefaultProfiles?: number | null
+  zernioOverLimitProfiles?: number | null
+  zernioConnectedAccountsTotal?: number | null
+}
+
+export type ZernioProfileSummary = {
+  id: string
+  name: string
+  isDefault: boolean
+  overLimit: boolean
+  accountCount: number | null
 }
 
 export type ApiUsageSummary = {

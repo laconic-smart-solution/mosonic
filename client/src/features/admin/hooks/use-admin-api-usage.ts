@@ -5,10 +5,15 @@ import type { ApiProviderId } from "../types/api-usage.types"
 
 export const ADMIN_API_USAGE_QUERY_KEY = ["admin-api-usage"] as const
 
-export const useAdminApiUsage = () =>
+export type AdminApiUsageDateParams = {
+  from?: string
+  to?: string
+}
+
+export const useAdminApiUsage = (params?: AdminApiUsageDateParams) =>
   useQuery({
-    queryKey: ADMIN_API_USAGE_QUERY_KEY,
-    queryFn: () => adminApi.getApiUsage(180),
+    queryKey: [...ADMIN_API_USAGE_QUERY_KEY, params?.from ?? "", params?.to ?? ""],
+    queryFn: () => adminApi.getApiUsage(params),
     staleTime: 60_000,
   })
 

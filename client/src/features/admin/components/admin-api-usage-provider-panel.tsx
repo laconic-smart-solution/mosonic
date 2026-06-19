@@ -15,8 +15,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
+import { AdminZernioAnalyticsSection } from "./admin-zernio-analytics-section"
 import type {
   ApiProviderBillingSummary,
+  ApiProviderId,
   ApiUsageI18nPrefix,
 } from "../types/api-usage.types"
 
@@ -28,6 +30,7 @@ function formatUsd(value: number | null | undefined, digits = 2) {
 }
 
 type AdminApiUsageProviderPanelProps = {
+  providerId: ApiProviderId
   i18nPrefix: ApiUsageI18nPrefix
   brandColor: string
   billingUrl: string
@@ -41,6 +44,7 @@ type AdminApiUsageProviderPanelProps = {
 }
 
 export function AdminApiUsageProviderPanel({
+  providerId,
   i18nPrefix,
   brandColor,
   billingUrl,
@@ -53,20 +57,23 @@ export function AdminApiUsageProviderPanel({
   isSaving,
 }: AdminApiUsageProviderPanelProps) {
   const { t } = useTranslation("admin")
-  const [chartDays, setChartDays] = useState<7 | 30>(30)
   const [prepaidInput, setPrepaidInput] = useState("")
   const [dirty, setDirty] = useState(false)
   const prepaidFieldId = useId()
   const sectionTitleId = useId()
   const progressId = useId()
 
+  const showPrepaidForm = providerId === "openai"
+  const isZernio = providerId === "zernio"
+  const isHeygen = providerId === "heygen"
+
   useEffect(() => {
-    if (data?.prepaidCreditUsd == null) return
+    if (!showPrepaidForm || data?.prepaidCreditUsd == null) return
     const next = String(data.prepaidCreditUsd)
     if (!dirty) {
       setPrepaidInput(next)
     }
-  }, [data?.prepaidCreditUsd, dirty])
+  }, [data?.prepaidCreditUsd, dirty, showPrepaidForm])
 
   const chartConfig = {
     spend: {
@@ -77,16 +84,20 @@ export function AdminApiUsageProviderPanel({
 
   const chartData = useMemo(() => {
     const rows = data?.dailySpend ?? []
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - chartDays)
-    const cutoffIso = cutoff.toISOString().slice(0, 10)
-    return rows
-      .filter((row) => row.date >= cutoffIso)
-      .map((row) => ({
-        date: row.date.slice(5),
-        amountUsd: row.amountUsd,
-      }))
-  }, [data?.dailySpend, chartDays])
+    return rows.map((row) => ({
+      date: row.date.slice(5),
+      amountUsd: row.amountUsd,
+    }))
+  }, [data?.dailySpend])
+
+  const spentHint = data?.spendFrom && data?.spendTo
+    ? t(`${i18nPrefix}.totalSpentHint`, {
+        from: data.spendFrom,
+        to: data.spendTo,
+      })
+    : t(`${i18nPrefix}.totalSpentHintFallback`, {
+        days: data?.spendDays ?? 180,
+      })
 
   const prepaid = data?.prepaidCreditUsd ?? 0
   const spent = data?.totalSpentUsd
@@ -136,11 +147,9 @@ export function AdminApiUsageProviderPanel({
               {t(`${i18nPrefix}.liveBalanceBadge`)}
             </p>
           ) : null}
-          {data?.connectedAccountsCount != null ? (
+          {data?.billingType ? (
             <p className="mt-1 text-[12px] text-muted-foreground">
-              {t(`${i18nPrefix}.connectedAccounts`, {
-                count: data.connectedAccountsCount,
-              })}
+              {t("heygen.billingType", { type: data.billingType })}
             </p>
           ) : null}
         </div>
@@ -209,36 +218,47 @@ export function AdminApiUsageProviderPanel({
           <p className="text-sm text-muted-foreground">{t(`${i18nPrefix}.loading`)}</p>
         ) : (
           <>
-            <div className="grid gap-2.5 sm:grid-cols-3">
-              <MetricCard
-                label={t(`${i18nPrefix}.totalGranted`)}
-                value={formatUsd(prepaid)}
-                hint={t(`${i18nPrefix}.totalGrantedHint`)}
-              />
-              <MetricCard
-                label={t(`${i18nPrefix}.totalSpent`)}
-                value={formatUsd(spent)}
-                hint={t(`${i18nPrefix}.totalSpentHint`, { days: data?.spendDays ?? 180 })}
-              />
-              <MetricCard
-                label={t(`${i18nPrefix}.totalAvailable`)}
-                value={formatUsd(available)}
-                hint={
-                  data?.liveBalanceFromApi
-                    ? t(`${i18nPrefix}.totalAvailableLiveHint`)
-                    : t(`${i18nPrefix}.totalAvailableHint`)
-                }
-                valueClass={
-                  available != null && available < prepaid * 0.1
-                    ? "text-destructive"
-                    : available != null && available < prepaid * 0.25
-                      ? "text-amber-600 dark:text-amber-400"
-                      : undefined
-                }
-              />
-            </div>
+            {isZernio ? (
+              <AdminZernioAnalyticsSection data={data} />
+            ) : (
+              <div
+                className={cn(
+                  "grid gap-2.5",
+                  isHeygen ? "sm:grid-cols-2" : "sm:grid-cols-3",
+                )}
+              >
+                {!isHeygen ? (
+                  <MetricCard
+                    label={t(`${i18nPrefix}.totalGranted`)}
+                    value={formatUsd(prepaid)}
+                    hint={t(`${i18nPrefix}.totalGrantedHint`)}
+                  />
+                ) : null}
+                <MetricCard
+                  label={t(`${i18nPrefix}.totalSpent`)}
+                  value={formatUsd(spent)}
+                  hint={spentHint}
+                />
+                <MetricCard
+                  label={t(`${i18nPrefix}.totalAvailable`)}
+                  value={formatUsd(available)}
+                  hint={
+                    data?.liveBalanceFromApi
+                      ? t(`${i18nPrefix}.totalAvailableLiveHint`)
+                      : t(`${i18nPrefix}.totalAvailableHint`)
+                  }
+                  valueClass={
+                    available != null && !isHeygen && available < prepaid * 0.1
+                      ? "text-destructive"
+                      : available != null && !isHeygen && available < prepaid * 0.25
+                        ? "text-amber-600 dark:text-amber-400"
+                        : undefined
+                  }
+                />
+              </div>
+            )}
 
-            {spent != null && prepaid > 0 ? (
+            {showPrepaidForm && spent != null && prepaid > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[12px] text-muted-foreground">
                   <span id={progressId}>{t(`${i18nPrefix}.usageProgress`)}</span>
@@ -261,138 +281,157 @@ export function AdminApiUsageProviderPanel({
                           ? "bg-amber-500"
                           : "bg-emerald-600",
                     )}
-                    style={{ width: `${usagePct}%`, backgroundColor: usagePct < 75 ? brandColor : undefined }}
+                    style={{
+                      width: `${usagePct}%`,
+                      backgroundColor: usagePct < 75 ? brandColor : undefined,
+                    }}
                   />
                 </div>
               </div>
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-              <form
-                className="rounded-xl border border-border bg-muted/20 p-4"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void handleSave()
-                }}
-              >
-                <Label htmlFor={prepaidFieldId} className="text-[13px] font-medium">
-                  {t(`${i18nPrefix}.prepaidLabel`)}
-                </Label>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  {t(`${i18nPrefix}.prepaidHint`)}
-                </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1">
-                    <div className="relative">
-                      <span
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
-                        aria-hidden
-                      >
-                        $
-                      </span>
-                      <Input
-                        id={prepaidFieldId}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        inputMode="decimal"
-                        className="pl-7 font-mono tabular-nums"
-                        value={prepaidInput}
-                        onChange={(e) => {
-                          setPrepaidInput(e.target.value)
-                          setDirty(true)
-                        }}
-                        aria-describedby={`${prepaidFieldId}-hint`}
-                      />
-                    </div>
-                    <p id={`${prepaidFieldId}-hint`} className="sr-only">
-                      {t(`${i18nPrefix}.prepaidHint`)}
-                    </p>
-                  </div>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={!dirty || isSaving}
-                    className="shrink-0"
-                  >
-                    <Save className="mr-1.5 size-3.5" aria-hidden />
-                    {isSaving ? t(`${i18nPrefix}.saving`) : t(`${i18nPrefix}.save`)}
-                  </Button>
-                </div>
-                {data?.updatedAt ? (
-                  <p className="mt-3 text-[11px] text-muted-foreground">
-                    {t(`${i18nPrefix}.lastUpdated`, {
-                      date: new Date(data.updatedAt).toLocaleString(),
-                    })}
+            <div
+              className={cn(
+                "grid gap-4",
+                showPrepaidForm
+                  ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]"
+                  : "grid-cols-1",
+              )}
+            >
+              {showPrepaidForm ? (
+                <form
+                  className="rounded-xl border border-border bg-muted/20 p-4"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void handleSave()
+                  }}
+                >
+                  <Label htmlFor={prepaidFieldId} className="text-[13px] font-medium">
+                    {t(`${i18nPrefix}.prepaidLabel`)}
+                  </Label>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    {t(`${i18nPrefix}.prepaidHint`)}
                   </p>
-                ) : null}
-              </form>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1">
+                      <div className="relative">
+                        <span
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                          aria-hidden
+                        >
+                          $
+                        </span>
+                        <Input
+                          id={prepaidFieldId}
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          className="pl-7 font-mono tabular-nums"
+                          value={prepaidInput}
+                          onChange={(e) => {
+                            setPrepaidInput(e.target.value)
+                            setDirty(true)
+                          }}
+                          aria-describedby={`${prepaidFieldId}-hint`}
+                        />
+                      </div>
+                      <p id={`${prepaidFieldId}-hint`} className="sr-only">
+                        {t(`${i18nPrefix}.prepaidHint`)}
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={!dirty || isSaving}
+                      className="shrink-0"
+                    >
+                      <Save className="mr-1.5 size-3.5" aria-hidden />
+                      {isSaving ? t(`${i18nPrefix}.saving`) : t(`${i18nPrefix}.save`)}
+                    </Button>
+                  </div>
+                  {data?.updatedAt ? (
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      {t(`${i18nPrefix}.lastUpdated`, {
+                        date: new Date(data.updatedAt).toLocaleString(),
+                      })}
+                    </p>
+                  ) : null}
+                </form>
+              ) : null}
 
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-[13px] font-medium text-foreground">
-                    {t(`${i18nPrefix}.dailySpend`)}
-                  </h3>
-                  <div className="flex gap-1.5" role="group" aria-label={t(`${i18nPrefix}.chartRange`)}>
-                    {([7, 30] as const).map((d) => (
-                      <Button
-                        key={d}
-                        type="button"
-                        size="sm"
-                        variant={chartDays === d ? "default" : "outline"}
-                        onClick={() => setChartDays(d)}
-                        aria-pressed={chartDays === d}
-                      >
-                        {d}d
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                {chartData.length === 0 ? (
-                  <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
-                    {t(`${i18nPrefix}.chartEmpty`)}
-                  </div>
-                ) : (
-                  <ChartContainer config={chartConfig} className="aspect-auto h-[180px] w-full">
-                    <LineChart data={chartData} accessibilityLayer>
-                      <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tick={{ fontSize: 11 }}
-                      />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) => `$${v}`}
-                      />
-                      <ChartTooltip
-                        content={
-                          <ChartTooltipContent
-                            formatter={(value) => `$${Number(value ?? 0).toFixed(4)}`}
-                          />
-                        }
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="amountUsd"
-                        stroke="var(--color-spend)"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                )}
-              </div>
+              <DailySpendChart
+                i18nPrefix={i18nPrefix}
+                chartConfig={chartConfig}
+                chartData={chartData}
+                t={t}
+              />
             </div>
           </>
         )}
       </div>
     </section>
+  )
+}
+
+function DailySpendChart({
+  i18nPrefix,
+  chartConfig,
+  chartData,
+  t,
+}: {
+  i18nPrefix: ApiUsageI18nPrefix
+  chartConfig: ChartConfig
+  chartData: Array<{ date: string; amountUsd: number }>
+  t: (key: string, options?: Record<string, unknown>) => string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3">
+        <h3 className="text-[13px] font-medium text-foreground">
+          {t(`${i18nPrefix}.dailySpend`)}
+        </h3>
+      </div>
+      {chartData.length === 0 ? (
+        <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+          {t(`${i18nPrefix}.chartEmpty`)}
+        </div>
+      ) : (
+        <ChartContainer config={chartConfig} className="aspect-auto h-[180px] w-full">
+          <LineChart data={chartData} accessibilityLayer>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              tick={{ fontSize: 11 }}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(v) => `$${v}`}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value) => `$${Number(value ?? 0).toFixed(4)}`}
+                />
+              }
+            />
+            <Line
+              type="monotone"
+              dataKey="amountUsd"
+              stroke="var(--color-spend)"
+              strokeWidth={2}
+              dot={false}
+            />
+          </LineChart>
+        </ChartContainer>
+      )}
+    </div>
   )
 }
 

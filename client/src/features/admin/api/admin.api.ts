@@ -140,8 +140,8 @@ export const adminApi = {
       .put("/admin/openai/billing/prepaid", { prepaidCreditUsd })
       .then((r) => r.data),
 
-  getApiUsage: (days = 180) =>
-    apiClient.get("/admin/api-usage", { params: { days } }).then((r) => r.data),
+  getApiUsage: (params?: { from?: string; to?: string; days?: number }) =>
+    apiClient.get("/admin/api-usage", { params }).then((r) => r.data),
 
   updateApiUsagePrepaid: (provider: string, prepaidCreditUsd: number) =>
     apiClient

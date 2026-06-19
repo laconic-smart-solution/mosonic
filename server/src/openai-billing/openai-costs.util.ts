@@ -74,6 +74,43 @@ export async function fetchOpenAiSpendSummary(
   days: number,
 ): Promise<OpenAiSpendSummary> {
   const startTime = Math.floor(Date.now() / 1000) - days * 86400;
+  return fetchOpenAiSpendSummaryFromStart(adminKey, startTime);
+}
+
+/** Fetch OpenAI org spend from Admin API from `from` through `to` (inclusive). */
+export async function fetchOpenAiSpendSummaryForRange(
+  adminKey: string,
+  from: Date,
+  to: Date,
+): Promise<OpenAiSpendSummary> {
+  const bufferDays = 7;
+  const start = new Date(from);
+  start.setDate(start.getDate() - bufferDays);
+  start.setHours(0, 0, 0, 0);
+  const startTime = Math.floor(start.getTime() / 1000);
+  const summary = await fetchOpenAiSpendSummaryFromStart(adminKey, startTime);
+  const fromIso = toLocalIsoDate(from);
+  const toIso = toLocalIsoDate(to);
+  const daily = summary.daily.filter(
+    (row) => row.date >= fromIso && row.date <= toIso,
+  );
+  return {
+    totalUsd: daily.reduce((acc, row) => acc + row.amountUsd, 0),
+    daily,
+  };
+}
+
+function toLocalIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+async function fetchOpenAiSpendSummaryFromStart(
+  adminKey: string,
+  startTime: number,
+): Promise<OpenAiSpendSummary> {
   const dailyMap = new Map<string, number>();
   let totalUsd = 0;
   let page: string | undefined;
