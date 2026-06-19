@@ -15,7 +15,15 @@ function formatCredits(value: number): string {
   return Math.round(value).toLocaleString()
 }
 
-export function TopbarCreditBalance() {
+type TopbarCreditBalanceProps = {
+  className?: string
+  alwaysShowCount?: boolean
+}
+
+export function TopbarCreditBalance({
+  className,
+  alwaysShowCount = false,
+}: TopbarCreditBalanceProps = {}) {
   const { t } = useTranslation("common")
   useCreditBalanceSocketRefresh()
   const { data, isLoading, isError } = useUsageSummaryQuery()
@@ -41,6 +49,7 @@ export function TopbarCreditBalance() {
               "flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-muted",
               "focus-visible:ring-2 focus-visible:ring-ring/25",
               lowBalance && "border-amber-500/40 text-amber-600 dark:text-amber-400",
+              className,
             )}
             style={
               lowBalance
@@ -58,7 +67,7 @@ export function TopbarCreditBalance() {
           )}
           aria-hidden
         />
-        <span className="hidden sm:inline">
+        <span className={alwaysShowCount ? "inline" : "hidden sm:inline"}>
           {isLoading ? "…" : isError ? "—" : formatCredits(creditsRemaining)}
         </span>
       </TooltipTrigger>

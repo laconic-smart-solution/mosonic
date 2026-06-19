@@ -13,6 +13,7 @@ import type { RuleListItem } from "@/shared/services/rule.service"
 
 type HomeHelperLinksProps = {
   rules: RuleListItem[]
+  showRuleSelector?: boolean
   selectedRuleLabel?: string
   isLoadingRules: boolean
   isLoadingMore: boolean
@@ -24,6 +25,7 @@ type HomeHelperLinksProps = {
 
 export function HomeHelperLinks({
   rules,
+  showRuleSelector = true,
   selectedRuleLabel,
   isLoadingRules,
   isLoadingMore,
@@ -50,7 +52,8 @@ export function HomeHelperLinks({
         {t("helper.setupRule")}
       </Button>
 
-      <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      {!isLoadingRules && showRuleSelector && rules.length > 0 ? (
+        <Popover open={isOpen} onOpenChange={handleOpenChange}>
         <PopoverTrigger
           render={
             <Button
@@ -126,6 +129,7 @@ export function HomeHelperLinks({
           ) : null}
         </PopoverContent>
       </Popover>
+      ) : null}
     </div>
   )
 }
