@@ -1,37 +1,35 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomBytes } from 'node:crypto';
-import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { UserRole } from '../users/schemas/user.schema';
 import { OrchestrationService } from '../orchestration/orchestration.service';
+import type { IIntegrationApiKeyRepository } from '../repositories/interfaces/integration-api-key.repository.interface';
+import type { IWebhookSubscriptionRepository } from '../repositories/interfaces/webhook-subscription.repository.interface';
+import type { IntegrationApiKeyRecord } from '../repositories/interfaces/integration-api-key.repository.interface';
 import {
-  IntegrationApiKey,
-  type IntegrationApiKeyDocument,
-} from './schemas/integration-api-key.schema';
-import {
-  WebhookSubscription,
-  type WebhookSubscriptionDocument,
-} from './schemas/webhook-subscription.schema';
+  INTEGRATION_API_KEY_REPOSITORY,
+  WEBHOOK_SUBSCRIPTION_REPOSITORY,
+} from '../repositories/tokens';
 
 @Injectable()
 export class IntegrationsService {
   constructor(
-    @InjectModel(IntegrationApiKey.name)
-    private readonly apiKeyModel: Model<IntegrationApiKeyDocument>,
-    @InjectModel(WebhookSubscription.name)
-    private readonly subscriptionModel: Model<WebhookSubscriptionDocument>,
+    @Inject(INTEGRATION_API_KEY_REPOSITORY)
+    private readonly apiKeys: IIntegrationApiKeyRepository,
+    @Inject(WEBHOOK_SUBSCRIPTION_REPOSITORY)
+    private readonly subscriptions: IWebhookSubscriptionRepository,
     private readonly orchestration: OrchestrationService,
   ) {}
 
   async createApiKey(userId: string, name: string, scopes?: string[]) {
     const raw = `ntx_${randomBytes(24).toString('hex')}`;
     const keyHash = createHash('sha256').update(raw).digest('hex');
-    const doc = await this.apiKeyModel.create({
+    const doc = await this.apiKeys.create({
       userId,
       name: name.trim(),
       keyHash,
@@ -40,9 +38,11 @@ export class IntegrationsService {
     return { keyId: doc.keyId, apiKey: raw, scopes: doc.scopes };
   }
 
-  async validateApiKey(rawKey: string): Promise<IntegrationApiKeyDocument | null> {
+  async validateApiKey(
+    rawKey: string,
+  ): Promise<IntegrationApiKeyRecord | null> {
     const keyHash = createHash('sha256').update(rawKey.trim()).digest('hex');
-    return this.apiKeyModel.findOne({ keyHash, enabled: true }).exec();
+    return this.apiKeys.findEnabledByKeyHash(keyHash);
   }
 
   async startPipelineViaApiKey(
@@ -71,7 +71,7 @@ export class IntegrationsService {
     body: { url: string; events: string[]; secret?: string },
   ) {
     const secret = body.secret?.trim() || randomBytes(16).toString('hex');
-    const doc = await this.subscriptionModel.create({
+    const doc = await this.subscriptions.create({
       userId: auth.userId,
       url: body.url.trim(),
       secret,

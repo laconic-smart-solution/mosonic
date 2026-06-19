@@ -1,34 +1,40 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
 import { extractPostAnalyticsRows } from '../analytics/analytics-metrics.util';
 import { ZernioRestClient } from '../mcp/zernio/zernio-rest.client';
-import { SyncLock, type SyncLockDocument } from '../upload/sync-lock.schema';
 import { ANALYTICS_WEEKLY_PULL_LOCK_ID } from '../analytics/analytics-sync.constants';
+import type { IPostAnalyticsRepository } from '../repositories/interfaces/post-analytics.repository.interface';
+import type { PostAnalyticsRecord } from '../repositories/interfaces/post-analytics.repository.interface';
+import type { IPostRepository } from '../repositories/interfaces/post.repository.interface';
+import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
+import type { ISyncLockRepository } from '../repositories/interfaces/sync-lock.repository.interface';
+import {
+  POST_ANALYTICS_REPOSITORY,
+  POST_REPOSITORY,
+  SYNC_LOCK_REPOSITORY,
+} from '../repositories/tokens';
+import { postPlatformResults } from '../upload/upload-record.util';
 import {
   isPostMetricsEligible,
   publishedChannelsFromPost,
 } from './post-analytics.util';
 import {
-  Post,
   PostStatus,
-  type PostDocument,
 } from './schemas/post.schema';
 import {
   PlatformMetricSyncStatus,
-  PostAnalytics,
   PostAnalyticsSyncStatus,
   type PlatformMetricEntry,
-  type PostAnalyticsDocument,
 } from './schemas/post-analytics.schema';
 
 export type PostAnalyticsDto = {
@@ -46,18 +52,31 @@ export type PostAnalyticsDto = {
   }>;
 };
 
+function periodBounds(period: unknown): { from: Date; to: Date } {
+  const p = (period ?? {}) as { from?: unknown; to?: unknown };
+  const from =
+    p.from instanceof Date
+      ? p.from
+      : new Date(typeof p.from === 'string' ? p.from : Date.now());
+  const to =
+    p.to instanceof Date
+      ? p.to
+      : new Date(typeof p.to === 'string' ? p.to : Date.now());
+  return { from, to };
+}
+
 @Injectable()
 export class PostAnalyticsService {
   private readonly logger = new Logger(PostAnalyticsService.name);
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(PostAnalytics.name)
-    private readonly postAnalyticsModel: Model<PostAnalyticsDocument>,
-    @InjectModel(Post.name)
-    private readonly postModel: Model<PostDocument>,
-    @InjectModel(SyncLock.name)
-    private readonly syncLockModel: Model<SyncLockDocument>,
+    @Inject(POST_ANALYTICS_REPOSITORY)
+    private readonly postAnalytics: IPostAnalyticsRepository,
+    @Inject(POST_REPOSITORY)
+    private readonly posts: IPostRepository,
+    @Inject(SYNC_LOCK_REPOSITORY)
+    private readonly syncLocks: ISyncLockRepository,
     private readonly zernioRest: ZernioRestClient,
   ) {}
 
@@ -71,18 +90,21 @@ export class PostAnalyticsService {
     return { from, to };
   }
 
-  toDto(doc: PostAnalyticsDocument | Record<string, unknown>): PostAnalyticsDto {
-    const d = doc as PostAnalyticsDocument;
+  toDto(doc: PostAnalyticsRecord): PostAnalyticsDto {
+    const { from, to } = periodBounds(doc.period);
+    const platformMetrics = Array.isArray(doc.platformMetrics)
+      ? (doc.platformMetrics as unknown as PlatformMetricEntry[])
+      : [];
     return {
-      postId: d.postId,
-      zernioPostId: d.zernioPostId,
-      syncStatus: d.syncStatus,
-      pulledAt: d.pulledAt.toISOString(),
+      postId: doc.postId,
+      zernioPostId: doc.zernioPostId,
+      syncStatus: doc.syncStatus as PostAnalyticsSyncStatus,
+      pulledAt: doc.pulledAt.toISOString(),
       period: {
-        from: d.period.from.toISOString(),
-        to: d.period.to.toISOString(),
+        from: from.toISOString(),
+        to: to.toISOString(),
       },
-      platformMetrics: (d.platformMetrics ?? []).map((row) => ({
+      platformMetrics: platformMetrics.map((row) => ({
         platform: row.platform,
         metrics: row.metrics,
         syncStatus: row.syncStatus,
@@ -92,12 +114,12 @@ export class PostAnalyticsService {
     };
   }
 
-  async findByPostId(postId: string): Promise<PostAnalyticsDocument | null> {
-    return this.postAnalyticsModel.findOne({ postId }).exec();
+  async findByPostId(postId: string): Promise<PostAnalyticsRecord | null> {
+    return this.postAnalytics.findByPostId(postId);
   }
 
-  async ensureForPost(post: PostDocument): Promise<PostAnalyticsDocument | null> {
-    if (!isPostMetricsEligible(post.status)) {
+  async ensureForPost(post: PostRecord): Promise<PostAnalyticsRecord | null> {
+    if (!isPostMetricsEligible(post.status as PostStatus)) {
       return null;
     }
     const zernioPostId = post.zernioPostId?.trim();
@@ -105,16 +127,14 @@ export class PostAnalyticsService {
       return null;
     }
 
-    const existing = await this.postAnalyticsModel
-      .findOne({ postId: post.postId })
-      .exec();
+    const existing = await this.postAnalytics.findByPostId(post.postId);
     if (existing) {
       return existing;
     }
 
     const { from, to } = this.defaultPeriod();
     const now = new Date();
-    return this.postAnalyticsModel.create({
+    return this.postAnalytics.create({
       postId: post.postId,
       zernioPostId,
       ruleRef: post.ruleRef,
@@ -217,14 +237,11 @@ export class PostAnalyticsService {
     postId: string,
     auth?: TenancyAuth,
   ): Promise<PostAnalyticsDto> {
-    const filter = auth
-      ? mergeUserIdFilter({ postId }, auth)
-      : { postId };
-    const post = await this.postModel.findOne(filter).exec();
+    const post = await this.posts.findByPostId(postId, auth);
     if (!post) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    if (!isPostMetricsEligible(post.status)) {
+    if (!isPostMetricsEligible(post.status as PostStatus)) {
       throw new BadRequestException(
         'Analytics are only available for published or partial posts.',
       );
@@ -237,7 +254,11 @@ export class PostAnalyticsService {
 
     await this.ensureForPost(post);
 
-    const channels = publishedChannelsFromPost(post);
+    const channels = publishedChannelsFromPost({
+      status: post.status as PostStatus,
+      platformResults: postPlatformResults(post),
+      channels: post.channels,
+    });
     if (channels.length === 0) {
       throw new BadRequestException(
         'No published channels to sync analytics for.',
@@ -277,27 +298,15 @@ export class PostAnalyticsService {
       syncStatus = this.resolveOverallSyncStatus(platformMetrics);
     }
 
-    const updated = await this.postAnalyticsModel
-      .findOneAndUpdate(
-        { postId },
-        {
-          $set: {
-            zernioPostId,
-            ruleRef: post.ruleRef,
-            userId: post.userId,
-            syncStatus,
-            pulledAt,
-            period: { from, to },
-            platformMetrics,
-          },
-        },
-        { new: true },
-      )
-      .exec();
-
-    if (!updated) {
-      throw new NotFoundException(`Analytics for post ${postId} not found`);
-    }
+    const updated = await this.postAnalytics.upsertSyncResult(postId, {
+      zernioPostId,
+      ruleRef: post.ruleRef,
+      userId: post.userId,
+      syncStatus,
+      pulledAt,
+      period: { from, to },
+      platformMetrics: platformMetrics as unknown as Prisma.InputJsonValue,
+    });
 
     return this.toDto(updated);
   }
@@ -312,11 +321,15 @@ export class PostAnalyticsService {
     }));
   }
 
-  async getDtoForPost(post: PostDocument): Promise<PostAnalyticsDto | null> {
-    if (!isPostMetricsEligible(post.status)) {
+  async getDtoForPost(post: PostRecord): Promise<PostAnalyticsDto | null> {
+    if (!isPostMetricsEligible(post.status as PostStatus)) {
       return null;
     }
-    const channels = publishedChannelsFromPost(post);
+    const channels = publishedChannelsFromPost({
+      status: post.status as PostStatus,
+      platformResults: postPlatformResults(post),
+      channels: post.channels,
+    });
     const zernioPostId = post.zernioPostId?.trim() ?? '';
     if (!zernioPostId || channels.length === 0) {
       return null;
@@ -362,22 +375,21 @@ export class PostAnalyticsService {
       metrics: NonNullable<PlatformMetricEntry['metrics']>;
     }>
   > {
-    const posts = await this.postModel
-      .find({
+    const { rows: posts } = await this.posts.findPage(
+      {
         ruleRef,
-        status: { $in: [PostStatus.Published, PostStatus.Partial] },
-      })
-      .select({ postId: 1, contentRef: 1 })
-      .lean()
-      .exec();
+        status: { in: [PostStatus.Published, PostStatus.Partial] },
+      },
+      1,
+      50_000,
+      'createdAt',
+      'desc',
+    );
 
     if (!posts.length) return [];
 
     const postIds = posts.map((p) => p.postId);
-    const analyticsDocs = await this.postAnalyticsModel
-      .find({ postId: { $in: postIds } })
-      .lean()
-      .exec();
+    const analyticsDocs = await this.postAnalytics.findByPostIds(postIds);
 
     const contentByPostId = new Map(
       posts.map((p) => [p.postId, String(p.contentRef ?? '')]),
@@ -392,7 +404,10 @@ export class PostAnalyticsService {
 
     for (const doc of analyticsDocs) {
       const contentRef = contentByPostId.get(doc.postId) ?? '';
-      for (const row of doc.platformMetrics ?? []) {
+      const platformMetrics = Array.isArray(doc.platformMetrics)
+        ? (doc.platformMetrics as unknown as PlatformMetricEntry[])
+        : [];
+      for (const row of platformMetrics) {
         if (
           row.syncStatus === PlatformMetricSyncStatus.Synced &&
           row.metrics
@@ -418,26 +433,23 @@ export class PostAnalyticsService {
       metrics: NonNullable<PlatformMetricEntry['metrics']>;
     }>
   > {
-    const posts = await this.postModel
-      .find(
-        mergeUserIdFilter(
-          {
-            status: { $in: [PostStatus.Published, PostStatus.Partial] },
-          },
-          auth,
-        ),
-      )
-      .select({ postId: 1, contentRef: 1 })
-      .lean()
-      .exec();
+    const { rows: posts } = await this.posts.findPage(
+      mergeTenancyWhere(
+        {
+          status: { in: [PostStatus.Published, PostStatus.Partial] },
+        },
+        auth,
+      ),
+      1,
+      50_000,
+      'createdAt',
+      'desc',
+    );
 
     if (!posts.length) return [];
 
     const postIds = posts.map((p) => p.postId);
-    const analyticsDocs = await this.postAnalyticsModel
-      .find({ postId: { $in: postIds } })
-      .lean()
-      .exec();
+    const analyticsDocs = await this.postAnalytics.findByPostIds(postIds);
 
     const contentByPostId = new Map(
       posts.map((p) => [p.postId, String(p.contentRef ?? '')]),
@@ -452,7 +464,10 @@ export class PostAnalyticsService {
 
     for (const doc of analyticsDocs) {
       const contentRef = contentByPostId.get(doc.postId) ?? '';
-      for (const row of doc.platformMetrics ?? []) {
+      const platformMetrics = Array.isArray(doc.platformMetrics)
+        ? (doc.platformMetrics as unknown as PlatformMetricEntry[])
+        : [];
+      for (const row of platformMetrics) {
         if (
           row.syncStatus === PlatformMetricSyncStatus.Synced &&
           row.metrics
@@ -477,28 +492,26 @@ export class PostAnalyticsService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + leaseMs);
 
-    const upserted = await this.syncLockModel
-      .updateOne(
-        { _id: ANALYTICS_WEEKLY_PULL_LOCK_ID },
-        { $setOnInsert: { owner: instanceId, expiresAt } },
-        { upsert: true },
+    if (
+      await this.syncLocks.tryAcquire(
+        ANALYTICS_WEEKLY_PULL_LOCK_ID,
+        instanceId,
+        expiresAt,
       )
-      .exec();
-    if (upserted.upsertedCount > 0) return true;
+    ) {
+      return true;
+    }
 
-    const stolen = await this.syncLockModel
-      .updateOne(
-        { _id: ANALYTICS_WEEKLY_PULL_LOCK_ID, expiresAt: { $lte: now } },
-        { $set: { owner: instanceId, expiresAt } },
-      )
-      .exec();
-    return stolen.modifiedCount > 0;
+    return this.syncLocks.stealExpired(
+      ANALYTICS_WEEKLY_PULL_LOCK_ID,
+      instanceId,
+      expiresAt,
+      now,
+    );
   }
 
   private async releaseWeeklyLock(): Promise<void> {
-    await this.syncLockModel
-      .deleteOne({ _id: ANALYTICS_WEEKLY_PULL_LOCK_ID })
-      .exec();
+    await this.syncLocks.release(ANALYTICS_WEEKLY_PULL_LOCK_ID);
   }
 
   @Cron('0 0 * * 1')
@@ -513,14 +526,16 @@ export class PostAnalyticsService {
     }
 
     try {
-      const posts = await this.postModel
-        .find({
-          status: { $in: [PostStatus.Published, PostStatus.Partial] },
-          zernioPostId: { $exists: true, $nin: [null, ''] },
-        })
-        .select({ postId: 1 })
-        .lean()
-        .exec();
+      const { rows: posts } = await this.posts.findPage(
+        {
+          status: { in: [PostStatus.Published, PostStatus.Partial] },
+          zernioPostId: { not: null },
+        },
+        1,
+        50_000,
+        'createdAt',
+        'desc',
+      );
 
       for (const post of posts) {
         try {

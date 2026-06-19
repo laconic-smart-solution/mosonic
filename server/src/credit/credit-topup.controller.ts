@@ -34,10 +34,10 @@ export class CreditTopupController {
     return this.creditService.getPackages();
   }
 
-  @Post('topup')
+  @Post('topup/initiate')
   @UsePipes(bodyPipe)
-  topup(@Body() body: TopupCreditsDto, @Req() req: Request) {
+  initiateTopup(@Body() body: TopupCreditsDto, @Req() req: Request) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
-    return this.creditService.topup(auth.userId, body.packageId);
+    return this.creditService.initiateTopup(auth.userId, body.packageId);
   }
 }

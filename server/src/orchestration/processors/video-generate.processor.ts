@@ -4,13 +4,14 @@ import {
   Processor,
   WorkerHost,
 } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import {
   getVideoGenerationMode,
   VideoGenerationService,
 } from '../../nodes/services/video-generation.service';
-import { PipelineRepository } from '../../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../../pipeline/pipeline.repository';
 import { PipelineNodeExecutionStatus } from '../../pipeline/schemas/pipeline.schema';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
 import { POLL_CONFIG, QUEUES, videoCheckJobId } from '../types/queue.constants';
@@ -24,7 +25,8 @@ export class VideoGenerateProcessor extends WorkerHost {
   private readonly logger = new Logger(VideoGenerateProcessor.name);
 
   constructor(
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     private readonly videoService: VideoGenerationService,
     private readonly completion: MediaNodeCompletionService,
     @InjectQueue(QUEUES.VIDEO_CHECK)

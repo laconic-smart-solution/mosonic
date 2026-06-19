@@ -1,22 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Plan, type PlanDocument } from '../plan/schemas/plan.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ServiceRateType } from '@prisma/client';
+import type { CreditConfigRecord } from '../domain/credit/credit.types';
+import type { ICreditConfigRepository } from '../repositories/interfaces/credit-config.repository.interface';
+import type { IFixedCostRepository } from '../repositories/interfaces/fixed-cost.repository.interface';
+import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
+import type { IServiceRateRepository } from '../repositories/interfaces/service-rate.repository.interface';
 import {
-  CreditConfig,
-  type CreditConfigDocument,
-} from './schemas/credit-config.schema';
-import {
-  FixedCost,
-  type FixedCostDocument,
-} from './schemas/fixed-cost.schema';
-import {
-  ServiceRate,
-  type ServiceRateDocument,
-  type ServiceRateType,
-} from './schemas/service-rate.schema';
-
-const CONFIG_SINGLETON_KEY = 'default';
+  CREDIT_CONFIG_REPOSITORY,
+  FIXED_COST_REPOSITORY,
+  PLAN_REPOSITORY,
+  SERVICE_RATE_REPOSITORY,
+} from '../repositories/tokens';
 
 export type CreditCalculationResult = {
   rawCostUsd: number;
@@ -33,10 +27,6 @@ export type PreviewNodeInput = {
   count?: number;
   durationSec?: number;
 };
-
-function singletonFilter() {
-  return { singletonKey: CONFIG_SINGLETON_KEY };
-}
 
 type LegacyHistoryEntry = Record<string, unknown>;
 
@@ -76,21 +66,21 @@ function normalizeHistoryEntry(
 @Injectable()
 export class CreditCalculationService {
   constructor(
-    @InjectModel(CreditConfig.name)
-    private readonly configModel: Model<CreditConfigDocument>,
-    @InjectModel(FixedCost.name)
-    private readonly fixedCostModel: Model<FixedCostDocument>,
-    @InjectModel(ServiceRate.name)
-    private readonly serviceRateModel: Model<ServiceRateDocument>,
-    @InjectModel(Plan.name)
-    private readonly planModel: Model<PlanDocument>,
+    @Inject(CREDIT_CONFIG_REPOSITORY)
+    private readonly creditConfig: ICreditConfigRepository,
+    @Inject(FIXED_COST_REPOSITORY)
+    private readonly fixedCosts: IFixedCostRepository,
+    @Inject(SERVICE_RATE_REPOSITORY)
+    private readonly serviceRates: IServiceRateRepository,
+    @Inject(PLAN_REPOSITORY)
+    private readonly plans: IPlanRepository,
   ) {}
 
-  async getConfig(): Promise<CreditConfigDocument> {
-    let doc = await this.configModel.findOne(singletonFilter()).exec();
+  async getConfig(): Promise<CreditConfigRecord> {
+    let doc = await this.creditConfig.findSingleton();
     if (!doc) {
-      doc = await this.configModel.create({
-        singletonKey: CONFIG_SINGLETON_KEY,
+      doc = await this.creditConfig.createSingleton({
+        singletonKey: 'default',
         creditPriceUsd: 0.01,
         marginTarget: 3.0,
         basicUsersPerMonth: 50,
@@ -104,12 +94,14 @@ export class CreditCalculationService {
 
   /** Backfill v2 fields and normalize legacy changeHistory rows from v1 config. */
   async ensureLegacyConfigMigrated(): Promise<void> {
-    const raw = await this.configModel.findOne(singletonFilter()).lean().exec();
+    const raw = await this.creditConfig.findSingleton();
     if (!raw) return;
 
     const creditPriceUsd = Number(raw.creditPriceUsd ?? 0.01);
     const marginTarget = Number(
-      raw.marginTarget ?? (raw as { marginMultiplier?: number }).marginMultiplier ?? 3,
+      raw.marginTarget ??
+        (raw as { marginMultiplier?: number }).marginMultiplier ??
+        3,
     );
     const basicUsersPerMonth = Number(raw.basicUsersPerMonth ?? 50);
     const overheadFactor = Number(raw.overheadFactor ?? 0);
@@ -126,14 +118,14 @@ export class CreditCalculationService {
       (entry) => entry.creditPriceUsd == null || entry.marginTarget == null,
     );
 
-    const $set: Record<string, unknown> = {};
-    if (raw.creditPriceUsd == null) $set.creditPriceUsd = creditPriceUsd;
-    if (raw.marginTarget == null) $set.marginTarget = marginTarget;
-    if (raw.basicUsersPerMonth == null) $set.basicUsersPerMonth = basicUsersPerMonth;
-    if (raw.overheadFactor == null) $set.overheadFactor = overheadFactor;
-    if (raw.derivedMargin == null) $set.derivedMargin = derivedMargin;
+    const set: Record<string, unknown> = {};
+    if (raw.creditPriceUsd == null) set.creditPriceUsd = creditPriceUsd;
+    if (raw.marginTarget == null) set.marginTarget = marginTarget;
+    if (raw.basicUsersPerMonth == null) set.basicUsersPerMonth = basicUsersPerMonth;
+    if (raw.overheadFactor == null) set.overheadFactor = overheadFactor;
+    if (raw.derivedMargin == null) set.derivedMargin = derivedMargin;
     if (needsHistoryFix) {
-      $set.changeHistory = history.map((entry) =>
+      set.changeHistory = history.map((entry) =>
         normalizeHistoryEntry(entry, fallback),
       );
     }
@@ -145,36 +137,30 @@ export class CreditCalculationService {
       creditsIssuedPerMonth?: number;
       creditValueUsd?: number;
     };
-    const $unset: Record<string, ''> = {};
-    if (legacy.infraCostUsd != null) $unset.infraCostUsd = '';
-    if (legacy.maintCostUsd != null) $unset.maintCostUsd = '';
-    if (legacy.marginMultiplier != null) $unset.marginMultiplier = '';
-    if (legacy.creditsIssuedPerMonth != null) $unset.creditsIssuedPerMonth = '';
-    if (legacy.creditValueUsd != null) $unset.creditValueUsd = '';
+    const unsetKeys: string[] = [];
+    if (legacy.infraCostUsd != null) unsetKeys.push('infraCostUsd');
+    if (legacy.maintCostUsd != null) unsetKeys.push('maintCostUsd');
+    if (legacy.marginMultiplier != null) unsetKeys.push('marginMultiplier');
+    if (legacy.creditsIssuedPerMonth != null) {
+      unsetKeys.push('creditsIssuedPerMonth');
+    }
+    if (legacy.creditValueUsd != null) unsetKeys.push('creditValueUsd');
 
-    if (Object.keys($set).length === 0 && Object.keys($unset).length === 0) {
+    if (Object.keys(set).length === 0 && unsetKeys.length === 0) {
       return;
     }
 
-    await this.configModel
-      .updateOne(singletonFilter(), {
-        ...(Object.keys($set).length ? { $set } : {}),
-        ...(Object.keys($unset).length ? { $unset } : {}),
-      })
-      .exec();
+    await this.creditConfig.migrateLegacyFields(set, unsetKeys);
   }
 
   async getTotalFixedCosts(): Promise<number> {
-    const rows = await this.fixedCostModel.find({ isActive: true }).lean().exec();
+    const rows = await this.fixedCosts.listActive();
     return rows.reduce((sum, r) => sum + (r.amountUsd ?? 0), 0);
   }
 
-  async getBasicPlanCredits(config: CreditConfig): Promise<number> {
-    const basicPlan = await this.planModel
-      .findOne({ name: 'Basic', isActive: true })
-      .lean()
-      .exec();
-    if (!basicPlan || config.creditPriceUsd <= 0) return 0;
+  async getBasicPlanCredits(config: CreditConfigRecord): Promise<number> {
+    const basicPlan = await this.plans.findByName('Basic');
+    if (!basicPlan?.isActive || config.creditPriceUsd <= 0) return 0;
     return Math.floor(basicPlan.priceUsd / config.creditPriceUsd);
   }
 
@@ -203,21 +189,12 @@ export class CreditCalculationService {
         costPerCredit > 0 ? config.creditPriceUsd / costPerCredit : 0;
     }
 
-    config.overheadFactor = overheadFactor;
-    config.derivedMargin = derivedMargin;
-    await this.configModel
-      .updateOne(singletonFilter(), {
-        $set: { overheadFactor, derivedMargin },
-      })
-      .exec();
+    await this.creditConfig.updateOverhead(overheadFactor, derivedMargin);
     return overheadFactor;
   }
 
   private async estimateDefaultTextCost(): Promise<number> {
-    const rate = await this.serviceRateModel
-      .findOne({ serviceType: 'text', isActive: true })
-      .lean()
-      .exec();
+    const rate = await this.serviceRates.findFirstActiveByType('text');
     return rate?.avgPricePerCall ?? 0.01;
   }
 
@@ -243,16 +220,11 @@ export class CreditCalculationService {
 
   async estimateNodeRawCost(node: PreviewNodeInput): Promise<number> {
     const count = Math.max(1, node.count ?? 1);
-    const filter: Record<string, unknown> = {
+    const rate = await this.serviceRates.findActiveRate({
       serviceType: node.serviceType,
       model: node.model,
-      isActive: true,
-    };
-    if (node.provider?.trim()) {
-      filter.provider = node.provider.trim();
-    }
-
-    const rate = await this.serviceRateModel.findOne(filter).lean().exec();
+      ...(node.provider?.trim() ? { provider: node.provider.trim() } : {}),
+    });
     if (!rate) return 0;
 
     switch (node.serviceType) {
@@ -270,9 +242,7 @@ export class CreditCalculationService {
   }
 
   async previewWorkflow(nodes: PreviewNodeInput[]) {
-    const nodeResults: Array<
-      PreviewNodeInput & CreditCalculationResult
-    > = [];
+    const nodeResults: Array<PreviewNodeInput & CreditCalculationResult> = [];
 
     let rawCostUsd = 0;
     let overheadUsd = 0;

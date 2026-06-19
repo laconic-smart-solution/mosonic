@@ -7,13 +7,15 @@ export type CreditPackage = {
   id: string;
   credits: number;
   priceUsd: number;
+  /** Amount charged via Payni (THB). */
+  priceThb: number;
   label: string;
 };
 
 export const CREDIT_PACKAGES: ReadonlyArray<CreditPackage> = [
-  { id: 'starter', credits: 1000, priceUsd: 10, label: 'Starter' },
-  { id: 'growth', credits: 5000, priceUsd: 45, label: 'Growth' },
-  { id: 'scale', credits: 10000, priceUsd: 80, label: 'Scale' },
+  { id: 'starter', credits: 1000, priceUsd: 10, priceThb: 350, label: 'Starter' },
+  { id: 'growth', credits: 5000, priceUsd: 45, priceThb: 1575, label: 'Growth' },
+  { id: 'scale', credits: 10000, priceUsd: 80, priceThb: 2800, label: 'Scale' },
 ] as const;
 
 export function findCreditPackage(id: string): CreditPackage | null {

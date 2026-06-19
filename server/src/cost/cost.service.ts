@@ -1,14 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { EventsService } from '../events/events.service';
+import type { IBudgetSettingsRepository } from '../repositories/interfaces/budget-settings.repository.interface';
+import type { ICostEntryRepository } from '../repositories/interfaces/cost-entry.repository.interface';
+import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
 import {
-  Pipeline,
-  type PipelineDocument,
-} from '../pipeline/schemas/pipeline.schema';
+  BUDGET_SETTINGS_REPOSITORY,
+  COST_ENTRY_REPOSITORY,
+  PIPELINE_REPOSITORY,
+} from '../repositories/tokens';
 import { UsersService } from '../users/users.service';
 import {
   OPENAI_IMAGE_PRICING,
@@ -19,20 +21,18 @@ import {
 } from './cost.config';
 import { RecordCostDto } from './dto/record-cost.dto';
 import { PipelineBudgetExceededError } from './pipeline-budget-exceeded.error';
-import { BudgetSettings, type BudgetSettingsDocument } from './schemas/budget-settings.schema';
-import { CostEntry, type CostEntryDocument } from './schemas/cost-entry.schema';
 
 @Injectable()
 export class CostService {
   private readonly logger = new Logger(CostService.name);
 
   constructor(
-    @InjectModel(CostEntry.name)
-    private readonly costEntryModel: Model<CostEntryDocument>,
-    @InjectModel(BudgetSettings.name)
-    private readonly budgetModel: Model<BudgetSettingsDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
+    @Inject(COST_ENTRY_REPOSITORY)
+    private readonly costEntries: ICostEntryRepository,
+    @Inject(BUDGET_SETTINGS_REPOSITORY)
+    private readonly budgetSettings: IBudgetSettingsRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     private readonly events: EventsService,
     private readonly usersService: UsersService,
   ) {}
@@ -43,7 +43,7 @@ export class CostService {
     const inputTokens = dto.inputTokens ?? 0;
     const outputTokens = dto.outputTokens ?? 0;
 
-    await this.costEntryModel.create({
+    await this.costEntries.create({
       userId: dto.userId,
       pipelineRef: dto.pipelineRef,
       campaignRef: dto.campaignRef,
@@ -155,7 +155,7 @@ export class CostService {
     onMonthlyHit?: 'warn' | 'stop';
     onRunHit?: 'warn' | 'stop';
   }> {
-    const settings = await this.budgetModel.findOne({ userId }).lean();
+    const settings = await this.budgetSettings.findByUserId(userId);
     if (!settings) {
       return { monthlyLimitHit: false, runLimitHit: false };
     }
@@ -244,22 +244,17 @@ export class CostService {
     to?: Date,
     campaignRef?: string,
   ) {
-    const match: Record<string, unknown> = { userId };
-    if (from != null || to != null) {
-      const createdAt: { $gte?: Date; $lte?: Date } = {};
-      if (from != null) {
-        createdAt.$gte = from;
-      }
-      if (to != null) {
-        createdAt.$lte = to;
-      }
-      match.createdAt = createdAt;
-    }
-    if (campaignRef) {
-      match.campaignRef = campaignRef;
-    }
-
-    const entries = await this.costEntryModel.find(match).lean().exec();
+    const entries = await this.costEntries.findByUser(userId, {
+      ...(from != null || to != null
+        ? {
+            createdAt: {
+              ...(from != null ? { gte: from } : {}),
+              ...(to != null ? { lte: to } : {}),
+            },
+          }
+        : {}),
+      ...(campaignRef ? { campaignRef } : {}),
+    });
     const plain = entries as unknown as Array<Record<string, unknown>>;
 
     const totalUsd = this.sum(plain, 'costUsd');
@@ -271,7 +266,7 @@ export class CostService {
     const byDay = this.groupByDay(plain);
 
     const monthlyTotal = await this.getMonthlyTotal(userId);
-    const settings = await this.budgetModel.findOne({ userId }).lean();
+    const settings = await this.budgetSettings.findByUserId(userId);
 
     return {
       totalUsd,
@@ -294,20 +289,14 @@ export class CostService {
   }
 
   async getPipelineBreakdown(pipelineRef: string, auth: TenancyAuth) {
-    const owned = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId: pipelineRef }, auth))
-      .select({ pipelineId: 1 })
-      .lean()
-      .exec();
+    const owned = await this.pipelines.findById(pipelineRef, auth);
     if (!owned) {
       throw new NotFoundException(`Pipeline ${pipelineRef} not found`);
     }
 
-    const entries = await this.costEntryModel
-      .find({ pipelineRef })
-      .sort({ createdAt: 1 })
-      .lean()
-      .exec();
+    const entries = (await this.costEntries.findByPipeline(pipelineRef)).sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    );
     const plain = entries as unknown as Array<Record<string, unknown>>;
 
     return {
@@ -318,33 +307,24 @@ export class CostService {
         nodeType: e.nodeType,
         model: e.providerModel,
         costUsd: e.costUsd,
-        createdAt: (e as { createdAt?: Date }).createdAt,
+        createdAt: e.createdAt,
       })),
     };
   }
 
   async getMonthlyTotal(userId: string): Promise<number> {
-    const result = await this.costEntryModel
-      .aggregate([
-        { $match: { userId, billingPeriod: this.currentBillingPeriod() } },
-        { $group: { _id: null, total: { $sum: '$costUsd' } } },
-      ])
-      .exec();
-    return result[0]?.total ?? 0;
+    return this.costEntries.sumMonthlyForUser(
+      userId,
+      this.currentBillingPeriod(),
+    );
   }
 
   async getPipelineTotal(pipelineRef: string): Promise<number> {
-    const result = await this.costEntryModel
-      .aggregate([
-        { $match: { pipelineRef } },
-        { $group: { _id: null, total: { $sum: '$costUsd' } } },
-      ])
-      .exec();
-    return result[0]?.total ?? 0;
+    return this.costEntries.sumForPipeline(pipelineRef);
   }
 
   async getBudgetSettings(userId: string) {
-    const doc = await this.budgetModel.findOne({ userId }).lean().exec();
+    const doc = await this.budgetSettings.findByUserId(userId);
     return (
       doc ?? {
         userId,
@@ -359,12 +339,9 @@ export class CostService {
 
   async updateBudgetSettings(
     userId: string,
-    dto: Partial<BudgetSettings>,
+    dto: Partial<Omit<Prisma.BudgetSettingsCreateInput, 'userId'>>,
   ) {
-    return this.budgetModel
-      .findOneAndUpdate({ userId }, { ...dto }, { upsert: true, new: true })
-      .lean()
-      .exec();
+    return this.budgetSettings.upsertByUserId(userId, dto);
   }
 
   currentBillingPeriod(): Date {
@@ -391,16 +368,16 @@ export class CostService {
         continue;
       }
       const pipelineRef = `zernio-monthly:${userId}:${monthKey}`;
-      const existing = await this.costEntryModel
-        .findOne({ userId, pipelineRef, billingPeriod })
-        .select({ _id: 1 })
-        .lean()
-        .exec();
+      const existing = await this.costEntries.existsMonthlyZernioRow(
+        userId,
+        pipelineRef,
+        billingPeriod,
+      );
       if (existing) {
         continue;
       }
       try {
-        await this.costEntryModel.create({
+        await this.costEntries.create({
           userId,
           pipelineRef,
           campaignRef: `zernio-monthly:${monthKey}`,

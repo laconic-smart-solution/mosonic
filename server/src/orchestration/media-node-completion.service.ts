@@ -1,6 +1,4 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
@@ -23,11 +21,13 @@ import type {
 } from '../nodes/services/video-generation.service';
 import { getVideoGenerationMode } from '../nodes/services/video-generation.service';
 import { PRESENTER_WORDS_PER_SECOND } from '../nodes/services/presenter-script.util';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
 } from '../pipeline/schemas/pipeline.schema';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
@@ -45,14 +45,15 @@ export class MediaNodeCompletionService {
   private readonly logger = new Logger(MediaNodeCompletionService.name);
 
   constructor(
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     private readonly resolver: DependencyResolverService,
     private readonly pipelineNodeRunner: PipelineNodeRunnerService,
     private readonly events: EventsService,
     private readonly costService: CostService,
     private readonly loggingService: LoggingService,
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
   ) {}
 
   async buildVideoGenerationInput(
@@ -70,7 +71,7 @@ export class MediaNodeCompletionService {
         `Node ${payload.nodeId} not found on pipeline ${payload.pipelineId}`,
       );
     }
-    const rule = await this.ruleModel.findOne({ ruleId: payload.ruleId }).exec();
+    const rule = await this.rules.findById(payload.ruleId);
     if (!rule) {
       throw new UnprocessableEntityException(`Rule ${payload.ruleId} not found`);
     }

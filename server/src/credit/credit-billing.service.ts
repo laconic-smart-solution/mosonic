@@ -1,6 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { CostService } from '../cost/cost.service';
 import type { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';

@@ -1,47 +1,29 @@
-import { Module, OnModuleInit } from '@nestjs/common';
-import { InjectModel, MongooseModule } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { AuthModule } from '../auth/auth.module';
-import { CostModule } from '../cost/cost.module';
-import { EventsModule } from '../events/events.module';
-import { Plan, PlanSchema } from '../plan/schemas/plan.schema';
-import { UserPlan, UserPlanSchema } from '../plan/schemas/user-plan.schema';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import type { IFixedCostRepository } from '../repositories/interfaces/fixed-cost.repository.interface';
+import type { IServiceRateRepository } from '../repositories/interfaces/service-rate.repository.interface';
+import {
+  FIXED_COST_REPOSITORY,
+  SERVICE_RATE_REPOSITORY,
+} from '../repositories/tokens';
 import { AdminNodeCreditController } from './admin-node-credit.controller';
 import { CreditBillingService } from './credit-billing.service';
 import { CreditCalculationService } from './credit-calculation.service';
 import { CreditConfigController } from './credit-config.controller';
 import { CreditConfigService } from './credit-config.service';
 import { CreditTopupController } from './credit-topup.controller';
+import { PaymentWebhookController } from './payment-webhook.controller';
 import { ContentCreditUsageService } from './content-credit-usage.service';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { OPERATION_REFERENCE_COSTS } from './lib/operation-reference-costs';
-import {
-  CreditConfig,
-  CreditConfigSchema,
-} from './schemas/credit-config.schema';
-import {
-  CreditLedger,
-  CreditLedgerSchema,
-} from './schemas/credit-ledger.schema';
-import {
-  CreditTopup,
-  CreditTopupSchema,
-} from './schemas/credit-topup.schema';
-import {
-  FixedCost,
-  FixedCostSchema,
-} from './schemas/fixed-cost.schema';
-import {
-  NodeCreditPrice,
-  NodeCreditPriceSchema,
-} from './schemas/node-credit-price.schema';
-import {
-  ServiceRate,
-  ServiceRateSchema,
-} from './schemas/service-rate.schema';
 import { ServiceRateService } from './service-rate.service';
+import { AuthModule } from '../auth/auth.module';
+import { CostModule } from '../cost/cost.module';
+import { EventsModule } from '../events/events.module';
+import { PayniModule } from '../payni/payni.module';
+import { RepositoriesModule } from '../repositories/repositories.module';
+import { Module } from '@nestjs/common';
 
 const DEFAULT_FIXED_COSTS = [
   { name: 'Infrastructure', amountUsd: 500 },
@@ -65,21 +47,14 @@ const DEFAULT_SERVICE_RATES = [
     AuthModule,
     CostModule,
     EventsModule,
-    MongooseModule.forFeature([
-      { name: CreditConfig.name, schema: CreditConfigSchema },
-      { name: CreditLedger.name, schema: CreditLedgerSchema },
-      { name: CreditTopup.name, schema: CreditTopupSchema },
-      { name: UserPlan.name, schema: UserPlanSchema },
-      { name: FixedCost.name, schema: FixedCostSchema },
-      { name: ServiceRate.name, schema: ServiceRateSchema },
-      { name: NodeCreditPrice.name, schema: NodeCreditPriceSchema },
-      { name: Plan.name, schema: PlanSchema },
-    ]),
+    PayniModule,
+    RepositoriesModule,
   ],
   controllers: [
     CreditConfigController,
     AdminNodeCreditController,
     CreditTopupController,
+    PaymentWebhookController,
   ],
   providers: [
     CreditConfigService,
@@ -100,15 +75,14 @@ const DEFAULT_SERVICE_RATES = [
     FixedCostService,
     ServiceRateService,
     NodeCreditPriceService,
-    MongooseModule,
   ],
 })
 export class CreditModule implements OnModuleInit {
   constructor(
-    @InjectModel(FixedCost.name)
-    private readonly fixedCostModel: Model<FixedCost>,
-    @InjectModel(ServiceRate.name)
-    private readonly serviceRateModel: Model<ServiceRate>,
+    @Inject(FIXED_COST_REPOSITORY)
+    private readonly fixedCosts: IFixedCostRepository,
+    @Inject(SERVICE_RATE_REPOSITORY)
+    private readonly serviceRates: IServiceRateRepository,
     private readonly calculation: CreditCalculationService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
   ) {}
@@ -121,14 +95,14 @@ export class CreditModule implements OnModuleInit {
   }
 
   private async seedDefaults(): Promise<void> {
-    const fixedCount = await this.fixedCostModel.countDocuments().exec();
+    const fixedCount = await this.fixedCosts.count();
     if (fixedCount === 0) {
-      await this.fixedCostModel.insertMany(
+      await this.fixedCosts.insertMany(
         DEFAULT_FIXED_COSTS.map((row) => ({ ...row, isActive: true })),
       );
     }
 
-    const rateCount = await this.serviceRateModel.countDocuments().exec();
+    const rateCount = await this.serviceRates.count();
     if (rateCount === 0) {
       const fromRefs = OPERATION_REFERENCE_COSTS.map((op) => {
         if (op.nodeType.includes('video')) {
@@ -167,7 +141,7 @@ export class CreditModule implements OnModuleInit {
         );
         if (!exists) merged.push(row);
       }
-      await this.serviceRateModel.insertMany(merged);
+      await this.serviceRates.insertMany(merged);
     }
   }
 }

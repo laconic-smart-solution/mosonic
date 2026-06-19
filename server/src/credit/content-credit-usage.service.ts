@@ -1,11 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Inject, Injectable } from '@nestjs/common';
 import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
-import {
-  CreditLedger,
-  type CreditLedgerDocument,
-} from './schemas/credit-ledger.schema';
+import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
+import { CREDIT_LEDGER_REPOSITORY } from '../repositories/tokens';
 
 export type ContentCreditUsage = {
   totalCredits: number;
@@ -22,15 +18,15 @@ type LedgerLean = {
   nodeId: string;
   nodeType: string;
   pipelineRef: string;
-  contentRef?: string;
+  contentRef?: string | null;
   creditsCharged: number;
 };
 
 @Injectable()
 export class ContentCreditUsageService {
   constructor(
-    @InjectModel(CreditLedger.name)
-    private readonly ledgerModel: Model<CreditLedgerDocument>,
+    @Inject(CREDIT_LEDGER_REPOSITORY)
+    private readonly ledger: ICreditLedgerRepository,
   ) {}
 
   async getTotalsForContents(
@@ -46,17 +42,11 @@ export class ContentCreditUsageService {
       items.map((i) => [i.pipelineRef, i.contentId]),
     );
 
-    const entries = (await this.ledgerModel
-      .find({
-        userId,
-        $or: [
-          { contentRef: { $in: contentIds } },
-          { pipelineRef: { $in: pipelineRefs } },
-        ],
-      })
-      .select('contentRef pipelineRef creditsCharged')
-      .lean()
-      .exec()) as LedgerLean[];
+    const entries = (await this.ledger.findForContentUsage(
+      userId,
+      contentIds,
+      pipelineRefs,
+    )) as LedgerLean[];
 
     for (const entry of entries) {
       const contentId =
@@ -77,14 +67,11 @@ export class ContentCreditUsageService {
     pipelineRef: string,
     pipelineNodes: PipelineNodeRef[],
   ): Promise<ContentCreditUsage> {
-    const entries = (await this.ledgerModel
-      .find({
-        userId,
-        $or: [{ contentRef: contentId }, { pipelineRef }],
-      })
-      .select('nodeId nodeType pipelineRef contentRef creditsCharged')
-      .lean()
-      .exec()) as LedgerLean[];
+    const entries = (await this.ledger.findForContentUsage(
+      userId,
+      [contentId],
+      [pipelineRef],
+    )) as LedgerLean[];
 
     return this.buildUsageFromEntries(
       contentId,

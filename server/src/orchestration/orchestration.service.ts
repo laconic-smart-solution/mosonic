@@ -8,16 +8,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { UserRole } from '../domain/users/user.types';
 import { mergeResolvedOutputs } from '../content/content-output.utils';
-import {
-  Content,
-  ContentStatus,
-  type ContentDocument,
-} from '../content/schemas/content.schema';
+import { ContentStatus } from '../content/schemas/content.schema';
+import type { ContentOutputs, ContentUserEdits } from '../content/schemas/content.schema';
 import { EventsService } from '../events/events.service';
 import { ContentService } from '../content/content.service';
 import {
@@ -26,30 +22,38 @@ import {
   pipelineStartedNotification,
 } from '../events/notification.util';
 import { LoggingService } from '../logging/logging.service';
-import {
-  WorkflowNode,
-  type WorkflowNodeDocument,
-} from '../nodes/schemas/workflow-node.schema';
+import type { WorkflowNodeRecord } from '../domain/workflow/workflow.types';
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
 import type { PipelineContext } from '../nodes/types/node-execution.types';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
+import { filterPipelineForVariant } from '../pipeline/pipeline-variant-filter.util';
 import {
-  Pipeline,
+  parsePipelineGraph,
+  parsePipelineMetadata,
+  parsePipelineNodes,
+} from '../repositories/prisma/pipeline-nodes.util';
+import {
   PipelineExecutionMode,
   PipelineNodeExecutionStatus,
   PipelineStatus,
-  type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import { defaultPipelineName } from '../pipeline/pipeline-name.util';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
-import { UserRole } from '../users/schemas/user.schema';
+import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
+import type { IWorkflowNodeRepository } from '../repositories/interfaces/workflow-node.repository.interface';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
 import {
-  Workflow,
-  type WorkflowDocument,
-} from '../workflow/schemas/workflow.schema';
+  CONTENT_REPOSITORY,
+  RULE_REPOSITORY,
+  USER_PLAN_REPOSITORY,
+  WORKFLOW_NODE_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../repositories/tokens';
 import { UploadService } from '../upload/upload.service';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
-import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { CreditService } from '../credit/credit.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
@@ -63,17 +67,20 @@ import {
   mergeWorkflowLaneIntoConfig,
 } from './graph-materialization.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
+import { countNodesByLane } from './lane-pause.util';
 import { CampaignAutonomyService } from '../campaign/campaign-autonomy.service';
 import { OutboundWebhookService } from '../integrations/outbound-webhook.service';
 import { GraphReplanService } from './graph-replan.service';
 import { RuleOverlayBuilderService } from './rule-overlay-builder.service';
 import { buildApprovalStateFromPolicy } from '../content/content-approval.util';
-import { countNodesByLane } from './lane-pause.util';
-import { buildLinearEdgesFromOrder } from '../workflow/workflow-graph.util';
+import { buildLinearEdgesFromOrder, parseWorkflowEdges } from '../workflow/workflow-graph.util';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
-import type {
-  NodeExecutorInput,
-} from '../nodes/types/node-execution.types';
+import type { WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
+import type { NodeExecutorInput } from '../nodes/types/node-execution.types';
+import type { Rule } from '../rule/schemas/rule.schema';
+import type { ChannelEntry } from '../rule/schemas/rule.schema';
+import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
+import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 
 @Injectable()
 export class OrchestrationService {
@@ -82,25 +89,24 @@ export class OrchestrationService {
 
   constructor(
     config: ConfigService,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<WorkflowDocument>,
-    @InjectModel(WorkflowNode.name)
-    private readonly workflowNodeModel: Model<WorkflowNodeDocument>,
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(Content.name)
-    private readonly contentModel: Model<ContentDocument>,
-    @InjectModel(UserPlan.name)
-    private readonly userPlanModel: Model<UserPlanDocument>,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
+    @Inject(WORKFLOW_NODE_REPOSITORY)
+    private readonly workflowNodes: IWorkflowNodeRepository,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    @Inject(CONTENT_REPOSITORY)
+    private readonly contents: IContentRepository,
+    @Inject(USER_PLAN_REPOSITORY)
+    private readonly userPlans: IUserPlanRepository,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly creditService: CreditService,
     private readonly creditCalculation: CreditCalculationService,
     private readonly nodeExecutor: NodeExecutor,
     private readonly events: EventsService,
     private readonly uploadService: UploadService,
-    private readonly pipelineRepo: PipelineRepository,
     private readonly graphMaterialization: GraphMaterializationService,
     private readonly ruleOverlayBuilder: RuleOverlayBuilderService,
     @Inject(forwardRef(() => DependencyResolverService))
@@ -141,31 +147,26 @@ export class OrchestrationService {
       throw new BadRequestException('contentPrompt must not be empty');
     }
 
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId: input.workflowId }, input.auth))
-      .exec();
+    const workflow = await this.workflows.findById(input.workflowId, input.auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${input.workflowId} not found`);
     }
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId: input.ruleId }, input.auth))
-      .exec();
+    const rule = await this.rules.findById(input.ruleId, input.auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${input.ruleId} not found`);
     }
-    const nodes = await this.workflowNodeModel
-      .find(
-        mergeUserIdFilter({ workflowRef: workflow.workflowId }, input.auth),
-      )
-      .sort({ order: 1 })
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflow(
+      workflow.workflowId,
+      input.auth,
+    );
     if (nodes.length === 0) {
       throw new BadRequestException('Workflow has no nodes to execute');
     }
 
+    const workflowEdges = parseWorkflowEdges(workflow.edges);
     const templateEdges =
-      (workflow.edges ?? []).length > 0
-        ? (workflow.edges ?? []).map((e) => ({ from: e.from, to: e.to }))
+      workflowEdges.length > 0
+        ? workflowEdges
         : buildLinearEdgesFromOrder(
             nodes.map((n) => ({ nodeId: n.nodeId, order: n.order })),
           );
@@ -173,17 +174,17 @@ export class OrchestrationService {
     const materialized = this.graphMaterialization.materialize(
       nodes.map((node) => ({
         nodeId: node.nodeId,
-        type: node.type,
+        type: node.type as unknown as WorkflowNodeType,
         order: node.order,
         isLocked: node.isLocked,
-        userPrompt: node.userPrompt,
+        userPrompt: node.userPrompt ?? '',
         config: mergeWorkflowLaneIntoConfig(
           (node.config ?? {}) as Record<string, unknown>,
           node.lane,
         ),
       })),
       templateEdges,
-      rule.toObject(),
+      rule as unknown as Rule,
       workflow.version ?? 1,
     );
 
@@ -248,7 +249,7 @@ export class OrchestrationService {
         : undefined;
 
     const startedAt = new Date();
-    const pipeline = await this.pipelineModel.create({
+    const pipeline = await this.pipelineRepo.create({
       userId: input.auth.userId,
       workflowRef: workflow.workflowId,
       ruleRef: rule.ruleId,
@@ -259,7 +260,7 @@ export class OrchestrationService {
         lanes: materialized.lanes,
         materializedFromWorkflowVersion: workflow.version ?? 1,
         layout: pipelineLayout,
-      },
+      } as unknown as Prisma.InputJsonValue,
       nodes: pipelineStoreNodes.map((node) => ({
         nodeId: node.nodeId,
         type: node.type,
@@ -276,7 +277,7 @@ export class OrchestrationService {
         output: null,
         retryCount: 0,
         executedAt: null,
-      })),
+      })) as Prisma.InputJsonValue,
       status: PipelineStatus.Running,
       startedAt,
       completedAt: null,
@@ -285,13 +286,13 @@ export class OrchestrationService {
       executionMode: this.useQueue
         ? PipelineExecutionMode.Queue
         : PipelineExecutionMode.Inline,
-      ruleOverlay,
+      ruleOverlay: (ruleOverlay ?? null) as unknown as Prisma.InputJsonValue,
       metadata: {
         source: input.metadata?.source ?? 'manual',
         scheduleId: input.metadata?.scheduleId,
         experimentId,
         newsMeta: input.metadata?.newsMeta ?? null,
-      },
+      } as unknown as Prisma.InputJsonValue,
       creditsCharged: totalCredits,
       creditChargeBreakdown: creditBreakdown.map((row) => ({
         nodeType: row.nodeType,
@@ -432,10 +433,7 @@ export class OrchestrationService {
   }
 
   private async getCreditsRemaining(userId: string): Promise<number> {
-    const userPlan = await this.userPlanModel
-      .findOne({ userId, status: 'active' })
-      .lean<{ creditsRemaining?: number }>()
-      .exec();
+    const userPlan = await this.userPlans.findActiveByUserId(userId);
     return userPlan?.creditsRemaining ?? 0;
   }
 
@@ -446,22 +444,22 @@ export class OrchestrationService {
    */
   async reconcilePipelineCredits(pipelineId: string): Promise<void> {
     try {
-      const pipeline = await this.pipelineModel
-        .findOne({ pipelineId })
-        .exec();
+      const pipeline = await this.pipelineRepo.findById(pipelineId);
       if (!pipeline) return;
       if (pipeline.creditsReconciled) return;
       const charged = pipeline.creditsCharged ?? 0;
-      const breakdown = pipeline.creditChargeBreakdown ?? [];
+      const breakdown = (pipeline.creditChargeBreakdown ?? []) as Array<{
+        nodeType: string;
+        count: number;
+        creditsEach: number;
+      }>;
       if (charged <= 0 || breakdown.length === 0) {
-        await this.pipelineModel
-          .updateOne({ pipelineId }, { $set: { creditsReconciled: true } })
-          .exec();
+        await this.pipelineRepo.markCreditsReconciled(pipelineId);
         return;
       }
 
       const completedByType = new Map<string, number>();
-      for (const node of pipeline.nodes ?? []) {
+      for (const node of parsePipelineNodes(pipeline.nodes)) {
         if (node.status !== PipelineNodeExecutionStatus.Completed) continue;
         completedByType.set(
           node.type,
@@ -479,14 +477,8 @@ export class OrchestrationService {
         }
       }
 
-      // Mark reconciled first so concurrent terminal transitions don't double-refund.
-      const claim = await this.pipelineModel
-        .updateOne(
-          { pipelineId, creditsReconciled: { $ne: true } },
-          { $set: { creditsReconciled: true } },
-        )
-        .exec();
-      if (claim.modifiedCount === 0) return;
+      const claimed = await this.pipelineRepo.claimCreditReconciliation(pipelineId);
+      if (!claimed) return;
 
       if (refundItems.length > 0 && pipeline.userId) {
         const config = await this.creditCalculation.getConfig();
@@ -538,32 +530,29 @@ export class OrchestrationService {
     ruleId?: string;
     auth: TenancyAuth;
   }): Promise<string[]> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId: input.workflowId }, input.auth))
-      .exec();
+    const workflow = await this.workflows.findById(input.workflowId, input.auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${input.workflowId} not found`);
     }
 
-    const nodes = await this.workflowNodeModel
-      .find(mergeUserIdFilter({ workflowRef: workflow.workflowId }, input.auth))
-      .sort({ order: 1 })
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflow(
+      workflow.workflowId,
+      input.auth,
+    );
 
     if (!input.ruleId) {
       return nodes.map((n) => n.type);
     }
 
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId: input.ruleId }, input.auth))
-      .exec();
+    const rule = await this.rules.findById(input.ruleId, input.auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${input.ruleId} not found`);
     }
 
+    const workflowEdges = parseWorkflowEdges(workflow.edges);
     const templateEdges =
-      (workflow.edges ?? []).length > 0
-        ? (workflow.edges ?? []).map((e) => ({ from: e.from, to: e.to }))
+      workflowEdges.length > 0
+        ? workflowEdges
         : buildLinearEdgesFromOrder(
             nodes.map((n) => ({ nodeId: n.nodeId, order: n.order })),
           );
@@ -571,17 +560,17 @@ export class OrchestrationService {
     const materialized = this.graphMaterialization.materialize(
       nodes.map((node) => ({
         nodeId: node.nodeId,
-        type: node.type,
+        type: node.type as unknown as WorkflowNodeType,
         order: node.order,
         isLocked: node.isLocked,
-        userPrompt: node.userPrompt,
+        userPrompt: node.userPrompt ?? '',
         config: mergeWorkflowLaneIntoConfig(
           (node.config ?? {}) as Record<string, unknown>,
           node.lane,
         ),
       })),
       templateEdges,
-      rule.toObject(),
+      rule as unknown as Rule,
       workflow.version ?? 1,
     );
 
@@ -599,9 +588,7 @@ export class OrchestrationService {
     nodeId: string,
     auth: TenancyAuth,
   ): Promise<void> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -636,9 +623,7 @@ export class OrchestrationService {
     nodeId: string,
     auth: TenancyAuth,
   ): Promise<void> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -671,13 +656,13 @@ export class OrchestrationService {
       return;
     }
 
-    const rule = await this.ruleModel.findOne({ ruleId: pipeline.ruleRef }).exec();
+    const rule = await this.rules.findById(pipeline.ruleRef);
     if (!rule) {
       throw new NotFoundException(`Rule ${pipeline.ruleRef} not found`);
     }
 
-    const context = this.buildContextFromPipeline(pipeline, rule);
-    const experimentId = pipeline.metadata?.experimentId ?? null;
+    const metadata = parsePipelineMetadata(pipeline.metadata);
+    const experimentId = metadata.experimentId ?? null;
     const variantIds = this.collectAbVariantIds(pipeline);
     const targets =
       variantIds.length > 1
@@ -691,7 +676,6 @@ export class OrchestrationService {
         const { contentId, uploadId } = await this.finalizeVariantArtifact({
           pipeline,
           rule,
-          context,
           variantId,
           experimentId,
         });
@@ -741,7 +725,7 @@ export class OrchestrationService {
       const pipelineFresh = await this.pipelineRepo.findById(pipelineId);
       if (pipelineFresh) {
         void this.campaignAutonomy.evaluateAfterPipelineCompleted({
-          pipeline: pipelineFresh,
+          pipeline: pipelineFresh as unknown as PipelineDocument,
           contentId: primaryContentId,
           uploadId: primaryUploadId,
         });
@@ -771,9 +755,9 @@ export class OrchestrationService {
     }
   }
 
-  private collectAbVariantIds(pipeline: PipelineDocument): string[] {
+  private collectAbVariantIds(pipeline: PipelineRecord): string[] {
     const ids = new Set<string>();
-    for (const node of pipeline.nodes ?? []) {
+    for (const node of parsePipelineNodes(pipeline.nodes)) {
       if (node.variantId && node.variantId !== 'control') {
         ids.add(node.variantId);
       }
@@ -782,39 +766,61 @@ export class OrchestrationService {
   }
 
   private async finalizeVariantArtifact(args: {
-    pipeline: PipelineDocument;
-    rule: RuleDocument;
-    context: PipelineContext;
+    pipeline: PipelineRecord;
+    rule: RuleRecord;
     variantId: string | null;
     experimentId: string | null;
   }): Promise<{ contentId: string; uploadId: string }> {
-    const pipelineForVariant = this.filterPipelineForVariant(
+    const pipelineForVariant = filterPipelineForVariant(
       args.pipeline,
       args.variantId,
+    );
+    const variantContext = this.buildContextFromPipeline(
+      pipelineForVariant,
+      args.rule,
     );
     const contentId = await this.createContent({
       pipelineId: args.pipeline.pipelineId,
       workflowId: args.pipeline.workflowRef,
       ruleId: args.pipeline.ruleRef,
-      context: args.context,
+      context: variantContext,
       userId: args.pipeline.userId ?? '',
       pipeline: pipelineForVariant,
       variantId: args.variantId,
       experimentId: args.experimentId,
     });
 
-    const contentDoc = await this.contentModel.findOne({ contentId }).exec();
+    const contentDoc = await this.contents.findByContentId(contentId);
     if (!contentDoc) {
       throw new Error(`Content ${contentId} missing after pipeline completion`);
     }
-    const resolvedOutputs = mergeResolvedOutputs({
-      outputs: contentDoc.outputs ?? {},
-      userEdits: contentDoc.userEdits ?? {},
-    });
+    const pipelineNodesOrdered = parsePipelineNodes(pipelineForVariant.nodes).map(
+      (n) => ({
+        nodeId: n.nodeId,
+        type: String(n.type),
+        order: n.order,
+      }),
+    );
+    const resolvedOutputs = mergeResolvedOutputs(
+      {
+        outputs: (contentDoc.outputs ?? {}) as ContentOutputs,
+        userEdits: (contentDoc.userEdits ?? {}) as ContentUserEdits,
+        nodeOutputs: (contentDoc.nodeOutputs ?? {}) as Record<
+          string,
+          Record<string, unknown>
+        >,
+        nodeUserEdits: (contentDoc.nodeUserEdits ?? {}) as Record<
+          string,
+          Record<string, unknown>
+        >,
+      },
+      pipelineNodesOrdered.length > 0 ? { pipelineNodesOrdered } : undefined,
+    );
+    const ruleChannels = (args.rule.channels ?? []) as ChannelEntry[];
     const channels = this.uploadService
       .buildChannelEntriesFromPipeline(
-        args.rule.channels ?? [],
-        pipelineForVariant,
+        ruleChannels,
+        pipelineForVariant as unknown as PipelineDocument,
         resolvedOutputs,
       )
       .filter((ch) => ch.included);
@@ -824,27 +830,10 @@ export class OrchestrationService {
       workflowRef: args.pipeline.workflowRef,
       ruleRef: args.pipeline.ruleRef,
       resolvedOutputs,
-      ruleChannels: args.rule.channels ?? [],
+      ruleChannels,
       channels,
     });
     return { contentId, uploadId };
-  }
-
-  private filterPipelineForVariant(
-    pipeline: PipelineDocument,
-    variantId: string | null,
-  ): PipelineDocument {
-    if (!variantId) {
-      return pipeline;
-    }
-    const plain =
-      typeof pipeline.toObject === 'function'
-        ? pipeline.toObject()
-        : pipeline;
-    const nodes = (plain.nodes ?? []).filter(
-      (n) => !n.variantId || n.variantId === variantId,
-    );
-    return { ...plain, nodes } as PipelineDocument;
   }
 
   async replanPipeline(
@@ -852,9 +841,7 @@ export class OrchestrationService {
     operations: Parameters<GraphReplanService['replan']>[1],
     auth: TenancyAuth,
   ) {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -865,12 +852,7 @@ export class OrchestrationService {
     pipelineId: string,
     auth: TenancyAuth,
   ): Promise<{ contentId?: string; uploadId?: string }> {
-    const content = await this.contentModel
-      .findOne(mergeUserIdFilter({ pipelineRef: pipelineId }, auth))
-      .sort({ createdAt: -1 })
-      .select({ contentId: 1 })
-      .lean()
-      .exec();
+    const content = await this.contents.findLatestByPipeline(pipelineId, auth);
     if (!content?.contentId) {
       return {};
     }
@@ -891,9 +873,7 @@ export class OrchestrationService {
     pipelineId: string,
     auth: TenancyAuth,
   ): ReturnType<OrchestrationService['getPipeline']> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -905,7 +885,8 @@ export class OrchestrationService {
         `Cannot finalize pipeline with status ${pipeline.status}`,
       );
     }
-    const hasPendingOrRunning = (pipeline.nodes ?? []).some(
+    const pipelineNodes = parsePipelineNodes(pipeline.nodes);
+    const hasPendingOrRunning = pipelineNodes.some(
       (n) =>
         n.status === PipelineNodeExecutionStatus.Pending ||
         n.status === PipelineNodeExecutionStatus.Running,
@@ -959,10 +940,7 @@ export class OrchestrationService {
       executedAt: Date | null;
     }>;
   }> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .lean()
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -984,20 +962,20 @@ export class OrchestrationService {
         completedAt: pipeline.completedAt,
         ...artifacts,
       },
-      graph: {
-        edges: (pipeline.graph?.edges ?? []).map((e) => ({
-          from: e.from,
-          to: e.to,
-          ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
-          ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
-        })),
-        lanes: pipeline.graph?.lanes ?? [],
-        layout:
-          (pipeline.graph?.layout as
-            | Record<string, { x: number; y: number }>
-            | undefined) ?? {},
-      },
-      nodes: (pipeline.nodes ?? []).map((node) => ({
+      graph: (() => {
+        const graph = parsePipelineGraph(pipeline.graph);
+        return {
+          edges: (graph.edges ?? []).map((e) => ({
+            from: e.from,
+            to: e.to,
+            ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+            ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
+          })),
+          lanes: graph.lanes ?? [],
+          layout: graph.layout ?? {},
+        };
+      })(),
+      nodes: parsePipelineNodes(pipeline.nodes).map((node) => ({
         nodeId: node.nodeId,
         type: node.type,
         order: node.order,
@@ -1008,7 +986,7 @@ export class OrchestrationService {
         status: node.status,
         output: parsePipelineNodeOutputString(node.output),
         retryCount: node.retryCount,
-        executedAt: node.executedAt,
+        executedAt: node.executedAt ? new Date(node.executedAt) : null,
       })),
     };
   }
@@ -1017,9 +995,7 @@ export class OrchestrationService {
     pipelineId: string,
     auth: TenancyAuth,
   ): Promise<{ success: boolean }> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -1032,7 +1008,7 @@ export class OrchestrationService {
 
     await this.resolver.removeQueuedJobsForPipeline(pipelineId);
 
-    for (const node of pipeline.nodes ?? []) {
+    for (const node of parsePipelineNodes(pipeline.nodes)) {
       if (node.status === PipelineNodeExecutionStatus.Pending) {
         await this.pipelineRepo.markNodeSkipped(pipelineId, node.nodeId);
       }
@@ -1065,9 +1041,7 @@ export class OrchestrationService {
     laneId: string,
     auth: TenancyAuth,
   ): Promise<{ success: boolean }> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -1088,14 +1062,12 @@ export class OrchestrationService {
     laneId: string,
     auth: TenancyAuth,
   ): Promise<{ success: boolean }> {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
     const normalized = laneId.trim().toLowerCase();
-    const laneNodes = (pipeline.nodes ?? []).filter(
+    const laneNodes = parsePipelineNodes(pipeline.nodes).filter(
       (n) => (n.lane?.trim().toLowerCase() ?? '') === normalized,
     );
     for (const node of laneNodes) {
@@ -1116,19 +1088,17 @@ export class OrchestrationService {
   }
 
   async getPipelineRunSummary(pipelineId: string, auth: TenancyAuth) {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .lean()
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
+    const graph = parsePipelineGraph(pipeline.graph);
     return {
       pipelineId: pipeline.pipelineId,
       status: pipeline.status,
-      materializedNodeCount: pipeline.nodes?.length ?? 0,
-      lanes: pipeline.graph?.lanes ?? [],
-      completedByLane: countNodesByLane(pipeline as PipelineDocument),
+      materializedNodeCount: parsePipelineNodes(pipeline.nodes).length,
+      lanes: graph.lanes ?? [],
+      completedByLane: countNodesByLane(pipeline),
       ruleOverlay: pipeline.ruleOverlay ?? null,
       startedAt: pipeline.startedAt,
       completedAt: pipeline.completedAt,
@@ -1136,10 +1106,7 @@ export class OrchestrationService {
   }
 
   async getPipelineTimeline(pipelineId: string, auth: TenancyAuth) {
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId }, auth))
-      .lean()
-      .exec();
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -1150,7 +1117,7 @@ export class OrchestrationService {
         status: pipeline.status,
         pausedLaneId: pipeline.pausedLaneId,
       },
-      nodes: (pipeline.nodes ?? []).map((n) => ({
+      nodes: parsePipelineNodes(pipeline.nodes).map((n) => ({
         nodeId: n.nodeId,
         type: n.type,
         lane: n.lane,
@@ -1169,15 +1136,14 @@ export class OrchestrationService {
   }
 
   private buildContextFromPipeline(
-    pipeline: PipelineDocument,
-    rule: RuleDocument,
+    pipeline: PipelineRecord,
+    rule: RuleRecord,
   ): PipelineContext {
-    const mergeNode = (pipeline.nodes ?? []).find(
-      (n) => n.type === WorkflowNodeType.Merge,
-    );
+    const nodes = parsePipelineNodes(pipeline.nodes);
+    const mergeNode = nodes.find((n) => n.type === WorkflowNodeType.Merge);
     const anchorId =
       mergeNode?.nodeId ??
-      [...(pipeline.nodes ?? [])].sort((a, b) => b.order - a.order)[0]?.nodeId;
+      [...nodes].sort((a, b) => b.order - a.order)[0]?.nodeId;
     const previousOutputs = anchorId
       ? this.pipelineRepo.buildAncestorOutputs(pipeline, anchorId)
       : this.pipelineRepo.buildPreviousOutputsUpToOrder(
@@ -1196,8 +1162,8 @@ export class OrchestrationService {
     pipelineId: string;
     workflowId: string;
     ruleId: string;
-    nodes: WorkflowNodeDocument[];
-    rule: RuleDocument;
+    nodes: WorkflowNodeRecord[];
+    rule: RuleRecord;
     contentPrompt: string;
     userId: string;
   }): Promise<void> {
@@ -1216,7 +1182,7 @@ export class OrchestrationService {
     });
 
     const context: PipelineContext = {
-      rule,
+      rule: rule as unknown as Rule,
       contentPrompt,
       previousOutputs: {},
     };
@@ -1263,21 +1229,22 @@ export class OrchestrationService {
       userId,
     });
 
-    const contentDoc = await this.contentModel.findOne({ contentId }).exec();
+    const contentDoc = await this.contents.findByContentId(contentId);
     if (!contentDoc) {
       throw new Error(`Content ${contentId} missing after pipeline completion`);
     }
     const resolvedOutputs = mergeResolvedOutputs({
-      outputs: contentDoc.outputs ?? {},
-      userEdits: contentDoc.userEdits ?? {},
+      outputs: (contentDoc.outputs ?? {}) as ContentOutputs,
+      userEdits: (contentDoc.userEdits ?? {}) as ContentUserEdits,
     });
+    const ruleChannels = (rule.channels ?? []) as ChannelEntry[];
     const { uploadId } = await this.uploadService.createUpload({
       userId,
       contentRef: contentId,
       workflowRef: workflowId,
       ruleRef: ruleId,
       resolvedOutputs,
-      ruleChannels: rule.channels ?? [],
+      ruleChannels,
     });
 
     this.events.emitToPipeline(pipelineId, 'pipeline:completed', {
@@ -1315,13 +1282,14 @@ export class OrchestrationService {
   }
 
   private async handleNewsPipelineCompleted(args: {
-    pipeline: PipelineDocument;
+    pipeline: PipelineRecord;
     contentId: string;
   }): Promise<void> {
-    if (args.pipeline.metadata?.source !== 'news') return;
+    const metadata = parsePipelineMetadata(args.pipeline.metadata);
+    if (metadata.source !== 'news') return;
 
     const userId = args.pipeline.userId?.trim();
-    const newsMeta = args.pipeline.metadata?.newsMeta;
+    const newsMeta = metadata.newsMeta;
     if (userId && newsMeta?.title) {
       const body = newsContentReadyNotification({
         pipelineId: args.pipeline.pipelineId,
@@ -1343,10 +1311,9 @@ export class OrchestrationService {
 
     if (!userId) return;
 
-    const rule = await this.ruleModel
-      .findOne({ ruleId: args.pipeline.ruleRef })
-      .exec();
-    if (!rule?.newsTrigger?.autoApprove) return;
+    const rule = await this.rules.findById(args.pipeline.ruleRef);
+    const newsTrigger = rule?.newsTrigger as { autoApprove?: boolean } | null;
+    if (!newsTrigger?.autoApprove) return;
 
     try {
       await this.contentService.approveContent(args.contentId, {
@@ -1390,7 +1357,7 @@ export class OrchestrationService {
     pipelineId: string;
     totalNodes: number;
     context: PipelineContext;
-    node: WorkflowNodeDocument;
+    node: WorkflowNodeRecord;
     userId: string;
     ruleId: string;
   }): Promise<void> {
@@ -1406,9 +1373,9 @@ export class OrchestrationService {
       const executorInput: NodeExecutorInput = {
         node: {
           nodeId: node.nodeId,
-          type: node.type,
+          type: node.type as unknown as WorkflowNodeType,
           order: node.order,
-          config: node.config ?? {},
+          config: (node.config ?? {}) as WorkflowNodeConfig,
           workflowRef: node.workflowRef,
         },
         context,
@@ -1486,16 +1453,16 @@ export class OrchestrationService {
     ruleId: string;
     context: PipelineContext;
     userId: string;
-    pipeline?: PipelineDocument;
+    pipeline?: PipelineRecord;
     variantId?: string | null;
     experimentId?: string | null;
   }): Promise<string> {
     const pipelineLean =
       args.pipeline ??
-      (await this.pipelineModel.findOne({ pipelineId: args.pipelineId }).exec());
+      (await this.pipelineRepo.findById(args.pipelineId));
     const nodeOutputs: Record<string, Record<string, unknown>> = {};
     const laneOutputs: Record<string, Record<string, unknown>> = {};
-    for (const n of pipelineLean?.nodes ?? []) {
+    for (const n of parsePipelineNodes(pipelineLean?.nodes)) {
       const parsed = parsePipelineNodeOutputString(n.output);
       if (parsed && Object.keys(parsed).length > 0) {
         nodeOutputs[n.nodeId] = parsed;
@@ -1505,20 +1472,24 @@ export class OrchestrationService {
       }
     }
 
-    const ruleDoc = await this.ruleModel.findOne({ ruleId: args.ruleId }).exec();
-    const approvalSteps = (ruleDoc?.approvalPolicy ?? []).map((s) => ({
+    const ruleDoc = await this.rules.findById(args.ruleId);
+    const approvalPolicy = (ruleDoc?.approvalPolicy ?? []) as Array<{
+      role: string;
+      required?: boolean;
+    }>;
+    const approvalSteps = approvalPolicy.map((s) => ({
       role: s.role,
       required: s.required !== false,
     }));
 
-    const content = await this.contentModel.create({
+    const content = await this.contents.create({
       userId: args.userId,
       pipelineRef: args.pipelineId,
       workflowRef: args.workflowId,
       ruleRef: args.ruleId,
       variantId: args.variantId ?? null,
       experimentId: args.experimentId ?? null,
-      approval: buildApprovalStateFromPolicy(approvalSteps),
+      approval: buildApprovalStateFromPolicy(approvalSteps) as unknown as Prisma.InputJsonValue,
       outputs: {
         keywords: args.context.previousOutputs.keywords,
         text: args.context.previousOutputs.text,
@@ -1527,12 +1498,12 @@ export class OrchestrationService {
         video: args.context.previousOutputs.video,
         transcription: args.context.previousOutputs.transcription,
         summary: args.context.previousOutputs.summary,
-      },
-      userEdits: {},
-      nodePromptOverrides: {},
-      nodeOutputs,
-      nodeUserEdits: {},
-      laneOutputs,
+      } as unknown as Prisma.InputJsonValue,
+      userEdits: {} as Prisma.InputJsonValue,
+      nodePromptOverrides: {} as Prisma.InputJsonValue,
+      nodeOutputs: nodeOutputs as Prisma.InputJsonValue,
+      nodeUserEdits: {} as Prisma.InputJsonValue,
+      laneOutputs: laneOutputs as Prisma.InputJsonValue,
       status: ContentStatus.Draft,
     });
     return content.contentId;

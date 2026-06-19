@@ -5,10 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { UserRole } from '../users/schemas/user.schema';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { ContentService } from '../content/content.service';
@@ -21,6 +19,9 @@ import {
   tiktokPhotoCaptionError,
 } from '../mcp/zernio/tiktok-publish.util';
 import type { ChannelEntry } from '../rule/schemas/rule.schema';
+import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
+import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
+import { UPLOAD_REPOSITORY } from '../repositories/tokens';
 import type {
   ChannelPublishDto,
   PublishUploadDto,
@@ -32,11 +33,9 @@ import type {
   UploadStatusSummaryDto,
 } from './dto/upload-status.dto';
 import {
-  Upload,
   UploadChannelStatus,
   UploadJobStatus,
   type UploadChannelEntry,
-  type UploadDocument,
 } from './schemas/upload.schema';
 import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -53,6 +52,11 @@ import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
 } from './upload-status.util';
+import {
+  uploadChannels,
+  withUploadChannels,
+  channelsToJson,
+} from './upload-record.util';
 
 export type CreateUploadParams = {
   userId: string;
@@ -94,14 +98,11 @@ export type UpdateUploadResult = { success: true };
 
 const FAILURE_REASON_MAX = 500;
 
-/** Raw BSON may still contain pre-refactor keys; Mongoose drops them on hydrate. */
-type LegacyRawChannel = Record<string, unknown>;
-
 @Injectable()
 export class UploadService {
   constructor(
-    @InjectModel(Upload.name)
-    private readonly uploadModel: Model<UploadDocument>,
+    @Inject(UPLOAD_REPOSITORY)
+    private readonly uploads: IUploadRepository,
     private readonly mcpService: McpService,
     private readonly events: EventsService,
     private readonly postService: PostService,
@@ -221,37 +222,37 @@ export class UploadService {
   }
 
   private async ensureChannelsForConnectedAccounts(
-    doc: UploadDocument,
+    upload: UploadRecord,
     userId: string,
-  ): Promise<boolean> {
+  ): Promise<UploadRecord> {
     const connected = await this.mcpService.getConnectedAccounts(userId);
     const connectedKeys = new Set(
       (connected.accounts ?? [])
         .map((a) => a.channel?.trim().toLowerCase())
         .filter(Boolean),
     );
-    if (connectedKeys.size === 0) return false;
+    if (connectedKeys.size === 0) return upload;
 
+    let channels = uploadChannels(upload);
     const existingKeys = new Set(
-      (doc.channels ?? []).map((c) => c.channel.toLowerCase()),
+      channels.map((c) => c.channel.toLowerCase()),
     );
     let changed = false;
-    const ro = doc.resolvedOutputs ?? {};
+    const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
 
     for (const key of connectedKeys) {
       if (existingKeys.has(key)) continue;
-      // Normalize display casing based on existing tabs (capitalize first) for UI consistency.
       const channelName = key[0] ? `${key[0].toUpperCase()}${key.slice(1)}` : key;
-      doc.channels.push(this.createDefaultChannelRow(channelName, ro));
+      channels = [...channels, this.createDefaultChannelRow(channelName, ro)];
       changed = true;
     }
 
-    if (changed) {
-      doc.status = recomputeUploadJobStatus(doc.channels);
-      doc.markModified('channels');
-      await doc.save();
-    }
-    return changed;
+    if (!changed) return upload;
+
+    return this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
   }
 
   /**
@@ -305,14 +306,14 @@ export class UploadService {
         params.resolvedOutputs ?? {},
       );
 
-    const doc = await this.uploadModel.create({
+    const doc = await this.uploads.create({
       userId: params.userId,
       contentRef: params.contentRef,
       workflowRef: params.workflowRef,
       ruleRef: params.ruleRef,
-      channels,
+      channels: channelsToJson(channels),
       status: UploadJobStatus.Pending,
-      resolvedOutputs: params.resolvedOutputs,
+      resolvedOutputs: (params.resolvedOutputs ?? {}) as unknown as Prisma.InputJsonValue,
     });
 
     return { uploadId: doc.uploadId };
@@ -326,11 +327,10 @@ export class UploadService {
     params: CreateUploadParams,
     auth: TenancyAuth,
   ): Promise<{ uploadId: string }> {
-    const filter = mergeUserIdFilter({ contentRef: params.contentRef }, auth);
-    const doc = await this.uploadModel
-      .findOne(filter)
-      .sort({ createdAt: -1 })
-      .exec();
+    const doc = await this.uploads.findLatestByContentRef(
+      params.contentRef,
+      auth,
+    );
     const channels =
       params.channels ??
       this.buildChannelEntriesFromRule(
@@ -338,14 +338,19 @@ export class UploadService {
         params.resolvedOutputs ?? {},
       );
     if (doc) {
-      doc.resolvedOutputs = params.resolvedOutputs;
-      doc.workflowRef = params.workflowRef;
-      doc.ruleRef = params.ruleRef;
-      doc.channels = this.mergeChannelsPreservingUserEdits(channels, doc.channels);
-      doc.status = recomputeUploadJobStatus(doc.channels);
-      await doc.save();
-      await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
-      return { uploadId: doc.uploadId };
+      const merged = this.mergeChannelsPreservingUserEdits(
+        channels,
+        uploadChannels(doc),
+      );
+      let saved = await this.uploads.save({
+        ...withUploadChannels(doc, merged),
+        resolvedOutputs: (params.resolvedOutputs ?? {}) as unknown as UploadRecord['resolvedOutputs'],
+        workflowRef: params.workflowRef,
+        ruleRef: params.ruleRef,
+        status: recomputeUploadJobStatus(merged),
+      });
+      saved = await this.ensureChannelsForConnectedAccounts(saved, auth.userId);
+      return { uploadId: saved.uploadId };
     }
     return this.createUpload(params);
   }
@@ -356,16 +361,14 @@ export class UploadService {
     auth: TenancyAuth,
     resolvedOutputs: ResolvedContentOutputs,
   ): Promise<void> {
-    const filter = mergeUserIdFilter({ contentRef }, auth);
-    const doc = await this.uploadModel
-      .findOne(filter)
-      .sort({ createdAt: -1 })
-      .exec();
+    const doc = await this.uploads.findLatestByContentRef(contentRef, auth);
     if (!doc) {
       return;
     }
-    doc.resolvedOutputs = resolvedOutputs;
-    await doc.save();
+    await this.uploads.save({
+      ...doc,
+      resolvedOutputs: resolvedOutputs as unknown as UploadRecord['resolvedOutputs'],
+    });
   }
 
   /** Latest upload id per contentRef when multiple legacy rows exist. */
@@ -377,15 +380,13 @@ export class UploadService {
     if (contentRefs.length === 0) {
       return map;
     }
-    const docs = await this.uploadModel
-      .find(mergeUserIdFilter({ contentRef: { $in: contentRefs } }, auth))
-      .sort({ createdAt: -1 })
-      .select({ contentRef: 1, uploadId: 1 })
-      .lean()
-      .exec();
-    for (const d of docs) {
-      const ref = d.contentRef as string;
-      const id = d.uploadId as string;
+    const docs = await this.uploads.findByContentRefs(contentRefs, auth);
+    const sorted = [...docs].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+    for (const d of sorted) {
+      const ref = d.contentRef;
+      const id = d.uploadId;
       if (!map.has(ref)) {
         map.set(ref, id);
       }
@@ -397,13 +398,7 @@ export class UploadService {
     contentRef: string,
     auth: TenancyAuth,
   ): Promise<{ uploadId: string }> {
-    const filter = mergeUserIdFilter({ contentRef }, auth);
-    const doc = await this.uploadModel
-      .findOne(filter)
-      .sort({ createdAt: -1 })
-      .select({ uploadId: 1 })
-      .lean()
-      .exec();
+    const doc = await this.uploads.findLatestByContentRef(contentRef, auth);
     if (!doc) {
       throw new NotFoundException(`No upload found for content ${contentRef}`);
     }
@@ -414,18 +409,19 @@ export class UploadService {
     uploadId: string,
     auth: TenancyAuth,
   ): Promise<UploadDetailDto> {
-    const doc = await this.uploadModel.findOne({ uploadId }).exec();
+    let doc = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!doc) {
       throw new NotFoundException(`Upload ${uploadId} not found`);
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
-    const roFallback = doc.resolvedOutputs ?? {};
-    for (const ch of doc.channels) {
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    const channels = uploadChannels(doc);
+    for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
-    return this.toDetailDto(doc);
+    return this.toDetailDto(withUploadChannels(doc, channels));
   }
 
   async getUploadStatus(
@@ -441,83 +437,10 @@ export class UploadService {
     };
   }
 
-  /**
-   * Persist-on-read: legacy docs stored autoCaption/overrideCaption/etc. on subdocuments.
-   * Hydrated UploadChannelEntry omits those paths; merge from raw collection read once and save.
-   */
   private async migrateLegacyChannelsFromMongo(
-    doc: UploadDocument,
+    _doc: UploadRecord,
   ): Promise<void> {
-    const rawDoc = (await this.uploadModel.collection.findOne(
-      { uploadId: doc.uploadId },
-      { projection: { channels: 1 } },
-    )) as { channels?: LegacyRawChannel[] } | null;
-    if (!rawDoc?.channels?.length) {
-      return;
-    }
-
-    let changed = false;
-    for (let i = 0; i < doc.channels.length; i++) {
-      const row = doc.channels[i];
-      const raw = rawDoc.channels[i];
-      if (!raw || !row) {
-        continue;
-      }
-      const hasLegacy =
-        'autoCaption' in raw ||
-        'overrideCaption' in raw ||
-        'autoMediaUrl' in raw ||
-        'overrideMediaUrl' in raw ||
-        'overrideMediaUrls' in raw;
-      if (!hasLegacy) {
-        continue;
-      }
-
-      const legCap =
-        this.strOrEmpty(raw['overrideCaption']) ||
-        this.strOrEmpty(raw['autoCaption']);
-      const legMedia =
-        typeof raw['overrideMediaUrl'] === 'string'
-          ? raw['overrideMediaUrl']
-          : typeof raw['autoMediaUrl'] === 'string'
-            ? raw['autoMediaUrl']
-            : null;
-      const legUrls = Array.isArray(raw['overrideMediaUrls'])
-        ? (raw['overrideMediaUrls'] as unknown[]).filter(
-            (u): u is string => typeof u === 'string',
-          )
-        : [];
-
-      if (!(row.caption ?? '').trim() && legCap) {
-        row.caption = legCap;
-        changed = true;
-      }
-
-      const urls = row.mediaUrls ?? [];
-      if (!urls.length && legUrls.length) {
-        row.mediaUrls = [...legUrls];
-        changed = true;
-      }
-
-      if (!(row.mediaUrl ?? '').trim()) {
-        if (legMedia?.trim()) {
-          row.mediaUrl = legMedia.trim();
-          changed = true;
-        } else if (legUrls[0]?.trim()) {
-          row.mediaUrl = legUrls[0]!.trim();
-          changed = true;
-        }
-      }
-    }
-
-    if (changed) {
-      doc.markModified('channels');
-      await doc.save();
-    }
-  }
-
-  private strOrEmpty(v: unknown): string {
-    return typeof v === 'string' ? v.trim() : '';
+    return;
   }
 
   async patchUploadChannel(
@@ -541,20 +464,21 @@ export class UploadService {
       throw new BadRequestException('No fields to update');
     }
 
-    const doc = await this.uploadModel.findOne({ uploadId }).exec();
+    let doc = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!doc) {
       throw new NotFoundException(`Upload ${uploadId} not found`);
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
 
-    const roFallback = doc.resolvedOutputs ?? {};
-    for (const ch of doc.channels) {
+    const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    let channels = uploadChannels(doc);
+    for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
 
-    const row = doc.channels.find((c) => c.channel.toLowerCase() === key);
+    const row = channels.find((c) => c.channel.toLowerCase() === key);
     if (!row) {
       throw new BadRequestException(`Unknown channel: ${channelParam}`);
     }
@@ -576,8 +500,10 @@ export class UploadService {
       row.youtubeTitle = body.youtubeTitle;
     }
 
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+    await this.uploads.save({
+      ...withUploadChannels(doc, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
     return { success: true };
   }
 
@@ -619,15 +545,16 @@ export class UploadService {
       scheduledIso = scheduledDate.toISOString();
     }
 
-    const doc = await this.uploadModel.findOne({ uploadId }).exec();
+    let doc = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!doc) {
       throw new NotFoundException(`Upload ${uploadId} not found`);
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
 
-    const roFallback = doc.resolvedOutputs ?? {};
-    for (const ch of doc.channels) {
+    const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    let channels = uploadChannels(doc);
+    for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
 
@@ -637,7 +564,7 @@ export class UploadService {
       doc.uploadId,
     );
 
-    let scheduledChannels = doc.channels.filter(
+    let scheduledChannels = channels.filter(
       (ch) => ch.status === UploadChannelStatus.Scheduled,
     );
     if (channelFilter) {
@@ -796,9 +723,10 @@ export class UploadService {
       });
     }
 
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    doc.markModified('channels');
-    await doc.save();
+    doc = await this.uploads.save({
+      ...withUploadChannels(doc, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
     this.emitUploadEvent(doc.uploadId, 'upload:updated', {
       uploadId: doc.uploadId,
@@ -806,9 +734,9 @@ export class UploadService {
       scheduledAt: scheduledIso,
       youtubeTitle: hasTitleUpdate ? title : undefined,
       channels: scheduledChannels.map((ch) =>
-        this.toChannelDto(ch, doc.resolvedOutputs),
+        this.toChannelDto(ch, roFallback),
       ),
-      summary: buildUploadStatusSummary(doc.channels),
+      summary: buildUploadStatusSummary(channels),
     });
 
     return { success: true };
@@ -819,7 +747,7 @@ export class UploadService {
     body: PublishUploadDto,
     auth: TenancyAuth,
   ): Promise<PublishUploadResult> {
-    let doc = await this.uploadModel.findOne({ uploadId }).exec();
+    let doc = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!doc) {
       throw new NotFoundException(`Upload ${uploadId} not found`);
     }
@@ -830,17 +758,17 @@ export class UploadService {
       auth,
     );
 
-    const reloaded = await this.uploadModel.findOne({ uploadId }).exec();
+    const reloaded = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!reloaded) {
       throw new NotFoundException(`Upload ${uploadId} not found`);
     }
     this.assertUploadAccess(reloaded, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(reloaded);
-    doc = reloaded;
-    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(reloaded, auth.userId);
 
-    const roFallback = doc.resolvedOutputs ?? {};
-    for (const ch of doc.channels) {
+    const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    let channels = uploadChannels(doc);
+    for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
 
@@ -889,7 +817,7 @@ export class UploadService {
       UploadChannelStatus.Publishing,
     ]);
 
-    for (const row of doc.channels) {
+    for (const row of channels) {
       const key = row.channel.toLowerCase();
       const entry = dtoByChannel.get(key);
       const include = entry ? Boolean(entry.included) : Boolean(row.included);
@@ -948,8 +876,10 @@ export class UploadService {
         channel: chKey,
       });
     }
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+    doc = await this.uploads.save({
+      ...withUploadChannels(doc, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
     try {
       const { postId } = await this.mcpService.publishCreatePostBatch(
@@ -1026,8 +956,10 @@ export class UploadService {
       }
     }
 
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+    doc = await this.uploads.save({
+      ...withUploadChannels(doc, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
     const channelsPublished = channelsSucceeded;
     this.emitUploadEvent(doc.uploadId, 'upload:all_completed', {
@@ -1035,7 +967,7 @@ export class UploadService {
       publishNow: body.publishNow,
       scheduledAt: scheduledIso,
       channelsPublished,
-      summary: buildUploadStatusSummary(doc.channels),
+      summary: buildUploadStatusSummary(channels),
     });
 
     return { success: true };
@@ -1045,20 +977,21 @@ export class UploadService {
     uploadId: string,
     auth: TenancyAuth,
   ): Promise<PublishUploadResult> {
-    const doc = await this.uploadModel.findOne({ uploadId }).exec();
+    let doc = await this.uploads.findByUploadIdScoped(uploadId, auth);
     if (!doc) throw new NotFoundException(`Upload ${uploadId} not found`);
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
 
-    const failed = doc.channels.filter(
+    const channels = uploadChannels(doc);
+    const failed = channels.filter(
       (c) => c.status === UploadChannelStatus.Failed,
     );
     if (failed.length === 0) {
       throw new BadRequestException('No failed channels to retry.');
     }
 
-    const channels: ChannelPublishDto[] = doc.channels.map((c) => {
+    const channelDtos: ChannelPublishDto[] = channels.map((c) => {
       const retry = c.status === UploadChannelStatus.Failed;
       if (!retry) {
         return { channel: c.channel, included: false };
@@ -1074,7 +1007,7 @@ export class UploadService {
       {
         publishNow: true,
         scheduledAt: null,
-        channels,
+        channels: channelDtos,
       },
       auth,
     );
@@ -1166,7 +1099,7 @@ export class UploadService {
   }
 
   private assertUploadAccess(
-    doc: UploadDocument,
+    doc: UploadRecord,
     auth: TenancyAuth,
     uploadId: string,
   ): void {
@@ -1178,21 +1111,21 @@ export class UploadService {
     }
   }
 
-  private toDetailDto(doc: UploadDocument): UploadDetailDto {
+  private toDetailDto(doc: UploadRecord): UploadDetailDto {
+    const channels = uploadChannels(doc);
+    const ro = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
     return {
       uploadId: doc.uploadId,
       contentRef: doc.contentRef,
-      status: doc.status,
-      channels: doc.channels.map((c) =>
-        this.toChannelDto(c, doc.resolvedOutputs),
-      ),
+      status: doc.status as UploadJobStatus,
+      channels: channels.map((c) => this.toChannelDto(c, ro)),
       resolvedOutputs: {
-        text: doc.resolvedOutputs?.text,
-        image: doc.resolvedOutputs?.image,
-        translatedText: doc.resolvedOutputs?.translatedText,
-        video: doc.resolvedOutputs?.video,
-        transcription: doc.resolvedOutputs?.transcription,
-        summary: doc.resolvedOutputs?.summary,
+        text: ro.text,
+        image: ro.image,
+        translatedText: ro.translatedText,
+        video: ro.video,
+        transcription: ro.transcription,
+        summary: ro.summary,
       },
     };
   }
@@ -1225,10 +1158,16 @@ export class UploadService {
       mediaUrl,
       mediaUrls,
       youtubeTitle: c.youtubeTitle ?? null,
-      scheduledAt: c.scheduledAt ? c.scheduledAt.toISOString() : null,
-      publishedAt: c.publishedAt ? c.publishedAt.toISOString() : null,
+      scheduledAt: this.channelDateIso(c.scheduledAt),
+      publishedAt: this.channelDateIso(c.publishedAt),
       failureReason: c.failureReason,
     };
+  }
+
+  private channelDateIso(value: unknown): string | null {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(value as string);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
   }
 
   private coerceLegacyChannelRow(

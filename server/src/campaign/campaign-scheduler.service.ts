@@ -1,20 +1,31 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { OrchestrationService } from '../orchestration/orchestration.service';
-import { Pipeline, PipelineStatus } from '../pipeline/schemas/pipeline.schema';
-import { Rule, RuleStatus, type RuleDocument } from '../rule/schemas/rule.schema';
+import { PipelineStatus } from '../pipeline/schemas/pipeline.schema';
+import type {
+  CampaignScheduleRecord,
+  ICampaignScheduleRepository,
+} from '../repositories/interfaces/campaign-schedule.repository.interface';
+import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
+import {
+  CAMPAIGN_SCHEDULE_REPOSITORY,
+  PIPELINE_REPOSITORY,
+  RULE_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../repositories/tokens';
+import { PostingFrequency, RuleStatus } from '../rule/schemas/rule.schema';
 import { UserRole } from '../users/schemas/user.schema';
 import { WorkflowService } from '../workflow/workflow.service';
-import { Workflow, WorkflowStatus } from '../workflow/schemas/workflow.schema';
 import { computeNextRunAt } from './campaign-schedule.util';
-import {
-  CampaignSchedule,
-  ContentPromptStrategy,
-  type CampaignScheduleDocument,
-} from './schemas/campaign-schedule.schema';
+import { ContentPromptStrategy } from './schemas/campaign-schedule.schema';
+
+type RuleCampaign = {
+  postingFrequency: PostingFrequency;
+  customSchedule?: string | string[];
+};
 
 @Injectable()
 export class CampaignSchedulerService {
@@ -22,14 +33,14 @@ export class CampaignSchedulerService {
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(CampaignSchedule.name)
-    private readonly scheduleModel: Model<CampaignScheduleDocument>,
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<Workflow>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<Pipeline>,
+    @Inject(CAMPAIGN_SCHEDULE_REPOSITORY)
+    private readonly schedules: ICampaignScheduleRepository,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     private readonly orchestration: OrchestrationService,
     private readonly workflowService: WorkflowService,
   ) {}
@@ -37,10 +48,7 @@ export class CampaignSchedulerService {
   @Cron('*/15 * * * *')
   async tick(): Promise<void> {
     const now = new Date();
-    const due = await this.scheduleModel
-      .find({ enabled: true, nextRunAt: { $lte: now } })
-      .limit(50)
-      .exec();
+    const due = await this.schedules.findDue(now, 50);
 
     for (const schedule of due) {
       try {
@@ -53,43 +61,38 @@ export class CampaignSchedulerService {
         schedule.nextRunAt = new Date(
           Date.now() + Math.min(3600_000 * 2 ** schedule.failureCount, 86_400_000),
         );
-        await schedule.save();
+        await this.schedules.save(schedule);
       }
     }
   }
 
-  private async runSchedule(
-    schedule: CampaignScheduleDocument,
-  ): Promise<void> {
-    const rule = await this.ruleModel
-      .findOne({ ruleId: schedule.ruleRef })
-      .exec();
+  private async runSchedule(schedule: CampaignScheduleRecord): Promise<void> {
+    const rule = await this.rules.findById(schedule.ruleRef);
     if (!rule || rule.status !== RuleStatus.Active) {
       schedule.enabled = false;
-      await schedule.save();
+      await this.schedules.save(schedule);
       return;
     }
 
+    const campaign = rule.campaign as RuleCampaign;
     const maxConcurrent = Number(
       this.config.get('SCHEDULER_MAX_CONCURRENT_PER_USER', 2),
     );
-    const running = await this.pipelineModel.countDocuments({
+    const running = await this.pipelines.count({
       userId: schedule.userId,
       status: PipelineStatus.Running,
     });
     if (running >= maxConcurrent) {
       schedule.nextRunAt = new Date(Date.now() + 15 * 60_000);
-      await schedule.save();
+      await this.schedules.save(schedule);
       return;
     }
 
     if (schedule.lastPipelineId) {
-      const last = await this.pipelineModel
-        .findOne({ pipelineId: schedule.lastPipelineId })
-        .exec();
+      const last = await this.pipelines.findById(schedule.lastPipelineId);
       if (last?.status === PipelineStatus.Running) {
         schedule.nextRunAt = new Date(Date.now() + 15 * 60_000);
-        await schedule.save();
+        await this.schedules.save(schedule);
         return;
       }
     }
@@ -97,10 +100,10 @@ export class CampaignSchedulerService {
     const workflowId = await this.resolveWorkflowId(schedule);
     if (!workflowId) {
       schedule.nextRunAt = computeNextRunAt(
-        rule.campaign.postingFrequency,
-        rule.campaign.customSchedule,
+        campaign.postingFrequency,
+        campaign.customSchedule,
       );
-      await schedule.save();
+      await this.schedules.save(schedule);
       return;
     }
 
@@ -118,19 +121,17 @@ export class CampaignSchedulerService {
     schedule.lastPipelineId = pipelineId;
     schedule.failureCount = 0;
     schedule.nextRunAt = computeNextRunAt(
-      rule.campaign.postingFrequency,
-      rule.campaign.customSchedule,
+      campaign.postingFrequency,
+      campaign.customSchedule,
     );
-    await schedule.save();
+    await this.schedules.save(schedule);
   }
 
   private async resolveWorkflowId(
-    schedule: CampaignScheduleDocument,
+    schedule: CampaignScheduleRecord,
   ): Promise<string | null> {
     if (schedule.workflowRef) {
-      const w = await this.workflowModel
-        .findOne({ workflowId: schedule.workflowRef, status: WorkflowStatus.Ready })
-        .exec();
+      const w = await this.workflows.findReadyById(schedule.workflowRef);
       if (w) return w.workflowId;
     }
     if (schedule.workflowTemplateId) {
@@ -140,21 +141,14 @@ export class CampaignSchedulerService {
         { userId: schedule.userId, role: UserRole.CUSTOMER },
       );
       schedule.workflowRef = applied.workflowId;
-      await schedule.save();
+      await this.schedules.save(schedule);
       return applied.workflowId;
     }
-    const latest = await this.workflowModel
-      .findOne({
-        ruleRef: schedule.ruleRef,
-        status: WorkflowStatus.Ready,
-        isTemplate: false,
-      })
-      .sort({ updatedAt: -1 })
-      .exec();
+    const latest = await this.workflows.findLatestReadyByRule(schedule.ruleRef);
     return latest?.workflowId ?? null;
   }
 
-  private pickContentPrompt(schedule: CampaignScheduleDocument): string {
+  private pickContentPrompt(schedule: CampaignScheduleRecord): string {
     const prompts = schedule.contentPrompts.filter((p) => p.trim());
     if (prompts.length === 0) {
       return 'Scheduled campaign generation';

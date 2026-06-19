@@ -1,22 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { InjectModel } from '@nestjs/mongoose';
 import { Queue } from 'bullmq';
-import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
+import type { INewsTriggerLogRepository } from '../repositories/interfaces/news-trigger-log.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
 import {
-  Rule,
-  RuleStatus,
-  type RuleDocument,
-} from '../rule/schemas/rule.schema';
+  NEWS_TRIGGER_LOG_REPOSITORY,
+  RULE_REPOSITORY,
+} from '../repositories/tokens';
+import { RuleStatus } from '../rule/schemas/rule.schema';
 import { EventsService } from '../events/events.service';
 import { WorkflowResolveService } from '../workflow/workflow-resolve.service';
 import { emitNewsRunUpdate } from './news-trigger-run-events';
@@ -25,10 +25,6 @@ import {
   manualRunGroupKey,
   pendingRunStatus,
 } from './news-trigger-run-summary.util';
-import {
-  NewsTriggerLog,
-  type NewsTriggerLogDocument,
-} from './schemas/news-trigger-log.schema';
 import {
   NEWS_TRIGGER_JOB_PROCESS_SINGLE,
   NEWS_TRIGGER_QUEUE,
@@ -47,10 +43,10 @@ export class NewsTriggerManualService {
   private readonly logger = new Logger(NewsTriggerManualService.name);
 
   constructor(
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(NewsTriggerLog.name)
-    private readonly logModel: Model<NewsTriggerLogDocument>,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    @Inject(NEWS_TRIGGER_LOG_REPOSITORY)
+    private readonly logs: INewsTriggerLogRepository,
     @InjectQueue(NEWS_TRIGGER_QUEUE)
     private readonly queue: Queue<NewsTriggerManualJobPayload>,
     private readonly workflowResolve: WorkflowResolveService,
@@ -61,9 +57,7 @@ export class NewsTriggerManualService {
     ruleId: string,
     auth: TenancyAuth,
   ): Promise<NewsTriggerRunQueuedResponse> {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+    const rule = await this.rules.findById(ruleId, auth);
 
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
@@ -104,7 +98,7 @@ export class NewsTriggerManualService {
     const jobId = newsTriggerManualJobId(ruleId, runId);
     const workersInApi = workersInApiProcessLabel();
 
-    await this.logModel.create({
+    await this.logs.create({
       runId,
       group: manualRunGroupKey(ruleId),
       ruleId,
@@ -125,7 +119,7 @@ export class NewsTriggerManualService {
     );
 
     const addedState = await added.getState();
-    const counts = await logNewsTriggerQueueState(
+    await logNewsTriggerQueueState(
       this.queue,
       this.logger,
       `enqueued manual run=${runId}`,

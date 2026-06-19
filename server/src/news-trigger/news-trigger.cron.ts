@@ -1,25 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import { RULE_REPOSITORY } from '../repositories/tokens';
 import { formatHourLocal } from './news-trigger-date.util';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
 import {
   NEWS_TRIGGER_JOB_PROCESS_GROUP,
   NEWS_TRIGGER_QUEUE,
 } from './news-trigger.constants';
 import type { NewsTriggerGroupJobPayload } from './news-trigger.processor';
 
+type NewsTriggerConfig = {
+  country: string;
+  language: string;
+  category?: string;
+};
+
 @Injectable()
 export class NewsTriggerCron {
   private readonly logger = new Logger(NewsTriggerCron.name);
 
   constructor(
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
     @InjectQueue(NEWS_TRIGGER_QUEUE)
     private readonly queue: Queue<NewsTriggerGroupJobPayload>,
   ) {}
@@ -35,18 +40,7 @@ export class NewsTriggerCron {
       `[NewsTriggerCron] firing at ${currentHour}:00 (${isMorning ? 'morning' : 'evening'} run)`,
     );
 
-    const scheduleQuery = isMorning
-      ? { $in: ['daily', 'twice_daily'] as const }
-      : 'twice_daily';
-
-    const eligibleRules = await this.ruleModel
-      .find({
-        'newsTrigger.enabled': true,
-        'newsTrigger.schedule': scheduleQuery,
-      } as Record<string, unknown>)
-      .select('newsTrigger.country newsTrigger.language newsTrigger.category')
-      .lean()
-      .exec();
+    const eligibleRules = await this.rules.findNewsTriggerEligible(isMorning);
 
     if (!eligibleRules.length) {
       this.logger.log('[NewsTriggerCron] no enabled rules found');
@@ -57,13 +51,11 @@ export class NewsTriggerCron {
       `[NewsTriggerCron] ${eligibleRules.length} enabled rules found`,
     );
 
-    const groups = new Map<
-      string,
-      { country: string; language: string; category: string }
-    >();
+    const groups = new Map<string, NewsTriggerConfig>();
 
     for (const rule of eligibleRules) {
-      const nt = rule.newsTrigger;
+      const nt = rule.newsTrigger as NewsTriggerConfig | null;
+      if (!nt?.country || !nt?.language) continue;
       const key = `${nt.country}:${nt.language}:${nt.category ?? ''}`;
       if (!groups.has(key)) {
         groups.set(key, {
@@ -84,7 +76,12 @@ export class NewsTriggerCron {
 
       await this.queue.add(
         NEWS_TRIGGER_JOB_PROCESS_GROUP,
-        { runId, ...params },
+        {
+          runId,
+          country: params.country,
+          language: params.language,
+          category: params.category ?? '',
+        },
         {
           jobId,
           attempts: 2,

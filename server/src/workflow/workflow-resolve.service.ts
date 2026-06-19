@@ -1,25 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Workflow, WorkflowStatus } from './schemas/workflow.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
+import { WORKFLOW_REPOSITORY } from '../repositories/tokens';
 
 @Injectable()
 export class WorkflowResolveService {
   constructor(
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<Workflow>,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
   ) {}
 
   /** Latest Ready non-template workflow for a rule. */
   async resolveLatestReadyWorkflowId(ruleRef: string): Promise<string | null> {
-    const latest = await this.workflowModel
-      .findOne({
-        ruleRef,
-        status: WorkflowStatus.Ready,
-        isTemplate: false,
-      })
-      .sort({ updatedAt: -1 })
-      .exec();
+    const latest = await this.workflows.findLatestReadyByRule(ruleRef);
     return latest?.workflowId ?? null;
   }
 }

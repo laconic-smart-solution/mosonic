@@ -1,20 +1,24 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
 import {
-  Pipeline,
+  parsePipelineGraph,
+  parsePipelineNodes,
+} from '../repositories/prisma/pipeline-nodes.util';
+import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
+import { PIPELINE_REPOSITORY } from '../repositories/tokens';
+import {
   PipelineNodeExecutionStatus,
   PipelineStatus,
-  type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import { DependencyResolverService } from './dependency-resolver.service';
-import { randomUUID } from 'node:crypto';
+import type { PipelineNodeExecution } from '../domain/pipeline/pipeline.types';
 
 export type ReplanOperation =
   | { op: 'skip_node'; nodeId: string }
@@ -33,9 +37,8 @@ export type ReplanOperation =
 @Injectable()
 export class GraphReplanService {
   constructor(
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     private readonly resolver: DependencyResolverService,
   ) {}
 
@@ -43,7 +46,7 @@ export class GraphReplanService {
     pipelineId: string,
     operations: ReplanOperation[],
   ): Promise<{ success: boolean; nodeCount: number }> {
-    const pipeline = await this.pipelineRepo.findById(pipelineId);
+    const pipeline = await this.pipelines.findById(pipelineId);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
@@ -51,8 +54,9 @@ export class GraphReplanService {
       throw new BadRequestException('Replan is only allowed when pipeline is paused');
     }
 
-    let nodes = [...(pipeline.nodes ?? [])];
-    let edges = [...(pipeline.graph?.edges ?? [])];
+    let nodes = [...parsePipelineNodes(pipeline.nodes)];
+    const graph = parsePipelineGraph(pipeline.graph);
+    let edges = [...(graph.edges ?? [])];
 
     for (const op of operations) {
       if (op.op === 'skip_node') {
@@ -107,7 +111,7 @@ export class GraphReplanService {
           variantId: after.variantId ?? null,
           lastError: null,
           externalJobId: null,
-        });
+        } as PipelineNodeExecution);
         edges.push({ from: op.afterNodeId, to: newId });
         const outbound = edges.filter((e) => e.from === op.afterNodeId && e.to !== newId);
         for (const edge of outbound) {
@@ -124,20 +128,13 @@ export class GraphReplanService {
       n.order = i + 1;
     });
 
-    await this.pipelineModel
-      .updateOne(
-        { pipelineId },
-        {
-          $set: {
-            nodes,
-            'graph.edges': edges,
-            status: PipelineStatus.Running,
-            pausedNodeId: null,
-            pausedLaneId: null,
-          },
-        },
-      )
-      .exec();
+    await this.pipelines.updateById(pipelineId, {
+      nodes: nodes as Prisma.InputJsonValue,
+      graph: { ...graph, edges } as Prisma.InputJsonValue,
+      status: PipelineStatus.Running,
+      pausedNodeId: null,
+      pausedLaneId: null,
+    });
 
     await this.resolver.enqueueReadyNodes(pipelineId);
 

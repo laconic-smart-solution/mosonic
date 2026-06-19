@@ -1,13 +1,12 @@
 import type { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { Model } from 'mongoose';
-import type { NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
+import type { INewsTriggerLogRepository } from '../repositories/interfaces/news-trigger-log.repository.interface';
+import type { NewsTriggerLogLike, NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
 import { summarizeNewsTriggerLog } from './news-trigger-run-summary.util';
 import type { NewsTriggerManualJobPayload } from './news-trigger.processor';
-import type { NewsTriggerLogDocument } from './schemas/news-trigger-log.schema';
 
 export async function reconcileRunningManualLog(
-  logModel: Model<NewsTriggerLogDocument>,
+  logs: INewsTriggerLogRepository,
   logger: Logger,
   ruleId: string,
   log: { runId: string; ranAt?: Date },
@@ -24,9 +23,9 @@ export async function reconcileRunningManualLog(
     return null;
   }
 
-  const fresh = await logModel.findOne({ runId: log.runId }).lean().exec();
+  const fresh = await logs.findByRunId(log.runId);
   if (fresh?.completedAt) {
-    return summarizeNewsTriggerLog(fresh, ruleId);
+    return summarizeNewsTriggerLog(fresh as unknown as NewsTriggerLogLike, ruleId);
   }
 
   if (bullState === 'completed') {
@@ -36,16 +35,13 @@ export async function reconcileRunningManualLog(
     logger.error(
       `[NewsTrigger] repairing orphan log run=${log.runId} — Bull job completed but Mongo log has no completedAt`,
     );
-    await logModel.updateOne(
-      { runId: log.runId },
-      {
-        completedAt: finishedAt,
-        errorMessage:
-          'Run finished in the queue but the result was not saved. Check worker/API logs and try again.',
-      },
-    );
-    const repaired = await logModel.findOne({ runId: log.runId }).lean().exec();
-    return repaired ? summarizeNewsTriggerLog(repaired, ruleId) : null;
+    await logs.updateByRunId(log.runId, {
+      completedAt: finishedAt,
+      errorMessage:
+        'Run finished in the queue but the result was not saved. Check worker/API logs and try again.',
+    });
+    const repaired = await logs.findByRunId(log.runId);
+    return repaired ? summarizeNewsTriggerLog(repaired as unknown as NewsTriggerLogLike, ruleId) : null;
   }
 
   if (bullState === 'failed') {
@@ -58,15 +54,12 @@ export async function reconcileRunningManualLog(
     logger.error(
       `[NewsTrigger] repairing failed job log run=${log.runId}: ${reason}`,
     );
-    await logModel.updateOne(
-      { runId: log.runId },
-      {
-        completedAt: finishedAt,
-        errorMessage: reason,
-      },
-    );
-    const repaired = await logModel.findOne({ runId: log.runId }).lean().exec();
-    return repaired ? summarizeNewsTriggerLog(repaired, ruleId) : null;
+    await logs.updateByRunId(log.runId, {
+      completedAt: finishedAt,
+      errorMessage: reason,
+    });
+    const repaired = await logs.findByRunId(log.runId);
+    return repaired ? summarizeNewsTriggerLog(repaired as unknown as NewsTriggerLogLike, ruleId) : null;
   }
 
   return null;

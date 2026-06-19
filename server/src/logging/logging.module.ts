@@ -1,15 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
+import { RepositoriesModule } from '../repositories/repositories.module';
 import { LoggingService } from './logging.service';
-import { PipelineLog, PipelineLogSchema } from './schemas/pipeline-log.schema';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: PipelineLog.name, schema: PipelineLogSchema },
-    ]),
-  ],
+  imports: [RepositoriesModule],
   providers: [LoggingService],
-  exports: [MongooseModule, LoggingService],
+  exports: [LoggingService],
 })
 export class LoggingModule {}
