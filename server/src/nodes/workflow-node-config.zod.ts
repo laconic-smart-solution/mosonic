@@ -294,14 +294,16 @@ export const IntelligenceSearchType = z.enum([
 ]);
 export type IntelligenceSearchTypeValue = z.infer<typeof IntelligenceSearchType>;
 
-const intelligenceConfigSchema = z
+const intelligenceConfigObjectSchema = z
   .object({
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     searchType: IntelligenceSearchType.default('all'),
     customPrompt: z.string().nullable().optional(),
   })
-  .strict()
+  .strict();
+
+const intelligenceConfigSchema = intelligenceConfigObjectSchema
   .superRefine((val, ctx) => {
     if (val.searchType === 'custom') {
       const p = val.customPrompt?.trim();
@@ -456,6 +458,20 @@ export function coerceVideoConfigForPersist(
     return { ...raw, mode: 'cinematic' };
   }
   return raw;
+}
+
+function configShapeKeys(type: WorkflowNodeType): string[] {
+  if (type === WorkflowNodeType.VideoGeneration) {
+    return Object.keys(videoConfigObjectSchema.shape);
+  }
+  if (type === WorkflowNodeType.Intelligence) {
+    return Object.keys(intelligenceConfigObjectSchema.shape);
+  }
+  const schema = SCHEMAS[type];
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+  return [];
 }
 
 export function parseWorkflowNodeConfig(
