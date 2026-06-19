@@ -8,7 +8,7 @@ import {
 import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { STATUS_COLOR, type RuleStatus, type RuleSummary } from "@/features/rules/data/rules-mock"
-import { T } from "@/lib/tokens"
+import { cn } from "@/lib/utils"
 import { RuleChip, type RuleChipTone } from "./rule-chip"
 
 function statusToChipTone(status: RuleStatus): RuleChipTone {
@@ -78,11 +78,12 @@ export function RulesListDrawer({
                   onSelectRule(summary.ruleId)
                   onOpenChange(false)
                 }}
-                className="w-full rounded-lg border p-3 text-left transition"
-                style={{
-                  borderColor: isSelected ? T.accent : T.surfaceBorder,
-                  background: isSelected ? T.accentLight : "white",
-                }}
+                className={cn(
+                  "w-full rounded-lg border p-3 text-left transition-colors",
+                  isSelected
+                    ? "border-primary/45 bg-accent/90 shadow-sm dark:border-primary/50 dark:bg-accent/25"
+                    : "border-border bg-card hover:bg-muted/40 dark:bg-card dark:hover:bg-muted/35",
+                )}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-foreground">{summary.name}</p>
