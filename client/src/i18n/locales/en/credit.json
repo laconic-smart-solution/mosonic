@@ -39,6 +39,7 @@
     "translation": "Translation",
     "summarization": "Summarization",
     "image_generation": "Image generation",
-    "video_generation": "Video generation"
+    "video_generation": "Video generation",
+    "social_account_connect": "Social account connection"
   }
 }

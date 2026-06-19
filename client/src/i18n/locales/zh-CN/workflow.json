@@ -34,7 +34,8 @@
     "transcription": "转录",
     "summarization": "摘要",
     "adapt": "适配",
-    "intelligence": "情报"
+    "intelligence": "情报",
+    "social_account_connect": "社交账户连接"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"

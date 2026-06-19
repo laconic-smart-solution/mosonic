@@ -18,6 +18,10 @@ import {
   findCreditPackage,
 } from './lib/credit-packages';
 import { NodeCreditPriceService } from './node-credit-price.service';
+import { InsufficientCreditsException } from './insufficient-credits.exception';
+import {
+  SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+} from './lib/billable-node-credit-types';
 import {
   CreditLedger,
   type CreditLedgerDocument,
@@ -294,6 +298,78 @@ export class CreditService {
     if (updated) {
       this.emitBalanceUpdated(updated);
     }
+  }
+
+  async getCreditsRemaining(userId: string): Promise<number> {
+    const userPlan = await this.userPlanModel
+      .findOne({ userId, status: 'active' })
+      .lean<{ creditsRemaining?: number }>()
+      .exec();
+    return userPlan?.creditsRemaining ?? 0;
+  }
+
+  async assertCreditsForNodeType(
+    userId: string,
+    nodeType: string,
+  ): Promise<{ creditsEach: number; creditsRemaining: number }> {
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(nodeType)) ?? 0;
+    const creditsRemaining = await this.getCreditsRemaining(userId);
+    if (creditsEach > 0 && creditsRemaining < creditsEach) {
+      throw new InsufficientCreditsException({
+        requiredCredits: creditsEach,
+        creditsRemaining,
+      });
+    }
+    return { creditsEach, creditsRemaining };
+  }
+
+  /** Charge credits when a user connects a new publishing channel via OAuth. */
+  async chargeSocialAccountConnect(args: {
+    userId: string;
+    channel: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+
+    const channel = args.channel.trim().toLowerCase();
+    await new this.ledgerModel({
+      userId: args.userId,
+      pipelineRef: 'social-connect',
+      nodeId: `social:${channel}`,
+      nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      provider: 'system',
+      model: 'system',
+      rawCostUsd: 0,
+      overheadUsd: 0,
+      marginAppliedUsd: 0,
+      creditPriceUsdSnapshot: args.creditPriceUsd,
+      creditsCharged: args.credits,
+      billingPeriod: currentBillingPeriod(),
+    }).save();
+
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId: args.userId, status: 'active' },
+        {
+          $inc: {
+            creditsUsed: args.credits,
+            creditsRemaining: -args.credits,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(
+        `No active plan found for userId=${args.userId}`,
+      );
+    }
+
+    await this.maybeEmitLowBalance(updated);
+    this.emitBalanceUpdated(updated);
   }
 
   /**

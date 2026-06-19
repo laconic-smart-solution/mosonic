@@ -34,7 +34,8 @@
     "transcription": "Transcription",
     "summarization": "Summarization",
     "adapt": "Adapt",
-    "intelligence": "Intelligence"
+    "intelligence": "Intelligence",
+    "social_account_connect": "Social account connection"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} For {{channel}}"

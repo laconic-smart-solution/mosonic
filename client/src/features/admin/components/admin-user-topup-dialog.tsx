@@ -36,7 +36,7 @@ type Props = {
 
 function formatBalance(remaining: number | null, perMonth: number | null) {
   if (remaining == null && perMonth == null) return "—"
-  return `${(remaining ?? 0).toLocaleString()} / ${(perMonth ?? 0).toLocaleString()}`
+  return `${(remaining ?? 0).toLocaleString()}`
 }
 
 export function AdminUserTopupDialog({ target, open, onOpenChange }: Props) {

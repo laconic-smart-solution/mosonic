@@ -66,8 +66,7 @@ function roleLabel(t: (key: string) => string, role: string) {
 function formatCredits(user: AdminUserRow) {
   if (user.creditsRemaining == null && user.creditsPerMonth == null) return "—"
   const remaining = user.creditsRemaining ?? 0
-  const total = user.creditsPerMonth ?? 0
-  return `${remaining.toLocaleString()} / ${total.toLocaleString()}`
+  return `${remaining.toLocaleString()}`
 }
 
 function toActionTarget(user: AdminUserRow): AdminUserActionTarget {

@@ -32,6 +32,7 @@
     "profileReady": "Zernio profile ready.",
     "profileFailed": "Could not create profile.",
     "connectUrlFailed": "Could not get connect URL.",
+    "insufficientCredits": "Not enough credits to connect this channel.",
     "disconnected": "Channel disconnected.",
     "disconnectFailed": "Could not disconnect account."
   },
@@ -43,7 +44,10 @@
     "accountId": "Account ID",
     "disconnect": "Disconnect",
     "connect": "Connect",
+    "connectWithCredits": "Connect · {{count}}",
+    "connectCost": "Costs {{count}} credits per new connection",
     "connectAria": "Connect {{channel}}",
+    "connectAriaWithCost": "Connect {{channel}}, costs {{count}} credits",
     "facebook": {
       "label": "Facebook",
       "description": "Pages and profiles for Meta publishing."
@@ -68,5 +72,21 @@
       "label": "TikTok",
       "description": "Vertical video and TikTok-native formats."
     }
+  },
+  "connectConfirm": {
+    "title": "Connect {{channel}}",
+    "description": "Connecting a new publishing channel uses credits from your balance. You will be redirected to authorize the network.",
+    "loading": "Loading credit estimate…",
+    "estimatedCost": "Connection cost",
+    "currentBalance": "Your balance",
+    "credits": "credits",
+    "balanceAfter": "Balance after",
+    "noCharge": "No credits are charged for this connection.",
+    "insufficientTitle": "Not enough credits",
+    "insufficientDescription": "This connection requires {{required}} credits but you only have {{remaining}} remaining.",
+    "refill": "Add credits",
+    "cancel": "Cancel",
+    "confirm": "Continue to connect",
+    "connecting": "Connecting…"
   }
 }
