@@ -1,43 +1,41 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { createHmac } from 'node:crypto';
-import { Model } from 'mongoose';
+import type { IWebhookDeliveryRepository } from '../repositories/interfaces/webhook-delivery.repository.interface';
+import type { IWebhookSubscriptionRepository } from '../repositories/interfaces/webhook-subscription.repository.interface';
+import type { WebhookSubscriptionRecord } from '../repositories/interfaces/webhook-subscription.repository.interface';
 import {
-  WebhookDelivery,
-  WebhookSubscription,
-  type WebhookDeliveryDocument,
-  type WebhookSubscriptionDocument,
-} from './schemas/webhook-subscription.schema';
+  WEBHOOK_DELIVERY_REPOSITORY,
+  WEBHOOK_SUBSCRIPTION_REPOSITORY,
+} from '../repositories/tokens';
 
 @Injectable()
 export class OutboundWebhookService {
   private readonly logger = new Logger(OutboundWebhookService.name);
 
   constructor(
-    @InjectModel(WebhookSubscription.name)
-    private readonly subscriptionModel: Model<WebhookSubscriptionDocument>,
-    @InjectModel(WebhookDelivery.name)
-    private readonly deliveryModel: Model<WebhookDeliveryDocument>,
+    @Inject(WEBHOOK_SUBSCRIPTION_REPOSITORY)
+    private readonly subscriptions: IWebhookSubscriptionRepository,
+    @Inject(WEBHOOK_DELIVERY_REPOSITORY)
+    private readonly deliveries: IWebhookDeliveryRepository,
   ) {}
 
   async emit(userId: string, event: string, payload: Record<string, unknown>) {
-    const subs = await this.subscriptionModel
-      .find({ userId, enabled: true, events: event })
-      .exec();
+    const subs = await this.subscriptions.findActiveForEvent(userId, event);
     for (const sub of subs) {
       void this.deliverWithRetry(sub, event, payload);
     }
   }
 
   private async deliverWithRetry(
-    sub: WebhookSubscriptionDocument,
+    sub: WebhookSubscriptionRecord,
     event: string,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    const delivery = await this.deliveryModel.create({
-      subscriptionId: sub.subscriptionId,
+    let delivery = await this.deliveries.create({
+      subscription: { connect: { subscriptionId: sub.subscriptionId } },
       event,
-      payload,
+      payload: payload as Prisma.InputJsonValue,
       attempts: 0,
     });
 
@@ -60,7 +58,7 @@ export class OutboundWebhookService {
         if (res.ok) {
           delivery.deliveredAt = new Date();
           delivery.lastError = null;
-          await delivery.save();
+          await this.deliveries.save(delivery);
           return;
         }
         delivery.lastError = `HTTP ${res.status}`;
@@ -68,7 +66,7 @@ export class OutboundWebhookService {
         delivery.attempts = attempt;
         delivery.lastError = err instanceof Error ? err.message : String(err);
       }
-      await delivery.save();
+      await this.deliveries.save(delivery);
       await new Promise((r) => setTimeout(r, attempt * 1000));
     }
     this.logger.warn(

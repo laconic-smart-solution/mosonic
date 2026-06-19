@@ -1,22 +1,26 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
-import { Pipeline, type PipelineDocument } from '../../pipeline/schemas/pipeline.schema';
-import { UserPlan, type UserPlanDocument } from '../../plan/schemas/user-plan.schema';
-import { Plan, type PlanDocument } from '../../plan/schemas/plan.schema';
-import { Rule, type RuleDocument } from '../../rule/schemas/rule.schema';
+import { UserRole, UserStatus } from '../../domain/users/user.types';
+import type { ICostEntryRepository } from '../../repositories/interfaces/cost-entry.repository.interface';
+import type { IPipelineRepository } from '../../repositories/interfaces/pipeline.repository.interface';
+import type { IPlanRepository } from '../../repositories/interfaces/plan.repository.interface';
+import type { IRuleRepository } from '../../repositories/interfaces/rule.repository.interface';
+import type { IUserPlanRepository } from '../../repositories/interfaces/user-plan.repository.interface';
+import type { IUserRepository } from '../../repositories/interfaces/user.repository.interface';
+import type { IWorkflowRepository } from '../../repositories/interfaces/workflow.repository.interface';
 import {
-  User,
-  type UserDocument,
-  UserRole,
-  UserStatus,
-} from '../../users/schemas/user.schema';
-import { Workflow, type WorkflowDocument } from '../../workflow/schemas/workflow.schema';
+  COST_ENTRY_REPOSITORY,
+  PIPELINE_REPOSITORY,
+  PLAN_REPOSITORY,
+  RULE_REPOSITORY,
+  USER_PLAN_REPOSITORY,
+  USER_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../../repositories/tokens';
 
 function monthStart(d = new Date()): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -25,9 +29,9 @@ function monthStart(d = new Date()): Date {
 }
 
 function displayName(u: {
-  firstName?: string;
-  lastName?: string;
-  username?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
 }): string {
   const parts = [u.firstName, u.lastName].filter(Boolean) as string[];
   if (parts.length) return parts.join(' ');
@@ -37,18 +41,14 @@ function displayName(u: {
 @Injectable()
 export class AdminUsersService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
-    @InjectModel(Rule.name) private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<WorkflowDocument>,
-    @InjectModel(CostEntry.name)
-    private readonly costModel: Model<CostEntryDocument>,
-    @InjectModel(UserPlan.name)
-    private readonly userPlanModel: Model<UserPlanDocument>,
-    @InjectModel(Plan.name)
-    private readonly planModel: Model<PlanDocument>,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(RULE_REPOSITORY) private readonly rules: IRuleRepository,
+    @Inject(WORKFLOW_REPOSITORY) private readonly workflows: IWorkflowRepository,
+    @Inject(COST_ENTRY_REPOSITORY)
+    private readonly costEntries: ICostEntryRepository,
+    @Inject(USER_PLAN_REPOSITORY) private readonly userPlans: IUserPlanRepository,
+    @Inject(PLAN_REPOSITORY) private readonly plans: IPlanRepository,
   ) {}
 
   async listUsers(query: {
@@ -59,70 +59,40 @@ export class AdminUsersService {
   }) {
     const { page, limit, search, status } = query;
 
-    const filter: Record<string, unknown> = {};
-    if (search) {
-      filter.$or = [
-        { email: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } },
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-      ];
-    }
-    if (status === 'suspended') filter.status = UserStatus.DISABLED;
-    if (status === 'active') filter.status = UserStatus.ACTIVE;
+    const statusFilter =
+      status === 'suspended'
+        ? UserStatus.DISABLED
+        : status === 'active'
+          ? UserStatus.ACTIVE
+          : undefined;
 
-    const [users, total] = await Promise.all([
-      this.userModel
-        .find(filter, {
-          userId: 1,
-          email: 1,
-          username: 1,
-          firstName: 1,
-          lastName: 1,
-          createdAt: 1,
-          lastLoginAt: 1,
-          status: 1,
-          role: 1,
-        })
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      this.userModel.countDocuments(filter),
-    ]);
+    const { rows: users, total } = await this.users.listAdmin(
+      { search, status: statusFilter },
+      page,
+      limit,
+    );
 
     const mStart = monthStart();
-    const userIds = users.map((u) => u.userId).filter(Boolean) as string[];
+    const userIds = users.map((u) => u.userId).filter(Boolean);
 
-    const [costAgg, pipelineAgg, userPlans] = await Promise.all([
-      this.costModel.aggregate([
-        { $match: { userId: { $in: userIds }, billingPeriod: mStart } },
-        { $group: { _id: '$userId', total: { $sum: '$costUsd' } } },
-      ]),
-      this.pipelineModel.aggregate([
-        {
-          $match: {
-            userId: { $in: userIds },
-            startedAt: { $gte: mStart },
-          },
-        },
-        { $group: { _id: '$userId', count: { $sum: 1 } } },
-      ]),
-      this.userPlanModel
-        .find({ userId: { $in: userIds }, status: 'active' })
-        .select({ userId: 1, creditsRemaining: 1, creditsPerMonth: 1 })
-        .lean(),
+    const [costMap, pipelineCounts, userPlans] = await Promise.all([
+      this.costEntries.sumForUsersInBillingPeriod(userIds, mStart),
+      Promise.all(
+        userIds.map(async (userId) => ({
+          userId,
+          count: await this.pipelines.count({
+            userId,
+            startedAt: { gte: mStart },
+          }),
+        })),
+      ),
+      this.userPlans.findActiveByUserIds(userIds),
     ]);
 
-    const costMap = Object.fromEntries(
-      costAgg.map((r) => [r._id as string, r.total]),
-    );
     const pipelineMap = Object.fromEntries(
-      pipelineAgg.map((r) => [r._id as string, r.count]),
+      pipelineCounts.map((r) => [r.userId, r.count]),
     );
-    const planMap = Object.fromEntries(
-      userPlans.map((p) => [p.userId, p]),
-    );
+    const planMap = Object.fromEntries(userPlans.map((p) => [p.userId, p]));
 
     return {
       users: users.map((u) => ({
@@ -130,11 +100,11 @@ export class AdminUsersService {
         userId: u.userId,
         email: u.email,
         displayName: displayName(u),
-        createdAt: (u as { createdAt?: Date }).createdAt,
+        createdAt: u.createdAt,
         lastActiveAt: u.lastLoginAt ?? null,
         isSuspended: u.status === UserStatus.DISABLED,
         role: u.role,
-        costThisMonthUsd: costMap[u.userId] ?? 0,
+        costThisMonthUsd: costMap.get(u.userId) ?? 0,
         pipelinesThisMonth: pipelineMap[u.userId] ?? 0,
         creditsRemaining: planMap[u.userId]?.creditsRemaining ?? null,
         creditsPerMonth: planMap[u.userId]?.creditsPerMonth ?? null,
@@ -147,14 +117,7 @@ export class AdminUsersService {
   }
 
   async getUserDetail(userId: string) {
-    const user = await this.userModel
-      .findOne(
-        { userId },
-        {
-          password: 0,
-        },
-      )
-      .lean();
+    const user = await this.users.findByUserId(userId);
 
     if (!user) throw new NotFoundException('User not found');
 
@@ -166,42 +129,29 @@ export class AdminUsersService {
       pipelineCount,
       pipelineThisMonth,
       costThisMonth,
-      costByProvider,
+      costEntries,
       userPlan,
     ] = await Promise.all([
-      this.ruleModel.countDocuments({ userId }),
-      this.workflowModel.countDocuments({ userId }),
-      this.pipelineModel.countDocuments({ userId }),
-      this.pipelineModel.countDocuments({
-        userId,
-        startedAt: { $gte: mStart },
-      }),
-      this.costModel
-        .aggregate([
-          { $match: { userId, billingPeriod: mStart } },
-          { $group: { _id: null, total: { $sum: '$costUsd' } } },
-        ])
-        .then((r) => r[0]?.total ?? 0),
-      this.costModel.aggregate([
-        { $match: { userId, billingPeriod: mStart } },
-        { $group: { _id: '$provider', total: { $sum: '$costUsd' } } },
-      ]),
-      this.userPlanModel
-        .findOne({ userId, status: 'active' })
-        .select({
-          creditsRemaining: 1,
-          creditsPerMonth: 1,
-          creditsUsed: 1,
-          planId: 1,
-        })
-        .lean(),
+      this.rules.count({ userId }),
+      this.workflows.count({ userId }),
+      this.pipelines.count({ userId }),
+      this.pipelines.count({ userId, startedAt: { gte: mStart } }),
+      this.costEntries.sumMonthlyForUser(userId, mStart),
+      this.costEntries.aggregateSummary({ userId, billingPeriod: mStart }),
+      this.userPlans.findActiveByUserId(userId),
     ]);
 
+    const costByProvider = costEntries.reduce<Record<string, number>>(
+      (acc, row) => {
+        const key = row.provider ?? 'unknown';
+        acc[key] = (acc[key] ?? 0) + row.costUsd;
+        return acc;
+      },
+      {},
+    );
+
     const planDoc = userPlan?.planId
-      ? await this.planModel
-          .findOne({ planId: userPlan.planId })
-          .select({ name: 1 })
-          .lean()
+      ? await this.plans.findByPlanId(userPlan.planId)
       : null;
 
     const safeUser = {
@@ -210,7 +160,7 @@ export class AdminUsersService {
       displayName: displayName(user),
       role: user.role,
       isSuspended: user.status === UserStatus.DISABLED,
-      createdAt: (user as { createdAt?: Date }).createdAt,
+      createdAt: user.createdAt,
       lastActiveAt: user.lastLoginAt ?? null,
     };
 
@@ -228,29 +178,25 @@ export class AdminUsersService {
         pipelineCount,
         pipelineThisMonth,
         costThisMonthUsd: costThisMonth,
-        costByProvider: Object.fromEntries(
-          costByProvider.map((r) => [r._id ?? 'unknown', r.total]),
-        ),
+        costByProvider,
       },
     };
   }
 
   async suspendUser(userId: string) {
-    const user = await this.userModel.findOne({ userId });
+    const user = await this.users.findByUserId(userId);
     if (!user) throw new NotFoundException('User not found');
     if (user.role === UserRole.ADMIN) {
       throw new ForbiddenException('Cannot suspend an admin user');
     }
-    user.status = UserStatus.DISABLED;
-    await user.save();
+    await this.users.update(userId, { status: UserStatus.DISABLED });
     return { success: true, message: 'User suspended' };
   }
 
   async reactivateUser(userId: string) {
-    const user = await this.userModel.findOne({ userId });
+    const user = await this.users.findByUserId(userId);
     if (!user) throw new NotFoundException('User not found');
-    user.status = UserStatus.ACTIVE;
-    await user.save();
+    await this.users.update(userId, { status: UserStatus.ACTIVE });
     return { success: true, message: 'User reactivated' };
   }
 }

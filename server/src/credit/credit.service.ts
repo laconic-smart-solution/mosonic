@@ -1,14 +1,24 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { UserPlanRecord } from '../domain/plans/plan.types';
 import { EventsService } from '../events/events.service';
 import { userRoom } from '../events/notification.util';
-import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
+import { PayniService } from '../payni/payni.service';
+import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
+import type { ICreditTopupPurchaseRepository } from '../repositories/interfaces/credit-topup-purchase.repository.interface';
+import type { ICreditTopupRepository } from '../repositories/interfaces/credit-topup.repository.interface';
+import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
+import {
+  CREDIT_LEDGER_REPOSITORY,
+  CREDIT_TOPUP_PURCHASE_REPOSITORY,
+  CREDIT_TOPUP_REPOSITORY,
+  USER_PLAN_REPOSITORY,
+} from '../repositories/tokens';
 import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';
@@ -19,32 +29,32 @@ import {
 } from './lib/credit-packages';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
-import {
-  SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-} from './lib/billable-node-credit-types';
-import {
-  CreditLedger,
-  type CreditLedgerDocument,
-} from './schemas/credit-ledger.schema';
-import {
-  CreditTopup,
-  type CreditTopupDocument,
-} from './schemas/credit-topup.schema';
+import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from './lib/billable-node-credit-types';
+import type { PaymentStatusDto } from './dto/payment-status.dto';
+
+export type InitiateTopupResult = {
+  topupPurchaseId?: string;
+  payniResponse?: { redirectUrl: string; transactionId: string };
+  instant?: { creditsRemaining: number; creditsAdded: number };
+};
 
 @Injectable()
 export class CreditService {
   private readonly logger = new Logger(CreditService.name);
 
   constructor(
-    @InjectModel(CreditLedger.name)
-    private readonly ledgerModel: Model<CreditLedgerDocument>,
-    @InjectModel(CreditTopup.name)
-    private readonly topupModel: Model<CreditTopupDocument>,
-    @InjectModel(UserPlan.name)
-    private readonly userPlanModel: Model<UserPlanDocument>,
+    @Inject(CREDIT_LEDGER_REPOSITORY)
+    private readonly ledger: ICreditLedgerRepository,
+    @Inject(CREDIT_TOPUP_REPOSITORY)
+    private readonly topups: ICreditTopupRepository,
+    @Inject(CREDIT_TOPUP_PURCHASE_REPOSITORY)
+    private readonly topupPurchases: ICreditTopupPurchaseRepository,
+    @Inject(USER_PLAN_REPOSITORY)
+    private readonly userPlans: IUserPlanRepository,
     private readonly calculation: CreditCalculationService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly events: EventsService,
+    private readonly payniService: PayniService,
   ) {}
 
   getPackages(): ReadonlyArray<CreditPackage> {
@@ -52,24 +62,117 @@ export class CreditService {
   }
 
   /**
-   * Self-serve topup entry point for the client. Returns instant credits while
-   * Payni integration is not wired; later this can return payniResponse instead.
+   * Start self-serve top-up: Payni redirect when enabled, otherwise instant mock grant.
    */
   async initiateTopup(
     userId: string,
     packageId: string,
-  ): Promise<{
-    instant: { creditsRemaining: number; creditsAdded: number };
-  }> {
-    const result = await this.topup(userId, packageId);
-    return { instant: result };
+  ): Promise<InitiateTopupResult> {
+    if (!this.payniService.isTopupEnabled()) {
+      const instant = await this.grantPackageCredits(userId, packageId);
+      return { instant };
+    }
+
+    const pkg = findCreditPackage(packageId);
+    if (!pkg) {
+      throw new BadRequestException(`Unknown credit package: ${packageId}`);
+    }
+    if (pkg.priceThb <= 0) {
+      throw new BadRequestException('Credit package has no price configured');
+    }
+
+    const payniResponse = await this.payniService.createPayment({
+      amount: pkg.priceThb,
+    });
+
+    const purchase = await this.topupPurchases.create({
+      userId,
+      packageId: pkg.id,
+      credits: pkg.credits,
+      amount: pkg.priceThb,
+      currencyCode: this.payniService.getCurrencyCode(),
+      transactionId: payniResponse.transactionId,
+      status: 'pending',
+      purchaseDate: new Date(),
+    });
+
+    return {
+      topupPurchaseId: purchase.topupPurchaseId,
+      payniResponse,
+    };
   }
 
-  /**
-   * Mock self-serve topup: instantly grants the package's credits to the user's
-   * active plan. No real payment is processed.
-   */
-  async topup(
+  /** Payni webhook: credit balance when payment succeeds (idempotent). */
+  async handlePaymentWebhook(dto: PaymentStatusDto): Promise<void> {
+    const transactionId = dto.transactionId?.trim();
+    const rawStatus = dto.status?.trim().toUpperCase();
+    if (!transactionId || !rawStatus) {
+      this.logger.error('Invalid payment webhook payload');
+      return;
+    }
+
+    const purchase = await this.topupPurchases.findByTransactionId(transactionId);
+
+    if (!purchase) {
+      this.logger.error(`Payment webhook: transaction ${transactionId} not found`);
+      return;
+    }
+
+    if (rawStatus === 'SUCCESS') {
+      if (purchase.status === 'active') {
+        this.logger.warn(
+          `Payment webhook: transaction ${transactionId} already credited; skipping`,
+        );
+        return;
+      }
+      if (purchase.status !== 'pending') {
+        this.logger.warn(
+          `Payment webhook: transaction ${transactionId} status=${purchase.status}; skipping credit`,
+        );
+        return;
+      }
+
+      await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'active');
+
+      const updated = await this.userPlans.adjustActiveCredits(purchase.userId, {
+        creditsRemaining: purchase.credits,
+        clearLowBalanceNotified: true,
+      });
+
+      if (!updated) {
+        this.logger.error(
+          `Payment webhook: no active plan for user ${purchase.userId}`,
+        );
+        return;
+      }
+
+      const pkg = findCreditPackage(purchase.packageId);
+      await this.topups.create({
+        userId: purchase.userId,
+        packageId: purchase.packageId,
+        credits: purchase.credits,
+        priceUsd: pkg?.priceUsd ?? 0,
+        source: 'self_serve',
+      });
+
+      this.emitBalanceUpdated(updated);
+      this.events.emitUserNotification({
+        userId: purchase.userId,
+        sector: 'billing',
+        type: 'success',
+        title: 'Credits added',
+        message: `${purchase.credits.toLocaleString()} credits were added to your balance.`,
+      });
+      return;
+    }
+
+    if (rawStatus === 'CANCELLED' && purchase.status === 'pending') {
+      await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'cancelled');
+    }
+  }
+
+  /** Instant grant for dev mock mode or internal use. */
+  async grantPackageCredits(
     userId: string,
     packageId: string,
   ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
@@ -78,33 +181,39 @@ export class CreditService {
       throw new BadRequestException(`Unknown credit package: ${packageId}`);
     }
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId, status: 'active' },
-        {
-          $inc: { creditsRemaining: pkg.credits },
-          $set: { lowBalanceNotifiedAt: null },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(userId, {
+      creditsRemaining: pkg.credits,
+      clearLowBalanceNotified: true,
+    });
 
     if (!updated) {
       throw new NotFoundException('No active plan found for user');
     }
 
-    await new this.topupModel({
+    await this.topups.create({
       userId,
       packageId: pkg.id,
       credits: pkg.credits,
       priceUsd: pkg.priceUsd,
       source: 'self_serve',
-    }).save();
+    });
+
+    this.emitBalanceUpdated(updated);
 
     return {
       creditsRemaining: updated.creditsRemaining,
       creditsAdded: pkg.credits,
     };
+  }
+
+  /**
+   * @deprecated Use initiateTopup. Kept for backward compatibility in tests.
+   */
+  async topup(
+    userId: string,
+    packageId: string,
+  ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
+    return this.grantPackageCredits(userId, packageId);
   }
 
   /**
@@ -126,29 +235,25 @@ export class CreditService {
       throw new BadRequestException('Reason must be between 3 and 500 characters');
     }
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId, status: 'active' },
-        {
-          $inc: { creditsRemaining: credits },
-          $set: { lowBalanceNotifiedAt: null },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(userId, {
+      creditsRemaining: credits,
+      clearLowBalanceNotified: true,
+    });
 
     if (!updated) {
       throw new NotFoundException('No active plan found for user');
     }
 
-    await new this.topupModel({
+    await this.topups.create({
       userId,
       credits,
       priceUsd: 0,
       source: 'admin',
       adminUserId,
       reason: trimmedReason,
-    }).save();
+    });
+
+    this.emitBalanceUpdated(updated);
 
     return {
       creditsRemaining: updated.creditsRemaining,
@@ -176,7 +281,7 @@ export class CreditService {
     const total = rows.reduce((sum, row) => sum + row.credits, 0);
     if (total <= 0) return;
 
-    await this.ledgerModel.insertMany(
+    await this.ledger.insertMany(
       rows.map((row) => ({
         userId: args.userId,
         pipelineRef: args.pipelineId,
@@ -193,18 +298,10 @@ export class CreditService {
       })),
     );
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId: args.userId, status: 'active' },
-        {
-          $inc: {
-            creditsUsed: total,
-            creditsRemaining: -total,
-          },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+      creditsUsed: total,
+      creditsRemaining: -total,
+    });
 
     if (!updated) {
       throw new NotFoundException(
@@ -228,7 +325,7 @@ export class CreditService {
   }): Promise<void> {
     if (args.credits <= 0) return;
 
-    await new this.ledgerModel({
+    await this.ledger.create({
       userId: args.userId,
       pipelineRef: args.pipelineRef,
       contentRef: args.contentRef,
@@ -242,20 +339,12 @@ export class CreditService {
       creditPriceUsdSnapshot: args.creditPriceUsd,
       creditsCharged: args.credits,
       billingPeriod: currentBillingPeriod(),
-    }).save();
+    });
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId: args.userId, status: 'active' },
-        {
-          $inc: {
-            creditsUsed: args.credits,
-            creditsRemaining: -args.credits,
-          },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+      creditsUsed: args.credits,
+      creditsRemaining: -args.credits,
+    });
 
     if (!updated) {
       throw new NotFoundException(
@@ -279,7 +368,7 @@ export class CreditService {
   }): Promise<void> {
     if (args.credits <= 0) return;
 
-    await new this.ledgerModel({
+    await this.ledger.create({
       userId: args.userId,
       pipelineRef: args.pipelineRef,
       contentRef: args.contentRef,
@@ -293,21 +382,13 @@ export class CreditService {
       creditPriceUsdSnapshot: args.creditPriceUsd,
       creditsCharged: -args.credits,
       billingPeriod: currentBillingPeriod(),
-    }).save();
+    });
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId: args.userId, status: 'active' },
-        {
-          $inc: {
-            creditsUsed: -args.credits,
-            creditsRemaining: args.credits,
-          },
-          $set: { lowBalanceNotifiedAt: null },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+      creditsUsed: -args.credits,
+      creditsRemaining: args.credits,
+      clearLowBalanceNotified: true,
+    });
 
     if (updated) {
       this.emitBalanceUpdated(updated);
@@ -315,10 +396,7 @@ export class CreditService {
   }
 
   async getCreditsRemaining(userId: string): Promise<number> {
-    const userPlan = await this.userPlanModel
-      .findOne({ userId, status: 'active' })
-      .lean<{ creditsRemaining?: number }>()
-      .exec();
+    const userPlan = await this.userPlans.findActiveByUserId(userId);
     return userPlan?.creditsRemaining ?? 0;
   }
 
@@ -348,7 +426,7 @@ export class CreditService {
     if (args.credits <= 0) return;
 
     const channel = args.channel.trim().toLowerCase();
-    await new this.ledgerModel({
+    await this.ledger.create({
       userId: args.userId,
       pipelineRef: 'social-connect',
       nodeId: `social:${channel}`,
@@ -361,20 +439,12 @@ export class CreditService {
       creditPriceUsdSnapshot: args.creditPriceUsd,
       creditsCharged: args.credits,
       billingPeriod: currentBillingPeriod(),
-    }).save();
+    });
 
-    const updated = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId: args.userId, status: 'active' },
-        {
-          $inc: {
-            creditsUsed: args.credits,
-            creditsRemaining: -args.credits,
-          },
-        },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+      creditsUsed: args.credits,
+      creditsRemaining: -args.credits,
+    });
 
     if (!updated) {
       throw new NotFoundException(
@@ -402,7 +472,7 @@ export class CreditService {
     if (total <= 0) return;
 
     try {
-      await this.ledgerModel.insertMany(
+      await this.ledger.insertMany(
         rows.map((row) => ({
           userId: args.userId,
           pipelineRef: args.pipelineId,
@@ -419,22 +489,12 @@ export class CreditService {
         })),
       );
 
-      await this.userPlanModel
-        .findOneAndUpdate(
-          { userId: args.userId, status: 'active' },
-          {
-            $inc: {
-              creditsUsed: -total,
-              creditsRemaining: total,
-            },
-            $set: { lowBalanceNotifiedAt: null },
-          },
-          { new: true },
-        )
-        .exec()
-        .then((updated) => {
-          if (updated) this.emitBalanceUpdated(updated);
-        });
+      const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+        creditsUsed: -total,
+        creditsRemaining: total,
+        clearLowBalanceNotified: true,
+      });
+      if (updated) this.emitBalanceUpdated(updated);
     } catch (err) {
       this.logger.warn(
         `Pipeline credit refund failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -472,7 +532,7 @@ export class CreditService {
         creditPriceUsdSnapshot = calc.creditPriceUsdSnapshot;
       }
 
-      await new this.ledgerModel({
+      await this.ledger.create({
         userId: dto.userId,
         pipelineRef: dto.pipelineRef,
         campaignRef: dto.campaignRef,
@@ -487,20 +547,12 @@ export class CreditService {
         creditPriceUsdSnapshot,
         creditsCharged,
         billingPeriod: dto.billingPeriod,
-      }).save();
+      });
 
-      const updated = await this.userPlanModel
-        .findOneAndUpdate(
-          { userId: dto.userId, status: 'active' },
-          {
-            $inc: {
-              creditsUsed: creditsCharged,
-              creditsRemaining: -creditsCharged,
-            },
-          },
-          { new: true },
-        )
-        .exec();
+      const updated = await this.userPlans.adjustActiveCredits(dto.userId, {
+        creditsUsed: creditsCharged,
+        creditsRemaining: -creditsCharged,
+      });
 
       if (!updated) {
         this.logger.warn(
@@ -519,7 +571,7 @@ export class CreditService {
     }
   }
 
-  private emitBalanceUpdated(userPlan: UserPlanDocument): void {
+  private emitBalanceUpdated(userPlan: UserPlanRecord): void {
     try {
       this.events.emitToRoom(userRoom(userPlan.userId), 'credit:balance_updated', {
         userId: userPlan.userId,
@@ -532,7 +584,7 @@ export class CreditService {
     }
   }
 
-  private async maybeEmitLowBalance(userPlan: UserPlanDocument): Promise<void> {
+  private async maybeEmitLowBalance(userPlan: UserPlanRecord): Promise<void> {
     if (userPlan.creditsPerMonth <= 0) return;
     const pctRemaining =
       userPlan.creditsRemaining / userPlan.creditsPerMonth;
@@ -546,12 +598,7 @@ export class CreditService {
         creditsPerMonth: userPlan.creditsPerMonth,
         percentRemaining: pctRemaining * 100,
       });
-      await this.userPlanModel
-        .updateOne(
-          { _id: userPlan._id },
-          { $set: { lowBalanceNotifiedAt: new Date() } },
-        )
-        .exec();
+      await this.userPlans.markLowBalanceNotified(userPlan.id);
     } catch {
       // noop — credit layer must not break pipelines
     }

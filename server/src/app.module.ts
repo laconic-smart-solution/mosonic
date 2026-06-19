@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
+import { DatabaseModule } from './database/database.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -37,6 +37,7 @@ import {
 
 @Module({
   imports: [
+    DatabaseModule,
     ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
@@ -83,17 +84,6 @@ import {
           removeOnFail: 200,
         },
       }),
-      inject: [ConfigService],
-    }),
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const uri = configService.get<string>('MONGODB_URI');
-        if (!uri) {
-          throw new Error('MONGODB_URI is not set');
-        }
-        return { uri };
-      },
       inject: [ConfigService],
     }),
   ],

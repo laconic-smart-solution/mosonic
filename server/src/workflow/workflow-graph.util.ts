@@ -9,6 +9,20 @@ export interface WorkflowGraphEdge {
   targetHandle?: string;
 }
 
+/** Parse workflow template edges stored as Prisma JSON. */
+export function parseWorkflowEdges(json: unknown): WorkflowGraphEdge[] {
+  if (!Array.isArray(json)) return [];
+  return json
+    .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+    .map((e) => ({
+      from: String(e.from ?? ''),
+      to: String(e.to ?? ''),
+      ...(typeof e.sourceHandle === 'string' ? { sourceHandle: e.sourceHandle } : {}),
+      ...(typeof e.targetHandle === 'string' ? { targetHandle: e.targetHandle } : {}),
+    }))
+    .filter((e) => e.from && e.to);
+}
+
 export function buildLinearEdgesFromOrder(
   nodes: Array<{ nodeId: string; order: number }>,
 ): WorkflowGraphEdge[] {

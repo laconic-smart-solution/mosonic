@@ -1,10 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Inject, Injectable } from '@nestjs/common';
+import type { PipelineLogRecord } from '../domain/pipeline/pipeline.types';
+import type { IPipelineLogRepository } from '../repositories/interfaces/pipeline-log.repository.interface';
+import { PIPELINE_LOG_REPOSITORY } from '../repositories/tokens';
 import {
   LogLevel,
-  PipelineLog,
-  PipelineLogDocument,
   PipelineLogStatus,
 } from './schemas/pipeline-log.schema';
 import type { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -26,23 +25,19 @@ export interface AppendPipelineLogDto {
 @Injectable()
 export class LoggingService {
   constructor(
-    @InjectModel(PipelineLog.name)
-    private readonly logModel: Model<PipelineLogDocument>,
+    @Inject(PIPELINE_LOG_REPOSITORY)
+    private readonly logs: IPipelineLogRepository,
   ) {}
 
-  async findByPipelineRef(
+  findByPipelineRef(
     pipelineRef: string,
     limit = 500,
-  ): Promise<PipelineLogDocument[]> {
-    return this.logModel
-      .find({ pipelineRef })
-      .sort({ timestamp: 1 })
-      .limit(limit)
-      .exec();
+  ): Promise<PipelineLogRecord[]> {
+    return this.logs.findByPipelineRef(pipelineRef, limit);
   }
 
-  async appendLog(dto: AppendPipelineLogDto): Promise<PipelineLogDocument> {
-    return this.logModel.create({
+  appendLog(dto: AppendPipelineLogDto): Promise<PipelineLogRecord> {
+    return this.logs.append({
       pipelineRef: dto.pipelineRef,
       workflowRef: dto.workflowRef,
       nodeId: dto.nodeId,

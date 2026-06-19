@@ -5,12 +5,10 @@ jest.mock('./dependency-resolver.service', () => ({
 }));
 
 import { BadRequestException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import { GraphReplanService } from './graph-replan.service';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import { DependencyResolverService } from './dependency-resolver.service';
-import { Pipeline } from '../pipeline/schemas/pipeline.schema';
 import {
   PipelineNodeExecutionStatus,
   PipelineStatus,
@@ -19,8 +17,6 @@ import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 
 describe('GraphReplanService', () => {
   let service: GraphReplanService;
-  const updateOne = jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) });
-  const pipelineModel = { updateOne };
   const pipelineRepo = {
     findById: jest.fn(),
   };
@@ -33,8 +29,7 @@ describe('GraphReplanService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         GraphReplanService,
-        { provide: getModelToken(Pipeline.name), useValue: pipelineModel },
-        { provide: PipelineRepository, useValue: pipelineRepo },
+        { provide: PIPELINE_REPOSITORY, useValue: pipelineRepo },
         { provide: DependencyResolverService, useValue: resolver },
       ],
     }).compile();

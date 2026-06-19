@@ -31,10 +31,7 @@ export function mergeRuleWithOverlay(
   base: Rule | RuleDocument,
   patches: AppliedSuggestionPatch[],
 ): Rule {
-  const plain =
-    typeof (base as RuleDocument).toObject === 'function'
-      ? ((base as RuleDocument).toObject() as Rule)
-      : structuredClone(base as Rule);
+  const plain = structuredClone(base as Rule);
   let merged = plain;
   for (const patch of patches) {
     const dto = buildSuggestionUpdateDto(

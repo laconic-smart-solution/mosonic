@@ -1,17 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, type PipelineStage } from 'mongoose';
+import { Inject, Injectable } from '@nestjs/common';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { aggregateMetrics } from '../analytics/analytics-metrics.util';
 import type { ContentPerformanceEntry } from '../analytics/schemas/analytics.schema';
+import { ContentStatus } from '../content/schemas/content.schema';
 import { PostAnalyticsService } from '../post/post-analytics.service';
-import { Content, ContentStatus, type ContentDocument } from '../content/schemas/content.schema';
+import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
+import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
+import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
 import {
-  Upload,
-  UploadChannelStatus,
-  type UploadDocument,
-} from '../upload/schemas/upload.schema';
+  CONTENT_REPOSITORY,
+  UPLOAD_REPOSITORY,
+} from '../repositories/tokens';
+import { UploadChannelStatus } from '../upload/schemas/upload.schema';
+import { uploadChannels } from '../upload/upload-record.util';
 import type {
   DashboardRecentActivityDto,
   DashboardResponseDto,
@@ -20,6 +21,18 @@ import type {
 } from './dto/dashboard-response.dto';
 
 type DateRange = { from: Date; to: Date };
+
+type FlatChannel = {
+  uploadId: string;
+  contentRef: string;
+  ruleRef: string;
+  channel: string;
+  caption: string;
+  status: UploadChannelStatus;
+  scheduledAt: Date | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
 
 function monthRange(now: Date): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
@@ -32,13 +45,33 @@ function safeIso(d: unknown): string | null {
   return null;
 }
 
+function flattenChannels(uploads: UploadRecord[]): FlatChannel[] {
+  const out: FlatChannel[] = [];
+  for (const upload of uploads) {
+    for (const ch of uploadChannels(upload)) {
+      out.push({
+        uploadId: upload.uploadId,
+        contentRef: upload.contentRef,
+        ruleRef: upload.ruleRef ?? '',
+        channel: ch.channel,
+        caption: (ch.caption ?? '').toString(),
+        status: ch.status as UploadChannelStatus,
+        scheduledAt: ch.scheduledAt ?? null,
+        publishedAt: ch.publishedAt ?? null,
+        updatedAt: upload.updatedAt,
+      });
+    }
+  }
+  return out;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
-    @InjectModel(Content.name)
-    private readonly contentModel: Model<ContentDocument>,
-    @InjectModel(Upload.name)
-    private readonly uploadModel: Model<UploadDocument>,
+    @Inject(CONTENT_REPOSITORY)
+    private readonly contentRepository: IContentRepository,
+    @Inject(UPLOAD_REPOSITORY)
+    private readonly uploadRepository: IUploadRepository,
     private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
@@ -56,7 +89,7 @@ export class DashboardService {
       weeklyPerformance,
       recentActivity,
     ] = await Promise.all([
-      this.countDraftContent(auth),
+      this.contentRepository.countDrafts(auth),
       this.countPublishedChannelsInRange(auth, monthFrom, monthTo),
       this.countScheduledChannelsFromNow(auth, now),
       this.countFailedChannels(auth),
@@ -84,24 +117,15 @@ export class DashboardService {
     };
   }
 
-  private async countDraftContent(auth: TenancyAuth): Promise<number> {
-    const filter = mergeUserIdFilter({ status: ContentStatus.Draft }, auth);
-    return this.contentModel.countDocuments(filter).exec();
+  private async loadScopedChannels(auth: TenancyAuth): Promise<FlatChannel[]> {
+    const uploads = await this.uploadRepository.findAllScoped(auth);
+    return flattenChannels(uploads);
   }
 
   private async countFailedChannels(auth: TenancyAuth): Promise<number> {
-    const filter = mergeUserIdFilter(
-      { channels: { $elemMatch: { status: UploadChannelStatus.Failed } } },
-      auth,
-    );
-    const pipeline: PipelineStage[] = [
-      { $match: filter },
-      { $unwind: '$channels' },
-      { $match: { 'channels.status': UploadChannelStatus.Failed } },
-      { $count: 'n' },
-    ];
-    const res = await this.uploadModel.aggregate(pipeline).exec();
-    return typeof res?.[0]?.n === 'number' ? res[0].n : 0;
+    const channels = await this.loadScopedChannels(auth);
+    return channels.filter((ch) => ch.status === UploadChannelStatus.Failed)
+      .length;
   }
 
   private async countPublishedChannelsInRange(
@@ -109,60 +133,27 @@ export class DashboardService {
     from: Date,
     to: Date,
   ): Promise<number> {
-    const filter = mergeUserIdFilter(
-      {
-        channels: {
-          $elemMatch: {
-            status: UploadChannelStatus.Published,
-            publishedAt: { $gte: from, $lt: to },
-          },
-        },
-      },
-      auth,
-    );
-    const pipeline: PipelineStage[] = [
-      { $match: filter },
-      { $unwind: '$channels' },
-      {
-        $match: {
-          'channels.status': UploadChannelStatus.Published,
-          'channels.publishedAt': { $gte: from, $lt: to },
-        },
-      },
-      { $count: 'n' },
-    ];
-    const res = await this.uploadModel.aggregate(pipeline).exec();
-    return typeof res?.[0]?.n === 'number' ? res[0].n : 0;
+    const channels = await this.loadScopedChannels(auth);
+    return channels.filter(
+      (ch) =>
+        ch.status === UploadChannelStatus.Published &&
+        ch.publishedAt != null &&
+        ch.publishedAt >= from &&
+        ch.publishedAt < to,
+    ).length;
   }
 
   private async countScheduledChannelsFromNow(
     auth: TenancyAuth,
     now: Date,
   ): Promise<number> {
-    const filter = mergeUserIdFilter(
-      {
-        channels: {
-          $elemMatch: {
-            status: UploadChannelStatus.Scheduled,
-            scheduledAt: { $gte: now },
-          },
-        },
-      },
-      auth,
-    );
-    const pipeline: PipelineStage[] = [
-      { $match: filter },
-      { $unwind: '$channels' },
-      {
-        $match: {
-          'channels.status': UploadChannelStatus.Scheduled,
-          'channels.scheduledAt': { $gte: now },
-        },
-      },
-      { $count: 'n' },
-    ];
-    const res = await this.uploadModel.aggregate(pipeline).exec();
-    return typeof res?.[0]?.n === 'number' ? res[0].n : 0;
+    const channels = await this.loadScopedChannels(auth);
+    return channels.filter(
+      (ch) =>
+        ch.status === UploadChannelStatus.Scheduled &&
+        ch.scheduledAt != null &&
+        ch.scheduledAt >= now,
+    ).length;
   }
 
   private async listUpcomingScheduled(
@@ -170,55 +161,26 @@ export class DashboardService {
     now: Date,
     limit: number,
   ): Promise<DashboardUpcomingScheduledItemDto[]> {
-    const filter = mergeUserIdFilter(
-      {
-        channels: {
-          $elemMatch: {
-            status: UploadChannelStatus.Scheduled,
-            scheduledAt: { $gte: now },
-          },
-        },
-      },
-      auth,
-    );
-    const pipeline: PipelineStage[] = [
-      { $match: filter },
-      { $unwind: '$channels' },
-      {
-        $match: {
-          'channels.status': UploadChannelStatus.Scheduled,
-          'channels.scheduledAt': { $gte: now },
-        },
-      },
-      { $sort: { 'channels.scheduledAt': 1 } },
-      { $limit: limit },
-      {
-        $project: {
-          _id: 0,
-          uploadId: 1,
-          contentRef: 1,
-          ruleRef: 1,
-          channel: '$channels.channel',
-          caption: '$channels.caption',
-          scheduledAt: '$channels.scheduledAt',
-        },
-      },
-    ];
-    const rows = (await this.uploadModel.aggregate(pipeline).exec()) as Array<{
-      uploadId?: string;
-      contentRef?: string;
-      ruleRef?: string;
-      channel?: string;
-      caption?: string;
-      scheduledAt?: Date;
-    }>;
-    return rows
+    const channels = (await this.loadScopedChannels(auth))
+      .filter(
+        (ch) =>
+          ch.status === UploadChannelStatus.Scheduled &&
+          ch.scheduledAt != null &&
+          ch.scheduledAt >= now,
+      )
+      .sort(
+        (a, b) =>
+          (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0),
+      )
+      .slice(0, limit);
+
+    return channels
       .map((r) => ({
-        uploadId: r.uploadId ?? '',
-        contentRef: r.contentRef ?? '',
-        ruleRef: r.ruleRef ?? '',
-        channel: r.channel ?? '',
-        caption: (r.caption ?? '').toString(),
+        uploadId: r.uploadId,
+        contentRef: r.contentRef,
+        ruleRef: r.ruleRef,
+        channel: r.channel,
+        caption: r.caption,
         scheduledAt: safeIso(r.scheduledAt) ?? now.toISOString(),
       }))
       .filter((r) => r.uploadId && r.contentRef && r.channel);
@@ -240,20 +202,16 @@ export class DashboardService {
 
     let bestContentLabel = summary.bestPerformingContent;
     if (summary.bestPerformingContent) {
-      const content = await this.contentModel
-        .findOne(
-          mergeUserIdFilter(
-            { contentId: summary.bestPerformingContent },
-            auth,
-          ),
-        )
-        .select({ outputs: 1, userEdits: 1 })
-        .lean()
-        .exec();
-      const c = content as
-        | { outputs?: { text?: string }; userEdits?: { text?: string } }
-        | null;
-      const text = (c?.userEdits?.text ?? c?.outputs?.text ?? '').trim();
+      const content = await this.contentRepository.findById(
+        summary.bestPerformingContent,
+        auth,
+      );
+      const outputs = content?.outputs as { text?: string } | null | undefined;
+      const userEdits = content?.userEdits as
+        | { text?: string }
+        | null
+        | undefined;
+      const text = (userEdits?.text ?? outputs?.text ?? '').trim();
       if (text) {
         bestContentLabel =
           text.length > 48 ? `${text.slice(0, 48).trim()}…` : text;
@@ -276,49 +234,41 @@ export class DashboardService {
     limit: number,
   ): Promise<DashboardRecentActivityDto[]> {
     const [recentContents, recentUploadEvents] = await Promise.all([
-      this.contentModel
-        .find(mergeUserIdFilter({}, auth))
-        .sort({ updatedAt: -1 })
-        .limit(10)
-        .select({ contentId: 1, status: 1, updatedAt: 1 })
-        .lean()
-        .exec(),
+      this.contentRepository.findRecent(auth, 10),
       this.listRecentUploadChannelEvents(auth, 15),
     ]);
 
-    const contentEvents: DashboardRecentActivityDto[] = (recentContents as Array<{
-      contentId: string;
-      status: ContentStatus;
-      updatedAt?: Date;
-    }>).map((c) => {
-      const at = safeIso(c.updatedAt) ?? now.toISOString();
-      const status = c.status;
-      if (status === ContentStatus.Approved) {
+    const contentEvents: DashboardRecentActivityDto[] = recentContents.map(
+      (c) => {
+        const at = safeIso(c.updatedAt) ?? now.toISOString();
+        const status = c.status as ContentStatus;
+        if (status === ContentStatus.Approved) {
+          return {
+            kind: 'content_approved',
+            label: 'Content approved',
+            at,
+            contentRef: c.contentId,
+            status,
+          };
+        }
+        if (status === ContentStatus.Rejected) {
+          return {
+            kind: 'content_rejected',
+            label: 'Content rejected',
+            at,
+            contentRef: c.contentId,
+            status,
+          };
+        }
         return {
-          kind: 'content_approved',
-          label: 'Content approved',
+          kind: 'content_draft_updated',
+          label: 'Draft updated',
           at,
           contentRef: c.contentId,
           status,
         };
-      }
-      if (status === ContentStatus.Rejected) {
-        return {
-          kind: 'content_rejected',
-          label: 'Content rejected',
-          at,
-          contentRef: c.contentId,
-          status,
-        };
-      }
-      return {
-        kind: 'content_draft_updated',
-        label: 'Draft updated',
-        at,
-        contentRef: c.contentId,
-        status,
-      };
-    });
+      },
+    );
 
     const merged = [...contentEvents, ...recentUploadEvents].sort(
       (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0),
@@ -330,74 +280,30 @@ export class DashboardService {
     auth: TenancyAuth,
     limit: number,
   ): Promise<DashboardRecentActivityDto[]> {
-    const filter = mergeUserIdFilter(
-      {
-        channels: {
-          $elemMatch: {
-            status: {
-              $in: [
-                UploadChannelStatus.Published,
-                UploadChannelStatus.Scheduled,
-                UploadChannelStatus.Failed,
-              ],
-            },
-          },
-        },
-      },
-      auth,
-    );
-    const pipeline: PipelineStage[] = [
-      { $match: filter },
-      { $unwind: '$channels' },
-      {
-        $match: {
-          'channels.status': {
-            $in: [
-              UploadChannelStatus.Published,
-              UploadChannelStatus.Scheduled,
-              UploadChannelStatus.Failed,
-            ],
-          },
-        },
-      },
-      {
-        $addFields: {
-          eventAt: {
-            $ifNull: [
-              '$channels.publishedAt',
-              { $ifNull: ['$channels.scheduledAt', '$updatedAt'] },
-            ],
-          },
-        },
-      },
-      { $sort: { eventAt: -1 } },
-      { $limit: limit },
-      {
-        $project: {
-          _id: 0,
-          uploadId: 1,
-          contentRef: 1,
-          channel: '$channels.channel',
-          status: '$channels.status',
-          scheduledAt: '$channels.scheduledAt',
-          publishedAt: '$channels.publishedAt',
-          eventAt: 1,
-        },
-      },
-    ];
-    const rows = (await this.uploadModel.aggregate(pipeline).exec()) as Array<{
-      uploadId?: string;
-      contentRef?: string;
-      channel?: string;
-      status?: UploadChannelStatus;
-      eventAt?: Date;
-    }>;
+    const relevantStatuses = new Set<UploadChannelStatus>([
+      UploadChannelStatus.Published,
+      UploadChannelStatus.Scheduled,
+      UploadChannelStatus.Failed,
+    ]);
+
+    const rows = (await this.loadScopedChannels(auth))
+      .filter((ch) => relevantStatuses.has(ch.status))
+      .map((r) => ({
+        ...r,
+        eventAt:
+          r.publishedAt ??
+          r.scheduledAt ??
+          r.updatedAt,
+      }))
+      .sort((a, b) => b.eventAt.getTime() - a.eventAt.getTime())
+      .slice(0, limit);
+
     return rows
       .map((r) => {
         const at = safeIso(r.eventAt) ?? new Date().toISOString();
-        const channel = r.channel ?? '';
-        const uploadId = r.uploadId ?? undefined;
-        const contentRef = r.contentRef ?? undefined;
+        const channel = r.channel;
+        const uploadId = r.uploadId;
+        const contentRef = r.contentRef;
         if (r.status === UploadChannelStatus.Published) {
           return {
             kind: 'upload_published',
@@ -430,4 +336,3 @@ export class DashboardService {
       .filter((e) => Boolean(e.uploadId) && Boolean(e.contentRef));
   }
 }
-

@@ -1,62 +1,35 @@
 import {
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import { Model, type AnyBulkWriteOperation } from 'mongoose';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
-import { User, type UserDocument } from '../users/schemas/user.schema';
-import { AssignPlanDto } from './dto/assign-plan.dto';
+import type { PlanRecord, UserPlanRecord } from '../domain/plans/plan.types';
+import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
+import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
+import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
+import {
+  PLAN_REPOSITORY,
+  USER_PLAN_REPOSITORY,
+  USER_REPOSITORY,
+} from '../repositories/tokens';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
-import { Plan, type PlanDocument } from './schemas/plan.schema';
-import { UserPlan, type UserPlanDocument } from './schemas/user-plan.schema';
-
-const DEFAULT_PLANS: CreatePlanDto[] = [
-  {
-    name: 'Free',
-    priceThb: 0,
-    priceUsd: 0,
-    creditsOverride: 1000,
-    description: 'Free starter plan with monthly credits.',
-    features: ['1,000 credits / month', 'Community support'],
-  },
-  {
-    name: 'Basic',
-    priceThb: 1200,
-    priceUsd: 35,
-    description: 'For individuals and small teams getting started.',
-    features: ['All node types', 'Email support'],
-  },
-  {
-    name: 'Professional',
-    priceThb: 2000,
-    priceUsd: 58,
-    description: 'For growing teams with higher volume needs.',
-    features: ['Priority support', 'Advanced workflows'],
-  },
-  {
-    name: 'Enterprise',
-    priceThb: 4000,
-    priceUsd: 115,
-    description: 'For agencies and enterprises at scale.',
-    features: ['Dedicated support', 'Custom integrations'],
-  },
-];
+import { DEFAULT_PLANS } from './plan-defaults';
 
 @Injectable()
 export class PlanService implements OnModuleInit {
   private readonly logger = new Logger(PlanService.name);
 
   constructor(
-    @InjectModel(Plan.name) private readonly planModel: Model<PlanDocument>,
-    @InjectModel(UserPlan.name)
-    private readonly userPlanModel: Model<UserPlanDocument>,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(PLAN_REPOSITORY) private readonly plans: IPlanRepository,
+    @Inject(USER_PLAN_REPOSITORY)
+    private readonly userPlans: IUserPlanRepository,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
     private readonly calculation: CreditCalculationService,
   ) {}
 
@@ -66,7 +39,7 @@ export class PlanService implements OnModuleInit {
   }
 
   async getCreditsForPlan(
-    plan: Pick<Plan, 'priceUsd' | 'creditsOverride'>,
+    plan: Pick<PlanRecord, 'priceUsd' | 'creditsOverride'>,
   ): Promise<number> {
     if (plan.creditsOverride != null && plan.creditsOverride >= 0) {
       return Math.floor(plan.creditsOverride);
@@ -78,21 +51,18 @@ export class PlanService implements OnModuleInit {
 
   async bootstrapDefaultPlans(): Promise<void> {
     for (const seed of DEFAULT_PLANS) {
-      const existing = await this.planModel.findOne({ name: seed.name }).exec();
+      const existing = await this.plans.findByName(seed.name);
       if (existing) continue;
-      await this.planModel.create({ ...seed, isActive: true });
+      await this.plans.create({ ...seed, isActive: true });
       this.logger.log(`Seeded plan: ${seed.name}`);
     }
   }
 
   async bootstrapExistingUsers(): Promise<void> {
-    const users = await this.userModel.find({}).select({ userId: 1 }).lean().exec();
-    for (const row of users) {
-      const userId = typeof row.userId === 'string' ? row.userId : '';
+    const userIds = await this.users.listAllUserIds();
+    for (const userId of userIds) {
       if (!userId) continue;
-      const hasPlan = await this.userPlanModel
-        .exists({ userId, status: 'active' })
-        .exec();
+      const hasPlan = await this.userPlans.existsActiveForUser(userId);
       if (!hasPlan) {
         await this.assignDefaultPlan(userId);
       }
@@ -100,26 +70,20 @@ export class PlanService implements OnModuleInit {
   }
 
   async listPlans() {
-    const plans = await this.planModel.find({}).sort({ priceThb: 1 }).lean().exec();
-    const counts = await this.userPlanModel
-      .aggregate<{ _id: string; count: number }>([
-        { $match: { status: 'active' } },
-        { $group: { _id: '$planId', count: { $sum: 1 } } },
-      ])
-      .exec();
-    const countMap = new Map(counts.map((c) => [c._id, c.count]));
+    const plans = await this.plans.findAllSortedByPrice();
+    const countMap = await this.plans.countActiveUsersByPlan();
     const withCredits = await Promise.all(
       plans.map(async (p) => ({
         ...p,
         creditsPerMonth: await this.getCreditsForPlan(p),
-        activeUsers: countMap.get(p.planId as string) ?? 0,
+        activeUsers: countMap.get(p.planId) ?? 0,
       })),
     );
     return withCredits;
   }
 
   async createPlan(dto: CreatePlanDto) {
-    return this.planModel.create({
+    return this.plans.create({
       ...dto,
       isActive: dto.isActive ?? true,
       features: dto.features ?? [],
@@ -127,9 +91,7 @@ export class PlanService implements OnModuleInit {
   }
 
   async updatePlan(planId: string, dto: UpdatePlanDto) {
-    const plan = await this.planModel
-      .findOneAndUpdate({ planId }, { $set: dto }, { new: true })
-      .exec();
+    const plan = await this.plans.update(planId, dto);
     if (!plan) {
       throw new NotFoundException(`Plan ${planId} not found`);
     }
@@ -137,9 +99,7 @@ export class PlanService implements OnModuleInit {
   }
 
   async softDeletePlan(planId: string) {
-    const plan = await this.planModel
-      .findOneAndUpdate({ planId }, { $set: { isActive: false } }, { new: true })
-      .exec();
+    const plan = await this.plans.update(planId, { isActive: false });
     if (!plan) {
       throw new NotFoundException(`Plan ${planId} not found`);
     }
@@ -147,28 +107,23 @@ export class PlanService implements OnModuleInit {
   }
 
   async getPlanUsers(planId: string, page = 1, limit = 20) {
-    const plan = await this.planModel.findOne({ planId }).lean().exec();
+    const plan = await this.plans.findByPlanId(planId);
     if (!plan) {
       throw new NotFoundException(`Plan ${planId} not found`);
     }
-    const filter = { planId, status: 'active' as const };
-    const [users, total] = await Promise.all([
-      this.userPlanModel
-        .find(filter)
-        .sort({ updatedAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.userPlanModel.countDocuments(filter).exec(),
-    ]);
+    const { rows: users, total } = await this.userPlans.findActiveByPlanId(
+      planId,
+      page,
+      limit,
+    );
 
     const userIds = users.map((u) => u.userId);
-    const userDocs = await this.userModel
-      .find({ userId: { $in: userIds } })
-      .select({ userId: 1, email: 1, displayName: 1, firstName: 1, lastName: 1 })
-      .lean()
-      .exec();
+    const userDocs = await this.users.findManyByUserIds(userIds, {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+    });
     const userMap = new Map(userDocs.map((u) => [u.userId, u]));
 
     return {
@@ -182,9 +137,7 @@ export class PlanService implements OnModuleInit {
           userId: up.userId,
           email: u?.email,
           displayName:
-            ((u as { displayName?: string })?.displayName ??
-              [u?.firstName, u?.lastName].filter(Boolean).join(' ')) ||
-            undefined,
+            [u?.firstName, u?.lastName].filter(Boolean).join(' ') || undefined,
           creditsUsed: up.creditsUsed,
           creditsRemaining: up.creditsRemaining,
         };
@@ -195,48 +148,31 @@ export class PlanService implements OnModuleInit {
     };
   }
 
-  async assignUserToPlan(planId: string, userId: string): Promise<UserPlanDocument> {
-    const plan = await this.planModel.findOne({ planId, isActive: true }).exec();
-    if (!plan) {
+  async assignUserToPlan(
+    planId: string,
+    userId: string,
+  ): Promise<UserPlanRecord> {
+    const plan = await this.plans.findByPlanId(planId);
+    if (!plan?.isActive) {
       throw new NotFoundException(`Active plan ${planId} not found`);
     }
 
     const credits = await this.getCreditsForPlan(plan);
     const billingPeriod = currentBillingPeriod();
 
-    await this.userPlanModel
-      .updateMany({ userId, status: 'active', planId: { $ne: planId } }, {
-        $set: { status: 'suspended' },
-      })
-      .exec();
+    await this.userPlans.suspendOtherActivePlans(userId, planId);
 
-    const userPlan = await this.userPlanModel
-      .findOneAndUpdate(
-        { userId, status: 'active' },
-        {
-          $set: {
-            userId,
-            planId,
-            creditsPerMonth: credits,
-            billingPeriod,
-            creditsUsed: 0,
-            creditsRemaining: credits,
-            status: 'active',
-            lowBalanceNotifiedAt: null,
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
-
-    return userPlan!;
+    return this.userPlans.upsertActivePlan({
+      userId,
+      planId,
+      creditsPerMonth: credits,
+      billingPeriod,
+      creditsRemaining: credits,
+    });
   }
 
-  async assignDefaultPlan(userId: string): Promise<UserPlanDocument | null> {
-    const plan = await this.planModel
-      .findOne({ isActive: true })
-      .sort({ priceThb: 1 })
-      .exec();
+  async assignDefaultPlan(userId: string): Promise<UserPlanRecord | null> {
+    const plan = await this.plans.findActiveByLowestPrice();
     if (!plan) {
       this.logger.warn('No active plan for assignDefaultPlan');
       return null;
@@ -245,12 +181,9 @@ export class PlanService implements OnModuleInit {
   }
 
   async getUserPlan(userId: string) {
-    const userPlan = await this.userPlanModel
-      .findOne({ userId, status: 'active' })
-      .lean()
-      .exec();
+    const userPlan = await this.userPlans.findActiveByUserId(userId);
     if (!userPlan) return null;
-    const plan = await this.planModel.findOne({ planId: userPlan.planId }).lean().exec();
+    const plan = await this.plans.findByPlanId(userPlan.planId);
     const creditsPerMonth = plan
       ? await this.getCreditsForPlan(plan)
       : userPlan.creditsPerMonth;
@@ -263,43 +196,35 @@ export class PlanService implements OnModuleInit {
   @Cron('0 0 1 * *')
   async resetMonthlyCredits(): Promise<void> {
     const billingPeriod = currentBillingPeriod();
-    const activePlans = await this.userPlanModel
-      .find({ status: 'active' })
-      .lean()
-      .exec();
+    const activePlans = await this.userPlans.findAllActive();
 
     const planIds = [...new Set(activePlans.map((up) => up.planId))];
-    const plans = await this.planModel
-      .find({ planId: { $in: planIds } })
-      .lean()
-      .exec();
+    const plans = await this.plans.findManyByPlanIds(planIds);
     const planMap = new Map(plans.map((p) => [p.planId, p]));
 
-    const bulkOps: AnyBulkWriteOperation<UserPlanDocument>[] = [];
+    const updates: Array<{
+      id: string;
+      creditsPerMonth: number;
+      creditsRemaining: number;
+      billingPeriod: Date;
+    }> = [];
+
     for (const up of activePlans) {
       const plan = planMap.get(up.planId);
       if (!plan) continue;
       const credits = await this.getCreditsForPlan(plan);
-      bulkOps.push({
-        updateOne: {
-          filter: { _id: up._id },
-          update: {
-            $set: {
-              creditsPerMonth: credits,
-              creditsUsed: 0,
-              creditsRemaining: credits,
-              billingPeriod,
-              lowBalanceNotifiedAt: null,
-            },
-          },
-        },
+      updates.push({
+        id: up.id,
+        creditsPerMonth: credits,
+        creditsRemaining: credits,
+        billingPeriod,
       });
     }
 
-    if (bulkOps.length > 0) {
-      await this.userPlanModel.bulkWrite(bulkOps);
+    if (updates.length > 0) {
+      await this.userPlans.updateManyActive(updates);
     }
 
-    this.logger.log(`Monthly credit reset for ${bulkOps.length} user plans`);
+    this.logger.log(`Monthly credit reset for ${updates.length} user plans`);
   }
 }

@@ -1,12 +1,14 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
-import type { NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
+import type { INewsTriggerLogRepository } from '../repositories/interfaces/news-trigger-log.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import {
+  NEWS_TRIGGER_LOG_REPOSITORY,
+  RULE_REPOSITORY,
+} from '../repositories/tokens';
+import type { NewsTriggerLogLike, NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
 import {
   manualRunGroupKey,
   pendingRunStatus,
@@ -16,20 +18,16 @@ import { NEWS_TRIGGER_QUEUE } from './news-trigger.constants';
 import { findManualJobForRun } from './news-trigger-manual-job.util';
 import { logNewsTriggerQueueState, workersInApiProcessLabel } from './news-trigger-queue-diagnostics.util';
 import { reconcileRunningManualLog } from './news-trigger-run-reconcile.util';
-import {
-  NewsTriggerLog,
-  type NewsTriggerLogDocument,
-} from './schemas/news-trigger-log.schema';
 
 @Injectable()
 export class NewsTriggerRunService {
   private readonly logger = new Logger(NewsTriggerRunService.name);
 
   constructor(
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(NewsTriggerLog.name)
-    private readonly logModel: Model<NewsTriggerLogDocument>,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    @Inject(NEWS_TRIGGER_LOG_REPOSITORY)
+    private readonly logs: INewsTriggerLogRepository,
     @InjectQueue(NEWS_TRIGGER_QUEUE)
     private readonly queue: Queue,
   ) {}
@@ -40,18 +38,14 @@ export class NewsTriggerRunService {
   ): Promise<NewsTriggerRunStatusDto | null> {
     await this.assertRuleAccess(ruleId, auth);
 
-    const log = await this.logModel
-      .findOne({ group: manualRunGroupKey(ruleId) })
-      .sort({ ranAt: -1 })
-      .lean()
-      .exec();
+    const log = await this.logs.findLatestByGroup(manualRunGroupKey(ruleId));
 
     if (!log) {
       this.logger.debug(`[NewsTrigger] getLatestManualRun rule=${ruleId} — no logs`);
       return null;
     }
 
-    const summary = summarizeNewsTriggerLog(log, ruleId);
+    const summary = summarizeNewsTriggerLog(log as unknown as NewsTriggerLogLike, ruleId);
     if (summary.status !== 'running') {
       this.logger.debug(
         `[NewsTrigger] getLatestManualRun rule=${ruleId} run=${log.runId} status=${summary.status}`,
@@ -72,7 +66,7 @@ export class NewsTriggerRunService {
     );
 
     const reconciled = await reconcileRunningManualLog(
-      this.logModel,
+      this.logs,
       this.logger,
       ruleId,
       log,
@@ -128,7 +122,7 @@ export class NewsTriggerRunService {
   ): Promise<NewsTriggerRunStatusDto> {
     await this.assertRuleAccess(ruleId, auth);
 
-    const log = await this.logModel.findOne({ runId }).lean().exec();
+    const log = await this.logs.findByRunId(runId);
     if (!log) {
       return pendingRunStatus(runId);
     }
@@ -137,18 +131,14 @@ export class NewsTriggerRunService {
       throw new NotFoundException(`Run ${runId} not found for this campaign`);
     }
 
-    return summarizeNewsTriggerLog(log, ruleId);
+    return summarizeNewsTriggerLog(log as unknown as NewsTriggerLogLike, ruleId);
   }
 
   private async assertRuleAccess(
     ruleId: string,
     auth: TenancyAuth,
   ): Promise<void> {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .select('ruleId')
-      .lean()
-      .exec();
+    const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }

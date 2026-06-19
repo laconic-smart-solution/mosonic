@@ -1,5 +1,4 @@
-import { UserRole } from '../users/schemas/user.schema';
-import type { User } from '../users/schemas/user.schema';
+import { UserRole, type UserRecord } from '../domain/users/user.types';
 import type { TenancyAuth } from './tenancy.types';
 
 /**
@@ -17,6 +16,8 @@ export function mergeUserIdFilter(
   return { ...filter, userId: auth.userId };
 }
 
-export function tenancyFromLocalUser(user: User): TenancyAuth {
-  return { userId: user.userId, role: user.role };
+export function tenancyFromLocalUser(
+  user: Pick<UserRecord, 'userId'> & { role: UserRole | string },
+): TenancyAuth {
+  return { userId: user.userId, role: user.role as UserRole };
 }

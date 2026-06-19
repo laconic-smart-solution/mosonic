@@ -1,22 +1,18 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
 import {
-  WorkflowNode,
   WorkflowNodeType,
   type WorkflowNodeConfig,
-  type WorkflowNodeDocument,
 } from '../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
-import { Pipeline, type PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { EventsService } from '../events/events.service';
 import { workflowCompletedNotification } from '../events/notification.util';
 import { RuleService } from '../rule/rule.service';
@@ -41,8 +37,6 @@ import type {
   WorkflowPageQueryDto,
 } from './dto/workflow-page-query.dto';
 import {
-  Workflow,
-  type WorkflowDocument,
   WorkflowStatus,
 } from './schemas/workflow.schema';
 import { WorkflowGenerationService } from './services/workflow-generation.service';
@@ -73,22 +67,28 @@ import {
   dedupeAdaptNodesPerLane,
 } from './pipeline-to-workflow-template.util';
 import type { ApplyPipelineToWorkflowResponseDto } from './dto/apply-pipeline-to-workflow.dto';
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import type { WorkflowRecord, WorkflowNodeRecord } from '../domain/workflow/workflow.types';
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
+import type { IWorkflowNodeRepository } from '../repositories/interfaces/workflow-node.repository.interface';
+import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
+import {
+  PIPELINE_REPOSITORY,
+  WORKFLOW_NODE_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../repositories/tokens';
 
 @Injectable()
 export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
 
   constructor(
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<WorkflowDocument>,
-    @InjectModel(WorkflowNode.name)
-    private readonly workflowNodeModel: Model<WorkflowNodeDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
+    @Inject(WORKFLOW_NODE_REPOSITORY)
+    private readonly workflowNodes: IWorkflowNodeRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     private readonly workflowGeneration: WorkflowGenerationService,
     private readonly llm: LlmService,
     private readonly ruleService: RuleService,
@@ -120,7 +120,9 @@ export class WorkflowService {
     const answers = body.answers;
 
     const rule = await this.ruleService.getRuleById(normalizedRuleId, auth);
-    const ruleChannelIds = resolveRuleChannelIds(rule.channels);
+    const ruleChannelIds = resolveRuleChannelIds(
+      (Array.isArray(rule.channels) ? rule.channels : []) as never[],
+    );
     if (!ruleChannelIds.length) {
       throw new BadRequestException(
         'Rule must include at least one distribution channel before generating a workflow',
@@ -132,10 +134,7 @@ export class WorkflowService {
       ruleChannelIds,
     );
 
-    const existing = await this.workflowModel
-      .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
-      .sort({ createdAt: -1 })
-      .exec();
+    const existing = await this.workflows.findLatestByRule(normalizedRuleId, auth);
     const workflowName = this.workflowNameFromAnswers(
       normalizedAnswers.additionalMessage,
       normalizedRuleId,
@@ -149,12 +148,11 @@ export class WorkflowService {
       ));
 
     if (existing?.workflowId) {
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId: existing.workflowId }, auth),
-          { $set: { status: WorkflowStatus.Generating, name: workflowName } },
-        )
-        .exec();
+      await this.workflows.updateById(
+        existing.workflowId,
+        { status: WorkflowStatus.Generating, name: workflowName },
+        auth,
+      );
     }
 
     void this.runGeneration(
@@ -189,18 +187,11 @@ export class WorkflowService {
     }>;
     edges: WorkflowGraphEdge[];
   }> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId }, auth))
-      .exec();
+    const workflow = await this.workflows.findById(workflowId, auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const nodes = await this.workflowNodeModel
-      .find(
-        mergeUserIdFilter({ workflowRef: workflowId }, auth),
-      )
-      .sort({ order: 1 })
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
     return this.mapWorkflowResponse(workflow, nodes);
   }
 
@@ -226,27 +217,19 @@ export class WorkflowService {
     }>;
     edges: WorkflowGraphEdge[];
   } | null> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ ruleRef: ruleId }, auth))
-      .sort({ createdAt: -1 })
-      .exec();
+    const workflow = await this.workflows.findLatestByRule(ruleId, auth);
     if (!workflow) return null;
-    const nodes = await this.workflowNodeModel
-      .find(
-        mergeUserIdFilter({ workflowRef: workflow.workflowId }, auth),
-      )
-      .sort({ order: 1 })
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflow(workflow.workflowId, auth);
     return this.mapWorkflowResponse(workflow, nodes);
   }
 
   private mapWorkflowResponse(
-    workflow: WorkflowDocument,
-    nodes: WorkflowNodeDocument[],
+    workflow: WorkflowRecord,
+    nodes: WorkflowNodeRecord[],
   ) {
     const nodeRows = nodes.map((n) => ({
       nodeId: n.nodeId,
-      type: n.type,
+      type: n.type as unknown as WorkflowNodeType,
       order: n.order,
       isLocked: n.isLocked,
       config: (n.config ?? {}) as Record<string, unknown>,
@@ -256,12 +239,31 @@ export class WorkflowService {
         ? { lane: n.lane.trim() }
         : {}),
     }));
-    const storedEdges = (workflow.edges ?? []).map((e) => ({
-      from: e.from,
-      to: e.to,
-      ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
-      ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
-    }));
+    const rawEdges = Array.isArray(workflow.edges) ? workflow.edges : [];
+    const storedEdges = rawEdges
+      .map((edge) => {
+        if (!edge || typeof edge !== 'object') return null;
+        const e = edge as {
+          from?: unknown;
+          to?: unknown;
+          sourceHandle?: unknown;
+          targetHandle?: unknown;
+        };
+        if (typeof e.from !== 'string' || typeof e.to !== 'string') {
+          return null;
+        }
+        return {
+          from: e.from,
+          to: e.to,
+          ...(typeof e.sourceHandle === 'string' && e.sourceHandle
+            ? { sourceHandle: e.sourceHandle }
+            : {}),
+          ...(typeof e.targetHandle === 'string' && e.targetHandle
+            ? { targetHandle: e.targetHandle }
+            : {}),
+        };
+      })
+      .filter((edge): edge is WorkflowGraphEdge => Boolean(edge));
     const edges =
       storedEdges.length > 0
         ? storedEdges
@@ -270,7 +272,7 @@ export class WorkflowService {
       workflow: {
         workflowId: workflow.workflowId,
         name: workflow.name,
-        status: workflow.status,
+        status: workflow.status as unknown as WorkflowStatus,
         ruleRef: workflow.ruleRef,
       },
       nodes: nodeRows,
@@ -286,49 +288,28 @@ export class WorkflowService {
     const limit = dto.limit ?? 10;
     const sortBy = dto.sortBy ?? 'updatedAt';
     const sortOrder = dto.sortOrder ?? 'desc';
-    const skip = (page - 1) * limit;
-
-    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
+    const filter = mergeTenancyWhere({}, auth) as Record<string, unknown>;
     const q = dto.filter?.q?.trim();
     if (q) {
-      filter.name = {
-        $regex: escapeRegex(q),
-        $options: 'i',
-      };
+      filter.name = { contains: q, mode: 'insensitive' };
     }
     if (dto.filter?.nodeType !== undefined) {
-      const refs = await this.workflowNodeModel
-        .distinct(
-          'workflowRef',
-          mergeUserIdFilter({ type: dto.filter.nodeType }, auth),
-        )
-        .exec();
+      const refs = await this.workflowNodes.distinctWorkflowRefsByType(
+        dto.filter.nodeType,
+        auth,
+      );
       if (!refs.length) {
         return { data: [], total: 0 };
       }
-      filter.workflowId = { $in: refs };
+      filter.workflowId = { in: refs };
     }
-
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    const sort: Record<string, 1 | -1> = { [sortBy]: sortDir };
-
-    const [rows, total] = await Promise.all([
-      this.workflowModel
-        .find(filter)
-        .select({
-          workflowId: 1,
-          ruleRef: 1,
-          name: 1,
-          status: 1,
-          updatedAt: 1,
-        })
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.workflowModel.countDocuments(filter).exec(),
-    ]);
+    const { rows, total } = await this.workflows.findPage(
+      filter,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
 
     const ids = (rows as Array<{ workflowId?: string }>)
       .map((r) => r.workflowId)
@@ -377,11 +358,7 @@ export class WorkflowService {
   ): Promise<Map<string, string[]>> {
     const out = new Map<string, string[]>();
     if (!workflowIds.length) return out;
-    const nodes = await this.workflowNodeModel
-      .find(mergeUserIdFilter({ workflowRef: { $in: workflowIds } }, auth))
-      .select({ workflowRef: 1, type: 1 })
-      .lean()
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflowRefs(workflowIds, auth);
     for (const n of nodes) {
       const ref =
         typeof n.workflowRef === 'string' ? n.workflowRef.trim() : '';
@@ -406,19 +383,12 @@ export class WorkflowService {
     const nameTrimmed = body.name.trim();
     const workflowName = nameTrimmed || 'Untitled Workflow';
 
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId: normalizedId }, auth))
-      .exec();
+    const workflow = await this.workflows.findById(normalizedId, auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${normalizedId} not found`);
     }
 
-    await this.workflowModel
-      .updateOne(
-        mergeUserIdFilter({ workflowId: normalizedId }, auth),
-        { $set: { name: workflowName } },
-      )
-      .exec();
+    await this.workflows.updateById(normalizedId, { name: workflowName }, auth);
 
     return { workflowId: normalizedId, name: workflowName };
   }
@@ -428,21 +398,14 @@ export class WorkflowService {
     body: SaveWorkflowNodesRequestDto,
     auth: TenancyAuth,
   ): Promise<SaveWorkflowNodesResponseDto> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId }, auth))
-      .exec();
+    const workflow = await this.workflows.findById(workflowId, auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
 
     const nameTrimmed = body.name?.trim();
     if (nameTrimmed) {
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId }, auth),
-          { $set: { name: nameTrimmed } },
-        )
-        .exec();
+      await this.workflows.updateById(workflowId, { name: nameTrimmed }, auth);
     }
 
     const normalized = this.normalizeAndValidateNodes(body.nodes);
@@ -484,59 +447,48 @@ export class WorkflowService {
     }
 
     const nodeIds = nodeSpecs.map((n) => n.nodeId);
-    await this.workflowNodeModel
-      .deleteMany({
-        ...mergeUserIdFilter({ workflowRef: workflowId }, auth),
-        nodeId: { $nin: nodeIds },
-      })
-      .exec();
+    await this.workflowNodes.deleteExcept(workflowId, nodeIds, auth);
 
     for (const spec of nodeSpecs) {
-      await this.workflowNodeModel
-        .findOneAndUpdate(
-          mergeUserIdFilter({ workflowRef: workflowId, nodeId: spec.nodeId }, auth),
-          {
-            $set: {
-              workflowRef: workflowId,
-              userId: ownerUserId,
-              type: spec.type,
-              order: spec.order,
-              isLocked: spec.isLocked,
-              config: spec.config,
-              ...('x' in spec && spec.x !== undefined ? { x: spec.x } : {}),
-              ...('y' in spec && spec.y !== undefined ? { y: spec.y } : {}),
-              lane: spec.lane ?? null,
-            },
-          },
-          { upsert: true },
-        )
-        .exec();
+      await this.workflowNodes.upsertNode(
+        workflowId,
+        spec.nodeId,
+        {
+          nodeId: spec.nodeId,
+          workflow: { connect: { workflowId } },
+          userId: ownerUserId,
+          type: spec.type,
+          order: spec.order,
+          isLocked: spec.isLocked,
+          userPrompt: '',
+          config: spec.config as never,
+          ...('x' in spec && spec.x !== undefined ? { x: spec.x } : {}),
+          ...('y' in spec && spec.y !== undefined ? { y: spec.y } : {}),
+          lane: spec.lane ?? null,
+        },
+        auth,
+      );
     }
 
     const persistedEdges =
       edges.length > 0 ? edges : buildLinearEdgesFromOrder(nodeSpecs);
 
     const nextVersion = (workflow.version ?? 1) + 1;
-    await this.workflowModel
-      .updateOne(
-        mergeUserIdFilter({ workflowId }, auth),
-        {
-          $set: {
-            nodes: nodeIds,
-            edges: persistedEdges,
-            version: nextVersion,
-          },
-          $push: {
-            versions: {
-              versionNumber: nextVersion,
-              nodes: nodeIds,
-              edges: persistedEdges,
-              createdAt: new Date(),
-            },
-          },
-        },
-      )
-      .exec();
+    await this.workflows.appendVersion(
+      workflowId,
+      {
+        versionNumber: nextVersion,
+        nodes: nodeIds,
+        edges: persistedEdges,
+        createdAt: new Date(),
+      },
+      {
+        nodes: nodeIds,
+        edges: persistedEdges as unknown as never,
+        version: nextVersion,
+      },
+      auth,
+    );
 
     return { success: true };
   }
@@ -552,20 +504,14 @@ export class WorkflowService {
       throw new BadRequestException('ruleId and pipelineId must not be empty');
     }
 
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
-      .sort({ createdAt: -1 })
-      .exec();
+    const workflow = await this.workflows.findLatestByRule(normalizedRuleId, auth);
     if (!workflow) {
       throw new NotFoundException(
         `No workflow found for rule ${normalizedRuleId}`,
       );
     }
 
-    const pipeline = await this.pipelineModel
-      .findOne(mergeUserIdFilter({ pipelineId: normalizedPipelineId }, auth))
-      .lean()
-      .exec();
+    const pipeline = await this.pipelines.findById(normalizedPipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${normalizedPipelineId} not found`);
     }
@@ -575,36 +521,76 @@ export class WorkflowService {
       );
     }
 
+    const pipelineNodes = Array.isArray(pipeline.nodes)
+      ? (pipeline.nodes as Array<{
+          nodeId?: unknown;
+          type?: unknown;
+          order?: unknown;
+          isLocked?: unknown;
+          userPrompt?: unknown;
+          config?: unknown;
+          lane?: unknown;
+        }>)
+      : [];
+    const pipelineGraph =
+      pipeline.graph && typeof pipeline.graph === 'object'
+        ? (pipeline.graph as {
+            edges?: Array<{
+              from?: unknown;
+              to?: unknown;
+              sourceHandle?: unknown;
+              targetHandle?: unknown;
+            }>;
+            lanes?: unknown[];
+            layout?: Record<string, { x: number; y: number }>;
+          })
+        : {};
     const collapsed = collapsePipelineToWorkflowTemplate(
-      (pipeline.nodes ?? []).map((node) => ({
-        nodeId: node.nodeId,
-        type: node.type,
-        order: node.order,
-        isLocked: node.isLocked,
-        userPrompt: node.userPrompt ?? '',
-        config: (node.config ?? {}) as Record<string, unknown>,
-        lane: node.lane ?? null,
-      })),
+      pipelineNodes
+        .filter((node) => typeof node.nodeId === 'string')
+        .map((node) => {
+          const nodeId = node.nodeId as string;
+          return {
+            nodeId,
+            type: String(node.type ?? '') as WorkflowNodeType,
+            order: Number(node.order ?? 0),
+            isLocked: Boolean(node.isLocked),
+            userPrompt: typeof node.userPrompt === 'string' ? node.userPrompt : '',
+            config: (node.config ?? {}) as Record<string, unknown>,
+            lane: typeof node.lane === 'string' ? node.lane : null,
+          };
+        }),
       {
-        edges: (pipeline.graph?.edges ?? []).map((edge) => ({
-          from: edge.from,
-          to: edge.to,
-          ...(edge.sourceHandle ? { sourceHandle: edge.sourceHandle } : {}),
-          ...(edge.targetHandle ? { targetHandle: edge.targetHandle } : {}),
-        })),
-        lanes: pipeline.graph?.lanes ?? [],
+        edges: (pipelineGraph.edges ?? [])
+          .filter((edge) => typeof edge.from === 'string' && typeof edge.to === 'string')
+          .map((edge) => ({
+            from: edge.from as string,
+            to: edge.to as string,
+            ...(typeof edge.sourceHandle === 'string' && edge.sourceHandle
+              ? { sourceHandle: edge.sourceHandle }
+              : {}),
+            ...(typeof edge.targetHandle === 'string' && edge.targetHandle
+              ? { targetHandle: edge.targetHandle }
+              : {}),
+          })),
+        lanes: (Array.isArray(pipelineGraph.lanes)
+          ? pipelineGraph.lanes.map((lane) => String(lane))
+          : []) as string[],
         layout:
-          (pipeline.graph?.layout as
+          (pipelineGraph.layout as
             | Record<string, { x: number; y: number }>
             | undefined) ?? {},
       },
     );
 
     const rule = await this.ruleService.getRuleById(pipeline.ruleRef, auth);
-    const ruleChannelIds = resolveRuleChannelIds(rule.channels);
-    const pipelineLaneIds = (pipeline.graph?.lanes ?? []).map((lane) =>
-      normalizeLaneId(lane),
+    const ruleChannelIds = resolveRuleChannelIds(
+      (Array.isArray(rule.channels) ? rule.channels : []) as never[],
     );
+    const pipelineLaneIds = (Array.isArray(pipelineGraph.lanes)
+      ? pipelineGraph.lanes
+      : []
+    ).map((lane) => normalizeLaneId(String(lane)));
     const channelIds = [
       ...new Set(
         [...ruleChannelIds, ...pipelineLaneIds]
@@ -677,13 +663,10 @@ export class WorkflowService {
     const nameTrimmed = body.name?.trim();
     const workflowName = nameTrimmed || 'Untitled Workflow';
 
-    let workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ ruleRef: normalizedRuleId }, auth))
-      .sort({ createdAt: -1 })
-      .exec();
+    let workflow = await this.workflows.findLatestByRule(normalizedRuleId, auth);
 
     if (!workflow) {
-      workflow = await this.workflowModel.create({
+      workflow = await this.workflows.create({
         name: workflowName,
         ruleRef: normalizedRuleId,
         userId: auth.userId,
@@ -693,12 +676,11 @@ export class WorkflowService {
         versions: [],
       });
     } else if (nameTrimmed) {
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId: workflow.workflowId }, auth),
-          { $set: { name: workflowName } },
-        )
-        .exec();
+      await this.workflows.updateById(
+        workflow.workflowId,
+        { name: workflowName },
+        auth,
+      );
     }
 
     const { name: _name, ...saveBody } = body;
@@ -721,48 +703,41 @@ export class WorkflowService {
     },
     auth: TenancyAuth,
   ): Promise<{ nodeId: string; order: number }> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId }, auth))
-      .exec();
+    const workflow = await this.workflows.findById(workflowId, auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
 
-    const last = await this.workflowNodeModel
-      .findOne(mergeUserIdFilter({ workflowRef: workflowId }, auth))
-      .sort({ order: -1 })
-      .select({ order: 1 })
-      .lean()
-      .exec();
-    const nextOrder = (last?.order ?? 0) + 1;
+    const existingNodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+    const nextOrder = (existingNodes.at(-1)?.order ?? 0) + 1;
     const ownerUserId = workflow.userId ?? auth.userId;
 
-    await this.workflowNodeModel.create({
+    await this.workflowNodes.create({
       nodeId: args.nodeId,
-      workflowRef: workflowId,
+      workflow: { connect: { workflowId } },
       userId: ownerUserId,
       type: args.type,
       order: nextOrder,
       isLocked: false,
       userPrompt: args.userPrompt?.trim() ?? '',
-      config: args.config ?? {},
+      config: (args.config ?? {}) as never,
     });
 
     const nextVersion = (workflow.version ?? 1) + 1;
     const nextNodeIds = [...(workflow.nodes ?? []), args.nodeId];
-    await this.workflowModel
-      .updateOne(mergeUserIdFilter({ workflowId }, auth), {
-        $push: {
-          nodes: args.nodeId,
-          versions: {
-            versionNumber: nextVersion,
-            nodes: nextNodeIds,
-            createdAt: new Date(),
-          },
-        },
-        $set: { version: nextVersion },
-      })
-      .exec();
+    await this.workflows.appendVersion(
+      workflowId,
+      {
+        versionNumber: nextVersion,
+        nodes: nextNodeIds,
+        createdAt: new Date(),
+      },
+      {
+        nodes: nextNodeIds,
+        version: nextVersion,
+      },
+      auth,
+    );
 
     return { nodeId: args.nodeId, order: nextOrder };
   }
@@ -844,12 +819,7 @@ export class WorkflowService {
         throw new BadRequestException('ruleId must not be empty');
       }
 
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId }, auth),
-          { $set: { ruleRef: ruleId } },
-        )
-        .exec();
+      await this.workflows.updateById(workflowId, { ruleRef: ruleId }, auth);
 
       this.events.emitToWorkflow(workflowId, 'workflow:generating', {
         workflowId,
@@ -857,7 +827,7 @@ export class WorkflowService {
 
       const rule = await this.ruleService.getRuleById(ruleId, auth);
       const generatedNodes = await this.workflowGeneration.generate(
-        rule,
+        rule as never,
         answers,
         { userId: auth.userId, workflowId },
       );
@@ -870,33 +840,24 @@ export class WorkflowService {
           publishChannelIds,
         );
 
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId }, auth),
-          {
-            $set: {
-              nodes: nodeIds,
-              edges: persistedEdges,
-              status: WorkflowStatus.Ready,
-              version: 1,
-            },
-            $push: {
-              versions: {
-                versionNumber: 1,
-                nodes: nodeIds,
-                edges: persistedEdges,
-                createdAt: new Date(),
-              },
-            },
-          },
-        )
-        .exec();
+      await this.workflows.appendVersion(
+        workflowId,
+        {
+          versionNumber: 1,
+          nodes: nodeIds,
+          edges: persistedEdges,
+          createdAt: new Date(),
+        },
+        {
+          nodes: nodeIds,
+          edges: persistedEdges as unknown as never,
+          status: WorkflowStatus.Ready,
+          version: 1,
+        },
+        auth,
+      );
 
-      const nodes = await this.workflowNodeModel
-        .find(mergeUserIdFilter({ workflowRef: workflowId }, auth))
-        .sort({ order: 1 })
-        .lean()
-        .exec();
+      const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
 
       this.events.emitToWorkflow(workflowId, 'workflow:completed', {
         workflowId,
@@ -919,12 +880,11 @@ export class WorkflowService {
         `Workflow generation failed for ${workflowId}`,
         error as Error,
       );
-      await this.workflowModel
-        .updateOne(
-          mergeUserIdFilter({ workflowId }, auth),
-          { $set: { status: WorkflowStatus.Failed } },
-        )
-        .exec();
+      await this.workflows.updateById(
+        workflowId,
+        { status: WorkflowStatus.Failed },
+        auth,
+      );
       this.events.emitToWorkflow(workflowId, 'workflow:failed', {
         workflowId,
         message: 'Workflow generation failed',
@@ -936,13 +896,14 @@ export class WorkflowService {
     ruleRef: string,
     name: string,
     userId: string,
-  ): Promise<WorkflowDocument> {
-    return this.workflowModel.create({
+  ): Promise<WorkflowRecord> {
+    return this.workflows.create({
       name,
       ruleRef,
       userId,
       status: WorkflowStatus.Generating,
       nodes: [],
+      edges: [],
       versions: [],
     });
   }
@@ -1051,19 +1012,17 @@ export class WorkflowService {
     validateWorkflowGraph(forValidation, edges);
     assertEdgesRespectMatrix(forValidation, edges);
 
-    await this.workflowNodeModel
-      .deleteMany(mergeUserIdFilter({ workflowRef: workflowId }, auth))
-      .exec();
+    await this.workflowNodes.deleteByWorkflow(workflowId, auth);
     for (const n of graphNodes) {
-      await this.workflowNodeModel.create({
-        workflowRef: workflowId,
+      await this.workflowNodes.create({
+        workflow: { connect: { workflowId } },
         nodeId: n.nodeId,
         userId,
         type: n.type,
         order: n.order,
         isLocked: n.isLocked,
         userPrompt: n.userPrompt?.trim() ?? '',
-        config: n.config as WorkflowNodeConfig,
+        config: n.config as never,
         lane: n.lane ?? undefined,
       });
     }
@@ -1071,17 +1030,7 @@ export class WorkflowService {
   }
 
   async listTemplates(auth: TenancyAuth) {
-    const rows = await this.workflowModel
-      .find(mergeUserIdFilter({ isTemplate: true }, auth))
-      .select({
-        workflowId: 1,
-        templateName: 1,
-        name: 1,
-        updatedAt: 1,
-      })
-      .sort({ templateName: 1 })
-      .lean()
-      .exec();
+    const rows = await this.workflows.listTemplates(auth);
     return rows.map((r) => {
       const row = r as {
         workflowId?: string;
@@ -1110,19 +1059,14 @@ export class WorkflowService {
     if (!name) {
       throw new BadRequestException('templateName is required');
     }
-    const source = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId }, auth))
-      .exec();
+    const source = await this.workflows.findById(workflowId, auth);
     if (!source) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const nodes = await this.workflowNodeModel
-      .find(mergeUserIdFilter({ workflowRef: workflowId }, auth))
-      .sort({ order: 1 })
-      .exec();
-    const edges = source.edges ?? [];
+    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+    const edges = Array.isArray(source.edges) ? source.edges : [];
 
-    const clone = await this.workflowModel.create({
+    const clone = await this.workflows.create({
       userId: auth.userId,
       ruleRef: source.ruleRef,
       name: name,
@@ -1130,23 +1074,26 @@ export class WorkflowService {
       templateName: name,
       status: WorkflowStatus.Ready,
       nodes: [],
-      edges,
+      edges: edges as never,
       versions: [],
     });
 
     if (nodes.length > 0) {
-      const created = await this.workflowNodeModel.create(
+      const created = await this.workflowNodes.createMany(
         nodes.map((n) => ({
+          nodeId: randomUUID(),
           workflowRef: clone.workflowId,
           userId: auth.userId,
           type: n.type,
           order: n.order,
           isLocked: n.isLocked,
-          config: n.config ?? {},
+          userPrompt: n.userPrompt ?? '',
+          config: (n.config ?? {}) as never,
         })),
       );
-      clone.nodes = created.map((n) => n.nodeId);
-      await clone.save();
+      await this.workflows.updateById(clone.workflowId, {
+        nodes: created.map((n) => n.nodeId),
+      });
     }
 
     return { workflowId: clone.workflowId, templateName: name };
@@ -1157,21 +1104,14 @@ export class WorkflowService {
     ruleId: string,
     auth: TenancyAuth,
   ): Promise<{ workflowId: string }> {
-    const template = await this.workflowModel
-      .findOne(
-        mergeUserIdFilter({ workflowId: templateId, isTemplate: true }, auth),
-      )
-      .exec();
-    if (!template) {
+    const template = await this.workflows.findById(templateId, auth);
+    if (!template?.isTemplate) {
       throw new NotFoundException(`Template ${templateId} not found`);
     }
 
-    const nodes = await this.workflowNodeModel
-      .find(mergeUserIdFilter({ workflowRef: templateId }, auth))
-      .sort({ order: 1 })
-      .exec();
+    const nodes = await this.workflowNodes.findByWorkflow(templateId, auth);
 
-    const workflow = await this.workflowModel.create({
+    const workflow = await this.workflows.create({
       userId: auth.userId,
       ruleRef: ruleId,
       name: `From template: ${template.templateName ?? template.name}`,
@@ -1179,38 +1119,36 @@ export class WorkflowService {
       templateName: null,
       status: WorkflowStatus.Ready,
       nodes: [],
-      edges: template.edges ?? [],
+      edges: (Array.isArray(template.edges) ? template.edges : []) as never,
       versions: [],
     });
 
     if (nodes.length > 0) {
-      const created = await this.workflowNodeModel.create(
+      const created = await this.workflowNodes.createMany(
         nodes.map((n) => ({
+          nodeId: randomUUID(),
           workflowRef: workflow.workflowId,
           userId: auth.userId,
           type: n.type,
           order: n.order,
           isLocked: n.isLocked,
-          config: n.config ?? {},
+          userPrompt: n.userPrompt ?? '',
+          config: (n.config ?? {}) as never,
         })),
       );
-      workflow.nodes = created.map((n) => n.nodeId);
+      await this.workflows.updateById(workflow.workflowId, {
+        nodes: created.map((n) => n.nodeId),
+      });
     }
-    await workflow.save();
     return { workflowId: workflow.workflowId };
   }
 
   async archiveTemplate(templateId: string, auth: TenancyAuth) {
-    const doc = await this.workflowModel
-      .findOneAndUpdate(
-        mergeUserIdFilter(
-          { workflowId: templateId, isTemplate: true },
-          auth,
-        ),
-        { status: WorkflowStatus.Archived },
-        { new: true },
-      )
-      .exec();
+    const template = await this.workflows.findById(templateId, auth);
+    if (!template?.isTemplate) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+    const doc = await this.workflows.archiveTemplate(templateId);
     if (!doc) {
       throw new NotFoundException(`Template ${templateId} not found`);
     }

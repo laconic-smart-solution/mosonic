@@ -2,12 +2,14 @@ import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
   PipelineStatus,
-  type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
 import {
   areAllDependenciesMet,
@@ -41,7 +43,8 @@ export class DependencyResolverService {
 
   constructor(
     config: ConfigService,
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     @InjectQueue(PIPELINE_NODES_QUEUE)
     private readonly pipelineNodesQueue: Queue<NodeJobPayload>,
     @InjectQueue(QUEUES.VIDEO_GENERATE)
@@ -75,7 +78,8 @@ export class DependencyResolverService {
     }
 
     const edges = this.getEdges(pipeline);
-    const nodeIds = (pipeline.nodes ?? []).map((n) => n.nodeId);
+    const nodes = parsePipelineNodes(pipeline.nodes);
+    const nodeIds = nodes.map((n) => n.nodeId);
     const roots = getRoots(nodeIds, edges);
 
     const toEnqueue: string[] = [];
@@ -94,14 +98,14 @@ export class DependencyResolverService {
     let scanMode: 'roots' | 'all_pending' = 'roots';
     if (toEnqueue.length === 0) {
       scanMode = 'all_pending';
-      for (const node of pipeline.nodes ?? []) {
+      for (const node of nodes) {
         if (node.status !== PipelineNodeExecutionStatus.Pending) {
           continue;
         }
         if (
           areAllDependenciesMet(
             node.nodeId,
-            pipeline.nodes ?? [],
+            nodes,
             edges,
             TERMINAL_STATUSES,
           )
@@ -132,7 +136,7 @@ export class DependencyResolverService {
       );
     }
     if (filtered.length === 0 && scanMode === 'all_pending') {
-      const pendingIds = (pipeline.nodes ?? [])
+      const pendingIds = nodes
         .filter((n) => n.status === PipelineNodeExecutionStatus.Pending)
         .map((n) => n.nodeId);
       if (pendingIds.length > 0) {
@@ -171,6 +175,7 @@ export class DependencyResolverService {
       return;
     }
 
+    const nodes = parsePipelineNodes(pipeline.nodes);
     const completedNode = this.pipelineRepo.getNode(pipeline, completedNodeId);
     const edges = this.getEdges(pipeline);
     const outbound = getOutgoing(edges, completedNodeId);
@@ -190,7 +195,7 @@ export class DependencyResolverService {
       if (
         areAllDependenciesMet(
           edge.to,
-          pipeline.nodes ?? [],
+          nodes,
           edges,
           TERMINAL_STATUSES,
         )
@@ -251,7 +256,8 @@ export class DependencyResolverService {
     if (!pipeline || pipeline.status !== PipelineStatus.Running) {
       return;
     }
-    const hasPendingOrRunning = (pipeline.nodes ?? []).some(
+    const nodes = parsePipelineNodes(pipeline.nodes);
+    const hasPendingOrRunning = nodes.some(
       (n) =>
         n.status === PipelineNodeExecutionStatus.Pending ||
         n.status === PipelineNodeExecutionStatus.Running,
@@ -280,10 +286,10 @@ export class DependencyResolverService {
     await this.orchestration.finalizePipeline(pipelineId);
   }
 
-  private getEdges(pipeline: PipelineDocument): WorkflowGraphEdge[] {
+  private getEdges(pipeline: PipelineRecord): WorkflowGraphEdge[] {
     if (!this.useGraph) {
       return buildLinearEdgesFromOrder(
-        (pipeline.nodes ?? []).map((n) => ({
+        parsePipelineNodes(pipeline.nodes).map((n) => ({
           nodeId: n.nodeId,
           order: n.order,
         })),
@@ -350,14 +356,14 @@ export class DependencyResolverService {
     return count;
   }
 
-  private formatNodeSnapshot(pipeline: PipelineDocument): string {
-    return (pipeline.nodes ?? [])
+  private formatNodeSnapshot(pipeline: PipelineRecord): string {
+    return parsePipelineNodes(pipeline.nodes)
       .map((n) => `${n.nodeId.slice(0, 8)}…:${n.type}:${n.status}`)
       .join(' | ');
   }
 
   private describeNode(
-    pipeline: PipelineDocument,
+    pipeline: PipelineRecord,
     nodeId: string,
   ): string {
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
@@ -376,7 +382,7 @@ export class DependencyResolverService {
   }
 
   private async enqueueNode(
-    pipeline: PipelineDocument,
+    pipeline: PipelineRecord,
     nodeId: string,
   ): Promise<void> {
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
@@ -388,14 +394,14 @@ export class DependencyResolverService {
       return;
     }
 
-    const totalNodes = pipeline.nodes?.length ?? 0;
+    const totalNodes = parsePipelineNodes(pipeline.nodes).length;
     const payload: NodeJobPayload = {
       pipelineId: pipeline.pipelineId,
       workflowId: pipeline.workflowRef,
       ruleId: pipeline.ruleRef,
       userId: pipeline.userId ?? '',
       nodeId: node.nodeId,
-      nodeType: node.type,
+      nodeType: node.type as unknown as WorkflowNodeType,
       order: node.order,
       totalNodes,
       contentPrompt: pipeline.contentPrompt,

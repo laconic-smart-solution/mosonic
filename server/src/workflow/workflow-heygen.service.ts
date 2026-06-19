@@ -1,23 +1,23 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { HeygenAssetsService } from '../nodes/services/heygen-assets.service';
-import {
-  WorkflowNode,
-  WorkflowNodeType,
-  type WorkflowNodeDocument,
-} from '../nodes/schemas/workflow-node.schema';
+import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import {
   coerceVideoConfigForPersist,
   parseWorkflowNodeConfigOrThrow,
 } from '../nodes/workflow-node-config.zod';
-import { Workflow, type WorkflowDocument } from './schemas/workflow.schema';
+import type { IWorkflowNodeRepository } from '../repositories/interfaces/workflow-node.repository.interface';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
+import {
+  WORKFLOW_NODE_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../repositories/tokens';
 
 const IMAGE_MIMES = new Set([
   'image/jpeg',
@@ -29,10 +29,10 @@ const IMAGE_MIMES = new Set([
 @Injectable()
 export class WorkflowHeygenService {
   constructor(
-    @InjectModel(Workflow.name)
-    private readonly workflowModel: Model<WorkflowDocument>,
-    @InjectModel(WorkflowNode.name)
-    private readonly workflowNodeModel: Model<WorkflowNodeDocument>,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
+    @Inject(WORKFLOW_NODE_REPOSITORY)
+    private readonly workflowNodes: IWorkflowNodeRepository,
     private readonly heygen: HeygenAssetsService,
   ) {}
 
@@ -40,21 +40,12 @@ export class WorkflowHeygenService {
     workflowId: string,
     nodeId: string,
     auth: TenancyAuth,
-  ): Promise<WorkflowNodeDocument> {
-    const workflow = await this.workflowModel
-      .findOne(mergeUserIdFilter({ workflowId }, auth))
-      .exec();
+  ) {
+    const workflow = await this.workflows.findById(workflowId, auth);
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const node = await this.workflowNodeModel
-      .findOne(
-        mergeUserIdFilter(
-          { workflowRef: workflowId, nodeId, type: WorkflowNodeType.VideoGeneration },
-          auth,
-        ),
-      )
-      .exec();
+    const node = await this.workflowNodes.findVideoNode(workflowId, nodeId, auth);
     if (!node) {
       throw new NotFoundException(
         `Video node ${nodeId} not found on workflow ${workflowId}`,
@@ -147,7 +138,7 @@ export class WorkflowHeygenService {
     );
 
     const merged = coerceVideoConfigForPersist({
-      ...(node.config ?? {}),
+      ...((node.config ?? {}) as Record<string, unknown>),
       mode: 'presenter',
       heygenAvatarId: result.heygenAvatarId,
       heygenAvatarAssetId: result.heygenAvatarAssetId,
@@ -158,12 +149,12 @@ export class WorkflowHeygenService {
       merged,
     );
 
-    await this.workflowNodeModel
-      .updateOne(
-        mergeUserIdFilter({ workflowRef: workflowId, nodeId }, auth),
-        { $set: { config } },
-      )
-      .exec();
+    await this.workflowNodes.updateConfig(
+      workflowId,
+      nodeId,
+      config as unknown as Prisma.InputJsonValue,
+      auth,
+    );
 
     return result;
   }
@@ -187,7 +178,7 @@ export class WorkflowHeygenService {
     );
 
     const merged = coerceVideoConfigForPersist({
-      ...(node.config ?? {}),
+      ...((node.config ?? {}) as Record<string, unknown>),
       heygenBackgroundAssetId: assetId,
       heygenBackgroundUrl: url,
       removeBackground: true,
@@ -197,12 +188,12 @@ export class WorkflowHeygenService {
       merged,
     );
 
-    await this.workflowNodeModel
-      .updateOne(
-        mergeUserIdFilter({ workflowRef: workflowId, nodeId }, auth),
-        { $set: { config } },
-      )
-      .exec();
+    await this.workflowNodes.updateConfig(
+      workflowId,
+      nodeId,
+      config as unknown as Prisma.InputJsonValue,
+      auth,
+    );
 
     return {
       heygenBackgroundAssetId: assetId,
@@ -244,7 +235,7 @@ export class WorkflowHeygenService {
   ): Promise<Record<string, unknown>> {
     const node = await this.getVideoNode(workflowId, nodeId, auth);
     const merged = coerceVideoConfigForPersist({
-      ...(node.config ?? {}),
+      ...((node.config ?? {}) as Record<string, unknown>),
       ...patch,
     } as Record<string, unknown>);
     let config;
@@ -257,12 +248,12 @@ export class WorkflowHeygenService {
       const message = e instanceof Error ? e.message : String(e);
       throw new BadRequestException(message);
     }
-    await this.workflowNodeModel
-      .updateOne(
-        mergeUserIdFilter({ workflowRef: workflowId, nodeId }, auth),
-        { $set: { config } },
-      )
-      .exec();
+    await this.workflowNodes.updateConfig(
+      workflowId,
+      nodeId,
+      config as unknown as Prisma.InputJsonValue,
+      auth,
+    );
     return config as unknown as Record<string, unknown>;
   }
 }

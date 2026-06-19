@@ -1,11 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 import { parseHeygenCallbackId } from '../nodes/services/heygen-assets.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import {
   PipelineNodeExecutionStatus,
-  type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import { MediaNodeCompletionService } from './media-node-completion.service';
 import { VideoGenerationService } from '../nodes/services/video-generation.service';
 import type { NodeJobPayload } from './types/node-job.payload';
@@ -15,13 +17,14 @@ export class HeygenWebhookService {
   private readonly logger = new Logger(HeygenWebhookService.name);
 
   constructor(
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     private readonly completion: MediaNodeCompletionService,
     private readonly videoService: VideoGenerationService,
   ) {}
 
   private buildPayload(
-    pipeline: PipelineDocument,
+    pipeline: PipelineRecord,
     nodeId: string,
   ): NodeJobPayload {
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
@@ -34,9 +37,9 @@ export class HeygenWebhookService {
       ruleId: pipeline.ruleRef,
       userId: pipeline.userId ?? '',
       nodeId: node.nodeId,
-      nodeType: node.type,
+      nodeType: node.type as unknown as WorkflowNodeType,
       order: node.order,
-      totalNodes: pipeline.nodes?.length ?? 0,
+      totalNodes: parsePipelineNodes(pipeline.nodes).length,
       contentPrompt: pipeline.contentPrompt,
       lane: node.lane ?? null,
     };

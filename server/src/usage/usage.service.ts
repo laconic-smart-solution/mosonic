@@ -1,16 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreditConfigService } from '../credit/credit-config.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
+import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
+import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
+import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
+import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
 import {
-  CreditLedger,
-  type CreditLedgerDocument,
-} from '../credit/schemas/credit-ledger.schema';
-import { Plan, type PlanDocument } from '../plan/schemas/plan.schema';
+  CREDIT_LEDGER_REPOSITORY,
+  PLAN_REPOSITORY,
+  USER_PLAN_REPOSITORY,
+  USER_REPOSITORY,
+} from '../repositories/tokens';
 import { PlanService } from '../plan/plan.service';
-import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
-import { User, type UserDocument } from '../users/schemas/user.schema';
 
 function parseDate(value?: string): Date | undefined {
   if (!value?.trim()) return undefined;
@@ -19,10 +20,10 @@ function parseDate(value?: string): Date | undefined {
 }
 
 function displayName(u: {
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  email?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  email?: string | null;
 }): string {
   const parts = [u.firstName, u.lastName].filter(Boolean) as string[];
   if (parts.length) return parts.join(' ');
@@ -32,12 +33,12 @@ function displayName(u: {
 @Injectable()
 export class UsageService {
   constructor(
-    @InjectModel(CreditLedger.name)
-    private readonly ledgerModel: Model<CreditLedgerDocument>,
-    @InjectModel(UserPlan.name)
-    private readonly userPlanModel: Model<UserPlanDocument>,
-    @InjectModel(Plan.name) private readonly planModel: Model<PlanDocument>,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(CREDIT_LEDGER_REPOSITORY)
+    private readonly ledger: ICreditLedgerRepository,
+    @Inject(USER_PLAN_REPOSITORY)
+    private readonly userPlans: IUserPlanRepository,
+    @Inject(PLAN_REPOSITORY) private readonly plans: IPlanRepository,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
     private readonly creditConfig: CreditConfigService,
     private readonly planService: PlanService,
   ) {}
@@ -46,9 +47,9 @@ export class UsageService {
     const fromDate = parseDate(from);
     const toDate = parseDate(to);
     if (!fromDate && !toDate) return {};
-    const createdAt: { $gte?: Date; $lte?: Date } = {};
-    if (fromDate) createdAt.$gte = fromDate;
-    if (toDate) createdAt.$lte = toDate;
+    const createdAt: { gte?: Date; lte?: Date } = {};
+    if (fromDate) createdAt.gte = fromDate;
+    if (toDate) createdAt.lte = toDate;
     return { createdAt };
   }
 
@@ -64,37 +65,18 @@ export class UsageService {
   ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const filter: Record<string, unknown> = {
+    const filter = {
       userId,
       ...this.buildDateFilter(query.from, query.to),
+      ...(query.nodeType ? { nodeType: query.nodeType } : {}),
     };
-    if (query.nodeType) filter.nodeType = query.nodeType;
 
-    const [entries, total] = await Promise.all([
-      this.ledgerModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .select({
-          userId: 1,
-          pipelineRef: 1,
-          campaignRef: 1,
-          contentRef: 1,
-          nodeId: 1,
-          nodeType: 1,
-          provider: 1,
-          model: 1,
-          creditsCharged: 1,
-          creditPriceUsdSnapshot: 1,
-          rawCostUsd: 1,
-          billingPeriod: 1,
-          createdAt: 1,
-        })
-        .lean()
-        .exec(),
-      this.ledgerModel.countDocuments(filter).exec(),
-    ]);
+    const { rows: entries, total } = await this.ledger.findUserHistory(
+      userId,
+      filter,
+      page,
+      limit,
+    );
 
     return {
       entries,
@@ -107,16 +89,15 @@ export class UsageService {
   async getUserSummary(userId: string) {
     const billingPeriod = currentBillingPeriod();
     const creditPriceUsd = await this.creditConfig.getCreditPriceUsd();
-    const userPlan = await this.userPlanModel
-      .findOne({ userId, status: 'active' })
-      .lean()
-      .exec();
+    const userPlan = await this.userPlans.findActiveByUserId(userId);
     const plan = userPlan
-      ? await this.planModel.findOne({ planId: userPlan.planId }).lean().exec()
+      ? await this.plans.findByPlanId(userPlan.planId)
       : null;
 
-    const match = { userId, billingPeriod };
-    const entries = await this.ledgerModel.find(match).lean().exec();
+    const entries = await this.ledger.findByUserAndBillingPeriod(
+      userId,
+      billingPeriod,
+    );
 
     const byNodeTypeMap = new Map<string, { creditsCharged: number; count: number }>();
     const byDayMap = new Map<string, number>();
@@ -130,9 +111,8 @@ export class UsageService {
       cur.count += 1;
       byNodeTypeMap.set(nt, cur);
 
-      const createdAt = (e as { createdAt?: Date }).createdAt;
-      if (createdAt) {
-        const day = createdAt.toISOString().slice(0, 10);
+      if (e.createdAt) {
+        const day = e.createdAt.toISOString().slice(0, 10);
         byDayMap.set(day, (byDayMap.get(day) ?? 0) + e.creditsCharged);
       }
     }
@@ -196,30 +176,27 @@ export class UsageService {
   }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const filter: Record<string, unknown> = {
+    const filter = {
       ...this.buildDateFilter(query.from, query.to),
+      ...(query.userId ? { userId: query.userId } : {}),
+      ...(query.nodeType ? { nodeType: query.nodeType } : {}),
+      ...(query.provider ? { provider: query.provider } : {}),
     };
-    if (query.userId) filter.userId = query.userId;
-    if (query.nodeType) filter.nodeType = query.nodeType;
-    if (query.provider) filter.provider = query.provider;
 
-    const [entries, total] = await Promise.all([
-      this.ledgerModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.ledgerModel.countDocuments(filter).exec(),
-    ]);
+    const { rows: entries, total } = await this.ledger.findAdminHistory(
+      filter,
+      page,
+      limit,
+    );
 
     const userIds = [...new Set(entries.map((e) => e.userId))];
-    const users = await this.userModel
-      .find({ userId: { $in: userIds } })
-      .select({ userId: 1, email: 1, firstName: 1, lastName: 1, username: 1 })
-      .lean()
-      .exec();
+    const users = await this.users.findManyByUserIds(userIds, {
+      userId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+    });
     const userMap = new Map(users.map((u) => [u.userId, u]));
 
     return {
@@ -234,11 +211,11 @@ export class UsageService {
   }
 
   async getAdminSummary(query: { from?: string; to?: string; userId?: string }) {
-    const filter: Record<string, unknown> = {
+    const filter = {
       ...this.buildDateFilter(query.from, query.to),
+      ...(query.userId ? { userId: query.userId } : {}),
     };
-    if (query.userId) filter.userId = query.userId;
-    const entries = await this.ledgerModel.find(filter).lean().exec();
+    const entries = await this.ledger.findAdminSummary(filter);
 
     let totalCreditsCharged = 0;
     let totalRawCostUsd = 0;
@@ -275,9 +252,8 @@ export class UsageService {
       bump(byProvider, e.provider);
       bump(byUser, e.userId);
 
-      const createdAt = (e as { createdAt?: Date }).createdAt;
-      if (!createdAt) continue;
-      const day = createdAt.toISOString().slice(0, 10);
+      if (!e.createdAt) continue;
+      const day = e.createdAt.toISOString().slice(0, 10);
       const dayCur = byDay.get(day) ?? { creditsCharged: 0, rawCostUsd: 0 };
       dayCur.creditsCharged += e.creditsCharged;
       dayCur.rawCostUsd += e.rawCostUsd;
@@ -286,22 +262,18 @@ export class UsageService {
 
     const userIds = [...byUser.keys()];
     const [users, userPlans] = await Promise.all([
-      this.userModel
-        .find({ userId: { $in: userIds } })
-        .select({ userId: 1, email: 1, firstName: 1, lastName: 1, username: 1 })
-        .lean()
-        .exec(),
-      this.userPlanModel
-        .find({ userId: { $in: userIds }, status: 'active' })
-        .lean()
-        .exec(),
+      this.users.findManyByUserIds(userIds, {
+        userId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+      }),
+      this.userPlans.findActiveByUserIds(userIds),
     ]);
     const userMap = new Map(users.map((u) => [u.userId, u]));
     const planIds = [...new Set(userPlans.map((up) => up.planId))];
-    const plans = await this.planModel
-      .find({ planId: { $in: planIds } })
-      .lean()
-      .exec();
+    const plans = await this.plans.findManyByPlanIds(planIds);
     const planMap = new Map(plans.map((p) => [p.planId, p]));
     const userPlanMap = new Map(userPlans.map((up) => [up.userId, up]));
 

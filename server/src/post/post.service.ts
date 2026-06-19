@@ -1,12 +1,12 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
+import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { UserRole } from '../users/schemas/user.schema';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
@@ -15,22 +15,32 @@ import {
   resolvePlatformMediaUrls,
 } from '../mcp/zernio/tiktok-publish.util';
 import { McpService } from '../mcp/mcp.service';
+import type { IPostRepository } from '../repositories/interfaces/post.repository.interface';
+import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
+import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
+import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
 import {
-  Upload,
+  POST_REPOSITORY,
+  UPLOAD_REPOSITORY,
+} from '../repositories/tokens';
+import {
   UploadChannelStatus,
   type UploadChannelEntry,
-  type UploadDocument,
 } from '../upload/schemas/upload.schema';
+import {
+  postPlatformResults,
+  uploadChannels,
+  withPostPlatformResults,
+  withUploadChannels,
+} from '../upload/upload-record.util';
 import { recomputeUploadJobStatus } from '../upload/upload-status.util';
 import { PostAnalyticsService } from './post-analytics.service';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { PostListSort } from './dto/post-list-sort.enum';
 import type { PatchPostDto } from './dto/patch-post.dto';
 import {
-  Post,
   PlatformPostStatus,
   PostStatus,
-  type PostDocument,
   type PlatformResult,
 } from './schemas/post.schema';
 
@@ -56,10 +66,6 @@ type PublishWorkItem = {
   youtubeTitle: string | null;
 };
 
-function escapeRegexFragment(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(url.trim());
 }
@@ -67,15 +73,15 @@ function isVideoMediaUrl(url: string): boolean {
 @Injectable()
 export class PostService {
   constructor(
-    @InjectModel(Post.name)
-    private readonly postModel: Model<PostDocument>,
-    @InjectModel(Upload.name)
-    private readonly uploadModel: Model<UploadDocument>,
+    @Inject(POST_REPOSITORY)
+    private readonly posts: IPostRepository,
+    @Inject(UPLOAD_REPOSITORY)
+    private readonly uploads: IUploadRepository,
     private readonly mcpService: McpService,
     private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
-  private async ensurePostAnalyticsRecord(post: PostDocument): Promise<void> {
+  private async ensurePostAnalyticsRecord(post: PostRecord): Promise<void> {
     await this.postAnalyticsService.ensureForPost(post);
   }
 
@@ -108,7 +114,7 @@ export class PostService {
           },
     );
 
-    const doc = await this.postModel.create({
+    const doc = await this.posts.create({
       userId: params.userId,
       uploadRef: params.uploadRef,
       ruleRef: params.ruleRef,
@@ -119,7 +125,7 @@ export class PostService {
       scheduledAt: params.publishNow ? null : params.scheduledAt,
       publishedAt: params.publishNow ? now : null,
       publishedNow: params.publishNow,
-      platformResults,
+      platformResults: platformResults as unknown as Prisma.InputJsonValue,
       retryCount: 0,
       failureReason: null,
     });
@@ -127,43 +133,19 @@ export class PostService {
     return { postId: doc.postId };
   }
 
-  findByZernioPostId(zernioPostId: string): Promise<PostDocument | null> {
-    return this.postModel
-      .findOne({ zernioPostId })
-      .exec();
+  findByZernioPostId(zernioPostId: string): Promise<PostRecord | null> {
+    return this.posts.findByZernioPostId(zernioPostId);
   }
 
   async getPostStats(auth: TenancyAuth): Promise<{
     total: number;
     byStatus: Partial<Record<PostStatus, number>>;
   }> {
-    const scoped = mergeUserIdFilter({}, auth);
-    const agg = await this.postModel
-      .aggregate<{ _id: PostStatus | null; count: number }>([
-        { $match: scoped },
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-      ])
-      .exec();
-
-    const byStatus: Partial<Record<PostStatus, number>> = {};
-    let total = 0;
-    const knownStatuses = new Set<string>(Object.values(PostStatus));
-    for (const row of agg) {
-      total += row.count;
-      if (row._id == null) continue;
-      const key =
-        typeof row._id === 'string'
-          ? row._id
-          : typeof row._id === 'object' &&
-              row._id !== null &&
-              'toString' in row._id
-            ? String(row._id)
-            : String(row._id);
-      if (knownStatuses.has(key)) {
-        byStatus[key as PostStatus] = row.count;
-      }
-    }
-    return { total, byStatus };
+    const byStatus = await this.posts.aggregateStatusCounts(
+      mergeTenancyWhere({}, auth),
+    );
+    const total = Object.values(byStatus).reduce((sum, n) => sum + (n ?? 0), 0);
+    return { total, byStatus: byStatus as Partial<Record<PostStatus, number>> };
   }
 
   async listPosts(
@@ -175,57 +157,53 @@ export class PostService {
     page: number;
     totalPages: number;
   }> {
-    const filter: Record<string, unknown> = {};
+    const filter: Prisma.PostWhereInput = {};
     if (query.status) filter.status = query.status;
     if (query.ruleRef?.trim()) filter.ruleRef = query.ruleRef.trim();
     if (query.uploadRef?.trim()) filter.uploadRef = query.uploadRef.trim();
 
     const ch = query.channel?.trim().toLowerCase();
     if (ch) {
-      filter.channels = new RegExp(`^${escapeRegexFragment(ch)}$`, 'i');
+      filter.channels = { has: ch };
     }
 
     const searchTerm = query.search?.trim();
     if (searchTerm) {
-      const rx = new RegExp(escapeRegexFragment(searchTerm), 'i');
-      filter.$or = [
-        { postId: rx },
-        { uploadRef: rx },
-        { contentRef: rx },
-        { ruleRef: rx },
+      filter.OR = [
+        { postId: { contains: searchTerm, mode: 'insensitive' } },
+        { uploadRef: { contains: searchTerm, mode: 'insensitive' } },
+        { contentRef: { contains: searchTerm, mode: 'insensitive' } },
+        { ruleRef: { contains: searchTerm, mode: 'insensitive' } },
       ];
     }
 
     if (query.from || query.to) {
-      const createdAt: { $gte?: Date; $lte?: Date } = {};
+      const createdAt: Prisma.DateTimeFilter = {};
       if (query.from) {
         const d = new Date(query.from);
-        if (!Number.isNaN(d.getTime())) createdAt.$gte = d;
+        if (!Number.isNaN(d.getTime())) createdAt.gte = d;
       }
       if (query.to) {
         const d = new Date(query.to);
-        if (!Number.isNaN(d.getTime())) createdAt.$lte = d;
+        if (!Number.isNaN(d.getTime())) createdAt.lte = d;
       }
       if (Object.keys(createdAt).length > 0) filter.createdAt = createdAt;
     }
 
-    const scoped = mergeUserIdFilter(filter, auth);
+    const scoped = mergeTenancyWhere(filter, auth);
     const page = query.page;
     const limit = query.limit;
-    const sortSpec = this.listPostsSort(query.sort);
+    const { sortBy, sortOrder } = this.listPostsSort(query.sort);
 
-    const [postsRaw, total] = await Promise.all([
-      this.postModel
-        .find(scoped)
-        .sort(sortSpec)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.postModel.countDocuments(scoped).exec(),
-    ]);
+    const { rows: postsRaw, total } = await this.posts.findPage(
+      scoped,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
 
-    const posts = postsRaw as unknown as Array<Record<string, unknown>>;
+    const posts = postsRaw.map((p) => this.postToRecord(p));
     await this.attachListCaptionPreviews(posts);
 
     return {
@@ -236,20 +214,27 @@ export class PostService {
     };
   }
 
-  private listPostsSort(sort?: PostListSort): Record<string, 1 | -1> {
+  private listPostsSort(sort?: PostListSort): {
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+  } {
     switch (sort) {
       case PostListSort.OldestCreated:
-        return { createdAt: 1 };
+        return { sortBy: 'createdAt', sortOrder: 'asc' };
       case PostListSort.ScheduledDesc:
-        return { scheduledAt: -1, createdAt: -1 };
+        return { sortBy: 'scheduledAt', sortOrder: 'desc' };
       case PostListSort.ScheduledAsc:
-        return { scheduledAt: 1, createdAt: -1 };
+        return { sortBy: 'scheduledAt', sortOrder: 'asc' };
       case PostListSort.StatusAsc:
-        return { status: 1, createdAt: -1 };
+        return { sortBy: 'status', sortOrder: 'asc' };
       case PostListSort.NewestCreated:
       default:
-        return { createdAt: -1 };
+        return { sortBy: 'createdAt', sortOrder: 'desc' };
     }
+  }
+
+  private postToRecord(post: PostRecord): Record<string, unknown> {
+    return { ...post };
   }
 
   private async attachListCaptionPreviews(
@@ -264,11 +249,7 @@ export class PostService {
     ];
     if (refs.length === 0) return;
 
-    const uploads = await this.uploadModel
-      .find({ uploadId: { $in: refs } })
-      .select('uploadId channels resolvedOutputs')
-      .lean()
-      .exec();
+    const uploads = await this.uploads.findByUploadIds(refs);
 
     const byId = new Map(uploads.map((u) => [String(u.uploadId), u]));
 
@@ -281,11 +262,12 @@ export class PostService {
 
       const ro = (u.resolvedOutputs ?? {}) as ResolvedContentOutputs;
       const postChannels = (p['channels'] as string[] | undefined) ?? [];
+      const uploadChannelRows = uploadChannels(u);
 
       let caption = '';
       for (const plat of postChannels) {
         const key = plat.trim().toLowerCase();
-        const row = u.channels?.find(
+        const row = uploadChannelRows.find(
           (c) => c.channel.trim().toLowerCase() === key,
         );
         if (!row) continue;
@@ -298,7 +280,7 @@ export class PostService {
 
       let youtubeTitlePreview: string | null = null;
       if (postChannels.some((plat) => plat.trim().toLowerCase() === 'youtube')) {
-        const ytRow = u.channels?.find(
+        const ytRow = uploadChannelRows.find(
           (c) => c.channel.trim().toLowerCase() === 'youtube',
         );
         if (ytRow) youtubeTitlePreview = this.rowYoutubeTitle(ytRow);
@@ -309,7 +291,10 @@ export class PostService {
         trimmed.length > CAP_LEN ? `${trimmed.slice(0, CAP_LEN)}…` : trimmed || null;
       p['youtubeTitlePreview'] = youtubeTitlePreview;
 
-      const mediaPreview = this.resolveListMediaPreview(postChannels, u.channels ?? []);
+      const mediaPreview = this.resolveListMediaPreview(
+        postChannels,
+        uploadChannelRows,
+      );
       if (mediaPreview) {
         p['mediaPreviewUrl'] = mediaPreview.url;
         p['mediaKind'] = mediaPreview.kind;
@@ -349,20 +334,17 @@ export class PostService {
     const ref = String(local['uploadRef'] ?? '').trim();
     if (!ref) return;
 
-    const upload = await this.uploadModel
-      .findOne({ uploadId: ref })
-      .select('channels resolvedOutputs')
-      .lean()
-      .exec();
+    const upload = await this.uploads.findByUploadId(ref);
     if (!upload) return;
 
     const postChannels = (local['channels'] as string[] | undefined) ?? [];
     const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    const uploadChannelRows = uploadChannels(upload);
 
     let caption = '';
     for (const plat of postChannels) {
       const key = plat.trim().toLowerCase();
-      const row = upload.channels?.find(
+      const row = uploadChannelRows.find(
         (c) => c.channel.trim().toLowerCase() === key,
       );
       if (!row) continue;
@@ -375,7 +357,7 @@ export class PostService {
 
     let youtubeTitlePreview: string | null = null;
     if (postChannels.some((plat) => plat.trim().toLowerCase() === 'youtube')) {
-      const ytRow = upload.channels?.find(
+      const ytRow = uploadChannelRows.find(
         (c) => c.channel.trim().toLowerCase() === 'youtube',
       );
       if (ytRow) youtubeTitlePreview = this.rowYoutubeTitle(ytRow);
@@ -385,7 +367,7 @@ export class PostService {
     local['youtubeTitlePreview'] = youtubeTitlePreview;
     local['mediaItems'] = this.resolveDetailMediaItems(
       postChannels,
-      upload.channels ?? [],
+      uploadChannelRows,
     );
   }
 
@@ -418,12 +400,11 @@ export class PostService {
     postId: string,
     auth: TenancyAuth,
   ): Promise<Record<string, unknown>> {
-    const filter = mergeUserIdFilter({ postId }, auth);
-    const doc = await this.postModel.findOne(filter).lean().exec();
+    const doc = await this.posts.findByPostId(postId, auth);
     if (!doc) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    return doc as unknown as Record<string, unknown>;
+    return this.postToRecord(doc);
   }
 
   async getPostDetail(
@@ -438,12 +419,11 @@ export class PostService {
         analytics?: unknown;
       }
   > {
-    const filter = mergeUserIdFilter({ postId }, auth);
-    const postDoc = await this.postModel.findOne(filter).exec();
+    const postDoc = await this.posts.findByPostId(postId, auth);
     if (!postDoc) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    const local = postDoc.toObject() as unknown as Record<string, unknown>;
+    const local = this.postToRecord(postDoc);
     await this.enrichPostDetail(local);
     const analytics = await this.postAnalyticsService.getDtoForPost(postDoc);
 
@@ -485,12 +465,11 @@ export class PostService {
       );
     }
 
-    const filter = mergeUserIdFilter({ postId }, auth);
-    const post = await this.postModel.findOne(filter).exec();
+    const post = await this.posts.findByPostId(postId, auth);
     if (!post) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    if (!PATCHABLE_POST_STATUSES.has(post.status)) {
+    if (!PATCHABLE_POST_STATUSES.has(post.status as PostStatus)) {
       throw new BadRequestException(
         'This post cannot be edited in its current status.',
       );
@@ -547,14 +526,15 @@ export class PostService {
       throw new BadRequestException(msg || 'Zernio update failed.');
     }
 
-    post.failureReason = null;
+    let nextPost: PostRecord = { ...post, failureReason: null };
     if (hasScheduled) {
       const d = new Date(dto.scheduledAt!.trim());
-      post.scheduledAt = Number.isNaN(d.getTime()) ? post.scheduledAt : d;
-      post.status = PostStatus.Scheduled;
+      if (!Number.isNaN(d.getTime())) {
+        nextPost = { ...nextPost, scheduledAt: d, status: PostStatus.Scheduled };
+      }
     }
 
-    await post.save();
+    await this.posts.save(nextPost);
     return this.getPostById(postId, auth);
   }
 
@@ -577,7 +557,7 @@ export class PostService {
   }
 
   private async syncUploadFromPostPatch(
-    post: PostDocument,
+    post: PostRecord,
     dto: PatchPostDto,
     flags: {
       hasContent: boolean;
@@ -592,15 +572,16 @@ export class PostService {
       return resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls);
     }
 
-    const upload = await this.uploadModel.findOne({ uploadId: uploadRef }).exec();
+    const upload = await this.uploads.findByUploadId(uploadRef);
     if (!upload) {
       if (!flags.hasMediaUpdate) return undefined;
       return resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls);
     }
 
+    const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = upload.channels.find(
+      const row = channels.find(
         (c) => c.channel.trim().toLowerCase() === key,
       );
       if (!row) continue;
@@ -626,14 +607,15 @@ export class PostService {
       }
     }
 
-    upload.status = recomputeUploadJobStatus(upload.channels);
-    upload.markModified('channels');
-    await upload.save();
+    await this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
     if (!flags.hasMediaUpdate) return undefined;
 
     const primaryKey = post.channels[0]?.trim().toLowerCase();
-    const primaryRow = upload.channels.find(
+    const primaryRow = channels.find(
       (c) => c.channel.trim().toLowerCase() === primaryKey,
     );
     if (primaryRow) return this.rowAllMedia(primaryRow);
@@ -641,20 +623,17 @@ export class PostService {
   }
 
   private async resolvePostCaptionForValidation(
-    post: PostDocument,
+    post: PostRecord,
   ): Promise<string> {
     const uploadRef = post.uploadRef?.trim();
     if (!uploadRef) return '';
-    const upload = await this.uploadModel
-      .findOne({ uploadId: uploadRef })
-      .select('channels resolvedOutputs')
-      .lean()
-      .exec();
+    const upload = await this.uploads.findByUploadId(uploadRef);
     if (!upload) return '';
     const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = upload.channels?.find(
+      const row = channels.find(
         (c) => c.channel.trim().toLowerCase() === key,
       );
       if (!row) continue;
@@ -665,20 +644,17 @@ export class PostService {
   }
 
   private async resolvePostMediaForValidation(
-    post: PostDocument,
+    post: PostRecord,
   ): Promise<string[]> {
     const uploadRef = post.uploadRef?.trim();
     if (!uploadRef) return [];
-    const upload = await this.uploadModel
-      .findOne({ uploadId: uploadRef })
-      .select('channels resolvedOutputs')
-      .lean()
-      .exec();
+    const upload = await this.uploads.findByUploadId(uploadRef);
     if (!upload) return [];
     const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = upload.channels?.find(
+      const row = channels.find(
         (c) => c.channel.trim().toLowerCase() === key,
       );
       if (!row) continue;
@@ -717,27 +693,21 @@ export class PostService {
 
   async findScheduledPostsForUpload(
     uploadRef: string,
-  ): Promise<PostDocument[]> {
-    return this.postModel
-      .find({
-        uploadRef,
-        status: PostStatus.Scheduled,
-        zernioPostId: { $exists: true, $nin: [null, ''] },
-      })
-      .exec();
+  ): Promise<PostRecord[]> {
+    const rows = await this.posts.findByUploadRef(uploadRef, {
+      status: PostStatus.Scheduled,
+    });
+    return rows.filter((p) => Boolean(p.zernioPostId?.trim()));
   }
 
   async updateScheduledPostsOnUpload(
     uploadRef: string,
     opts: { scheduledAt?: Date },
   ): Promise<void> {
-    const set: Record<string, unknown> = {};
-    if (opts.scheduledAt) set.scheduledAt = opts.scheduledAt;
-    if (Object.keys(set).length === 0) return;
-    await this.postModel.updateMany(
-      { uploadRef, status: PostStatus.Scheduled },
-      { $set: set },
-    );
+    if (!opts.scheduledAt) return;
+    await this.posts.updateManyScheduledByUpload(uploadRef, {
+      scheduledAt: opts.scheduledAt,
+    });
   }
 
   async updateScheduledPostForChannel(
@@ -757,34 +727,35 @@ export class PostService {
     );
     if (!post) return;
 
-    if (opts.scheduledAt) post.scheduledAt = opts.scheduledAt;
-    await post.save();
+    if (opts.scheduledAt) {
+      await this.posts.save({ ...post, scheduledAt: opts.scheduledAt });
+    }
   }
 
-  findScheduledPostForUploadChannel(
+  async findScheduledPostForUploadChannel(
     uploadRef: string,
     channel: string,
-  ): Promise<PostDocument | null> {
+  ): Promise<PostRecord | null> {
     const channelKey = channel.trim().toLowerCase();
-    return this.postModel
-      .findOne({
-        uploadRef,
-        status: PostStatus.Scheduled,
-        zernioPostId: { $exists: true, $nin: [null, ''] },
-        channels: channelKey,
-      })
-      .exec();
+    const posts = await this.findScheduledPostsForUpload(uploadRef);
+    return (
+      posts.find((p) =>
+        (p.channels ?? []).some(
+          (c) => String(c).trim().toLowerCase() === channelKey,
+        ),
+      ) ?? null
+    );
   }
 
   async publishPost(
     postId: string,
     auth: TenancyAuth,
   ): Promise<{ postId: string }> {
-    const post = await this.postModel.findOne({ postId }).exec();
+    const post = await this.posts.findByPostId(postId, auth);
     if (!post) throw new NotFoundException(`Post ${postId} not found`);
     this.assertOwnership(post, auth);
 
-    if (!PUBLISHABLE_POST_STATUSES.has(post.status)) {
+    if (!PUBLISHABLE_POST_STATUSES.has(post.status as PostStatus)) {
       throw new BadRequestException(
         'Only pending, scheduled, partial, or failed posts can be published now.',
       );
@@ -807,7 +778,7 @@ export class PostService {
     postId: string,
     auth: TenancyAuth,
   ): Promise<{ newPostId: string }> {
-    const post = await this.postModel.findOne({ postId }).exec();
+    const post = await this.posts.findByPostId(postId, auth);
     if (!post) throw new NotFoundException(`Post ${postId} not found`);
     this.assertOwnership(post, auth);
 
@@ -815,7 +786,7 @@ export class PostService {
       throw new BadRequestException('Only failed posts can be retried.');
     }
 
-    const upload = await this.uploadModel.findOne({ uploadId: post.uploadRef }).exec();
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
     if (!upload) {
       throw new NotFoundException(`Upload ${post.uploadRef} not found`);
     }
@@ -832,9 +803,11 @@ export class PostService {
         },
       );
 
-      post.status = PostStatus.Cancelled;
-      post.failureReason = 'Superseded by retry.';
-      await post.save();
+      await this.posts.save({
+        ...post,
+        status: PostStatus.Cancelled,
+        failureReason: 'Superseded by retry.',
+      });
 
       const newPost = await this.createPublishedPostRecord(
         post,
@@ -848,15 +821,17 @@ export class PostService {
       return { newPostId: newPost.postId };
     } catch (err: unknown) {
       const msg = getFriendlyZernioPublishError(err);
-      post.retryCount = (post.retryCount ?? 0) + 1;
-      post.failureReason = msg;
-      await post.save();
+      await this.posts.save({
+        ...post,
+        retryCount: (post.retryCount ?? 0) + 1,
+        failureReason: msg,
+      });
       throw new BadRequestException(msg);
     }
   }
 
   private async publishExistingZernioPostNow(
-    post: PostDocument,
+    post: PostRecord,
     zernioPostId: string,
     _auth: TenancyAuth,
   ): Promise<{ postId: string }> {
@@ -875,21 +850,25 @@ export class PostService {
     const channelKeys = (post.channels ?? []).map((c) =>
       c.trim().toLowerCase(),
     );
-    post.status = PostStatus.Published;
-    post.scheduledAt = null;
-    post.publishedAt = now;
-    post.publishedNow = true;
-    post.failureReason = null;
-    post.platformResults = channelKeys.map((platform) => ({
-      platform,
-      status: PlatformPostStatus.Published,
-      platformUrl: null,
+    const saved = await this.posts.save({
+      ...withPostPlatformResults(
+        post,
+        channelKeys.map((platform) => ({
+          platform,
+          status: PlatformPostStatus.Published,
+          platformUrl: null,
+          publishedAt: now,
+          failureReason: null,
+        })),
+      ),
+      status: PostStatus.Published,
+      scheduledAt: null,
       publishedAt: now,
+      publishedNow: true,
       failureReason: null,
-    }));
-    await post.save();
+    });
 
-    await this.ensurePostAnalyticsRecord(post);
+    await this.ensurePostAnalyticsRecord(saved);
 
     await this.patchUploadChannelsFromPost(post.uploadRef, channelKeys, (ch) => {
       ch.status = UploadChannelStatus.Published;
@@ -898,14 +877,14 @@ export class PostService {
       ch.failureReason = null;
     });
 
-    return { postId: post.postId };
+    return { postId: saved.postId };
   }
 
   private async publishPostFromUploadNow(
-    post: PostDocument,
+    post: PostRecord,
     _auth: TenancyAuth,
   ): Promise<{ postId: string }> {
-    const upload = await this.uploadModel.findOne({ uploadId: post.uploadRef }).exec();
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
     if (!upload) {
       throw new NotFoundException(`Upload ${post.uploadRef} not found`);
     }
@@ -923,45 +902,49 @@ export class PostService {
       );
 
       const now = new Date();
-      post.zernioPostId = zernioPostId;
-      post.status = PostStatus.Published;
-      post.scheduledAt = null;
-      post.publishedAt = now;
-      post.publishedNow = true;
-      post.failureReason = null;
-      post.platformResults = work.map((w) => ({
-        platform: w.row.channel.trim().toLowerCase(),
-        status: PlatformPostStatus.Published,
-        platformUrl: null,
+      const saved = await this.posts.save({
+        ...withPostPlatformResults(
+          post,
+          work.map((w) => ({
+            platform: w.row.channel.trim().toLowerCase(),
+            status: PlatformPostStatus.Published,
+            platformUrl: null,
+            publishedAt: now,
+            failureReason: null,
+          })),
+        ),
+        zernioPostId,
+        status: PostStatus.Published,
+        scheduledAt: null,
         publishedAt: now,
+        publishedNow: true,
         failureReason: null,
-      }));
-      await post.save();
+      });
 
-      await this.ensurePostAnalyticsRecord(post);
+      await this.ensurePostAnalyticsRecord(saved);
 
       await this.markUploadChannelsPublished(upload, work);
 
-      return { postId: post.postId };
+      return { postId: saved.postId };
     } catch (err: unknown) {
       const msg = getFriendlyZernioPublishError(err);
-      post.failureReason = msg;
-      await post.save();
+      await this.posts.save({ ...post, failureReason: msg });
       throw new BadRequestException(msg);
     }
   }
 
   private async buildPublishWorkFromPost(
-    post: PostDocument,
-    upload: UploadDocument,
+    post: PostRecord,
+    upload: UploadRecord,
   ): Promise<PublishWorkItem[]> {
     const accountByChannel = await this.loadAccountMapForRetry(post.userId);
-    const ro = upload.resolvedOutputs ?? {};
+    const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
+    const channels = uploadChannels(upload);
     const work: PublishWorkItem[] = [];
 
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = upload.channels.find(
+      const row = channels.find(
         (c) => c.channel.trim().toLowerCase() === key,
       );
       if (!row || row.status === UploadChannelStatus.Skipped) continue;
@@ -1018,13 +1001,13 @@ export class PostService {
   }
 
   private async createPublishedPostRecord(
-    source: PostDocument,
+    source: PostRecord,
     work: PublishWorkItem[],
     zernioPostId: string,
     opts?: { retryCount?: number },
-  ): Promise<PostDocument> {
+  ): Promise<PostRecord> {
     const now = new Date();
-    return this.postModel.create({
+    const created = await this.posts.create({
       userId: source.userId,
       uploadRef: source.uploadRef,
       ruleRef: source.ruleRef,
@@ -1043,27 +1026,28 @@ export class PostService {
         platformUrl: null,
         publishedAt: now,
         failureReason: null,
-      })),
-    }).then(async (created) => {
-      await this.ensurePostAnalyticsRecord(created);
-      return created;
+      })) as Prisma.InputJsonValue,
     });
+    await this.ensurePostAnalyticsRecord(created);
+    return created;
   }
 
   private async markUploadChannelsPublished(
-    upload: UploadDocument,
+    upload: UploadRecord,
     work: PublishWorkItem[],
   ): Promise<void> {
     const now = new Date();
+    const channels = uploadChannels(upload);
     for (const w of work) {
       w.row.status = UploadChannelStatus.Published;
       w.row.publishedAt = now;
       w.row.scheduledAt = null;
       w.row.failureReason = null;
     }
-    upload.status = recomputeUploadJobStatus(upload.channels);
-    upload.markModified('channels');
-    await upload.save();
+    await this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
   }
 
   async deletePost(
@@ -1075,7 +1059,7 @@ export class PostService {
     message: string;
     removed: boolean;
   }> {
-    const post = await this.postModel.findOne({ postId }).exec();
+    const post = await this.posts.findByPostId(postId, auth);
     if (!post) throw new NotFoundException(`Post ${postId} not found`);
     this.assertOwnership(post, auth);
 
@@ -1102,7 +1086,7 @@ export class PostService {
       await this.mcpService.deleteZernioPost(zernioId);
     }
 
-    await this.postModel.deleteOne({ postId }).exec();
+    await this.posts.deleteByPostId(postId);
     await this.resetUploadChannelsToPending(post.uploadRef, channels);
 
     return {
@@ -1151,7 +1135,7 @@ export class PostService {
   }
 
   private async unpublishAndCancelPost(
-    post: PostDocument,
+    post: PostRecord,
     channels: string[],
   ): Promise<{
     success: true;
@@ -1181,26 +1165,32 @@ export class PostService {
       successfulPlatforms.push(...channels);
     }
 
-    if (post.platformResults?.length) {
+    let platformResults = postPlatformResults(post);
+    if (platformResults.length > 0) {
       const successSet = new Set(successfulPlatforms);
-      for (const pr of post.platformResults) {
+      platformResults = platformResults.map((pr) => {
         const plat = pr.platform.trim().toLowerCase();
-        if (!successSet.has(plat)) continue;
-        pr.status = PlatformPostStatus.Cancelled;
-        pr.publishedAt = null;
-        pr.platformUrl = null;
-        pr.failureReason = null;
-      }
+        if (!successSet.has(plat)) return pr;
+        return {
+          ...pr,
+          status: PlatformPostStatus.Cancelled,
+          publishedAt: null,
+          platformUrl: null,
+          failureReason: null,
+        };
+      });
     }
 
-    post.status = PostStatus.Cancelled;
-    post.publishedAt = null;
-    post.scheduledAt = null;
-    post.failureReason =
-      skipped.length > 0
-        ? `Cancelled; unpublish not supported for: ${skipped.join(', ')}`
-        : 'Post unpublished.';
-    await post.save();
+    await this.posts.save({
+      ...withPostPlatformResults(post, platformResults),
+      status: PostStatus.Cancelled,
+      publishedAt: null,
+      scheduledAt: null,
+      failureReason:
+        skipped.length > 0
+          ? `Cancelled; unpublish not supported for: ${skipped.join(', ')}`
+          : 'Post unpublished.',
+    });
 
     if (successfulPlatforms.length > 0) {
       await this.patchUploadChannelsFromPost(
@@ -1253,7 +1243,7 @@ export class PostService {
     };
   }
 
-  private assertOwnership(post: PostDocument, auth: TenancyAuth): void {
+  private assertOwnership(post: PostRecord, auth: TenancyAuth): void {
     if (auth.role === UserRole.ADMIN) return;
     if (post.userId !== auth.userId) {
       throw new NotFoundException(`Post ${post.postId} not found`);
@@ -1314,11 +1304,12 @@ export class PostService {
     message: string,
     opts?: { clearScheduled?: boolean },
   ): Promise<void> {
-    const upload = await this.uploadModel.findOne({ uploadId: uploadRef }).exec();
+    const upload = await this.uploads.findByUploadId(uploadRef);
     if (!upload) return;
 
     const keys = new Set(platforms.map((p) => p.trim().toLowerCase()));
-    for (const ch of upload.channels) {
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(ch.channel.trim().toLowerCase())) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
       ch.status = UploadChannelStatus.Failed;
@@ -1327,27 +1318,29 @@ export class PostService {
         ch.scheduledAt = null;
       }
     }
-    upload.status = recomputeUploadJobStatus(upload.channels);
-    upload.markModified('channels');
-    await upload.save();
+    await this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
   }
 
   async patchUploadChannelsFromPost(
     uploadRef: string,
     platforms: string[],
     mutate: (ch: UploadChannelEntry) => void,
-  ): Promise<UploadDocument | null> {
-    const doc = await this.uploadModel.findOne({ uploadId: uploadRef }).exec();
-    if (!doc) return null;
+  ): Promise<UploadRecord | null> {
+    const upload = await this.uploads.findByUploadId(uploadRef);
+    if (!upload) return null;
     const keys = new Set(platforms.map((p) => p.trim().toLowerCase()));
-    for (const ch of doc.channels) {
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(ch.channel.trim().toLowerCase())) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
       mutate(ch);
     }
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    doc.markModified('channels');
-    await doc.save();
-    return doc;
+    return this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
   }
 }

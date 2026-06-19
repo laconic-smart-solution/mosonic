@@ -1,21 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import {
-  ServiceRate,
-  type ServiceRateDocument,
-  type ServiceRateType,
-} from './schemas/service-rate.schema';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { ServiceRateType } from '@prisma/client';
+import type { IServiceRateRepository } from '../repositories/interfaces/service-rate.repository.interface';
+import { SERVICE_RATE_REPOSITORY } from '../repositories/tokens';
 
 @Injectable()
 export class ServiceRateService {
   constructor(
-    @InjectModel(ServiceRate.name)
-    private readonly serviceRateModel: Model<ServiceRateDocument>,
+    @Inject(SERVICE_RATE_REPOSITORY)
+    private readonly serviceRates: IServiceRateRepository,
   ) {}
 
   list() {
-    return this.serviceRateModel.find({}).sort({ serviceType: 1, provider: 1 }).lean().exec();
+    return this.serviceRates.listAll();
   }
 
   async create(body: {
@@ -26,10 +22,10 @@ export class ServiceRateService {
     pricePerImage?: number;
     pricePerSecond?: number;
   }) {
-    return new this.serviceRateModel({
+    return this.serviceRates.create({
       ...body,
       isActive: true,
-    }).save();
+    });
   }
 
   async update(
@@ -43,9 +39,7 @@ export class ServiceRateService {
       isActive: boolean;
     }>,
   ) {
-    const row = await this.serviceRateModel
-      .findOneAndUpdate({ serviceRateId }, { $set: body }, { new: true })
-      .exec();
+    const row = await this.serviceRates.updateById(serviceRateId, body);
     if (!row) throw new NotFoundException(`Service rate ${serviceRateId} not found`);
     return row;
   }
