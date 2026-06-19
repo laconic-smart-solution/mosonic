@@ -92,9 +92,11 @@ export function HomeRecentRail({
           </Tooltip>
         )
       })}
-      <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">
+      {slots.length > 0 && (
+        <div className="mt-0.5 text-[9px] font-semibold tracking-[0.8px] text-muted-foreground uppercase">
         {t("recent.label")}
       </div>
+      )}
     </div>
   )
 }

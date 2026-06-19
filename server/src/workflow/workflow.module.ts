@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
+import { DatabaseModule } from '../database/database.module';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { NodesModule } from '../nodes/nodes.module';
@@ -18,6 +19,7 @@ import { WorkflowResolveService } from './workflow-resolve.service';
   imports: [
     AuthModule,
     CreditModule,
+    DatabaseModule,
     EventsModule,
     LlmModule,
     NodesModule,

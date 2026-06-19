@@ -15,6 +15,8 @@ type Props = {
   /** Compact = inline card; dialog = larger preview with thumbnails. */
   variant?: "compact" | "dialog"
   className?: string
+  /** Carousel start index when opening the dialog variant. */
+  initialIndex?: number
 }
 
 export function UploadPreviewMedia({
@@ -23,6 +25,7 @@ export function UploadPreviewMedia({
   videoUrl,
   variant = "compact",
   className,
+  initialIndex = 0,
 }: Props) {
   const { t } = useTranslation("upload")
   const [activeIndex, setActiveIndex] = useState(0)
@@ -30,8 +33,8 @@ export function UploadPreviewMedia({
   const isDialog = variant === "dialog"
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [mediaTab, videoUrl, imageUrls.join("|")])
+    setActiveIndex(initialIndex)
+  }, [mediaTab, videoUrl, imageUrls.join("|"), initialIndex])
 
   if (mediaTab === "video" && videoUrl) {
     return (

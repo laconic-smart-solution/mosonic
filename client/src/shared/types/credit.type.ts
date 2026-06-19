@@ -29,3 +29,8 @@ export type TopupCreditsResponse = {
   creditsRemaining: number
   creditsAdded: number
 }
+
+export type GenerationCreditCosts = {
+  ruleGeneration: number
+  workflowGeneration: number
+}

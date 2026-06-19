@@ -15,6 +15,9 @@ import {
 import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
 import { EventsService } from '../events/events.service';
 import { workflowCompletedNotification } from '../events/notification.util';
+import { CreditService } from '../credit/credit.service';
+import { currentBillingPeriod } from '../credit/lib/billing-period.util';
+import { WORKFLOW_GENERATION_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
 import { RuleService } from '../rule/rule.service';
 import {
   GenerateWorkflowRequestDto,
@@ -93,6 +96,7 @@ export class WorkflowService {
     private readonly llm: LlmService,
     private readonly ruleService: RuleService,
     private readonly events: EventsService,
+    private readonly creditService: CreditService,
   ) {}
 
   async generateWorkflow(
@@ -132,6 +136,11 @@ export class WorkflowService {
     const normalizedAnswers = this.normalizeWorkflowQaAnswers(
       answers,
       ruleChannelIds,
+    );
+
+    await this.creditService.assertCreditsForNodeType(
+      auth.userId,
+      WORKFLOW_GENERATION_NODE_TYPE,
     );
 
     const existing = await this.workflows.findLatestByRule(normalizedRuleId, auth);
@@ -829,7 +838,6 @@ export class WorkflowService {
       const generatedNodes = await this.workflowGeneration.generate(
         rule as never,
         answers,
-        { userId: auth.userId, workflowId },
       );
       const { nodeIds, edges: persistedEdges } =
         await this.persistGeneratedNodes(
@@ -856,6 +864,18 @@ export class WorkflowService {
         },
         auth,
       );
+
+      await this.creditService.deductCredits({
+        userId: auth.userId,
+        pipelineRef: workflowId,
+        campaignRef: ruleId,
+        nodeId: 'workflow-generation',
+        nodeType: WORKFLOW_GENERATION_NODE_TYPE,
+        provider: 'system',
+        model: 'system',
+        rawCostUsd: 0,
+        billingPeriod: currentBillingPeriod(),
+      });
 
       const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
 

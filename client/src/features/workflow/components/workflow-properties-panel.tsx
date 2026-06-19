@@ -18,6 +18,8 @@ type WorkflowPropertiesPanelProps = {
   setPropConfig: (next: Record<string, unknown>) => void
   resolvedChannels?: BranchChannelHandle[]
   workflowId?: string
+  /** True when this node exists in the saved workflow API payload. */
+  nodePersisted?: boolean
   onClose: () => void
   onApply: () => boolean
   onReset: () => void
@@ -29,6 +31,7 @@ export function WorkflowPropertiesPanel({
   setPropConfig,
   resolvedChannels = [],
   workflowId,
+  nodePersisted = false,
   onClose,
   onApply,
   onReset,
@@ -107,6 +110,7 @@ export function WorkflowPropertiesPanel({
               onChange={setPropConfig}
               workflowId={workflowId}
               nodeId={selNode.id}
+              persistPresenterToServer={nodePersisted}
             />
           </div>
         ) : null}

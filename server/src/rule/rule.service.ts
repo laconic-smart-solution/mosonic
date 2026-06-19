@@ -39,8 +39,9 @@ import {
 import { ContentReaderService } from '../preprocessing/content-reader.service';
 import { PreprocessingService } from '../preprocessing/preprocessing.service';
 import { RuleExtractionService } from './rule-extraction.service';
-import { CreditBillingService } from '../credit/credit-billing.service';
-import { LlmProvider, WorkflowNodeType } from '../nodes/workflow-node-llm.enums';
+import { CreditService } from '../credit/credit.service';
+import { currentBillingPeriod } from '../credit/lib/billing-period.util';
+import { RULE_GENERATION_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -78,13 +79,18 @@ export class RuleService {
     private readonly preprocessing: PreprocessingService,
     private readonly contentReader: ContentReaderService,
     private readonly events: EventsService,
-    private readonly creditBilling: CreditBillingService,
+    private readonly creditService: CreditService,
   ) {}
 
   async requestExtraction(
     args: RuleExtractRequest,
     auth: TenancyAuth,
   ): Promise<ExtractRuleResponseDto> {
+    await this.creditService.assertCreditsForNodeType(
+      auth.userId,
+      RULE_GENERATION_NODE_TYPE,
+    );
+
     const now = new Date();
     const originalType =
       args.files.length > 0
@@ -457,20 +463,19 @@ export class RuleService {
         message: 'Analyzing your strategy...',
       });
 
-      const { draft: extracted, usage } =
+      const { draft: extracted } =
         await this.ruleExtraction.extractRuleFromInput(summary);
 
-      await this.creditBilling.recordAndDeduct({
+      await this.creditService.deductCredits({
         userId: auth.userId,
         pipelineRef: `rule:${ruleId}`,
         campaignRef: ruleId,
         nodeId: 'rule-extraction',
-        nodeType: WorkflowNodeType.TextGeneration,
-        provider: LlmProvider.OpenAI,
-        providerModel: 'gpt-4o',
-        entryType: 'openai_llm',
-        inputTokens: usage?.inputTokens,
-        outputTokens: usage?.outputTokens,
+        nodeType: RULE_GENERATION_NODE_TYPE,
+        provider: 'system',
+        model: 'system',
+        rawCostUsd: 0,
+        billingPeriod: currentBillingPeriod(),
       });
 
       const streamSource = JSON.stringify(extracted);

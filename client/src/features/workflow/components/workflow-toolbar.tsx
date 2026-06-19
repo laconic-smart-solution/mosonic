@@ -18,6 +18,7 @@ type WorkflowToolbarProps = {
   readOnly?: boolean
   generationDisabled?: boolean
   generateWorkflowDisabled?: boolean
+  workflowGenerationCredits?: number
   showCancel?: boolean
   onCancel?: () => void
 }
@@ -36,10 +37,16 @@ export function WorkflowToolbar({
   readOnly,
   generationDisabled = false,
   generateWorkflowDisabled = false,
+  workflowGenerationCredits,
   showCancel,
   onCancel,
 }: WorkflowToolbarProps) {
   const { t } = useTranslation("workflow")
+  const { t: tCredit } = useTranslation("credit")
+  const workflowGenLabel =
+    workflowGenerationCredits != null && workflowGenerationCredits > 0
+      ? tCredit("generationCost", { count: workflowGenerationCredits })
+      : null
 
   return (
     <div
@@ -124,6 +131,11 @@ export function WorkflowToolbar({
           >
             <Sparkles className="size-3.5 shrink-0" aria-hidden />
             {t("toolbar.generateWorkflow")}
+            {workflowGenLabel ? (
+              <span className="text-[10px] font-normal opacity-80">
+                · {workflowGenLabel}
+              </span>
+            ) : null}
           </Button>
         ) : null}
         {!readOnly ? (

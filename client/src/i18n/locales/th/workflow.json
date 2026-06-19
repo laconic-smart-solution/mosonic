@@ -35,7 +35,9 @@
     "summarization": "สรุปเนื้อหา",
     "adapt": "ปรับแต่ง",
     "intelligence": "ข่าวกรอง",
-    "social_account_connect": "ปลดล็อกบัญชีโซเชียล"
+    "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
+    "rule_generation": "สร้างกฎ",
+    "workflow_generation": "สร้างเวิร์กโฟลว์"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"
@@ -391,7 +393,9 @@
     "modeTabCurrent": "ปัจจุบัน",
     "modeTabAuto": "อัตโนมัติ",
     "generateWorkflowPlaceholder": "เช่น คำบรรยาย Instagram + Facebook แปลภาษาไทย รูปหลัก…",
-    "autoWorkflowHint": "AI จะสร้างเวิร์กโฟลว์จากโพสต์และกฎแคมเปญของคุณ แล้วสร้างเนื้อหาต่อ"
+    "autoWorkflowHint": "AI จะสร้างเวิร์กโฟลว์จากโพสต์และกฎแคมเปญของคุณ แล้วสร้างเนื้อหาต่อ",
+    "hidePrompt": "ซ่อนพื้นที่พรอมpt",
+    "showPrompt": "แสดงพื้นที่พรอมpt"
   },
   "nodesLabel_one": "โหนด",
   "nodesLabel_other": "โหนด",

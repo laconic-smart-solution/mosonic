@@ -79,7 +79,6 @@ import {
   getAllowedInsertTypes,
   getAllowedNextTypes,
   hasBlockingOutgoingEdge,
-  getVideoPresenterConfigErrors,
   mergeHeygenVideoConfig,
   toValidationEdges,
   toValidationNodes,
@@ -796,6 +795,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       [readOnly],
     )
 
+    const persistedNodeIds = useMemo(
+      () => new Set((apiNodes ?? []).map((node) => node.nodeId)),
+      [apiNodes],
+    )
+
     const selNode = useMemo(() => {
       const n = nodes.find((x) => x.id === settingsNodeId)
       if (
@@ -807,6 +811,60 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       }
       return rfNodeToWfNode(n)
     }, [nodes, settingsNodeId])
+
+    const syncVideoConfigToCanvas = useCallback(
+      (config: Record<string, unknown>) => {
+        if (readOnly || !settingsNodeId) return
+        const selected = nodesRef.current.find((n) => n.id === settingsNodeId)
+        if (selected?.type !== "wfNode" || selected.data.wfType !== "video") {
+          return
+        }
+        const configToApply = mergeHeygenVideoConfig({}, config)
+        const nextNodes = nodesRef.current.map((n) => {
+          if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              config: configToApply,
+            },
+          } as WfRfNode
+        })
+        nodesRef.current = nextNodes
+        setNodes(nextNodes)
+        setPropConfig(configToApply)
+        onConfigDraftChange?.(false)
+        if (
+          workflowId?.trim() &&
+          persistedNodeIds.has(settingsNodeId)
+        ) {
+          void heygenService
+            .patchPresenterConfig(workflowId, settingsNodeId, configToApply)
+            .catch(() => {
+              toast.error(t("canvas.videoSettingsSaveFailed"))
+            })
+        }
+      },
+      [
+        onConfigDraftChange,
+        persistedNodeIds,
+        readOnly,
+        settingsNodeId,
+        setNodes,
+        t,
+        workflowId,
+      ],
+    )
+
+    const handlePropConfigChange = useCallback(
+      (next: Record<string, unknown>) => {
+        setPropConfig(next)
+        if (selNode?.type === "video") {
+          syncVideoConfigToCanvas(next)
+        }
+      },
+      [selNode?.type, syncVideoConfigToCanvas],
+    )
 
     useEffect(() => {
       if (!selNode || readOnly) {
@@ -1002,11 +1060,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         }
       }
       if (selected?.type === "wfNode" && selected.data.wfType === "video") {
-        const presenterErrors = getVideoPresenterConfigErrors(propConfig)
-        if (presenterErrors.length > 0) {
-          toast.error(presenterErrors[0])
-          return false
-        }
         configToApply = mergeHeygenVideoConfig({}, propConfig)
       }
       let nextNodes = currentNodes
@@ -1055,6 +1108,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onConfigDraftChange?.(false)
       if (
         workflowId?.trim() &&
+        persistedNodeIds.has(settingsNodeId) &&
         selected?.type === "wfNode" &&
         selected.data.wfType === "video"
       ) {
@@ -1076,6 +1130,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       setPropConfig,
       t,
       workflowId,
+      persistedNodeIds,
     ])
 
     const applyOpenPropertiesPanel = useCallback((): boolean => {
@@ -1190,7 +1245,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
                       <WorkflowPropertiesPanel
                         selNode={selNode}
                         propConfig={propConfig}
-                        setPropConfig={setPropConfig}
+                        setPropConfig={handlePropConfigChange}
+                        nodePersisted={persistedNodeIds.has(selNode.id)}
                         resolvedChannels={resolvedChannels}
                         workflowId={workflowId}
                         onClose={closePanel}
@@ -1207,7 +1263,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
                       <WorkflowPropertiesPanel
                         selNode={selNode}
                         propConfig={propConfig}
-                        setPropConfig={setPropConfig}
+                        setPropConfig={handlePropConfigChange}
+                        nodePersisted={persistedNodeIds.has(selNode.id)}
                         resolvedChannels={resolvedChannels}
                         workflowId={workflowId}
                         onClose={closePanel}

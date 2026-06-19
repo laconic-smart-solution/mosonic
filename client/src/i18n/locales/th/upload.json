@@ -26,6 +26,11 @@
     "mediaCounter": "{{current}} / {{total}}",
     "tiktokVerticalHint": "TikTok ใช้วิดีโอแนวตั้ง 9:16 ในตัวอย่าง"
   },
+  "mediaDetail": {
+    "title": "ตัวอย่างสื่อ",
+    "description": "ดูสื่อขนาดเต็ม",
+    "openHint": "ดูขนาดเต็ม"
+  },
   "scheduledEdit": {
     "title": "แก้ไขโพสต์ที่กำหนดเวลา",
     "hint": "การเปลี่ยนแปลงใช้กับช่องทางนี้เท่านั้น",

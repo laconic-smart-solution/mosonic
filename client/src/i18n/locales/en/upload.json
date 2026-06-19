@@ -26,6 +26,11 @@
     "mediaCounter": "{{current}} / {{total}}",
     "tiktokVerticalHint": "TikTok uses vertical 9:16 video in preview."
   },
+  "mediaDetail": {
+    "title": "Media preview",
+    "description": "Full-size view of the selected media.",
+    "openHint": "View full size"
+  },
   "scheduledEdit": {
     "title": "Edit scheduled post",
     "hint": "Changes apply to this channel only.",

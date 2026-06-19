@@ -34,6 +34,11 @@ export class CreditTopupController {
     return this.creditService.getPackages();
   }
 
+  @Get('generation-costs')
+  getGenerationCosts() {
+    return this.creditService.getGenerationCreditCosts();
+  }
+
   @Post('topup/initiate')
   @UsePipes(bodyPipe)
   initiateTopup(@Body() body: TopupCreditsDto, @Req() req: Request) {

@@ -1,8 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreditBillingService } from '../../credit/credit-billing.service';
 import { LlmService } from '../../llm/llm.service';
-import { extractUsageFromAiMessage } from '../../nodes/langchain-usage.util';
-import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../../nodes/workflow-node-config.zod';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -38,16 +35,12 @@ function mergeValidatedNodeConfig(
 export class WorkflowConfigGenerationService {
   private readonly logger = new Logger(WorkflowConfigGenerationService.name);
 
-  constructor(
-    private readonly llm: LlmService,
-    private readonly creditBilling: CreditBillingService,
-  ) {}
+  constructor(private readonly llm: LlmService) {}
 
   async generateConfigs(
     nodes: LogicalWorkflowNode[],
     rule: Rule,
     additionalMessage: string,
-    billing?: { userId: string; workflowId: string },
   ): Promise<LogicalWorkflowNode[]> {
     if (!nodes.length) {
       return nodes;
@@ -81,22 +74,6 @@ export class WorkflowConfigGenerationService {
       this.logger.warn(
         `Failed to parse workflow config JSON: ${err instanceof Error ? err.message : String(err)}`,
       );
-    }
-
-    if (billing) {
-      const usage = extractUsageFromAiMessage(res);
-      await this.creditBilling.recordAndDeduct({
-        userId: billing.userId,
-        pipelineRef: billing.workflowId,
-        campaignRef: rule.ruleId,
-        nodeId: 'workflow-config-generation',
-        nodeType: WorkflowNodeType.TextGeneration,
-        provider: LlmProvider.OpenAI,
-        providerModel: 'gpt-4o',
-        entryType: 'openai_llm',
-        inputTokens: usage?.inputTokens,
-        outputTokens: usage?.outputTokens,
-      });
     }
 
     return nodes.map((node) => {

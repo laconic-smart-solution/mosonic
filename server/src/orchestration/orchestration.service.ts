@@ -57,7 +57,7 @@ import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.er
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { CreditService } from '../credit/credit.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
-import { isBillableNodeCreditType } from '../credit/lib/billable-node-credit-types';
+import { isPipelineNodeCreditType } from '../credit/lib/billable-node-credit-types';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { NodeExecutor } from './node-executor.service';
 import { DependencyResolverService } from './dependency-resolver.service';
@@ -395,7 +395,7 @@ export class OrchestrationService {
     return { pipelineId };
   }
 
-  /** Aggregate per-node-type credit cost for a set of node types. */
+  /** Aggregate per-node-type credit cost for workflow node runs. */
   private async computeNodeCreditEstimate(nodeTypes: string[]): Promise<{
     totalCredits: number;
     breakdown: Array<{
@@ -407,7 +407,7 @@ export class OrchestrationService {
   }> {
     const counts = new Map<string, number>();
     for (const type of nodeTypes) {
-      if (isBillableNodeCreditType(type)) {
+      if (isPipelineNodeCreditType(type)) {
         counts.set(type, (counts.get(type) ?? 0) + 1);
       }
     }
@@ -469,6 +469,7 @@ export class OrchestrationService {
 
       const refundItems: Array<{ nodeType: string; credits: number }> = [];
       for (const row of breakdown) {
+        if (!isPipelineNodeCreditType(row.nodeType)) continue;
         const completed = completedByType.get(row.nodeType) ?? 0;
         const unused = Math.max(0, row.count - completed);
         const credits = unused * row.creditsEach;

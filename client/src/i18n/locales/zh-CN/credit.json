@@ -44,6 +44,20 @@
     "summarization": "摘要",
     "image_generation": "图像生成",
     "video_generation": "视频生成",
-    "social_account_connect": "社交账户解锁"
+    "social_account_connect": "社交账户解锁",
+    "rule_generation": "规则生成",
+    "workflow_generation": "工作流生成"
+  },
+  "generationCost": "{{count}} 积分",
+  "generationConfirm": {
+    "ruleTitle": "生成规则？",
+    "workflowTitle": "生成工作流？",
+    "ruleDescription": "请在此输入生成活动规则前查看积分消耗。",
+    "workflowDescription": "请在自动构建工作流前查看积分消耗。",
+    "confirmRule": "生成规则",
+    "confirmWorkflow": "生成工作流",
+    "starting": "正在启动…",
+    "loading": "正在计算费用…",
+    "noCharge": "按当前定价，此操作免费。"
   }
 }
