@@ -22,9 +22,11 @@ import {
   type WfNodeData,
 } from "@/features/workflow/data/workflow-model"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import { useWorkflowFlowVisualTheme } from "@/features/workflow/lib/workflow-flow-theme"
 import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
+import { cn } from "@/lib/utils"
 import { WorkflowNodeAddButton } from "./workflow-node-add-button"
 import { WorkflowNodeSettingsButton } from "./workflow-node-settings-button"
 
@@ -34,6 +36,7 @@ type WorkflowRfNodeProps = NodeProps<
 
 export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
   const { t } = useTranslation("workflow")
+  const flowTheme = useWorkflowFlowVisualTheme()
   const nodeId = useNodeId()
   const updateNodeInternals = useUpdateNodeInternals()
   const edges = useEdges()
@@ -81,7 +84,7 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
   const targetHandleStyle = {
     width: 10,
     height: 10,
-    background: "#fff",
+    background: flowTheme.handleFill,
     border: `2px solid ${nt.color}`,
     boxShadow: `0 0 0 3px ${nt.color}20`,
   }
@@ -89,7 +92,7 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
     width: 10,
     height: 10,
     background: nt.color,
-    border: "2px solid #fff",
+    border: `2px solid ${flowTheme.handleRing}`,
     boxShadow: `0 0 0 3px ${nt.color}30, 0 2px 4px ${nt.color}40`,
   }
 
@@ -115,10 +118,9 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
         overflow: showLaneHandles ? "visible" : undefined,
         filter: selected
           ? `drop-shadow(0 0 12px ${nt.color}35)`
-          : "drop-shadow(0 2px 6px rgba(0,0,0,0.08))",
+          : flowTheme.cardShadow,
       }}
     >
-      {/* LEFT HANDLE(S) */}
       {data.wfType !== "keywords" && !isBranch ? (
         isMerge && showLaneHandles ? (
           channelHandles.map((ch, index) => {
@@ -153,83 +155,43 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
         />
       ) : null}
 
-      {/* CARD */}
       <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          border: `1.5px solid ${selected ? nt.color : "#E5E1D8"}`,
-          overflow: "hidden",
-          transition: "border-color 0.15s",
-        }}
+        className={cn(
+          "overflow-hidden rounded-xl border-[1.5px] bg-card transition-[border-color]",
+          !selected && "border-border",
+        )}
+        style={selected ? { borderColor: nt.color } : undefined}
       >
-        {/* ACCENT LINE */}
-        <div style={{ height: 2, background: nt.color, flexShrink: 0 }} />
+        <div className="h-0.5 shrink-0" style={{ background: nt.color }} />
 
-        {/* HEADER */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "9px 10px 8px",
-            borderBottom: "1px solid #F0EDE8",
-          }}
-        >
-          {/* Icon */}
+        <div className="flex items-center gap-2 border-b border-border px-2.5 pt-2.5 pb-2">
           <div
+            className="flex size-[26px] shrink-0 items-center justify-center rounded-[7px]"
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 7,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               background: nt.bg,
               border: `1px solid ${nt.color}30`,
               color: nt.color,
-              flexShrink: 0,
             }}
           >
             {nt.icon}
           </div>
 
-          {/* Label */}
-          <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#0F1F3D",
-              letterSpacing: "-0.01em",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold tracking-tight text-foreground">
             {data.label}
           </span>
 
-          {/* Lane pill */}
-          {data.lane && (
+          {data.lane ? (
             <span
+              className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase"
               style={{
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: "0.07em",
-                textTransform: "uppercase",
-                padding: "2px 6px",
-                borderRadius: 4,
                 background: `${nt.color}18`,
                 color: nt.color,
                 border: `1px solid ${nt.color}40`,
-                flexShrink: 0,
               }}
             >
               {data.lane}
             </span>
-          )}
+          ) : null}
 
           {data.onOpenSettings ? (
             <WorkflowNodeSettingsButton
@@ -238,92 +200,58 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             />
           ) : null}
 
-          {/* Lock icon */}
-          {data.locked && (
+          {data.locked ? (
             <svg
               width="12"
               height="12"
               viewBox="0 0 12 12"
               fill="none"
               aria-label={t("rfNode.locked")}
-              style={{ flexShrink: 0, opacity: 0.45 }}
+              className="shrink-0 opacity-45"
             >
-              <rect x="2" y="5" width="8" height="6" rx="1.5" stroke="#4A5568" strokeWidth="1.2" />
-              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="#4A5568" strokeWidth="1.2" />
+              <rect
+                x="2"
+                y="5"
+                width="8"
+                height="6"
+                rx="1.5"
+                className="stroke-muted-foreground"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M4 5V3.5a2 2 0 0 1 4 0V5"
+                className="stroke-muted-foreground"
+                strokeWidth="1.2"
+              />
             </svg>
-          )}
+          ) : null}
         </div>
 
-        {/* BODY */}
-        <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column", gap: 7 }}>
-
-          {/* Config summary */}
+        <div className="flex flex-col gap-1.5 px-2.5 pt-2 pb-2.5">
           {bodySummary ? (
-            <p
-              style={{
-                fontSize: 11,
-                lineHeight: 1.55,
-                color: "#857A6C",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
+            <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
               {bodySummary}
             </p>
           ) : null}
 
-          {/* Processing message */}
-          {data.processingMessage && (
-            <p
-              style={{
-                fontSize: 10,
-                lineHeight: 1.5,
-                color: "#2563EB",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
+          {data.processingMessage ? (
+            <p className="line-clamp-2 text-[10px] leading-snug text-[var(--nt-blue)]">
               {data.processingMessage}
             </p>
-          )}
+          ) : null}
 
-          {/* Error message */}
-          {data.errorMessage && (
-            <div
-              style={{
-                fontSize: 10,
-                lineHeight: 1.5,
-                color: "#DC2626",
-                background: "#FEF2F2",
-                border: "1px solid #FECACA",
-                borderRadius: 6,
-                padding: "5px 7px",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
+          {data.errorMessage ? (
+            <div className="line-clamp-2 rounded-md border px-1.5 py-1 text-[10px] leading-snug text-[var(--nt-red)] border-[var(--nt-red-border)] bg-[var(--nt-red-bg)]">
               {data.errorMessage}
             </div>
-          )}
+          ) : null}
 
-          {/* Image preview */}
           {data.previewImage?.trim() ? (
             previewImageSrc ? (
               <img
                 src={previewImageSrc}
                 alt={t("rfNode.previewAlt")}
-                style={{
-                  width: "100%",
-                  borderRadius: 6,
-                  objectFit: "cover",
-                  maxHeight: 80,
-                }}
+                className="max-h-20 w-full rounded-md object-cover"
               />
             ) : (
               <MediaLoadPlaceholder
@@ -331,22 +259,16 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
                 status={previewImage.status === "error" ? "error" : "loading"}
                 kind="image"
                 compact
-                className="rounded-md border border-[#F0EDE8] bg-[#FAF9F7]"
+                className="rounded-md border border-border bg-muted"
               />
             )
           ) : null}
 
-          {/* Video preview */}
           {data.previewVideo?.trim() ? (
             previewVideoSrc ? (
               <video
                 src={previewVideoSrc}
-                style={{
-                  width: "100%",
-                  height: 40,
-                  borderRadius: 6,
-                  objectFit: "cover",
-                }}
+                className="h-10 w-full rounded-md object-cover"
                 muted
                 controls
               />
@@ -356,137 +278,76 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
                 status={previewVideo.status === "error" ? "error" : "loading"}
                 kind="video"
                 compact
-                className="rounded-md border border-[#F0EDE8] bg-[#FAF9F7]"
+                className="rounded-md border border-border bg-muted"
               />
             )
           ) : null}
 
-          {/* Text preview */}
-          {data.previewText && (
-            <div
-              style={{
-                fontSize: 10,
-                lineHeight: 1.6,
-                color: "#62594E",
-                background: "#F7F4EF",
-                borderRadius: 6,
-                padding: "5px 7px",
-                display: "-webkit-box",
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
+          {data.previewText ? (
+            <div className="line-clamp-3 rounded-md bg-muted px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">
               {data.previewText}
             </div>
-          )}
+          ) : null}
 
-          {/* FOOTER ROW: status + retry/skip + delete */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-
-            {/* Status badge */}
+          <div className="mt-0.5 flex items-center justify-between">
             <span
+              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 7px",
-                borderRadius: 20,
-                border: `1px solid ${sc.border}`,
+                borderColor: sc.border,
                 background: sc.bg,
                 color: sc.text,
               }}
             >
               <span
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: "50%",
-                  background: sc.dot,
-                  flexShrink: 0,
-                }}
+                className="size-[5px] shrink-0 rounded-full"
+                style={{ background: sc.dot }}
               />
               {sc.label}
             </span>
 
-            {/* Retry attempt counter */}
-            {data.status === "retrying" && data.retryAttempt && data.retryMaxAttempts && (
-              <span style={{ fontSize: 10, color: "#EA580C", fontVariantNumeric: "tabular-nums" }}>
+            {data.status === "retrying" &&
+            data.retryAttempt &&
+            data.retryMaxAttempts ? (
+              <span className="text-[10px] text-[var(--nt-amber)] tabular-nums">
                 {data.retryAttempt}/{data.retryMaxAttempts}
               </span>
-            )}
+            ) : null}
 
-            {/* Retry / Skip buttons on final failure */}
-            {data.status === "failed_final" && (
-              <div style={{ display: "flex", gap: 4 }}>
+            {data.status === "failed_final" ? (
+              <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => data.onRetry?.()}
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    padding: "3px 8px",
-                    borderRadius: 5,
-                    border: "1px solid #FECACA",
-                    background: "#FEF2F2",
-                    color: "#DC2626",
-                    cursor: "pointer",
-                  }}
+                  className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-red)] border-[var(--nt-red-border)] bg-[var(--nt-red-bg)]"
                 >
                   {t("rfNode.retry")}
                 </button>
-                {data.onSkip && (
+                {data.onSkip ? (
                   <button
                     type="button"
                     onClick={() => data.onSkip?.()}
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "3px 8px",
-                      borderRadius: 5,
-                      border: "1px solid #FCD34D",
-                      background: "#FFFBEB",
-                      color: "#92400E",
-                      cursor: "pointer",
-                    }}
+                    className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-amber)] border-[var(--nt-amber-border)] bg-[var(--nt-amber-bg)]"
                   >
                     {t("rfNode.skip")}
                   </button>
-                )}
+                ) : null}
               </div>
-            )}
+            ) : null}
 
-            {/* Delete button when selected */}
-            {selected && data.onDelete && (
+            {selected && data.onDelete ? (
               <button
                 type="button"
                 onClick={() => data.onDelete?.()}
-                style={{
-                  width: 22,
-                  height: 22,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 5,
-                  border: "1px solid #FECACA",
-                  background: "#FEF2F2",
-                  color: "#DC2626",
-                  fontSize: 11,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
+                className="flex size-[22px] shrink-0 cursor-pointer items-center justify-center rounded-[5px] border text-[11px] text-[var(--nt-red)] border-[var(--nt-red-border)] bg-[var(--nt-red-bg)]"
                 aria-label={t("rfNode.deleteAria")}
               >
                 ✕
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
 
-      {/* RIGHT HANDLE(S) */}
       {isBranch && showLaneHandles
         ? channelHandles.map((ch, index) => {
             const topPct = ((index + 1) / (channelHandles.length + 1)) * 100

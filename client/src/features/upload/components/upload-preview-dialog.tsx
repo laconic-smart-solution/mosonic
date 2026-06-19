@@ -26,6 +26,7 @@ type Props = {
   scheduledAt: string | null
   onConnect?: () => void
   onRetry?: () => void
+  showActions?: boolean
 }
 
 export function UploadPreviewDialog({
@@ -42,6 +43,7 @@ export function UploadPreviewDialog({
   scheduledAt,
   onConnect,
   onRetry,
+  showActions = false,
 }: Props) {
   const { t } = useTranslation("upload")
 
@@ -70,6 +72,7 @@ export function UploadPreviewDialog({
             scheduledAt={scheduledAt}
             onConnect={onConnect}
             onRetry={onRetry}
+            showActions={showActions}
           />
           <UploadPlatformPreview
             channel={channel}

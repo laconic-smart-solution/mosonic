@@ -279,6 +279,24 @@
   opacity: 0.45;
 }
 
+/* React Flow — workflow canvas dark mode */
+.dark .workflow-flow-canvas .react-flow__controls-button {
+  background-color: #171d26;
+  border-color: #252d3b;
+  color: #a0aec0;
+  fill: #a0aec0;
+}
+
+.dark .workflow-flow-canvas .react-flow__controls-button:hover {
+  background-color: #252d3b;
+  color: #f7f8fa;
+  fill: #f7f8fa;
+}
+
+.dark .workflow-flow-canvas .react-flow__controls-button:disabled {
+  opacity: 0.45;
+}
+
 /* NeuralTex animations */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }

@@ -24,7 +24,7 @@ export function WorkflowNodeAddButton({
   return (
     <button
       type="button"
-      className={`nodrag nopan absolute left-1/2 z-10 flex -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-[#00A589] text-white shadow-md transition-all duration-150 hover:bg-[#008f77] ${
+      className={`nodrag nopan absolute left-1/2 z-10 flex -translate-x-1/2 items-center justify-center rounded-full border-2 border-card bg-[#00A589] text-white shadow-md transition-all duration-150 hover:bg-[#008f77] dark:border-[#252D3B] ${
         show ? "opacity-100" : "pointer-events-none opacity-0"
       } ${highlighted && !visible ? "pointer-events-none" : ""} ${
         highlighted ? "ring-4 ring-[#00A589]/30" : ""

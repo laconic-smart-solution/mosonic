@@ -23,6 +23,7 @@ import type { UploadPaletteDragPayload } from "@/features/upload/components/uplo
 import { UploadMediaDropZone } from "@/features/upload/components/upload-media-drop-zone"
 import { UploadPreviewDialog } from "@/features/upload/components/upload-preview-dialog"
 import { UploadPublishControls } from "@/features/upload/components/upload-publish-controls"
+import { UploadStatusBanner } from "@/features/upload/components/upload-status-banner"
 import { UploadTextDropZone } from "@/features/upload/components/upload-text-drop-zone"
 import { UploadContentReviewPanel } from "@/features/upload/components/upload-content-review-panel"
 import {
@@ -1157,7 +1158,7 @@ export default function UploadPage() {
             generationChannelKeys={channelTabs.map((t) => t.channel)}
             onWorkflowLayersChange={handleWorkflowLayersChange}
             preview={
-              <div className="h-full min-w-0 space-y-3 rounded-xl border border-canvas-200 bg-card p-4 shadow-sm">
+              <div className="h-full min-w-0 space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                     Editor
@@ -1200,10 +1201,21 @@ export default function UploadPage() {
                   </div>
                 </div>
 
+                {activeRow && mediaCfg && bannerVariant !== "hidden" ? (
+                  <UploadStatusBanner
+                    platformLabel={mediaCfg.displayName}
+                    variant={bannerVariant}
+                    publishedAt={activeRow.publishedAt}
+                    scheduledAt={activeRow.scheduledAt}
+                    onConnect={() => navigate("/settings/accounts")}
+                    onRetry={retryActiveChannel}
+                  />
+                ) : null}
+
                 {activeRow && mediaCfg ? (
                   <div className="h-[70vh] space-y-3 overflow-y-auto">
                     {activeIsScheduled ? (
-                      <div className="rounded-md border border-[#D7ECFF] bg-[#F3F8FE] px-3 py-2 text-[11px] text-[#185FA5]">
+                      <div className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-[11px] text-blue-950 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-100">
                         {i18n.t("upload:editor.scheduledHint")}
                       </div>
                     ) : null}

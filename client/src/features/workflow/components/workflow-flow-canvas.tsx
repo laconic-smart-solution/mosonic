@@ -65,6 +65,7 @@ import {
   persistedLayoutFromApiNodes,
   resolveWorkflowLayout,
 } from "@/features/workflow/lib/branch-layout"
+import { useWorkflowFlowVisualTheme } from "@/features/workflow/lib/workflow-flow-theme"
 import { workflowConfigsEqual } from "@/features/workflow/lib/config-equality"
 import { normalizeImageCanvasConfig } from "@/features/workflow/lib/openai-image-size"
 import { expandLegacySingleAdapt } from "@/features/workflow/lib/workflow-lane-expand"
@@ -276,6 +277,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     ref,
   ) {
     const { t } = useTranslation("workflow")
+    const flowTheme = useWorkflowFlowVisualTheme()
     const initialNodes = useMemo(() => [] as WfRfNode[], [])
     const initialEdges = useMemo(() => [] as Edge[], [])
     const defaultViewport = useMemo(() => defaultWorkflowCanvasViewport(), [])
@@ -687,6 +689,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         edges.map((edge) => ({
           ...edge,
           type: edge.type ?? "plus_edge",
+          style: {
+            strokeWidth: 2,
+            ...edge.style,
+            stroke: flowTheme.edgeColor,
+          },
           data: {
             ...edge.data,
             readOnly,
@@ -703,6 +710,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         activeBetweenEdgeId,
         betweenEdgeIds,
         edges,
+        flowTheme.edgeColor,
         openBetweenPopover,
         readOnly,
       ],
@@ -1144,17 +1152,21 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             minZoom={0.35}
             maxZoom={1.5}
             defaultViewport={defaultViewport}
-            className="h-full min-h-0 w-full flex-1 bg-transparent!"
+            className="workflow-flow-canvas h-full min-h-0 w-full flex-1 bg-muted/10! dark:bg-transparent!"
             style={{ width: "100%", height: "100%" }}
           >
-            <Background gap={24} size={1} />
+            <Background
+              gap={24}
+              size={1}
+              color={flowTheme.backgroundDotColor}
+            />
             <Controls
               className="border-(--nt-border)! shadow-md!"
               showInteractive={false}
             />
             <MiniMap
               className="rounded-lg! border! border-(--nt-border)! bg-card! shadow-md!"
-              maskColor="rgba(247, 244, 239, 0.72)"
+              maskColor={flowTheme.minimapMaskColor}
               nodeStrokeWidth={2}
               zoomable
               pannable
