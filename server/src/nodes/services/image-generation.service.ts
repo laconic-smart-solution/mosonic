@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { buildFileStorageFolderPath } from '../../common/utils/file-storage-path.util';
 import OpenAI from 'openai';
 import { LlmService } from '../../llm/llm.service';
