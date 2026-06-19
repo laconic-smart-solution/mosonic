@@ -5,7 +5,17 @@
   },
   "page": {
     "title": "账户设置",
-    "subtitle": "关联您用于发布的渠道。连接与上传和定时发布共享，因此只需认证一次。"
+    "subtitle": "管理您的个人资料、语言和已连接的发布渠道。"
+  },
+  "profile": {
+    "email": "邮箱",
+    "phone": "电话",
+    "address": "地址",
+    "unnamed": "账户",
+    "roles": {
+      "admin": "管理员",
+      "member": "成员"
+    }
   },
   "toolbar": {
     "createProfile": "创建 Zernio 配置文件",

@@ -15,6 +15,8 @@ jest.mock('jose', () => ({
 describe('McpService', () => {
   const zernio = {
     listAccounts: jest.fn(),
+    listProfiles: jest.fn(),
+    createProfile: jest.fn(),
   } as unknown as jest.Mocked<ZernioClient>;
   const zernioMcp = {} as unknown as jest.Mocked<ZernioMcpClient>;
   const zernioRest = {
@@ -29,6 +31,7 @@ describe('McpService', () => {
     findByUserId: jest.fn(),
     getZernioConnectedAccounts: jest.fn(),
     disconnectZernioConnectedAccount: jest.fn(),
+    setZernioProfileId: jest.fn(),
   } as unknown as jest.Mocked<UsersService>;
   const oauthState = {} as ZernioOauthStateService;
   const config = {} as ConfigService;
@@ -44,6 +47,26 @@ describe('McpService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('syncAccounts reuses an existing Zernio profile when none is stored locally', async () => {
+    usersService.findByUserId.mockResolvedValue({
+      userId: 'u1',
+      email: 'user@example.com',
+    } as never);
+    zernio.listProfiles.mockResolvedValue([
+      { _id: 'prof_existing', name: 'user@example.com' },
+    ]);
+    zernio.listAccounts.mockResolvedValue([]);
+
+    await service.syncAccounts('u1');
+
+    expect(zernio.createProfile).not.toHaveBeenCalled();
+    expect(usersService.setZernioProfileId).toHaveBeenCalledWith(
+      'u1',
+      'prof_existing',
+    );
+    expect(zernio.listAccounts).toHaveBeenCalledWith('prof_existing');
   });
 
   it('syncAccounts normalizes channels/accounts and deduplicates by channel', async () => {

@@ -2,7 +2,6 @@ import type { ReactNode } from "react"
 import { UserCog } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { T } from "@/lib/tokens"
 
 type AccountSettingsPageHeaderProps = {
   className?: string
@@ -18,12 +17,12 @@ export function AccountSettingsPageHeader({ className, actions }: AccountSetting
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <UserCog className="size-5 shrink-0" strokeWidth={1.75} style={{ color: T.accent }} aria-hidden />
-            <h1 className="m-0 text-xl font-bold tracking-[-0.35px] sm:text-2xl" style={{ color: T.textPrimary }}>
+            <UserCog className="size-5 shrink-0 text-primary" strokeWidth={1.75} aria-hidden />
+            <h1 className="font-heading m-0 text-[26px] leading-tight tracking-tight text-foreground">
               {t("page.title")}
             </h1>
           </div>
-          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed" style={{ color: T.textSecondary }}>
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
             {t("page.subtitle")}
           </p>
         </div>

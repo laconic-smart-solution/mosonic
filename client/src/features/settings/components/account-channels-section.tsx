@@ -14,6 +14,7 @@ type AccountChannelsSectionProps = {
   onDisconnect: (channel: string) => void
   connectPending: boolean
   disconnectPending: boolean
+  hideHeader?: boolean
 }
 
 export function AccountChannelsSection({
@@ -23,6 +24,7 @@ export function AccountChannelsSection({
   onDisconnect,
   connectPending,
   disconnectPending,
+  hideHeader = false,
 }: AccountChannelsSectionProps) {
   const { t } = useTranslation("settings")
 
@@ -53,12 +55,14 @@ export function AccountChannelsSection({
 
   return (
     <Card className="overflow-hidden shadow-none ring-1 ring-foreground/8">
-      <CardHeader className="border-b border-foreground/8 pb-4">
-        <CardTitle className="text-base font-semibold">{t("channels.sectionTitle")}</CardTitle>
-        <CardDescription className="text-[13px] leading-relaxed">
-          {t("channels.sectionDesc")}
-        </CardDescription>
-      </CardHeader>
+      {hideHeader ? null : (
+        <CardHeader className="border-b border-foreground/8 pb-4">
+          <CardTitle className="text-base font-semibold">{t("channels.sectionTitle")}</CardTitle>
+          <CardDescription className="text-[13px] leading-relaxed">
+            {t("channels.sectionDesc")}
+          </CardDescription>
+        </CardHeader>
+      )}
       <CardContent className="divide-y divide-border p-0">
         {ACCOUNT_CHANNELS.map((def) => (
           <AccountChannelRow
