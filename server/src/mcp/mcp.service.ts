@@ -9,7 +9,11 @@ import {
   type ConnectedAccountRecord,
   UsersService,
 } from '../users/users.service';
-import { ZernioClient } from './zernio/zernio.client';
+import {
+  pickZernioProfileForUser,
+  ZernioClient,
+  ZernioClientError,
+} from './zernio/zernio.client';
 import { ZernioMcpClient } from './zernio/zernio.mcp';
 import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
@@ -249,9 +253,28 @@ export class McpService {
       user.username?.trim() ||
       `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
       user.userId;
-    const profile = await this.zernio.createProfile(name);
-    await this.usersService.setZernioProfileId(userId, profile._id);
-    return profile._id;
+
+    try {
+      const profiles = await this.zernio.listProfiles(true);
+      const reused = pickZernioProfileForUser(profiles, name);
+      if (reused?._id?.trim()) {
+        const profileId = reused._id.trim();
+        await this.usersService.setZernioProfileId(userId, profileId);
+        this.logger.log(
+          `Reused Zernio profile ${profileId} for user ${userId}`,
+        );
+        return profileId;
+      }
+
+      const profile = await this.zernio.createProfile(name);
+      await this.usersService.setZernioProfileId(userId, profile._id);
+      return profile._id;
+    } catch (err: unknown) {
+      if (err instanceof ZernioClientError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
   private parseConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {

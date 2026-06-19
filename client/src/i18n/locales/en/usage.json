@@ -16,15 +16,17 @@
   },
   "charts": {
     "byType": "Usage by operation",
-    "daily": "Daily credits"
+    "daily": "Daily credits",
+    "empty": "No usage data for this period"
   },
   "ledger": {
     "title": "Activity log",
     "date": "Date",
-    "pipeline": "Pipeline",
+    "action": "Action",
     "operation": "Operation",
     "provider": "Provider",
-    "credits": "Credits"
+    "credits": "Credits",
+    "empty": "No activity recorded for this period"
   },
   "range": {
     "month": "This month",

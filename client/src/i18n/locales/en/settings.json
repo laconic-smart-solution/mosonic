@@ -5,7 +5,17 @@
   },
   "page": {
     "title": "Account settings",
-    "subtitle": "Link the channels you publish to. Connections are shared with upload and scheduling so you only authenticate once."
+    "subtitle": "Manage your profile, language, and connected publishing channels."
+  },
+  "profile": {
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "unnamed": "Account",
+    "roles": {
+      "admin": "Administrator",
+      "member": "Member"
+    }
   },
   "toolbar": {
     "createProfile": "Create Zernio profile",
