@@ -34,6 +34,7 @@ import {
   AdminNodeCreditsPage,
   AdminPlansPage,
   AdminUsagePage,
+  AdminApiUsagePage,
   AdminContentPage,
   AdminContentDetailPage,
 } from "../constants/lazyload"
@@ -132,6 +133,7 @@ export const router = createBrowserRouter([
           { path: "plans", element: <AdminPlansPage /> },
           { path: "usage", element: <AdminUsagePage /> },
           { path: "cost", element: <AdminCostPage /> },
+          { path: "api-usage", element: <AdminApiUsagePage /> },
           { path: "content", element: <AdminContentPage /> },
           { path: "content/:contentId", element: <AdminContentDetailPage /> },
         ],

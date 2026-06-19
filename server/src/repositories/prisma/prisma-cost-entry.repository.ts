@@ -74,6 +74,16 @@ export class PrismaCostEntryRepository implements ICostEntryRepository {
     });
   }
 
+  findInCreatedAtRangeByProvider(
+    provider: string,
+    from: Date,
+    to: Date,
+  ): Promise<CostEntryRecord[]> {
+    return this.prisma.costEntry.findMany({
+      where: { provider, createdAt: { gte: from, lte: to } },
+    });
+  }
+
   async sumForBillingPeriod(billingPeriod: Date): Promise<number> {
     const result = await this.prisma.costEntry.aggregate({
       where: { billingPeriod },

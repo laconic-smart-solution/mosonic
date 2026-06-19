@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { usageService } from "@/shared/services/usage.service"
 import { onCreditBalanceUpdated } from "@/shared/socket/credit-events"
 import { useAuthStore } from "@/shared/stores/auth.store"
+import { zernioQueryKeys } from "./zernio.query"
 
 export const usageQueryKeys = {
   summary: ["usage", "summary"] as const,
@@ -19,6 +20,8 @@ export function useCreditBalanceSocketRefresh() {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
       void queryClient.invalidateQueries({ queryKey: ["content"] })
+      void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
+      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
     })
   }, [queryClient])
 }

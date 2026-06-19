@@ -7,6 +7,7 @@ import {
   Gauge,
   History,
   LayoutDashboard,
+  Plug,
   Users,
   Workflow,
 } from "lucide-react"
@@ -16,7 +17,7 @@ import { Link, Outlet, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS: {
-  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "content"
+  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "apiUsage" | "content"
   href: string
   icon: LucideIcon
 }[] = [
@@ -27,6 +28,7 @@ const NAV_ITEMS: {
   { key: "plans", href: "/admin/plans", icon: CreditCard },
   { key: "usage", href: "/admin/usage", icon: History },
   { key: "cost", href: "/admin/cost", icon: Coins },
+  { key: "apiUsage", href: "/admin/api-usage", icon: Plug },
   { key: "content", href: "/admin/content", icon: FileText },
 ]
 
