@@ -28,8 +28,8 @@ import {
   type Edge,
   type NodeChange,
   type OnSelectionChangeParams,
+  type OnMoveEnd,
   type ReactFlowInstance,
-  type Viewport,
 } from "@xyflow/react"
 
 import {
@@ -815,8 +815,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       queueMicrotask(() => applyWorkflowCanvasViewport(inst))
     }, [])
 
-    const onMoveEnd = useCallback(
-      (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+    const onMoveEnd = useCallback<OnMoveEnd>(
+      (_event, viewport) => {
         writeWorkflowCanvasViewport(viewport)
       },
       [],

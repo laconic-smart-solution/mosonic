@@ -170,14 +170,6 @@ function readLayoutPosition(
   return null
 }
 
-function hasCompletePersistedLayout(
-  snapNodes: PipelineNodeSnapshot[],
-  layout: Record<string, { x: number; y: number }>,
-): boolean {
-  if (snapNodes.length === 0) return false
-  return snapNodes.every((n) => readLayoutPosition(layout, n.nodeId) != null)
-}
-
 function buildPipelineAutoPositions(
   snapNodes: PipelineNodeSnapshot[],
   snapEdges: WorkflowEdge[],
