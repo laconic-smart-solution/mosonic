@@ -25,6 +25,12 @@ export const adminApi = {
 
   reactivateUser: (userId: string) => apiClient.put(`/admin/users/${userId}/reactivate`).then((r) => r.data),
 
+  topupUserCredits: (
+    userId: string,
+    body: { credits: number; reason: string },
+  ) =>
+    apiClient.post(`/admin/users/${userId}/credits/topup`, body).then((r) => r.data),
+
   getCostSummary: (params?: { from?: string; to?: string }) =>
     apiClient.get("/admin/cost/summary", { params }).then((r) => r.data),
 

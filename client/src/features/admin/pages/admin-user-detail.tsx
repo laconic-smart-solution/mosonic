@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Coins } from "lucide-react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import type { ReactNode } from "react"
@@ -27,6 +27,10 @@ import {
 import { cn } from "@/lib/utils"
 
 import { useAdminUserActions, useAdminUserDetail } from "../hooks/use-admin-users"
+import {
+  AdminUserTopupDialog,
+  type AdminUserTopupTarget,
+} from "../components/admin-user-topup-dialog"
 
 const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
@@ -72,6 +76,7 @@ export default function AdminUserDetailPage() {
   const { data, isLoading } = useAdminUserDetail(userId)
   const { suspend, reactivate } = useAdminUserActions()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [topupTarget, setTopupTarget] = useState<AdminUserTopupTarget | null>(null)
 
   const actionPending = suspend.isPending || reactivate.isPending
 
@@ -129,6 +134,7 @@ export default function AdminUserDetailPage() {
 
   const email = user.email ?? t("admin:userDetail.untitled")
   const costEntries = Object.entries(stats.costByProvider ?? {})
+  const hasPlan = credits?.remaining != null || credits?.perMonth != null
 
   return (
     <div className="min-h-full bg-background px-7 py-8 pb-20">
@@ -171,7 +177,25 @@ export default function AdminUserDetailPage() {
             </div>
 
             {user.role !== "ADMIN" ? (
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!hasPlan || actionPending}
+                  title={!hasPlan ? t("admin:users.topUpNoPlan") : undefined}
+                  onClick={() =>
+                    setTopupTarget({
+                      userId: user.userId,
+                      email,
+                      creditsRemaining: credits?.remaining ?? null,
+                      creditsPerMonth: credits?.perMonth ?? null,
+                    })
+                  }
+                >
+                  <Coins className="size-4" aria-hidden />
+                  {t("admin:userDetail.topUpCredits")}
+                </Button>
                 {user.isSuspended ? (
                   <Button
                     type="button"
@@ -179,7 +203,7 @@ export default function AdminUserDetailPage() {
                     disabled={actionPending}
                     onClick={() => setConfirmAction("reactivate")}
                   >
-                    {t("admin:userDetail.reactivate")}
+                    {t("admin:userDetail.enableAccount")}
                   </Button>
                 ) : (
                   <Button
@@ -189,7 +213,7 @@ export default function AdminUserDetailPage() {
                     disabled={actionPending}
                     onClick={() => setConfirmAction("suspend")}
                   >
-                    {t("admin:userDetail.suspend")}
+                    {t("admin:userDetail.disableAccount")}
                   </Button>
                 )}
               </div>
@@ -311,6 +335,14 @@ export default function AdminUserDetailPage() {
         </div>
       </div>
 
+      <AdminUserTopupDialog
+        target={topupTarget}
+        open={topupTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setTopupTarget(null)
+        }}
+      />
+
       <AlertDialog
         open={confirmAction != null}
         onOpenChange={(open) => {
@@ -347,8 +379,8 @@ export default function AdminUserDetailPage() {
               }}
             >
               {confirmAction === "suspend"
-                ? t("admin:userDetail.suspend")
-                : t("admin:userDetail.reactivate")}
+                ? t("admin:userDetail.disableAccount")
+                : t("admin:userDetail.enableAccount")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

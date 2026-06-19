@@ -8,15 +8,19 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
-import { UserRole, UserStatus } from '../../users/schemas/user.schema';
+import { CreditService } from '../../credit/credit.service';
+import { User } from '../../users/schemas/user.schema';
 import { AdminCreateUserDto } from '../dto/admin-create-user.dto';
+import { AdminManualTopupDto } from '../dto/admin-manual-topup.dto';
 import { AdminUpdateRoleDto } from '../dto/admin-update-role.dto';
 import { AdminUpdateStatusDto } from '../dto/admin-update-status.dto';
 import { AdminUserProvisioningService } from '../services/admin-user-provisioning.service';
@@ -36,6 +40,7 @@ export class AdminUsersController {
   constructor(
     private readonly users: AdminUsersService,
     private readonly provisioning: AdminUserProvisioningService,
+    private readonly creditService: CreditService,
   ) {}
 
   @Get()
@@ -67,6 +72,22 @@ export class AdminUsersController {
   @Put(':userId/reactivate')
   reactivateUser(@Param('userId') userId: string) {
     return this.users.reactivateUser(userId);
+  }
+
+  @Post(':userId/credits/topup')
+  @UsePipes(bodyPipe)
+  topupCredits(
+    @Param('userId') userId: string,
+    @Body() body: AdminManualTopupDto,
+    @Req() req: Request,
+  ) {
+    const adminUserId = (req.auth!.localUser as User).userId;
+    return this.creditService.adminManualTopup(
+      userId,
+      body.credits,
+      adminUserId,
+      body.reason,
+    );
   }
 
   @Patch(':userId/role')
