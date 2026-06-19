@@ -5,7 +5,7 @@ import type { WfNodeData, WfRfNode } from "@/features/workflow/data/workflow-mod
 import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
 import { laneKeyFromRfNode } from "@/features/workflow/lib/workflow-lane-layout"
 
-import { canvasNextMatrix } from "@workflow-next-matrix"
+import { canvasNextMatrix, type PlusPopoverKey } from "@workflow-next-matrix"
 
 /** Canvas wfType values allowed in the plus-insert popover. */
 export const PLUS_POPOVER_TYPES = [
@@ -56,16 +56,17 @@ const ENRICHMENT_BEFORE_TEXT: readonly PlusPopoverType[] = [
   "intelligence",
 ]
 
-const NEXT_MATRIX: Record<string, readonly PlusPopoverType[]> =
+const NEXT_MATRIX: Record<string, readonly PlusPopoverKey[]> =
   canvasNextMatrix()
 
 function buildCanPrecede(
-  matrix: Record<string, readonly PlusPopoverType[]>,
+  matrix: Record<string, readonly PlusPopoverKey[]>,
 ): Record<string, PlusPopoverType[]> {
   const result: Record<string, PlusPopoverType[]> = {}
   for (const [from, targets] of Object.entries(matrix)) {
     if (!isPlusType(from)) continue
     for (const to of targets) {
+      if (!isPlusType(to)) continue
       if (!result[to]) result[to] = []
       if (!result[to].includes(from)) {
         result[to].push(from)
@@ -178,7 +179,7 @@ export function inferGraphContext(
 }
 
 function applyExtraRules(
-  types: PlusPopoverType[],
+  types: PlusPopoverKey[],
   ctx: ValidationContext,
   opts: {
     sourceNodeId?: string
@@ -188,7 +189,7 @@ function applyExtraRules(
   },
 ): PlusPopoverType[] {
   const graphMode = hasWorkflowBranch(ctx.nodes)
-  let result = [...types]
+  let result: PlusPopoverKey[] = [...types]
 
   if (ctx.nodes.some((n) => n.data.wfType === "branch")) {
     result = result.filter((t) => t !== "branch")
@@ -210,7 +211,7 @@ function applyExtraRules(
           isPlusType(opts.targetWfType))
 
   if (laneContext) {
-    result = result.filter((t) => !TRUNK_ONLY.has(t))
+    result = result.filter((t) => !(isPlusType(t) && TRUNK_ONLY.has(t)))
   }
 
   if (result.includes("adapt")) {
@@ -231,10 +232,10 @@ function applyExtraRules(
   }
 
   if (opts.forInsert && opts.targetWfType === "text") {
-    result = result.filter((t) => ENRICHMENT_BEFORE_TEXT.includes(t))
+    result = result.filter((t) => ENRICHMENT_BEFORE_TEXT.includes(t as PlusPopoverType))
   }
 
-  return result
+  return filterPlusTypes(result)
 }
 
 export function getMatrixNextTypes(sourceWfType: string): PlusPopoverType[] {

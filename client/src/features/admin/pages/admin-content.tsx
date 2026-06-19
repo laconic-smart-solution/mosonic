@@ -141,7 +141,7 @@ export default function AdminContentPage() {
           <Select
             value={status ?? "all"}
             onValueChange={(value) => {
-              setStatus(value === "all" ? undefined : value)
+              setStatus(value === "all" ? undefined : value ?? undefined)
               setPage(1)
             }}
           >

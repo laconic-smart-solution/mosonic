@@ -208,7 +208,7 @@ export function expandLegacySingleAdapt(
   if (!branch) return { nodes, edges }
 
   let merge = findMergeNode(nodes)
-  const nodesById = new Map(
+  const nodesById = new Map<string, WfRfNode>(
     nodes
       .filter((n) => n.type !== "plus_placeholder")
       .map((n) => [n.id, n]),

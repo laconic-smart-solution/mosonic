@@ -17,6 +17,7 @@ import {
   MarkerType,
   ReactFlow,
   type Edge,
+  type Node,
 } from "@xyflow/react"
 import type { Attachment } from "@/components/core/prompt-area"
 import { Button } from "@/components/ui/button"

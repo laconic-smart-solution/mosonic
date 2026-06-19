@@ -22,8 +22,8 @@ type UploadStatusBannerProps = {
   variant: BannerVariant
   publishedAt: string | null
   scheduledAt: string | null
-  onConnect: () => void
-  onRetry: () => void
+  onConnect?: () => void
+  onRetry?: () => void
 }
 
 function formatWhen(iso: string | null): string {
@@ -68,7 +68,7 @@ export function UploadStatusBanner({
           size="sm"
           variant="outline"
           className="h-8 shrink-0 border-[#854F0B] text-[#633806] hover:bg-[#FAC775]"
-          onClick={onConnect}
+          onClick={() => onConnect?.()}
         >
           Connect
         </Button>
@@ -91,7 +91,7 @@ export function UploadStatusBanner({
           size="sm"
           variant="destructive"
           className="h-8 shrink-0"
-          onClick={onRetry}
+          onClick={() => onRetry?.()}
         >
           Retry
         </Button>

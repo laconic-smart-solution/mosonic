@@ -64,7 +64,7 @@ export function defaultWorkflowCanvasViewport(): Viewport {
 
 /** Restore saved pan/zoom or fit the graph when nothing is stored yet. */
 export function applyWorkflowCanvasViewport(
-  inst: Pick<ReactFlowInstance, "setViewport" | "fitView">,
+  inst: Pick<ReactFlowInstance<never>, "setViewport" | "fitView">,
 ): void {
   const saved = readWorkflowCanvasViewport()
   if (saved) {
