@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { fetchOpenAiSpendSummary } from './openai-costs.util';
+import { fetchOpenAiSpendSummaryForRange } from './openai-costs.util';
 import { ApiProviderBillingSettingsService } from '../api-usage/api-provider-billing-settings.service';
 import type { ApiProviderBillingSummaryDto } from '../api-usage/api-provider.types';
+import type { SpendDateRange } from '../api-usage/cost-spend.util';
+import {
+  parseSpendDateRange,
+  spendDaysInRange,
+  toLocalIsoDate,
+} from '../api-usage/cost-spend.util';
 
 export type OpenAiBillingSummaryDto = ApiProviderBillingSummaryDto;
-
-const DEFAULT_SPEND_DAYS = 180;
 
 @Injectable()
 export class OpenAiBillingService {
@@ -15,7 +19,9 @@ export class OpenAiBillingService {
     private readonly config: ConfigService,
   ) {}
 
-  async getSummary(spendDays = DEFAULT_SPEND_DAYS): Promise<OpenAiBillingSummaryDto> {
+  async getSummary(
+    range: SpendDateRange = parseSpendDateRange(),
+  ): Promise<OpenAiBillingSummaryDto> {
     const settings = await this.settings.ensureSettings('openai');
     const adminKey = this.config.get<string>('OPENAI_ADMIN_KEY')?.trim() ?? '';
     const projectKey = this.config.get<string>('OPENAI_API_KEY')?.trim() ?? '';
@@ -26,7 +32,11 @@ export class OpenAiBillingService {
 
     if (adminKey) {
       try {
-        const spend = await fetchOpenAiSpendSummary(adminKey, spendDays);
+        const spend = await fetchOpenAiSpendSummaryForRange(
+          adminKey,
+          range.from,
+          range.to,
+        );
         totalSpentUsd = spend.totalUsd;
         dailySpend = spend.daily;
       } catch (err) {
@@ -46,7 +56,9 @@ export class OpenAiBillingService {
       prepaidCreditUsd,
       totalSpentUsd,
       totalAvailableUsd,
-      spendDays,
+      spendDays: spendDaysInRange(range),
+      spendFrom: toLocalIsoDate(range.from),
+      spendTo: toLocalIsoDate(range.to),
       dailySpend,
       apiKeyConfigured: Boolean(adminKey),
       adminKeyConfigured: Boolean(adminKey),

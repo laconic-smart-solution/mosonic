@@ -4,10 +4,13 @@ import type {
   ApiProviderBillingSummaryDto,
   ZernioProfileSummaryDto,
 } from '../api-usage/api-provider.types';
+import type { SpendDateRange } from '../api-usage/cost-spend.util';
 import {
   groupCostEntriesByDay,
-  spendRangeFromDays,
+  parseSpendDateRange,
+  spendDaysInRange,
   sumCostEntriesUsd,
+  toLocalIsoDate,
 } from '../api-usage/cost-spend.util';
 import { ZernioClient } from '../mcp/zernio/zernio.client';
 import type { ICostEntryRepository } from '../repositories/interfaces/cost-entry.repository.interface';
@@ -30,14 +33,15 @@ export class ZernioBillingService {
     private readonly costEntries: ICostEntryRepository,
   ) {}
 
-  async getSummary(spendDays = DEFAULT_SPEND_DAYS): Promise<ApiProviderBillingSummaryDto> {
+  async getSummary(
+    range: SpendDateRange = parseSpendDateRange(undefined, undefined, DEFAULT_SPEND_DAYS),
+  ): Promise<ApiProviderBillingSummaryDto> {
     const apiKey = this.config.get<string>('ZERNIO_API_KEY')?.trim() ?? '';
 
-    const { from, to } = spendRangeFromDays(spendDays);
     const costRows = await this.costEntries.findInCreatedAtRangeByProvider(
       'zernio',
-      from,
-      to,
+      range.from,
+      range.to,
     );
     const dailySpend = groupCostEntriesByDay(costRows);
     const totalSpentUsd = costRows.length > 0 ? sumCostEntriesUsd(costRows) : 0;
@@ -101,7 +105,9 @@ export class ZernioBillingService {
       prepaidCreditUsd: 0,
       totalSpentUsd,
       totalAvailableUsd: null,
-      spendDays,
+      spendDays: spendDaysInRange(range),
+      spendFrom: toLocalIsoDate(range.from),
+      spendTo: toLocalIsoDate(range.to),
       dailySpend,
       apiKeyConfigured: Boolean(apiKey),
       syncError,

@@ -57,7 +57,6 @@ export function AdminApiUsageProviderPanel({
   isSaving,
 }: AdminApiUsageProviderPanelProps) {
   const { t } = useTranslation("admin")
-  const [chartDays, setChartDays] = useState<7 | 30>(30)
   const [prepaidInput, setPrepaidInput] = useState("")
   const [dirty, setDirty] = useState(false)
   const prepaidFieldId = useId()
@@ -85,16 +84,20 @@ export function AdminApiUsageProviderPanel({
 
   const chartData = useMemo(() => {
     const rows = data?.dailySpend ?? []
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - chartDays)
-    const cutoffIso = cutoff.toISOString().slice(0, 10)
-    return rows
-      .filter((row) => row.date >= cutoffIso)
-      .map((row) => ({
-        date: row.date.slice(5),
-        amountUsd: row.amountUsd,
-      }))
-  }, [data?.dailySpend, chartDays])
+    return rows.map((row) => ({
+      date: row.date.slice(5),
+      amountUsd: row.amountUsd,
+    }))
+  }, [data?.dailySpend])
+
+  const spentHint = data?.spendFrom && data?.spendTo
+    ? t(`${i18nPrefix}.totalSpentHint`, {
+        from: data.spendFrom,
+        to: data.spendTo,
+      })
+    : t(`${i18nPrefix}.totalSpentHintFallback`, {
+        days: data?.spendDays ?? 180,
+      })
 
   const prepaid = data?.prepaidCreditUsd ?? 0
   const spent = data?.totalSpentUsd
@@ -234,7 +237,7 @@ export function AdminApiUsageProviderPanel({
                 <MetricCard
                   label={t(`${i18nPrefix}.totalSpent`)}
                   value={formatUsd(spent)}
-                  hint={t(`${i18nPrefix}.totalSpentHint`, { days: data?.spendDays ?? 180 })}
+                  hint={spentHint}
                 />
                 <MetricCard
                   label={t(`${i18nPrefix}.totalAvailable`)}
@@ -361,8 +364,6 @@ export function AdminApiUsageProviderPanel({
                 i18nPrefix={i18nPrefix}
                 chartConfig={chartConfig}
                 chartData={chartData}
-                chartDays={chartDays}
-                onChartDaysChange={setChartDays}
                 t={t}
               />
             </div>
@@ -377,37 +378,19 @@ function DailySpendChart({
   i18nPrefix,
   chartConfig,
   chartData,
-  chartDays,
-  onChartDaysChange,
   t,
 }: {
   i18nPrefix: ApiUsageI18nPrefix
   chartConfig: ChartConfig
   chartData: Array<{ date: string; amountUsd: number }>
-  chartDays: 7 | 30
-  onChartDaysChange: (days: 7 | 30) => void
   t: (key: string, options?: Record<string, unknown>) => string
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3">
         <h3 className="text-[13px] font-medium text-foreground">
           {t(`${i18nPrefix}.dailySpend`)}
         </h3>
-        <div className="flex gap-1.5" role="group" aria-label={t(`${i18nPrefix}.chartRange`)}>
-          {([7, 30] as const).map((d) => (
-            <Button
-              key={d}
-              type="button"
-              size="sm"
-              variant={chartDays === d ? "default" : "outline"}
-              onClick={() => onChartDaysChange(d)}
-              aria-pressed={chartDays === d}
-            >
-              {d}d
-            </Button>
-          ))}
-        </div>
       </div>
       {chartData.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">

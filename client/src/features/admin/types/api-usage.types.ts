@@ -11,6 +11,8 @@ export type ApiProviderBillingSummary = {
   totalSpentUsd: number | null
   totalAvailableUsd: number | null
   spendDays: number
+  spendFrom: string
+  spendTo: string
   dailySpend: DailySpendRow[]
   apiKeyConfigured: boolean
   syncError: string | null

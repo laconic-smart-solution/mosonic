@@ -126,18 +126,23 @@ const videoAspect = z.enum([
 ]);
 
 const SORA_DURATION_LITERALS = [4, 8, 12, 16, 20] as const;
+const PRESENTER_DURATION_LITERALS = [10, 20, 30, 40, 60] as const;
 
-function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+function snapToNearestDuration(
+  raw: unknown,
+  allowed: readonly number[],
+  fallback: number,
+): number {
   const n =
     typeof raw === 'number'
       ? raw
       : typeof raw === 'string' && raw.trim()
         ? Number(raw)
-        : 8;
-  const value = Number.isFinite(n) ? n : 8;
-  let best: (typeof SORA_DURATION_LITERALS)[number] = SORA_DURATION_LITERALS[0];
+        : fallback;
+  const value = Number.isFinite(n) ? n : fallback;
+  let best = allowed[0];
   let bestDiff = Math.abs(value - best);
-  for (const s of SORA_DURATION_LITERALS) {
+  for (const s of allowed) {
     const d = Math.abs(value - s);
     if (d < bestDiff) {
       best = s;
@@ -147,18 +152,25 @@ function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[numbe
   return best;
 }
 
-const soraDurationSchema = z.preprocess(
-  (val) => (val === undefined ? undefined : snapToSoraDuration(val)),
-  z
-    .union([
-      z.literal(4),
-      z.literal(8),
-      z.literal(12),
-      z.literal(16),
-      z.literal(20),
-    ])
-    .optional(),
-);
+function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+  return snapToNearestDuration(
+    raw,
+    SORA_DURATION_LITERALS,
+    8,
+  ) as (typeof SORA_DURATION_LITERALS)[number];
+}
+
+function snapToPresenterDuration(
+  raw: unknown,
+): (typeof PRESENTER_DURATION_LITERALS)[number] {
+  return snapToNearestDuration(
+    raw,
+    PRESENTER_DURATION_LITERALS,
+    20,
+  ) as (typeof PRESENTER_DURATION_LITERALS)[number];
+}
+
+const videoDurationSchema = z.preprocess((val) => val, z.number().optional());
 
 const videoModeSchema = z.enum(['cinematic', 'presenter']).optional();
 
@@ -168,13 +180,13 @@ const heygenExpressivenessSchema = z
   .enum(['low', 'medium', 'high'])
   .optional();
 
-const videoConfigSchema = z
+const videoConfigObjectSchema = z
   .object({
     laneId: laneIdSchema,
     mode: videoModeSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
-    duration: soraDurationSchema,
+    duration: videoDurationSchema,
     resolution: z.string().min(1).optional(),
     aspectRatio: videoAspect.optional(),
     negativePrompt: z.string().max(2000).optional(),
@@ -189,7 +201,17 @@ const videoConfigSchema = z
     heygenMotionPrompt: z.string().max(500).optional(),
     removeBackground: z.boolean().optional(),
   })
-  .strict()
+  .strict();
+
+const videoConfigSchema = videoConfigObjectSchema
+  .transform((data) => {
+    const mode = data.mode ?? 'cinematic';
+    const duration =
+      mode === 'presenter'
+        ? snapToPresenterDuration(data.duration)
+        : snapToSoraDuration(data.duration);
+    return { ...data, duration };
+  })
   .superRefine((data, ctx) => {
     const mode = data.mode ?? 'cinematic';
     if (mode === 'presenter' && !data.heygenAvatarId?.trim()) {
@@ -439,7 +461,11 @@ export function parseWorkflowNodeConfig(
       : {};
 
   const picked: Record<string, unknown> = {};
-  const allowed = new Set(Object.keys(schema.shape));
+  const allowed = new Set(
+    type === WorkflowNodeType.VideoGeneration
+      ? Object.keys(videoConfigObjectSchema.shape)
+      : Object.keys(schema.shape),
+  );
   for (const [k, v] of Object.entries(obj)) {
     if (allowed.has(k)) {
       picked[k] = v;

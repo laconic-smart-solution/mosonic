@@ -2,10 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiProviderBillingSettingsService } from '../api-usage/api-provider-billing-settings.service';
 import type { ApiProviderBillingSummaryDto } from '../api-usage/api-provider.types';
+import type { SpendDateRange } from '../api-usage/cost-spend.util';
 import {
   groupCostEntriesByDay,
-  spendRangeFromDays,
+  parseSpendDateRange,
+  spendDaysInRange,
   sumCostEntriesUsd,
+  toLocalIsoDate,
 } from '../api-usage/cost-spend.util';
 import type { ICostEntryRepository } from '../repositories/interfaces/cost-entry.repository.interface';
 import { COST_ENTRY_REPOSITORY } from '../repositories/tokens';
@@ -22,33 +25,32 @@ export class HeygenBillingService {
     private readonly costEntries: ICostEntryRepository,
   ) {}
 
-  async getSummary(spendDays = DEFAULT_SPEND_DAYS): Promise<ApiProviderBillingSummaryDto> {
+  async getSummary(
+    range: SpendDateRange = parseSpendDateRange(undefined, undefined, DEFAULT_SPEND_DAYS),
+  ): Promise<ApiProviderBillingSummaryDto> {
     const settings = await this.settings.ensureSettings('heygen');
     const apiKey = this.config.get<string>('HEYGEN_API_KEY')?.trim() ?? '';
 
-    let totalSpentUsd: number | null = null;
     let walletBalanceUsd: number | null = null;
     let billingType: string | null = null;
     let liveBalanceFromApi = false;
     let syncError: string | null = null;
 
-    const { from, to } = spendRangeFromDays(spendDays);
     const costRows = await this.costEntries.findInCreatedAtRangeByProvider(
       'heygen',
-      from,
-      to,
+      range.from,
+      range.to,
     );
     const dailySpend = groupCostEntriesByDay(costRows);
     const internalSpendUsd = sumCostEntriesUsd(costRows);
+    const totalSpentUsd: number | null =
+      costRows.length > 0 ? internalSpendUsd : null;
 
     if (apiKey) {
       try {
         const wallet = await fetchHeygenWalletSummary(apiKey);
         billingType = wallet.billingType;
         walletBalanceUsd = wallet.walletBalanceUsd;
-        if (wallet.spendingCurrentUsd != null) {
-          totalSpentUsd = wallet.spendingCurrentUsd;
-        }
         if (walletBalanceUsd != null) {
           liveBalanceFromApi = true;
         }
@@ -56,10 +58,6 @@ export class HeygenBillingService {
         syncError =
           err instanceof Error ? err.message : 'Failed to fetch HeyGen billing';
       }
-    }
-
-    if (totalSpentUsd == null && costRows.length > 0) {
-      totalSpentUsd = internalSpendUsd;
     }
 
     const prepaidCreditUsd = settings.prepaidCreditUsd;
@@ -74,7 +72,9 @@ export class HeygenBillingService {
       prepaidCreditUsd,
       totalSpentUsd,
       totalAvailableUsd,
-      spendDays,
+      spendDays: spendDaysInRange(range),
+      spendFrom: toLocalIsoDate(range.from),
+      spendTo: toLocalIsoDate(range.to),
       dailySpend,
       apiKeyConfigured: Boolean(apiKey),
       syncError,

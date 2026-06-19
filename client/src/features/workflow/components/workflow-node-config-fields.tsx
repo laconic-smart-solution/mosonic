@@ -218,13 +218,13 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
       control: "buttons",
       valueAsNumber: true,
       options: [
-        { label: fo("duration4s"), value: "4" },
-        { label: fo("duration8s"), value: "8" },
-        { label: fo("duration12s"), value: "12" },
-        { label: fo("duration16s"), value: "16" },
+        { label: fo("duration10s"), value: "10" },
         { label: fo("duration20s"), value: "20" },
+        { label: fo("duration30s"), value: "30" },
+        { label: fo("duration40s"), value: "40" },
+        { label: fo("duration60s"), value: "60" },
       ],
-      defaultValue: "8",
+      defaultValue: "20",
       visibleWhen: { key: "mode", value: "presenter" },
     },
     {

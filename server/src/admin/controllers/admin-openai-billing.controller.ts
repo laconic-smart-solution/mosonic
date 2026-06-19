@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { AdminGuard } from '../../auth/admin.guard';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { OpenAiBillingService } from '../../openai-billing/openai-billing.service';
+import { parseSpendDateRange } from '../../api-usage/cost-spend.util';
 import { User } from '../../users/schemas/user.schema';
 import { UpdateOpenAiPrepaidDto } from '../dto/update-openai-prepaid.dto';
 
@@ -31,9 +32,15 @@ export class AdminOpenAiBillingController {
   constructor(private readonly billing: OpenAiBillingService) {}
 
   @Get('billing')
-  getBilling(@Query('days') days?: string) {
-    const spendDays = days ? Math.min(365, Math.max(7, Number(days) || 180)) : 180;
-    return this.billing.getSummary(spendDays);
+  getBilling(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('days') days?: string,
+  ) {
+    const fallbackDays = days
+      ? Math.min(365, Math.max(7, Number(days) || 180))
+      : 180;
+    return this.billing.getSummary(parseSpendDateRange(from, to, fallbackDays));
   }
 
   @Put('billing/prepaid')
