@@ -21,7 +21,6 @@ import {
   type Node,
   type NodeChange,
 } from "@xyflow/react"
-import type { Attachment } from "@/components/core/prompt-area"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -43,29 +42,14 @@ import {
   createRuleFromPrompt,
   type RuleEntity,
 } from "@/features/rules/data/rules-mock"
+import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
 import {
-  useExtractRuleMutation,
   usePutRuleMutation,
   useRuleByIdQuery,
   useRulesPageQuery,
 } from "@/shared/queries/rule.query"
 import type { RuleReplacePayload } from "@/shared/services/rule.service"
 import type { RuleListItem } from "@/shared/services/rule.service"
-import {
-  formatMaxFileSizeMb,
-  RULE_EXTRACT_MAX_FILE_BYTES,
-} from "@/lib/rule-extract-limits"
-import { buildRuleExtractFormData } from "@/lib/strategy-input"
-import {
-  joinRuleRoom,
-  leaveRuleRoom,
-  onRuleCompleted,
-  onRuleFailed,
-  onRuleInputProcessed,
-  onRuleReadingInput,
-  onRuleStarted,
-  onRuleStreaming,
-} from "@/shared/socket/rule-events"
 
 type RuleViewMode = "tree" | "manage"
 const RULES_DRAWER_PAGE_LIMIT = 8
@@ -144,21 +128,8 @@ export default function RulesPage() {
     routeState.sourcePrompt ?? ""
   )
   const [createDialogKey, setCreateDialogKey] = useState(0)
-  const [processingRuleId, setProcessingRuleId] = useState<string | null>(null)
-  const [progressStep, setProgressStep] = useState<
-    | "idle"
-    | "started"
-    | "reading_input"
-    | "input_processed"
-    | "streaming"
-    | "completed"
-    | "failed"
-  >("idle")
-  const [streamedContent, setStreamedContent] = useState("")
-  const [failureMessage, setFailureMessage] = useState("")
   const [viewMode, setViewMode] = useState<RuleViewMode>("tree")
 
-  const extractRuleMutation = useExtractRuleMutation()
   const putRuleMutation = usePutRuleMutation()
   const flowTheme = useRuleFlowVisualTheme()
 
@@ -166,6 +137,55 @@ export default function RulesPage() {
     () => (rulesPageQuery.data?.data ?? []).filter(isVisibleRuleListItem),
     [rulesPageQuery.data?.data],
   )
+
+  const handleExtractStarted = useCallback(
+    (ruleId: string, previewLabel: string) => {
+      const nextRule = {
+        ...createRuleFromPrompt(previewLabel),
+        ruleId,
+        name: t("page.processingRuleName"),
+        status: "processing" as const,
+      }
+      queryClient.setQueryData<RuleEntity>(["rule", ruleId], nextRule)
+      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+      setSelectedRuleId(ruleId)
+      setCreateDialogOpen(false)
+      setCreatePrompt("")
+    },
+    [queryClient, t],
+  )
+
+  const handleExtractCompleted = useCallback(
+    async (ruleId: string) => {
+      setSelectedRuleId(ruleId)
+      await queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+      await queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
+    },
+    [queryClient],
+  )
+
+  const {
+    processingRuleId,
+    progressStep,
+    failureMessage,
+    streamedContent,
+    showOverlay: showExtractionOverlay,
+    runExtract: runRuleExtract,
+    dismissFailure,
+  } = useRuleExtraction({
+    onExtractStarted: handleExtractStarted,
+    onCompleted: handleExtractCompleted,
+  })
+
+  const dismissExtractionFailure = useCallback(() => {
+    dismissFailure()
+    setSelectedRuleId((prev) => {
+      if (!pageList.length) return undefined
+      if (prev && pageList.some((r) => r.ruleId === prev)) return prev
+      return pageList[0]?.ruleId
+    })
+  }, [dismissFailure, pageList])
+
   const drawerRulesPageQuery = useRulesPageQuery(
     {
       page: drawerPage,
@@ -228,24 +248,6 @@ export default function RulesPage() {
       return ids[0]
     })
   }, [pageList, processingRuleId, routeState.selectedRuleId])
-
-  const showExtractionOverlay =
-    Boolean(processingRuleId) ||
-    (progressStep === "failed" && Boolean(failureMessage))
-
-  const dismissExtractionFailure = useCallback(() => {
-    const failedRuleId = processingRuleId
-    setProcessingRuleId(null)
-    setProgressStep("idle")
-    setFailureMessage("")
-    setStreamedContent("")
-    if (failedRuleId) leaveRuleRoom(failedRuleId)
-    setSelectedRuleId((prev) => {
-      if (!pageList.length) return undefined
-      if (prev && pageList.some((r) => r.ruleId === prev)) return prev
-      return pageList[0]?.ruleId
-    })
-  }, [pageList, processingRuleId])
 
   const handleExtractionTryAgain = useCallback(() => {
     dismissExtractionFailure()
@@ -341,125 +343,6 @@ export default function RulesPage() {
       },
     })) as Edge[]
   }, [flow.edges, flowTheme])
-
-  const hydrateCompletedRule = useCallback(
-    async (ruleId: string) => {
-      setProgressStep("completed")
-      setSelectedRuleId(ruleId)
-      await queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      await queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
-      setProcessingRuleId(null)
-      leaveRuleRoom(ruleId)
-    },
-    [queryClient]
-  )
-
-  useEffect(() => {
-    if (!processingRuleId) return
-
-    const cleanupStarted = onRuleStarted(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("started")
-    })
-
-    const cleanupReadingInput = onRuleReadingInput(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("reading_input")
-    })
-
-    const cleanupInputProcessed = onRuleInputProcessed(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("input_processed")
-    })
-
-    const cleanupStreaming = onRuleStreaming(({ ruleId, chunk }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("streaming")
-      setStreamedContent((prev) => `${prev}${prev ? " " : ""}${chunk}`)
-    })
-
-    const cleanupCompleted = onRuleCompleted(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      void hydrateCompletedRule(ruleId)
-    })
-
-    const cleanupFailed = onRuleFailed(({ ruleId, message }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("failed")
-      setFailureMessage(message ?? t("toast.generationFailed"))
-      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      void queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
-      leaveRuleRoom(ruleId)
-    })
-
-    return () => {
-      cleanupStarted()
-      cleanupReadingInput()
-      cleanupInputProcessed()
-      cleanupStreaming()
-      cleanupCompleted()
-      cleanupFailed()
-    }
-  }, [hydrateCompletedRule, processingRuleId, queryClient, t])
-
-  async function runRuleExtract(text: string, attachments: Attachment[]) {
-    const trimmed = text.trim()
-    const hasFile = attachments.some(
-      (a) => a.type === "file" && a.data instanceof File
-    )
-    const hasUrl = attachments.some((a) => a.type === "url")
-    if (!trimmed && !hasFile && !hasUrl) return
-
-    for (const a of attachments) {
-      if (a.type === "file" && a.data instanceof File) {
-        if (a.data.size > RULE_EXTRACT_MAX_FILE_BYTES) {
-          const msg = t("toast.fileTooLarge", {
-            name: a.label,
-            maxMb: formatMaxFileSizeMb(RULE_EXTRACT_MAX_FILE_BYTES),
-          })
-          toast.error(msg)
-          setProgressStep("failed")
-          setFailureMessage(msg)
-          return
-        }
-      }
-    }
-
-    try {
-      const formData = buildRuleExtractFormData(text, attachments)
-      const { ruleId } = await extractRuleMutation.mutateAsync(formData)
-      const previewLabel =
-        trimmed ||
-        attachments
-          .map((a) => a.label)
-          .filter(Boolean)
-          .join(", ") ||
-        t("page.attachmentsFallback")
-      const nextRule = {
-        ...createRuleFromPrompt(previewLabel),
-        ruleId,
-        name: t("page.processingRuleName"),
-        status: "processing" as const,
-      }
-
-      queryClient.setQueryData<RuleEntity>(["rule", ruleId], nextRule)
-      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      setSelectedRuleId(ruleId)
-      setCreateDialogOpen(false)
-      setCreatePrompt("")
-      setProcessingRuleId(ruleId)
-      setProgressStep("idle")
-      setFailureMessage("")
-      setStreamedContent("")
-      joinRuleRoom(ruleId)
-      toast.success(t("toast.extractionStarted"))
-    } catch (err) {
-      const message = apiErrorMessage(err, t("toast.couldNotStartExtraction"))
-      setProgressStep("failed")
-      setFailureMessage(message)
-      toast.error(message)
-    }
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4">
