@@ -16,6 +16,7 @@ import {
 } from './schemas/user.schema';
 
 export type ConnectedAccountRecord = {
+  userId: string;
   channel: string;
   accountId: string;
   connectedAt: Date;
@@ -159,6 +160,7 @@ export class UsersService {
       if (!userId) continue;
       const count = this.normalizeConnectedAccounts(
         row.zernioConnectedAccounts,
+        userId,
       ).length;
       if (count > 0) {
         out.push({ userId, accountCount: count });
@@ -209,9 +211,11 @@ export class UsersService {
     const now = new Date();
     const accounts = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     );
     const next = accounts.filter((acc) => acc.channel !== key);
     next.push({
+      userId,
       channel: key,
       accountId: normalizedAccountId,
       connectedAt: now,
@@ -232,7 +236,10 @@ export class UsersService {
       throw new NotFoundException(`User ${userId} not found`);
     }
     const byChannel = new Map<string, ConnectedAccountRecord>();
-    for (const item of this.normalizeConnectedAccounts(user.zernioConnectedAccounts)) {
+    for (const item of this.normalizeConnectedAccounts(
+      user.zernioConnectedAccounts,
+      userId,
+    )) {
       byChannel.set(item.channel, item);
     }
     for (const item of accounts) {
@@ -240,6 +247,7 @@ export class UsersService {
       const accountId = item.accountId?.trim();
       if (!channel || !accountId) continue;
       byChannel.set(channel, {
+        userId,
         channel,
         accountId,
         connectedAt: item.connectedAt ?? new Date(),
@@ -255,11 +263,10 @@ export class UsersService {
     userId: string,
   ): Promise<ConnectedAccountRecord[]> {
     const user = await this.findByUserId(userId);
-    console.log('getZernioConnectedAccounts', user?.zernioConnectedAccounts);
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts);
+    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts, userId);
   }
 
   async disconnectZernioConnectedAccount(
@@ -276,6 +283,7 @@ export class UsersService {
     }
     const next = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     ).filter((acc) => acc.channel !== key);
     await this.replaceZernioConnectedAccounts(userId, next);
   }
@@ -296,6 +304,7 @@ export class UsersService {
     }
     const normalized = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     );
     const accounts = normalized.reduce<Record<string, string>>((acc, item) => {
       acc[item.channel] = item.accountId;
@@ -317,7 +326,13 @@ export class UsersService {
         { userId },
         {
           $set: {
-            zernioConnectedAccounts: accounts,
+            zernioConnectedAccounts: accounts.map(
+              ({ channel, accountId, connectedAt }) => ({
+                channel,
+                accountId,
+                connectedAt,
+              }),
+            ),
           },
         },
       )
@@ -327,12 +342,16 @@ export class UsersService {
     }
   }
 
-  private normalizeConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {
+  private normalizeConnectedAccounts(
+    raw: unknown,
+    userId: string,
+  ): ConnectedAccountRecord[] {
     if (Array.isArray(raw)) {
       const normalized: ConnectedAccountRecord[] = [];
       for (const item of raw) {
         if (!item || typeof item !== 'object') continue;
         const rec = item as {
+          userId?: string;
           channel?: string;
           accountId?: string;
           connectedAt?: Date | string;
@@ -341,6 +360,7 @@ export class UsersService {
         const accountId = rec.accountId?.trim();
         if (!channel || !accountId) continue;
         normalized.push({
+          userId: rec.userId?.trim() || userId,
           channel,
           accountId,
           connectedAt: this.toDate(rec.connectedAt),
@@ -352,6 +372,7 @@ export class UsersService {
     if (raw && typeof raw === 'object') {
       return Object.entries(raw as Record<string, unknown>)
         .map(([channel, accountId]) => ({
+          userId,
           channel: this.normalizeChannel(channel),
           accountId:
             typeof accountId === 'string' ? accountId.trim() : '',

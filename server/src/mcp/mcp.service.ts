@@ -144,15 +144,16 @@ export class McpService {
   }> {
     const profileId = await this.ensureZernioProfileId(userId);
     const raw = await this.zernio.listAccounts(profileId);
-    const accounts = this.parseConnectedAccounts(raw);
+    const accounts = this.parseConnectedAccounts(raw, userId);
     await this.usersService.syncZernioConnectedAccounts(userId, accounts);
     return { accounts };
   }
 
   async getConnectedAccounts(userId: string): Promise<{
     accounts: ConnectedAccountRecord[];
-  }> {
+  }> {    
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    this.logger.log(`getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`);
     return { accounts };
   }
 
@@ -354,7 +355,10 @@ export class McpService {
     }
   }
 
-  private parseConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {
+  private parseConnectedAccounts(
+    raw: unknown,
+    userId: string,
+  ): ConnectedAccountRecord[] {
     if (!Array.isArray(raw)) return [];
     const byChannel = new Map<string, ConnectedAccountRecord>();
     for (const item of raw) {
@@ -377,6 +381,7 @@ export class McpService {
       ])?.trim();
       if (!channel || !accountId) continue;
       byChannel.set(channel, {
+        userId,
         channel,
         accountId,
         connectedAt: new Date(),

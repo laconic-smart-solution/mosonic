@@ -1,4 +1,5 @@
 export type ZernioConnectedAccount = {
+  userId: string
   channel: string
   accountId: string
   connectedAt: string
