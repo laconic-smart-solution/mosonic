@@ -89,39 +89,50 @@ export class CreditService {
   }
 
   /**
-   * Charge a fixed number of credits up-front for a workflow run. Atomic
-   * decrement of the active plan plus a ledger audit row.
+   * Charge credits up-front for a workflow run. Writes one ledger row per
+   * billable node type (so the ledger/activity log shows each type), then a
+   * single atomic decrement of the active plan for the summed total.
    */
   async chargePipelineRun(args: {
     userId: string;
     pipelineId: string;
-    credits: number;
     creditPriceUsd: number;
+    items: Array<{ nodeType: string; count: number; creditsEach: number }>;
   }): Promise<void> {
-    if (args.credits <= 0) return;
+    const rows = args.items
+      .map((item) => ({
+        nodeType: item.nodeType,
+        credits: Math.max(0, item.creditsEach * item.count),
+      }))
+      .filter((row) => row.credits > 0);
+    const total = rows.reduce((sum, row) => sum + row.credits, 0);
+    if (total <= 0) return;
+
     try {
-      await new this.ledgerModel({
-        userId: args.userId,
-        pipelineRef: args.pipelineId,
-        nodeId: args.pipelineId,
-        nodeType: 'pipeline_run',
-        provider: 'system',
-        model: '',
-        rawCostUsd: 0,
-        overheadUsd: 0,
-        marginAppliedUsd: 0,
-        creditPriceUsdSnapshot: args.creditPriceUsd,
-        creditsCharged: args.credits,
-        billingPeriod: currentBillingPeriod(),
-      }).save();
+      await this.ledgerModel.insertMany(
+        rows.map((row) => ({
+          userId: args.userId,
+          pipelineRef: args.pipelineId,
+          nodeId: `${args.pipelineId}:${row.nodeType}`,
+          nodeType: row.nodeType,
+          provider: 'system',
+          model: '',
+          rawCostUsd: 0,
+          overheadUsd: 0,
+          marginAppliedUsd: 0,
+          creditPriceUsdSnapshot: args.creditPriceUsd,
+          creditsCharged: row.credits,
+          billingPeriod: currentBillingPeriod(),
+        })),
+      );
 
       const updated = await this.userPlanModel
         .findOneAndUpdate(
           { userId: args.userId, status: 'active' },
           {
             $inc: {
-              creditsUsed: args.credits,
-              creditsRemaining: -args.credits,
+              creditsUsed: total,
+              creditsRemaining: -total,
             },
           },
           { new: true },
@@ -144,39 +155,45 @@ export class CreditService {
   }
 
   /**
-   * Refund credits for a workflow run (e.g. nodes that never executed). Atomic
-   * increment of the active plan plus a ledger audit row.
+   * Refund credits for a workflow run (e.g. nodes that never executed). Writes
+   * one negative ledger row per node type, then a single atomic increment of the
+   * active plan for the summed refund.
    */
   async refundPipelineRun(args: {
     userId: string;
     pipelineId: string;
-    credits: number;
     creditPriceUsd: number;
+    items: Array<{ nodeType: string; credits: number }>;
   }): Promise<void> {
-    if (args.credits <= 0) return;
+    const rows = args.items.filter((item) => item.credits > 0);
+    const total = rows.reduce((sum, row) => sum + row.credits, 0);
+    if (total <= 0) return;
+
     try {
-      await new this.ledgerModel({
-        userId: args.userId,
-        pipelineRef: args.pipelineId,
-        nodeId: args.pipelineId,
-        nodeType: 'pipeline_refund',
-        provider: 'system',
-        model: '',
-        rawCostUsd: 0,
-        overheadUsd: 0,
-        marginAppliedUsd: 0,
-        creditPriceUsdSnapshot: args.creditPriceUsd,
-        creditsCharged: -args.credits,
-        billingPeriod: currentBillingPeriod(),
-      }).save();
+      await this.ledgerModel.insertMany(
+        rows.map((row) => ({
+          userId: args.userId,
+          pipelineRef: args.pipelineId,
+          nodeId: `${args.pipelineId}:${row.nodeType}:refund`,
+          nodeType: row.nodeType,
+          provider: 'system',
+          model: '',
+          rawCostUsd: 0,
+          overheadUsd: 0,
+          marginAppliedUsd: 0,
+          creditPriceUsdSnapshot: args.creditPriceUsd,
+          creditsCharged: -row.credits,
+          billingPeriod: currentBillingPeriod(),
+        })),
+      );
 
       await this.userPlanModel
         .findOneAndUpdate(
           { userId: args.userId, status: 'active' },
           {
             $inc: {
-              creditsUsed: -args.credits,
-              creditsRemaining: args.credits,
+              creditsUsed: -total,
+              creditsRemaining: total,
             },
             $set: { lowBalanceNotifiedAt: null },
           },
