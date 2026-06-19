@@ -305,8 +305,12 @@ export class OrchestrationService {
       await this.creditService.chargePipelineRun({
         userId: input.auth.userId,
         pipelineId,
-        credits: totalCredits,
         creditPriceUsd: config.creditPriceUsd,
+        items: creditBreakdown.map((row) => ({
+          nodeType: row.nodeType,
+          count: row.count,
+          creditsEach: row.creditsEach,
+        })),
       });
     }
 
@@ -453,11 +457,14 @@ export class OrchestrationService {
         );
       }
 
-      let refund = 0;
+      const refundItems: Array<{ nodeType: string; credits: number }> = [];
       for (const row of breakdown) {
         const completed = completedByType.get(row.nodeType) ?? 0;
         const unused = Math.max(0, row.count - completed);
-        refund += unused * row.creditsEach;
+        const credits = unused * row.creditsEach;
+        if (credits > 0) {
+          refundItems.push({ nodeType: row.nodeType, credits });
+        }
       }
 
       // Mark reconciled first so concurrent terminal transitions don't double-refund.
@@ -469,13 +476,13 @@ export class OrchestrationService {
         .exec();
       if (claim.modifiedCount === 0) return;
 
-      if (refund > 0 && pipeline.userId) {
+      if (refundItems.length > 0 && pipeline.userId) {
         const config = await this.creditCalculation.getConfig();
         await this.creditService.refundPipelineRun({
           userId: pipeline.userId,
           pipelineId,
-          credits: refund,
           creditPriceUsd: config.creditPriceUsd,
+          items: refundItems,
         });
       }
     } catch (err) {
