@@ -270,6 +270,73 @@ function laneHandleFromNodeId(nodeId: string): string | null {
   return null
 }
 
+function laneNodeIdsFromSnapshot(
+  snapNodes: PipelineNodeSnapshot[],
+): Set<string> {
+  return new Set(
+    snapNodes
+      .filter((n) => Boolean(n.lane?.trim()) || laneLabel(n))
+      .map((n) => n.nodeId),
+  )
+}
+
+/** Infer merge node id from graph edges when it was omitted from stored pipeline nodes. */
+export function inferPipelineMergeNodeId(
+  snapNodes: PipelineNodeSnapshot[],
+  snapEdges: WorkflowEdge[],
+): string | undefined {
+  const direct = snapNodes.find((n) => n.type === "merge")
+  if (direct) return direct.nodeId
+
+  const laneNodeIds = laneNodeIdsFromSnapshot(snapNodes)
+  if (laneNodeIds.size === 0) return undefined
+
+  const inboundCount = new Map<string, number>()
+  for (const edge of snapEdges) {
+    if (!laneNodeIds.has(edge.from)) continue
+    inboundCount.set(edge.to, (inboundCount.get(edge.to) ?? 0) + 1)
+  }
+
+  let bestId: string | undefined
+  let bestCount = 1
+  for (const [targetId, count] of inboundCount) {
+    if (laneNodeIds.has(targetId)) continue
+    if (count > bestCount) {
+      bestId = targetId
+      bestCount = count
+    }
+  }
+  return bestId
+}
+
+/** Backfill merge row for legacy pipelines that stored graph edges but dropped the merge node. */
+export function ensurePipelineMergeNode(
+  snapNodes: PipelineNodeSnapshot[],
+  snapEdges: WorkflowEdge[],
+): PipelineNodeSnapshot[] {
+  if (snapNodes.some((n) => n.type === "merge")) return snapNodes
+  const mergeId = inferPipelineMergeNodeId(snapNodes, snapEdges)
+  if (!mergeId) return snapNodes
+
+  const maxOrder = snapNodes.reduce((max, node) => Math.max(max, node.order), 0)
+  return [
+    ...snapNodes,
+    {
+      nodeId: mergeId,
+      type: "merge",
+      order: maxOrder + 1,
+      isLocked: true,
+      userPrompt: "",
+      config: {},
+      lane: null,
+      status: "pending",
+      output: null,
+      retryCount: 0,
+      executedAt: null,
+    },
+  ]
+}
+
 function rewritePipelinePreviewEdges(
   snapEdges: WorkflowEdge[],
   fanOutId: string | null,
@@ -327,20 +394,17 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
   edges: Edge[]
 } {
   const {
-    nodes: snapNodes,
+    nodes: rawSnapNodes,
     edges: snapEdges,
     lanes,
     layout = {},
     channelHandles = [],
   } = input
+  const snapNodes = ensurePipelineMergeNode(rawSnapNodes, snapEdges)
   const autoPositions = buildPipelineAutoPositions(snapNodes, snapEdges, lanes)
 
   const mergeNode = snapNodes.find((n) => n.type === "merge")
-  const laneNodeIds = new Set(
-    snapNodes
-      .filter((n) => Boolean(n.lane?.trim()) || laneLabel(n))
-      .map((n) => n.nodeId),
-  )
+  const laneNodeIds = laneNodeIdsFromSnapshot(snapNodes)
   const trunkNodes = snapNodes.filter(
     (n) =>
       !laneNodeIds.has(n.nodeId) &&

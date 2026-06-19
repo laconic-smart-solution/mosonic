@@ -36,6 +36,7 @@ import {
 import type { WfRfNode } from "@/features/workflow/data/workflow-model"
 import { pipelineGraphToRf } from "@/features/workflow/lib/branch-layout"
 import {
+  mergePipelineRuntimeMaps,
   resolveCanvasNodeIdToPipeline,
 } from "@/features/workflow/lib/pipeline-runtime-map"
 import {
@@ -209,6 +210,12 @@ export default function WorkflowPage() {
     workflowEventTargetRef.current = activeWorkflowId
   }, [activeWorkflowId])
 
+  /** Id used to filter pipeline socket events (avoids stale closure on handler re-subscribe). */
+  const pipelineIdRef = useRef<string | undefined>(pipelineId)
+  useEffect(() => {
+    pipelineIdRef.current = pipelineId
+  }, [pipelineId])
+
   const generateWorkflow = useGenerateWorkflow()
   const regenerateWorkflowByRule = useRegenerateWorkflowByRuleMutation()
   const saveNodesMutation = useSaveWorkflowNodesMutation()
@@ -220,7 +227,9 @@ export default function WorkflowPage() {
   const replanMutation = useReplanPipelineMutation()
   const applyPipelineToWorkflow = useApplyPipelineToWorkflowMutation()
   const updatePipelineNameMutation = useUpdatePipelineNameMutation()
-  const runningPipelineQuery = useGetPipelineQuery(pipelineId)
+  const runningPipelineQuery = useGetPipelineQuery(pipelineId, {
+    refetchInterval: processingMode === "processing" ? 2500 : false,
+  })
   const selectedPipelineSnapshotQuery = useGetPipelineQuery(
     selectedSnapshotPipelineId
   )
@@ -295,10 +304,13 @@ export default function WorkflowPage() {
   )
 
   const activePipelineSnap = useMemo(() => {
-    if (processingMode === "processing") return runningPipelineQuery.data
+    if (processingMode === "processing" || pipelineId) {
+      return runningPipelineQuery.data
+    }
     if (selectedSnapshotPipelineId) return selectedPipelineSnapshotQuery.data
     return undefined
   }, [
+    pipelineId,
     processingMode,
     runningPipelineQuery.data,
     selectedSnapshotPipelineId,
@@ -309,8 +321,12 @@ export default function WorkflowPage() {
   const pipelineCanvasOverride = useMemo(() => {
     if (!activePipelineSnap?.nodes.length) return null
     const isPreview = Boolean(selectedSnapshotPipelineId)
-    const isRunning = processingMode === "processing"
-    const useMaterialized = !apiNodes?.length || isPreview || isRunning
+    const isRunning =
+      processingMode === "processing" ||
+      activePipelineSnap.pipeline.status === "running" ||
+      activePipelineSnap.pipeline.status === "paused"
+    const useMaterialized =
+      !apiNodes?.length || isPreview || isRunning || Boolean(pipelineId)
     if (!useMaterialized) return null
     return pipelineGraphToRf({
       nodes: activePipelineSnap.nodes,
@@ -323,6 +339,7 @@ export default function WorkflowPage() {
     activePipelineSnap,
     apiNodes,
     branchChannels,
+    pipelineId,
     processingMode,
     selectedSnapshotPipelineId,
   ])
@@ -535,10 +552,12 @@ export default function WorkflowPage() {
   const hydratePipelineSnapshot = useCallback(
     (snap: GetPipelineResponse) => {
       const { runtime, completed } = buildRuntimeFromPipelineNodes(snap)
-      completedNodeIdsRef.current = completed
-      setNodeRuntimeById(runtime)
+      for (const nodeId of completed) {
+        completedNodeIdsRef.current.add(nodeId)
+      }
+      setNodeRuntimeById((prev) => mergePipelineRuntimeMaps(prev, runtime))
       setTotalNodes(snap.nodes.length)
-      setCompletedNodes(completed.size)
+      setCompletedNodes(completedNodeIdsRef.current.size)
 
       if (snap.pipeline.status === "paused") {
         setPipelinePaused(true)
@@ -548,7 +567,7 @@ export default function WorkflowPage() {
         setPipelinePaused(false)
         setPausedLaneId(null)
         setProcessingMode("processing")
-        if (completed.size >= snap.nodes.length && snap.nodes.length > 0) {
+        if (completedNodeIdsRef.current.size >= snap.nodes.length && snap.nodes.length > 0) {
           maybeTryFinalizePipeline(snap.pipeline.pipelineId)
         }
       } else if (snap.pipeline.status === "failed") {
@@ -651,29 +670,40 @@ export default function WorkflowPage() {
     return () => cleanups.forEach((fn) => fn())
   }, [])
 
+  const maybeTryFinalizePipelineRef = useRef(maybeTryFinalizePipeline)
+  maybeTryFinalizePipelineRef.current = maybeTryFinalizePipeline
+
+  const handlePipelineCompletionRef = useRef(handlePipelineCompletion)
+  handlePipelineCompletionRef.current = handlePipelineCompletion
+
+  const resetPipelineProcessingStateRef = useRef<() => void>(() => {})
+
+  // Subscribe once; filter by pipelineIdRef so handlers are not torn down mid-run.
   useEffect(() => {
-    if (!pipelineId) return
+    function matchesPipeline(id: string): boolean {
+      return id === pipelineIdRef.current
+    }
+
     const cleanups = [
       onPipelineStarted(({ pipelineId: id, totalNodes: total }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setTotalNodes(total)
-        setCompletedNodes(0)
-        completedNodeIdsRef.current.clear()
+        setCompletedNodes(completedNodeIdsRef.current.size)
       }),
       onNodeStarted(({ pipelineId: id, nodeId }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
             ...(prev[nodeId] ?? {}),
             status: "running",
-            processingMessage: t("processing.generating"),
+            processingMessage: i18n.t("workflow:processing.generating"),
             errorMessage: undefined,
           },
         }))
       }),
       onNodeStreaming(({ pipelineId: id, nodeId, chunk }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -684,7 +714,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeProcessing(({ pipelineId: id, nodeId, message }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -695,7 +725,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeRetrying(({ pipelineId: id, nodeId, attempt, maxAttempts }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -703,7 +733,7 @@ export default function WorkflowPage() {
             status: "retrying",
             retryAttempt: attempt,
             retryMaxAttempts: maxAttempts,
-            processingMessage: t("processing.retrying", {
+            processingMessage: i18n.t("workflow:processing.retrying", {
               attempt,
               max: maxAttempts,
             }),
@@ -711,7 +741,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeCompleted(({ pipelineId: id, nodeId, nodeType, output }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -726,10 +756,10 @@ export default function WorkflowPage() {
           completedNodeIdsRef.current.add(nodeId)
           setCompletedNodes(completedNodeIdsRef.current.size)
         }
-        maybeTryFinalizePipeline(id)
+        maybeTryFinalizePipelineRef.current(id)
       }),
       onNodeFailedFinal(({ pipelineId: id, nodeId, message }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -741,34 +771,38 @@ export default function WorkflowPage() {
         }))
       }),
       onPipelinePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setPipelinePaused(true)
         setPausedLaneId(laneId ?? null)
       }),
       onPipelineLanePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setPipelinePaused(true)
         setPausedLaneId(laneId ?? null)
       }),
       onPipelineCompleted(({ pipelineId: id, contentId, uploadId }) => {
-        if (id !== pipelineId) return
-        void handlePipelineCompletion({ pipelineId: id, contentId, uploadId })
+        if (!matchesPipeline(id)) return
+        void handlePipelineCompletionRef.current({
+          pipelineId: id,
+          contentId,
+          uploadId,
+        })
       }),
       onPipelineFailed(({ pipelineId: id, message, reason }) => {
-        if (id !== pipelineId) return
+        if (!matchesPipeline(id)) return
         setPipelinePaused(false)
         if (reason === "cancelled") {
-          resetPipelineProcessingState()
+          resetPipelineProcessingStateRef.current()
           return
         }
         setPipelineFailedMessage(
-          message ?? t("errors.somethingWrong")
+          message ?? i18n.t("workflow:errors.somethingWrong"),
         )
         setProcessingMode("failed")
       }),
     ]
     return () => cleanups.forEach((fn) => fn())
-  }, [handlePipelineCompletion, maybeTryFinalizePipeline, pipelineId])
+  }, [])
 
   function handleWfNameCommit() {
     if (!activeWorkflowId || !ruleId) return
@@ -904,6 +938,8 @@ export default function WorkflowPage() {
           void queryClient.invalidateQueries({
             queryKey: ["pipeline", "estimate"],
           })
+          pipelineIdRef.current = id
+          joinPipelineRoom(id)
           setPipelineId(id)
           setSearchParams((params) => {
             params.set("pipelineId", id)
@@ -915,7 +951,10 @@ export default function WorkflowPage() {
           setCompletedNodes(0)
           completedNodeIdsRef.current.clear()
           setNodeRuntimeById({})
-          joinPipelineRoom(id)
+          void pipelineService.getById(id).then((snap) => {
+            if (pipelineIdRef.current !== id) return
+            hydratePipelineSnapshot(snap)
+          })
         },
         onError: (err) => {
           const status = (err as { response?: { status?: number } })?.response
@@ -1047,6 +1086,7 @@ export default function WorkflowPage() {
   function resetPipelineProcessingState() {
     pipelineCompletionHandledRef.current = false
     if (pipelineId) leavePipelineRoom(pipelineId)
+    pipelineIdRef.current = undefined
     setPipelineId(undefined)
     setSearchParams((params) => {
       params.delete("pipelineId")
@@ -1060,6 +1100,7 @@ export default function WorkflowPage() {
     completedNodeIdsRef.current.clear()
     setTotalNodes(null)
   }
+  resetPipelineProcessingStateRef.current = resetPipelineProcessingState
 
   function handleRequestStopPipeline() {
     if (!pipelineId) return
@@ -1225,6 +1266,22 @@ export default function WorkflowPage() {
     workflowByRuleQuery.isFetched,
     workflowByRuleQuery.isLoading,
   ])
+
+  /** Wait for materialized pipeline graph before showing template nodes during a run. */
+  const pipelineCanvasLoading = useMemo(() => {
+    if (!pipelineId && processingMode !== "processing") return false
+    if (activePipelineSnap?.nodes.length) return false
+    return runningPipelineQuery.isLoading || runningPipelineQuery.isFetching
+  }, [
+    activePipelineSnap?.nodes.length,
+    pipelineId,
+    processingMode,
+    runningPipelineQuery.isFetching,
+    runningPipelineQuery.isLoading,
+  ])
+
+  const showCanvasSkeleton =
+    canvasMode === "loading" || pipelineCanvasLoading
 
   const progressPercent = useMemo(() => {
     if (!totalNodes || totalNodes <= 0) return null
@@ -1420,7 +1477,7 @@ export default function WorkflowPage() {
         ref={setCanvasShellEl}
         className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
       >
-        {canvasMode === "loading" ? (
+        {showCanvasSkeleton ? (
           <WorkflowFlowSkeleton />
         ) : (
           <WorkflowFlowCanvas

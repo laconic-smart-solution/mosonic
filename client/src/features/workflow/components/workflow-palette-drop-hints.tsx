@@ -57,8 +57,8 @@ export function WorkflowPaletteDropHints({
               key={`after-slot-${hint.sourceId}`}
               className={`nodrag nopan absolute rounded-xl border-2 border-dashed transition-all duration-150 ${
                 isActive
-                  ? "animate-pulse border-[#00A589] bg-[#E0FAF5]/50 shadow-[0_0_0_4px_rgba(0,165,137,0.25)]"
-                  : "border-[#00A589]/70 bg-[#E0FAF5]/30"
+                  ? "animate-pulse border-[#00A589] bg-[#E0FAF5]/50 shadow-[0_0_0_4px_rgba(0,165,137,0.25)] dark:border-teal-400 dark:bg-teal-950/40 dark:shadow-[0_0_0_4px_rgba(45,212,191,0.2)]"
+                  : "border-[#00A589]/70 bg-[#E0FAF5]/30 dark:border-teal-400/70 dark:bg-teal-950/25"
               }`}
               style={{
                 left: slot.x,

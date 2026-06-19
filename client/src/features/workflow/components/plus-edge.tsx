@@ -69,7 +69,7 @@ export function PlusEdge({
           >
             <button
               type="button"
-              className={`flex size-6 items-center justify-center rounded-full border-2 border-white bg-[#00A589] text-white shadow-md transition-all duration-150 hover:bg-[#008f77] ${
+              className={`flex size-6 items-center justify-center rounded-full border-2 border-card bg-[#00A589] text-white shadow-md transition-all duration-150 hover:bg-[#008f77] dark:border-[#252D3B] ${
                 hovered || forceVisible ? "opacity-100" : "pointer-events-none opacity-0"
               } ${forceVisible && !hovered ? "pointer-events-none" : ""} ${
                 forceVisible ? "ring-4 ring-[#00A589]/30" : ""

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   mapPipelineRuntimeToCanvas,
   materializedNodeIdToCanvasId,
+  mergePipelineRuntimeMaps,
   resolveCanvasNodeIdToPipeline,
 } from "./pipeline-runtime-map"
 
@@ -13,6 +14,38 @@ describe("materializedNodeIdToCanvasId", () => {
 
   it("returns id unchanged when no suffix", () => {
     expect(materializedNodeIdToCanvasId("trunk-1")).toBe("trunk-1")
+  })
+})
+
+describe("mergePipelineRuntimeMaps", () => {
+  it("keeps completed socket state over pending API snapshot", () => {
+    const merged = mergePipelineRuntimeMaps(
+      { "node-1": { status: "completed", previewText: "done" } },
+      { "node-1": { status: "pending" } },
+    )
+    expect(merged["node-1"]).toEqual({
+      status: "completed",
+      previewText: "done",
+    })
+  })
+
+  it("applies running state from socket over idle API snapshot", () => {
+    const merged = mergePipelineRuntimeMaps(
+      { "node-2": { status: "running" } },
+      { "node-2": { status: "idle" } },
+    )
+    expect(merged["node-2"]).toEqual({ status: "running" })
+  })
+
+  it("applies completed API snapshot over stale running socket state", () => {
+    const merged = mergePipelineRuntimeMaps(
+      { "node-3": { status: "running", previewText: "partial" } },
+      { "node-3": { status: "completed", previewText: "final" } },
+    )
+    expect(merged["node-3"]).toEqual({
+      status: "completed",
+      previewText: "final",
+    })
   })
 })
 

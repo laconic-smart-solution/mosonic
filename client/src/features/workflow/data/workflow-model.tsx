@@ -4,6 +4,7 @@ import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channel
 import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
 import { channelLabel, normalizeChannelId } from "@/shared/constants/distribution-channels"
 import i18n from "@/i18n"
+import { CHIP_COLORS, type ChipColor } from "@/lib/tokens"
 import {
   isPreviewEdgeId,
   persistedLayoutFromApiNodes,
@@ -632,10 +633,27 @@ export const CONNECTIONS: { from: string; to: string }[] = [
   { from: "n2", to: "n3" },
 ]
 
+const STATUS_CHIP: Record<NodeStatus, ChipColor> = {
+  pending: "gray",
+  idle: "gray",
+  ready: "green",
+  running: "blue",
+  streaming: "blue",
+  processing: "blue",
+  retrying: "amber",
+  done: "green",
+  completed: "green",
+  failed_final: "red",
+  failed: "red",
+}
+
 export function statusStyle(status: NodeStatus) {
-  const base = STATUS_MAP[status] ?? STATUS_MAP.idle
+  const chip = CHIP_COLORS[STATUS_CHIP[status] ?? "gray"]
   return {
-    ...base,
+    bg: chip.bg,
+    text: chip.text,
+    border: chip.border,
+    dot: chip.text,
     label: i18n.t(`workflow:nodeStatus.${status}`, { defaultValue: status }),
   }
 }
