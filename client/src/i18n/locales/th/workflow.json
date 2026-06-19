@@ -355,10 +355,19 @@
     "removedLanes": "ลบสาย: {{lanes}}",
     "videoSettingsSaveFailed": "บันทึกการตั้งค่าวิดีโอไม่ได้ ใช้บันทึกเวิร์กโฟลว์ก่อนรัน"
   },
+  "toast": {
+    "saved": "บันทึกเวิร์กโฟลว์เรียบร้อยแล้ว",
+    "saveFailed": "บันทึกเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง",
+    "nameUpdated": "อัปเดตชื่อเวิร์กโฟลว์แล้ว",
+    "nameUpdateFailed": "อัปเดตชื่อเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง"
+  },
   "toasts": {
     "replacedAdaptNodes": "แทนที่โหนด Adapt ที่ไม่ได้กำหนดสายด้วย Adapt ต่อช่องทางจาก Branch",
     "branchNeedsChannels": "Branch ต้องมีช่องทางกระจายอย่างน้อยสองช่องทางในกฎแคมเปญ",
     "addNodeBeforeSave": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนบันทึก",
+    "disconnectedNode": "โหนด {{label}} ไม่ได้เชื่อมกับเวิร์กโฟลว์ กรุณาเชื่อมต่อหรือลบออก",
+    "removedDisconnectedNode": "ลบโหนด {{label}} ที่ไม่ได้เชื่อมออกจากเวิร์กโฟลว์แล้ว",
+    "removedDisconnectedNodes": "ลบโหนดที่ไม่ได้เชื่อม {{count}} โหนดออกจากเวิร์กโฟลว์แล้ว",
     "pipelineStartFailed": "เริ่มไปป์ไลน์ไม่ได้ ลองอีกครั้ง",
     "enterPostTopic": "กรุณาใส่สิ่งที่ต้องการโพสต์",
     "addNodeBeforeRun": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนรัน",

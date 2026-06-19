@@ -7,6 +7,7 @@ import {
   countWords,
   needsRewrite,
   PRESENTER_WORDS_PER_SECOND,
+  sanitizeSpokenScript,
   simpleTrim,
 } from './presenter-script.util';
 
@@ -67,7 +68,7 @@ export class ScriptDurationService {
 
     if (!needsRewrite(rawScript, durationSeconds)) {
       this.logger.log('[ScriptDuration] script fits — no rewrite needed');
-      const trimmed = rawScript.trim();
+      const trimmed = sanitizeSpokenScript(rawScript.trim());
       return {
         script: trimmed,
         wordCount: countWords(trimmed),
@@ -97,7 +98,9 @@ export class ScriptDurationService {
       this.logger.warn(
         `[ScriptDuration] GPT rewrite failed: ${message} — using simple trim`,
       );
-      const trimmed = simpleTrim(rawScript, durationSeconds);
+      const trimmed = sanitizeSpokenScript(
+        simpleTrim(rawScript, durationSeconds),
+      );
       return {
         script: trimmed,
         wordCount: countWords(trimmed),
@@ -119,34 +122,49 @@ export class ScriptDurationService {
     wordBudget: number,
   ): Promise<string> {
     const prompt = [
-      `You are a video script writer. Rewrite the script below to fit a ${durationSeconds}-second video.`,
+      `Rewrite the text below into a ${durationSeconds}-second presenter video script — one person speaking directly to the camera.`,
       '',
-      'REQUIREMENTS:',
-      `  - Target length: ~${wordBudget} words (at ${PRESENTER_WORDS_PER_SECOND} words/second)`,
-      `  - Maximum: ${wordBudget} words — do NOT exceed this`,
-      '  - Keep the core message and key information',
-      '  - Maintain the same tone and language as the original',
-      '  - Must end with a natural, complete sentence (no cut-offs)',
-      '  - End with a clear call to action if the original had one',
-      '  - Output ONLY the rewritten script — no titles, no explanations',
+      'LENGTH:',
+      `  - Target: ~${wordBudget} words (read aloud at ~${PRESENTER_WORDS_PER_SECOND} words/second)`,
+      `  - Hard maximum: ${wordBudget} words — do NOT exceed this`,
       '',
-      '=== ORIGINAL SCRIPT ===',
+      'SPOKEN STYLE (critical):',
+      '  - Write how a real person talks, not how a social post reads',
+      '  - Use short sentences, contractions, and a natural conversational rhythm',
+      '  - Sound warm and human — like explaining something to a friend, not reading marketing copy',
+      '  - One continuous monologue; no lists, headings, labels, or stage directions',
+      '',
+      'CONVERT FROM SOCIAL / MARKETING COPY:',
+      '  - Turn caption-style text into full spoken sentences',
+      '  - Remove ALL hashtags, @mentions, URLs, and emoji',
+      '  - Do not say "link in bio", "swipe up", or other platform-only phrases',
+      '  - Keep the core message, key facts, and call-to-action intent',
+      '',
+      'OUTPUT:',
+      '  - Plain spoken text only — no titles, quotes, markdown, or explanations',
+      '  - Must end with a complete sentence (no cut-offs)',
+      '  - If the original had a CTA, express it naturally in spoken words',
+      '',
+      '=== ORIGINAL TEXT ===',
       originalScript.trim(),
     ].join('\n');
 
     const model = this.llm.getChatModelForPlainText({
       model: this.rewriteModel(),
-      temperature: 0.4,
+      temperature: 0.5,
     });
 
     const result = await model.invoke([
       new SystemMessage(
-        'You are a professional video script writer. Output only the rewritten script text, nothing else.',
+        'You convert social-media and marketing copy into natural spoken video scripts. ' +
+          'Output only the words the presenter will say aloud — no hashtags, metadata, or commentary.',
       ),
       new HumanMessage(prompt),
     ]);
 
-    const text = messageContentToString(result.content).trim();
+    const text = sanitizeSpokenScript(
+      messageContentToString(result.content).trim(),
+    );
     if (!text) {
       throw new Error('GPT returned empty script');
     }

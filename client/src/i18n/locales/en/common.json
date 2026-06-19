@@ -82,6 +82,11 @@
     "settingsAccounts": "Account settings",
     "admin": "Admin"
   },
+  "breadcrumb": {
+    "detail": "Details",
+    "review": "Review",
+    "newsTrigger": "News trigger"
+  },
   "routes": {
     "dashboard": "Dashboard",
     "rules": "Rules",
@@ -166,5 +171,15 @@
   "empty": "No items yet",
   "noData": "No data",
   "optional": "Optional",
-  "required": "Required"
+  "required": "Required",
+  "toast": {
+    "eyebrow": {
+      "success": "Saved",
+      "error": "Failed",
+      "warning": "Heads up",
+      "info": "Note",
+      "loading": "Loading",
+      "default": "Note"
+    }
+  }
 }

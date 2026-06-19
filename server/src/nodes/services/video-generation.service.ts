@@ -11,6 +11,7 @@ import type {
   VideoGenerationInput,
 } from '../types/node-execution.types';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
+import { buildFileStorageFolderPath } from '../../common/utils/file-storage-path.util';
 import { fetchUrlToBuffer } from '../../upload/fetch-url-to-buffer.util';
 import { uploadBufferToFileService } from '../../upload/file-service-upload.util';
 import type { WorkflowNodeConfig } from '../schemas/workflow-node.schema';
@@ -565,7 +566,7 @@ export class VideoGenerationService {
       buffer: new Uint8Array(buffer),
       originalName: fileName,
       mimeType: 'video/mp4',
-      folderPath: `neural-tex/videos/${input.pipelineId}`,
+      folderPath: buildFileStorageFolderPath('videos', input.pipelineId),
     });
     const storage = await this.maybeMirrorVideoUploadToPublicUploads(
       {
@@ -707,7 +708,7 @@ export class VideoGenerationService {
     const storage = await this.uploadVideoBuffer({
       videoBuffer,
       fileName,
-      folderPath: `neural-tex/videos/${input.pipelineId}`,
+      folderPath: buildFileStorageFolderPath('videos', input.pipelineId),
     });
 
     return {

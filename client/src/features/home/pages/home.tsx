@@ -7,6 +7,7 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits } from "@/shared/lib/api-error"
 
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
+import { PageShell } from "@/components/app/page-shell"
 import { HomeFooter } from "@/features/home/components/home-footer"
 import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
 import type { Attachment } from "@/components/core/prompt-area"
@@ -79,6 +80,7 @@ export default function HomePage() {
     attachments: Attachment[]
   } | null>(null)
   const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
+  const pendingWorkflowRuleIdRef = useRef<string | null>(null)
 
   const rulesPageQuery = useRulesPageQuery(
     {
@@ -258,27 +260,33 @@ export default function HomePage() {
   }
 
   function handleQaSubmit(answers: WorkflowQAAnswers) {
-    if (!workflowRuleId) return
+    const ruleId = workflowRuleId
+    if (!ruleId) return
     pendingWorkflowAnswersRef.current = answers
+    pendingWorkflowRuleIdRef.current = ruleId
     setQaWizardOpen(false)
     setWorkflowGenConfirmOpen(true)
   }
 
-  function executeWorkflowGeneration(answers: WorkflowQAAnswers) {
-    if (!workflowRuleId) return
+  function executeWorkflowGeneration(
+    answers: WorkflowQAAnswers,
+    ruleId: string,
+  ) {
+    if (!ruleId) return
     setOrbPulse(true)
 
     generateWorkflow.mutate(
-      { ruleId: workflowRuleId, answers },
+      { ruleId, answers },
       {
         onSuccess: (data) => {
-          const { workflowId, ruleId } = data
+          const { workflowId, ruleId: resolvedRuleId } = data
           joinWorkflowRoom(workflowId)
           const ruleName =
-            ruleOptions.find((r) => r.ruleId === ruleId)?.name ??
+            ruleOptions.find((r) => r.ruleId === resolvedRuleId)?.name ??
             pendingRuleQuery.data?.name
+          pendingWorkflowRuleIdRef.current = null
           setPendingRuleId(null)
-          navigate(`/workflow/${ruleId}`, {
+          navigate(`/workflow/${resolvedRuleId}`, {
             state: {
               generating: true,
               ruleName,
@@ -323,7 +331,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background font-sans">
+    <PageShell variant="marketing" className="bg-background font-sans">
       <HomeBackdrop />
       <HomeNavbar />
 
@@ -405,7 +413,7 @@ export default function HomePage() {
             open={qaWizardOpen}
             onOpenChange={(open) => {
               setQaWizardOpen(open)
-              if (!open) {
+              if (!open && !pendingWorkflowAnswersRef.current) {
                 setPendingRuleId(null)
                 setOrbPulse(false)
               }
@@ -437,20 +445,30 @@ export default function HomePage() {
             open={workflowGenConfirmOpen}
             onOpenChange={(open) => {
               setWorkflowGenConfirmOpen(open)
-              if (!open) pendingWorkflowAnswersRef.current = null
+              if (!open) {
+                pendingWorkflowAnswersRef.current = null
+                pendingWorkflowRuleIdRef.current = null
+                if (!selectedRuleId) {
+                  setPendingRuleId(null)
+                  setOrbPulse(false)
+                }
+              }
             }}
             kind="workflow"
             isSubmitting={generateWorkflow.isPending}
             onConfirm={() => {
               const answers = pendingWorkflowAnswersRef.current
-              if (!answers) return
-              setWorkflowGenConfirmOpen(false)
+              const ruleId =
+                pendingWorkflowRuleIdRef.current ?? workflowRuleId
+              if (!answers || !ruleId) return
               pendingWorkflowAnswersRef.current = null
-              executeWorkflowGeneration(answers)
+              pendingWorkflowRuleIdRef.current = null
+              setWorkflowGenConfirmOpen(false)
+              executeWorkflowGeneration(answers, ruleId)
             }}
           />
         </>
       ) : null}
-    </div>
+    </PageShell>
   )
 }

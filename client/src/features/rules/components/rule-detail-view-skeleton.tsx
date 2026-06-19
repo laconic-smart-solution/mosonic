@@ -48,7 +48,7 @@ export function RuleDetailViewSkeleton() {
   const navLabels = NAV_KEYS.map((key) => t(`detail.nav.${key}`))
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-8 lg:gap-10">
+    <div className="flex w-full gap-8 lg:gap-10">
       <nav aria-hidden className="hidden w-44 shrink-0 lg:block">
         <div className="sticky top-2 space-y-1.5 rounded-xl border border-border/60 bg-muted/20 p-2">
           {navLabels.map((label) => (

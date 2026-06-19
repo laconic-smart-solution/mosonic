@@ -11,9 +11,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import i18n from "@/i18n"
-import { ArrowLeft, Eye } from "lucide-react"
+import { Eye } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PageShell } from "@/components/app/page-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -193,7 +194,6 @@ export default function UploadPage() {
   const uploadQuery = useGetUploadQuery(uploadId)
   const upload = uploadQuery.data
   const contentQuery = useGetContentQuery(upload?.contentRef)
-  const workflowRuleId = contentQuery.data?.ruleRef
   const totalCreditsUsed = contentQuery.data?.creditUsage?.totalCredits ?? 0
   const zernioAccountsQuery = useZernioAccountsQuery(Boolean(uploadId))
   const publishMutation = usePublishUploadMutation()
@@ -1054,52 +1054,47 @@ export default function UploadPage() {
 
   if (!uploadId) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
-        Missing upload id.
-      </div>
+      <PageShell variant="canvas">
+        <div className="text-sm text-muted-foreground">Missing upload id.</div>
+      </PageShell>
     )
   }
 
   if (uploadQuery.isLoading || zernioAccountsQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-        <Spinner className="size-4" />
-        Loading upload…
-      </div>
+      <PageShell variant="canvas">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner className="size-4" />
+          Loading upload…
+        </div>
+      </PageShell>
     )
   }
 
   if (uploadQuery.isError || !upload) {
     return (
-      <div className="p-6">
+      <PageShell variant="canvas">
+        <div>
         <Alert variant="destructive">
           <AlertTitle>Could not load upload</AlertTitle>
           <AlertDescription>
             {getApiErrorMessage(uploadQuery.error)}
           </AlertDescription>
         </Alert>
-      </div>
+        </div>
+      </PageShell>
     )
   }
 
   return (
+    <PageShell variant="canvas">
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="relative p-6 pt-20">
-        {workflowRuleId ? (
-          <Button
-            onClick={() => navigate(-1)}
-            variant="outline"
-            className="absolute top-6 left-6 z-70 hover:cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-        ) : null}
+      <div className="relative">
         <div
           ref={globalSchedulePopoverAnchorRef}
           aria-hidden
@@ -1437,5 +1432,6 @@ export default function UploadPage() {
         />
       ) : null}
     </DndContext>
+    </PageShell>
   )
 }

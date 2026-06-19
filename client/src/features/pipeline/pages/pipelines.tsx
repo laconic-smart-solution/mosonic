@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { CircleAlert, Inbox, LayoutGrid } from "lucide-react"
 
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -254,10 +255,7 @@ export default function PipelinesPage() {
   }
 
   return (
-    <div
-      className="min-h-full w-full bg-[color:var(--nt-canvas)] px-4 py-5 sm:px-5"
-      style={{ minHeight: "100%" }}
-    >
+    <PageShell>
       <PipelineStopConfirmDialog
         pipelineId={stopPipelineId}
         open={!!stopPipelineId}
@@ -507,6 +505,6 @@ export default function PipelinesPage() {
           </>
         )}
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

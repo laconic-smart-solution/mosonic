@@ -16,5 +16,6 @@ export interface INodeCreditPriceRepository {
     legacyCostUsd: number,
     nextCostUsd: number,
   ): Promise<void>;
+  setActiveByNodeType(nodeType: string, isActive: boolean): Promise<void>;
   migrateLegacyRow(nodeType: string, costUsd: number): Promise<void>;
 }

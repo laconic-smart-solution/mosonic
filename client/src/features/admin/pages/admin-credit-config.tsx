@@ -11,6 +11,8 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+
+import { PageShell } from "@/components/app/page-shell"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -206,8 +208,8 @@ export default function AdminCreditConfigPage() {
   }
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-[18px]">
+    <PageShell>
+      <div className="w-full space-y-[18px]">
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -483,7 +485,7 @@ export default function AdminCreditConfigPage() {
           ) : null}
         </section>
       </div>
-    </div>
+    </PageShell>
   )
 }
 

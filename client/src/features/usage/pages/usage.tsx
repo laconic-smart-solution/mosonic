@@ -13,6 +13,8 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
+import { PageShell } from "@/components/app/page-shell"
+
 import { rangeToParams, type UsageRangeKey } from "@/features/usage/lib/usage-range"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
 import { Button } from "@/components/ui/button"
@@ -130,8 +132,8 @@ export default function UsagePage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-full bg-background px-5 py-6 md:px-7 md:py-8 md:pb-12">
-        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+      <PageShell>
+        <div className="flex w-full flex-col gap-6">
           <div>
             <h1 className="font-heading m-0 text-[26px] leading-tight tracking-tight text-foreground">
               {t("title")}
@@ -366,7 +368,7 @@ export default function UsagePage() {
             </div>
           </section>
         </div>
-      </div>
+      </PageShell>
     </TooltipProvider>
   )
 }

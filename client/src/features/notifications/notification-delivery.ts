@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react"
 import { toast } from "sonner"
 
 import {
@@ -56,6 +57,7 @@ function showInAppToast(payload: AppNotificationPayload): void {
       id: `noti-${payload.id}`,
       description: payload.message,
       duration: 8000,
+      style: { "--nt-duration": "8000ms" } as CSSProperties,
     })
     return
   }
@@ -65,6 +67,7 @@ function showInAppToast(payload: AppNotificationPayload): void {
       id: `noti-${payload.id}`,
       description: payload.message,
       duration: 8000,
+      style: { "--nt-duration": "8000ms" } as CSSProperties,
     })
     return
   }
@@ -73,6 +76,7 @@ function showInAppToast(payload: AppNotificationPayload): void {
     id: `noti-${payload.id}`,
     description: payload.message,
     duration: 6000,
+    style: { "--nt-duration": "6000ms" } as CSSProperties,
     action: payload.action
       ? {
           label: payload.action.label,

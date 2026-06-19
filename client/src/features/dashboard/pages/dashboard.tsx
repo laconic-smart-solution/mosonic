@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 
+import { PageShell } from "@/components/app/page-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -124,14 +125,14 @@ export default function DashboardPage() {
   ] as const
 
   return (
-    <div className="relative w-full min-h-0 overflow-x-hidden bg-linear-to-b from-muted/40 via-background to-background pb-8">
+    <PageShell className="relative overflow-x-hidden bg-linear-to-b from-muted/40 via-background to-background pb-8">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]"
         aria-hidden
       />
 
       <motion.div
-        className="relative mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
+        className="relative w-full space-y-8"
         variants={listVariants}
         initial="hidden"
         animate="show"
@@ -419,6 +420,6 @@ export default function DashboardPage() {
           </>
         ) : null}
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

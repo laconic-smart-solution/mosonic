@@ -21,7 +21,7 @@ import {
   type SortOption,
 } from "@/features/content/components/content-list/content-list-constants"
 import { ContentListStatCard } from "@/features/content/components/content-list/content-list-stat-card"
-import { ContentPageShell } from "@/features/content/components/content-list/content-page-shell"
+import { PageShell } from "@/components/app/page-shell"
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { useContentPageQuery, useContentStatsQuery } from "@/shared/queries/content.query"
@@ -240,7 +240,7 @@ export default function ContentPage() {
 
 
   return (
-    <ContentPageShell>
+    <PageShell>
       <motion.header
         className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start"
         initial={false}
@@ -498,6 +498,6 @@ export default function ContentPage() {
           />
         </div>
       ) : null}
-    </ContentPageShell>
+    </PageShell>
   )
 }

@@ -2,6 +2,7 @@ import {
   calcWordBudget,
   countWords,
   needsRewrite,
+  sanitizeSpokenScript,
   simpleTrim,
   trimScriptToTargetDuration,
 } from './presenter-script.util';
@@ -51,6 +52,19 @@ describe('simpleTrim', () => {
     const out = simpleTrim(words, 4);
     expect(out.endsWith('…')).toBe(true);
     expect(countWords(out)).toBeLessThanOrEqual(calcWordBudget(4));
+  });
+});
+
+describe('sanitizeSpokenScript', () => {
+  it('removes hashtags, mentions, urls, and emoji', () => {
+    const input =
+      'Hey everyone! Check this out 🔥 #Marketing #AI @brand https://example.com/x';
+    expect(sanitizeSpokenScript(input)).toBe('Hey everyone! Check this out');
+  });
+
+  it('strips bullet markers and collapses whitespace', () => {
+    const input = '- First point\n• Second point';
+    expect(sanitizeSpokenScript(input)).toBe('First point Second point');
   });
 });
 

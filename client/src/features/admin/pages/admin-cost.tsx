@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import { useTranslation } from "react-i18next"
+
+import { PageShell } from "@/components/app/page-shell"
 import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -97,8 +99,8 @@ export default function AdminCostPage() {
     data?.totalCostUsd != null ? `$${Number(data.totalCostUsd).toFixed(4)}` : "—"
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-6">
+    <PageShell>
+      <div className="w-full space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
@@ -294,7 +296,7 @@ export default function AdminCostPage() {
           </Table>
         </section>
       </div>
-    </div>
+    </PageShell>
   )
 }
 

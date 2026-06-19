@@ -317,6 +317,17 @@ const intelligenceConfigSchema = intelligenceConfigObjectSchema
     }
   });
 
+function configSchemaShapeKeys(schema: z.ZodTypeAny): string[] {
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+  const inner = (schema as { _def?: { in?: unknown } })._def?.in;
+  if (inner instanceof z.ZodObject) {
+    return Object.keys(inner.shape);
+  }
+  return [];
+}
+
 const SCHEMAS: Record<WorkflowNodeType, z.ZodTypeAny> = {
   [WorkflowNodeType.KeywordPlanner]: keywordPlannerConfigSchema,
   [WorkflowNodeType.TextGeneration]: textConfigSchema,
@@ -474,7 +485,11 @@ export function parseWorkflowNodeConfig(
       : {};
 
   const picked: Record<string, unknown> = {};
-  const allowed = new Set(configShapeKeys(type));
+  const allowed = new Set(
+    type === WorkflowNodeType.VideoGeneration
+      ? Object.keys(videoConfigObjectSchema.shape)
+      : configSchemaShapeKeys(schema),
+  );
   for (const [k, v] of Object.entries(obj)) {
     if (allowed.has(k)) {
       picked[k] = v;

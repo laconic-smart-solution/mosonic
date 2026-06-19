@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 
+import { PageShell } from "@/components/app/page-shell"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,8 +117,8 @@ export default function AdminUsersPage() {
   const users = (data?.users ?? []) as AdminUserRow[]
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-6">
+    <PageShell>
+      <div className="w-full space-y-6">
         <div>
           <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
             {t("users.title")}
@@ -340,6 +341,6 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   )
 }

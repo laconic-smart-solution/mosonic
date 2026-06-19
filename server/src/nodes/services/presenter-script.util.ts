@@ -41,6 +41,20 @@ export function simpleTrim(text: string, durationSeconds: number): string {
 }
 
 /**
+ * Remove social-post formatting unsuitable for spoken presenter video.
+ */
+export function sanitizeSpokenScript(text: string): string {
+  return text
+    .replace(/#[\w\u0E00-\u0E7F\u4e00-\u9fff]+/gu, '')
+    .replace(/@[\w.]+/g, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/^[\s]*[-*•]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * HeyGen avatar video length follows script/audio, not a duration API field.
  * @deprecated Prefer ScriptDurationService.fitScriptToDuration; kept as alias for simpleTrim.
  */

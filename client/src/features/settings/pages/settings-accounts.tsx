@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AccountChannelsSection } from "@/features/settings/components/account-channels-section"
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
@@ -27,7 +28,6 @@ import {
   zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
 import { useUserStore } from "@/shared/stores/user.store"
-import { zernioService } from "@/shared/services/zernio.service"
 
 const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
@@ -45,7 +45,6 @@ export default function SettingsAccountsPage() {
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
   const initialSyncRef = useRef(false)
-  const [profileBusy, setProfileBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingPlatform, setPendingPlatform] = useState<string | null>(null)
 
@@ -101,18 +100,6 @@ export default function SettingsAccountsPage() {
     toast.error(t("oauth.callbackFailed"))
   }, [queryClient, searchParams, setSearchParams, syncMutation, t])
 
-  async function ensureProfile() {
-    setProfileBusy(true)
-    try {
-      await zernioService.createProfile()
-      toast.success(t("oauth.profileReady"))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("oauth.profileFailed"))
-    } finally {
-      setProfileBusy(false)
-    }
-  }
-
   function requestUnlock(platform: string) {
     setPendingPlatform(platform)
     setConfirmOpen(true)
@@ -161,8 +148,8 @@ export default function SettingsAccountsPage() {
   }
 
   return (
-    <div className="min-h-full bg-background px-5 py-6 md:px-7 md:py-8 md:pb-12">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
+    <PageShell>
+      <div className="flex w-full flex-col gap-6">
         <AccountSettingsPageHeader />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
@@ -198,14 +185,12 @@ export default function SettingsAccountsPage() {
                   <p className="mt-1 text-[13px] text-muted-foreground">{t("channels.sectionDesc")}</p>
                 </div>
                 <AccountSettingsToolbar
-                  onCreateProfile={ensureProfile}
                   onSyncAccounts={() =>
                     syncMutation.mutate(undefined, {
                       onError: (err) =>
                         toastApiError(err, "settings:oauth.syncFailed"),
                     })
                   }
-                  createBusy={profileBusy}
                   syncBusy={syncMutation.isPending}
                 />
               </div>
@@ -241,6 +226,6 @@ export default function SettingsAccountsPage() {
         onConfirm={confirmUnlock}
         isUnlocking={unlockMutation.isPending}
       />
-    </div>
+    </PageShell>
   )
 }
