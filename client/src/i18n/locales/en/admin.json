@@ -237,7 +237,7 @@
     "title": "Node credit pricing",
     "subtitle": "Set reference cost (USD) per workflow node run. Credits are computed from",
     "creditSettingsLink": "Credit settings",
-    "creditHint": "Cost credit = ceil((cost USD + overhead) × margin ÷ credit price). Changing margin or credit price on the Credits page updates these values automatically. Social account connection applies per OAuth connect on Account settings (not workflow nodes).",
+    "creditHint": "Cost credit = ceil((cost USD + overhead) × margin ÷ credit price). Changing margin or credit price on the Credits page updates these values automatically. Social account unlock applies when a customer confirms unlock on Account settings (not workflow nodes).",
     "colMetric": "Metric",
     "colCostUsd": "Cost (USD)",
     "colCostCredit": "Cost credit",

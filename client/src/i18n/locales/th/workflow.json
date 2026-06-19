@@ -35,7 +35,7 @@
     "summarization": "สรุปเนื้อหา",
     "adapt": "ปรับแต่ง",
     "intelligence": "ข่าวกรอง",
-    "social_account_connect": "การเชื่อมบัญชีโซเชียล"
+    "social_account_connect": "ปลดล็อกบัญชีโซเชียล"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"

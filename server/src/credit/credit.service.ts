@@ -324,7 +324,7 @@ export class CreditService {
     return { creditsEach, creditsRemaining };
   }
 
-  /** Charge credits when a user connects a new publishing channel via OAuth. */
+  /** Charge credits when a user unlocks a new publishing channel (before OAuth). */
   async chargeSocialAccountConnect(args: {
     userId: string;
     channel: string;

@@ -10,9 +10,9 @@ import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 type AccountChannelsSectionProps = {
   accounts: ZernioConnectedAccount[] | undefined
   loading: boolean
-  onConnect: (apiKey: string) => void
+  onUnlock: (apiKey: string) => void
   onDisconnect: (channel: string) => void
-  connectPending: boolean
+  unlockPending: boolean
   disconnectPending: boolean
   hideHeader?: boolean
   creditsEach?: number
@@ -21,9 +21,9 @@ type AccountChannelsSectionProps = {
 export function AccountChannelsSection({
   accounts,
   loading,
-  onConnect,
+  onUnlock,
   onDisconnect,
-  connectPending,
+  unlockPending,
   disconnectPending,
   hideHeader = false,
   creditsEach = 0,
@@ -71,9 +71,9 @@ export function AccountChannelsSection({
             key={def.id}
             def={def}
             connected={findConnectedForChannel(def, byChannel)}
-            onConnect={onConnect}
+            onUnlock={onUnlock}
             onDisconnect={onDisconnect}
-            connectPending={connectPending}
+            unlockPending={unlockPending}
             disconnectPending={disconnectPending}
             creditsEach={creditsEach}
           />

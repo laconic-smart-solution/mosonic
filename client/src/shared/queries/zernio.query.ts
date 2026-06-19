@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { zernioService } from "../services/zernio.service"
+import { usageQueryKeys } from "./usage.query"
 
 export const zernioQueryKeys = {
   accounts: ["zernio", "accounts"] as const,
@@ -35,9 +36,15 @@ export const useSyncZernioAccountsMutation = () => {
   })
 }
 
-export const useZernioConnectMutation = () => {
+export const useZernioUnlockMutation = () => {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (platform: string) => zernioService.getConnectUrl(platform),
+    mutationFn: (platform: string) => zernioService.unlockChannel(platform),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
+      void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
+      void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+    },
   })
 }
 

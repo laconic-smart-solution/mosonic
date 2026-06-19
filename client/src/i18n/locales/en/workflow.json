@@ -35,7 +35,7 @@
     "summarization": "Summarization",
     "adapt": "Adapt",
     "intelligence": "Intelligence",
-    "social_account_connect": "Social account connection"
+    "social_account_connect": "Social account unlock"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} For {{channel}}"

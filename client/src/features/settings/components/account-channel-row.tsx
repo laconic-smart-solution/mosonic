@@ -1,4 +1,4 @@
-import { Loader2, Unlink } from "lucide-react"
+import { Loader2, LockOpen, Unlink } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { formatCreditAmount } from "@/components/core/credit-usage-badge"
@@ -11,9 +11,9 @@ import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 type AccountChannelRowProps = {
   def: AccountChannelDef
   connected: ZernioConnectedAccount | undefined
-  onConnect: (apiKey: string) => void
+  onUnlock: (apiKey: string) => void
   onDisconnect: (channel: string) => void
-  connectPending: boolean
+  unlockPending: boolean
   disconnectPending: boolean
   creditsEach?: number
 }
@@ -21,9 +21,9 @@ type AccountChannelRowProps = {
 export function AccountChannelRow({
   def,
   connected,
-  onConnect,
+  onUnlock,
   onDisconnect,
-  connectPending,
+  unlockPending,
   disconnectPending,
   creditsEach = 0,
 }: AccountChannelRowProps) {
@@ -33,9 +33,9 @@ export function AccountChannelRow({
   const disconnectKey = connected?.channel.trim().toLowerCase() ?? ""
   const label = t(`channels.${def.id}.label`)
   const description = t(`channels.${def.id}.description`)
-  const connectCostLabel =
+  const unlockCostLabel =
     creditsEach > 0
-      ? t("channels.connectCost", { count: formatCreditAmount(creditsEach) })
+      ? t("channels.unlockCost", { count: formatCreditAmount(creditsEach) })
       : null
 
   return (
@@ -64,8 +64,8 @@ export function AccountChannelRow({
             )}
           </div>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
-          {!isLinked && connectCostLabel ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">{connectCostLabel}</p>
+          {!isLinked && unlockCostLabel ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">{unlockCostLabel}</p>
           ) : null}
           {isLinked && connected ? (
             <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
@@ -102,23 +102,27 @@ export function AccountChannelRow({
             size="sm"
             className="min-w-[104px] gap-1.5"
             style={{ borderColor: T.accentBorder }}
-            disabled={connectPending}
-            onClick={() => onConnect(def.apiKey)}
+            disabled={unlockPending}
+            onClick={() => onUnlock(def.apiKey)}
             aria-label={
               creditsEach > 0
-                ? t("channels.connectAriaWithCost", {
+                ? t("channels.unlockAriaWithCost", {
                     channel: label,
                     count: formatCreditAmount(creditsEach),
                   })
-                : t("channels.connectAria", { channel: label })
+                : t("channels.unlockAria", { channel: label })
             }
           >
-            {connectPending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+            {unlockPending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <LockOpen className="size-3.5" aria-hidden />
+            )}
             {creditsEach > 0
-              ? t("channels.connectWithCredits", {
+              ? t("channels.unlockWithCredits", {
                   count: formatCreditAmount(creditsEach),
                 })
-              : t("channels.connect")}
+              : t("channels.unlock")}
           </Button>
         )}
       </div>

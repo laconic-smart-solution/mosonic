@@ -46,15 +46,51 @@ export class McpService {
     return { zernioProfileId: id };
   }
 
-  async getConnectUrl(platform: string, userId: string): Promise<string> {
+  /** Charge unlock credits, then return the OAuth URL for the publishing channel. */
+  async unlockChannelForConnect(
+    platform: string,
+    userId: string,
+  ): Promise<{ connectUrl: string }> {
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    if (!this.isChannelConnected(accounts, platform)) {
+    if (this.isChannelConnected(accounts, platform)) {
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is already connected`,
+      );
+    }
+
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+
+    if (creditsEach > 0) {
       await this.creditService.assertCreditsForNodeType(
         userId,
         SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       );
+      const config = await this.creditCalculation.getConfig();
+      const channel = platform.trim().toLowerCase();
+      await this.creditService.chargeSocialAccountConnect({
+        userId,
+        channel,
+        credits: creditsEach,
+        creditPriceUsd: config.creditPriceUsd,
+      });
     }
 
+    const connectUrl = await this.buildConnectUrl(platform, userId);
+    return { connectUrl };
+  }
+
+  /** OAuth redirect URL only (no credit charge). Prefer `unlockChannelForConnect`. */
+  async getConnectUrl(platform: string, userId: string): Promise<string> {
+    return await this.buildConnectUrl(platform, userId);
+  }
+
+  private async buildConnectUrl(
+    platform: string,
+    userId: string,
+  ): Promise<string> {
     const profileId = await this.ensureZernioProfileId(userId);
     const state = await this.oauthState.signState(userId);
     const base = this.config.get<string>('ZERNIO_CALLBACK_URL')?.trim();
@@ -84,32 +120,11 @@ export class McpService {
       );
     }
 
-    const accountsBefore =
-      await this.usersService.getZernioConnectedAccounts(userId);
-    const wasConnected = this.isChannelConnected(accountsBefore, platform);
-
     await this.usersService.setZernioConnectedAccount(
       userId,
       platform,
       accountId,
     );
-
-    if (!wasConnected) {
-      const creditsEach =
-        (await this.nodeCreditPriceService.getActiveCostCredit(
-          SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-        )) ?? 0;
-      if (creditsEach > 0) {
-        const config = await this.creditCalculation.getConfig();
-        const channel = platform.trim().toLowerCase();
-        await this.creditService.chargeSocialAccountConnect({
-          userId,
-          channel,
-          credits: creditsEach,
-          creditPriceUsd: config.creditPriceUsd,
-        });
-      }
-    }
 
     try {
       await this.syncAccounts(userId);

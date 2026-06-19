@@ -15,8 +15,8 @@ export const zernioService = {
     return response.data
   },
 
-  getConnectUrl: async (platform: string): Promise<{ connectUrl: string }> => {
-    const response = await apiClient.get(`/zernio/connect/${platform}`)
+  unlockChannel: async (platform: string): Promise<{ connectUrl: string }> => {
+    const response = await apiClient.post(`/zernio/unlock/${platform}`)
     return response.data
   },
 

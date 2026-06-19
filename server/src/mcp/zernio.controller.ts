@@ -36,15 +36,14 @@ export class ZernioController {
     return await this.mcpService.getConnectionCreditQuote(user.userId);
   }
 
-  @Get('connect/:platform')
+  @Post('unlock/:platform')
   @UseGuards(JwtAuthGuard)
-  async connectAccount(
+  async unlockChannel(
     @Req() req: Request,
     @Param('platform') platform: string,
   ) {
     const user = req.auth!.localUser as User;
-    const connectUrl = await this.mcpService.getConnectUrl(platform, user.userId);
-    return { connectUrl };
+    return await this.mcpService.unlockChannelForConnect(platform, user.userId);
   }
 
   @Get('callback')
@@ -80,6 +79,7 @@ export class ZernioController {
   @UseGuards(JwtAuthGuard)
   async getConnectedAccounts(@Req() req: Request) {
     const user = req.auth!.localUser as User;
+    console.log('getConnectedAccounts', user.username);
     return await this.mcpService.getConnectedAccounts(user.userId);
   }
 

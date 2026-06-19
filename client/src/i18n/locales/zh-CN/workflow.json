@@ -35,7 +35,7 @@
     "summarization": "摘要",
     "adapt": "适配",
     "intelligence": "情报",
-    "social_account_connect": "社交账户连接"
+    "social_account_connect": "社交账户解锁"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"

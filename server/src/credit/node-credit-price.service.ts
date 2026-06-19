@@ -10,6 +10,8 @@ import {
   BILLABLE_NODE_CREDIT_DEFAULTS,
   defaultCostUsdForNodeType,
   isBillableNodeCreditType,
+  SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD,
+  SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
 } from './lib/billable-node-credit-types';
 import {
   NodeCreditPrice,
@@ -61,6 +63,7 @@ export class NodeCreditPriceService {
 
   async seedDefaults(): Promise<void> {
     await this.migrateLegacyCostCredit();
+    await this.migrateSocialUnlockCost();
     for (const row of BILLABLE_NODE_CREDIT_DEFAULTS) {
       const existing = await this.nodeCreditPriceModel
         .findOne({ nodeType: row.nodeType })
@@ -73,6 +76,21 @@ export class NodeCreditPriceService {
         });
       }
     }
+  }
+
+  /** Lower social unlock cost when the row still uses the legacy default. */
+  private async migrateSocialUnlockCost(): Promise<void> {
+    const nextDefault = defaultCostUsdForNodeType(SOCIAL_ACCOUNT_CONNECT_NODE_TYPE);
+    if (nextDefault == null) return;
+    await this.nodeCreditPriceModel
+      .updateOne(
+        {
+          nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+          costUsd: SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD,
+        },
+        { $set: { costUsd: nextDefault, isActive: true } },
+      )
+      .exec();
   }
 
   private async resolveCostUsd(nodeType: string): Promise<number | null> {

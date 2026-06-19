@@ -11,7 +11,7 @@ import { AccountChannelsSection } from "@/features/settings/components/account-c
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
 import { AccountSettingsToolbar } from "@/features/settings/components/account-settings-toolbar"
 import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
-import { SocialConnectConfirmDialog } from "@/features/settings/components/social-connect-confirm-dialog"
+import { SocialUnlockConfirmDialog } from "@/features/settings/components/social-unlock-confirm-dialog"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
 import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
@@ -21,7 +21,7 @@ import {
   useSyncZernioAccountsMutation,
   useZernioAccountsQuery,
   useZernioConnectionCreditQuery,
-  useZernioConnectMutation,
+  useZernioUnlockMutation,
   zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
 import { useUserStore } from "@/shared/stores/user.store"
@@ -37,7 +37,7 @@ export default function SettingsAccountsPage() {
   const user = useUserStore((s) => s.user)
   const accountsQuery = useZernioAccountsQuery()
   const connectionCreditQuery = useZernioConnectionCreditQuery()
-  const connectMutation = useZernioConnectMutation()
+  const unlockMutation = useZernioUnlockMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
@@ -110,14 +110,14 @@ export default function SettingsAccountsPage() {
     }
   }
 
-  function requestConnect(platform: string) {
+  function requestUnlock(platform: string) {
     setPendingPlatform(platform)
     setConfirmOpen(true)
   }
 
-  function confirmConnect() {
+  function confirmUnlock() {
     if (!pendingPlatform) return
-    connectMutation.mutate(pendingPlatform, {
+    unlockMutation.mutate(pendingPlatform, {
       onSuccess: ({ connectUrl }) => {
         setConfirmOpen(false)
         setPendingPlatform(null)
@@ -127,11 +127,11 @@ export default function SettingsAccountsPage() {
         const status = (err as { response?: { status?: number } })?.response
           ?.status
         if (status === 402) {
-          toast.error(t("connectConfirm.insufficientTitle"))
+          toast.error(t("unlockConfirm.insufficientTitle"))
           void connectionCreditQuery.refetch()
           return
         }
-        toast.error(t("oauth.connectUrlFailed"))
+        toast.error(t("oauth.unlockFailed"))
       },
     })
   }
@@ -196,9 +196,9 @@ export default function SettingsAccountsPage() {
               <AccountChannelsSection
                 accounts={accountsQuery.data?.accounts}
                 loading={accountsQuery.isLoading}
-                onConnect={requestConnect}
+                onUnlock={requestUnlock}
                 onDisconnect={disconnect}
-                connectPending={connectMutation.isPending}
+                unlockPending={unlockMutation.isPending}
                 disconnectPending={disconnectMutation.isPending}
                 creditsEach={creditsEach}
                 hideHeader
@@ -208,7 +208,7 @@ export default function SettingsAccountsPage() {
         </div>
       </div>
 
-      <SocialConnectConfirmDialog
+      <SocialUnlockConfirmDialog
         open={confirmOpen}
         onOpenChange={(open) => {
           setConfirmOpen(open)
@@ -218,8 +218,8 @@ export default function SettingsAccountsPage() {
         creditsEach={creditsEach}
         creditsRemaining={creditsRemaining}
         loading={connectionCreditQuery.isLoading}
-        onConfirm={confirmConnect}
-        isConnecting={connectMutation.isPending}
+        onConfirm={confirmUnlock}
+        isUnlocking={unlockMutation.isPending}
       />
     </div>
   )

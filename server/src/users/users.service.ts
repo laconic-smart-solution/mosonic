@@ -255,6 +255,7 @@ export class UsersService {
     userId: string,
   ): Promise<ConnectedAccountRecord[]> {
     const user = await this.findByUserId(userId);
+    console.log('getZernioConnectedAccounts', user?.zernioConnectedAccounts);
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }

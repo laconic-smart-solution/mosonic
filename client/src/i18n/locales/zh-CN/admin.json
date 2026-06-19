@@ -237,7 +237,7 @@
     "title": "节点积分定价",
     "subtitle": "设置每种节点每次运行的参考成本（USD）。积分根据",
     "creditSettingsLink": "积分设置",
-    "creditHint": "消耗积分 = ceil((成本 USD + 间接费用) × 利润率 ÷ 积分单价)。在积分页修改设置会自动更新此列。社交账户连接按账户设置中的每次 OAuth 连接计费（非工作流节点）。",
+    "creditHint": "消耗积分 = ceil((成本 USD + 间接费用) × 利润率 ÷ 积分单价)。在积分页修改设置会自动更新此列。社交账户解锁在账户设置中客户确认解锁时计费（非工作流节点）。",
     "colMetric": "指标",
     "colCostUsd": "成本 (USD)",
     "colCostCredit": "消耗积分",

@@ -12,10 +12,13 @@ export const BILLABLE_NODE_CREDIT_DEFAULTS: ReadonlyArray<{
   { nodeType: 'translation', costUsd: 0.008 },
   { nodeType: 'image_generation', costUsd: 0.04 },
   { nodeType: 'video_generation', costUsd: 0.48 },
-  { nodeType: 'social_account_connect', costUsd: 0.01 },
+  { nodeType: 'social_account_connect', costUsd: 0.001 },
 ] as const;
 
 export const SOCIAL_ACCOUNT_CONNECT_NODE_TYPE = 'social_account_connect' as const;
+
+/** Previous default before social unlock cost reduction (used for one-time DB migration). */
+export const SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD = 0.01;
 
 const BILLABLE_NODE_TYPES = new Set(
   BILLABLE_NODE_CREDIT_DEFAULTS.map((row) => row.nodeType),

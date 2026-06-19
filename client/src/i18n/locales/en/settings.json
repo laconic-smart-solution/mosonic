@@ -32,22 +32,23 @@
     "profileReady": "Zernio profile ready.",
     "profileFailed": "Could not create profile.",
     "connectUrlFailed": "Could not get connect URL.",
-    "insufficientCredits": "Not enough credits to connect this channel.",
+    "unlockFailed": "Could not unlock this channel. Please try again.",
+    "insufficientCredits": "Not enough credits to unlock this channel.",
     "disconnected": "Channel disconnected.",
     "disconnectFailed": "Could not disconnect account."
   },
   "channels": {
     "sectionTitle": "Publishing channels",
-    "sectionDesc": "Facebook, X (Twitter), Instagram, YouTube, LinkedIn, and TikTok. Connect only the networks you use; they are shared with Upload and scheduling.",
+    "sectionDesc": "Facebook, X (Twitter), Instagram, YouTube, LinkedIn, and TikTok. Unlock only the networks you use; they are shared with Upload and scheduling.",
     "connected": "Connected",
     "notConnected": "Not connected",
     "accountId": "Account ID",
     "disconnect": "Disconnect",
-    "connect": "Connect",
-    "connectWithCredits": "Connect · {{count}}",
-    "connectCost": "Costs {{count}} credits per new connection",
-    "connectAria": "Connect {{channel}}",
-    "connectAriaWithCost": "Connect {{channel}}, costs {{count}} credits",
+    "unlock": "Unlock",
+    "unlockWithCredits": "Unlock · {{count}}",
+    "unlockCost": "Costs {{count}} credits to unlock",
+    "unlockAria": "Unlock {{channel}}",
+    "unlockAriaWithCost": "Unlock {{channel}}, costs {{count}} credits",
     "facebook": {
       "label": "Facebook",
       "description": "Pages and profiles for Meta publishing."
@@ -73,20 +74,25 @@
       "description": "Vertical video and TikTok-native formats."
     }
   },
-  "connectConfirm": {
-    "title": "Connect {{channel}}",
-    "description": "Connecting a new publishing channel uses credits from your balance. You will be redirected to authorize the network.",
-    "loading": "Loading credit estimate…",
-    "estimatedCost": "Connection cost",
+  "unlockConfirm": {
+    "title": "Unlock {{channel}}",
+    "description": "Unlocking lets you authorize this network for publishing. Credits are deducted when you confirm below, then you will be redirected to sign in.",
+    "loading": "Loading unlock cost…",
+    "estimatedCost": "Unlock cost",
     "currentBalance": "Your balance",
     "credits": "credits",
-    "balanceAfter": "Balance after",
-    "noCharge": "No credits are charged for this connection.",
+    "balanceAfter": "Balance after unlock",
+    "balanceAfterAria": "Balance after unlock: {{count}} credits",
+    "costSummaryAria": "Unlock cost and current balance",
+    "noCharge": "No credits are charged to unlock this channel.",
+    "chargeNotice": "Credits are deducted immediately when you confirm. You can finish authorization on the network’s site afterward.",
     "insufficientTitle": "Not enough credits",
-    "insufficientDescription": "This connection requires {{required}} credits but you only have {{remaining}} remaining.",
+    "insufficientDescription": "Unlocking requires {{required}} credits but you only have {{remaining}} remaining.",
     "refill": "Add credits",
-    "cancel": "Cancel",
-    "confirm": "Continue to connect",
-    "connecting": "Connecting…"
+    "cancel": "Not now",
+    "confirm": "Yes, I'm sure",
+    "confirmAria": "Yes, unlock {{channel}}",
+    "confirmAriaWithCost": "Yes, unlock {{channel}} for {{count}} credits",
+    "unlocking": "Unlocking…"
   }
 }

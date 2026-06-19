@@ -8,7 +8,7 @@ jest.mock('jose', () => ({
 describe('ZernioController', () => {
   const mcpService = {
     ensureZernioProfile: jest.fn(),
-    getConnectUrl: jest.fn(),
+    unlockChannelForConnect: jest.fn(),
     handleOAuthCallback: jest.fn(),
     syncAccounts: jest.fn(),
     getConnectedAccounts: jest.fn(),
@@ -24,10 +24,12 @@ describe('ZernioController', () => {
     jest.clearAllMocks();
   });
 
-  it('returns connect url for platform', async () => {
-    mcpService.getConnectUrl.mockResolvedValue('https://zernio/connect');
+  it('returns connect url after unlock charge', async () => {
+    mcpService.unlockChannelForConnect.mockResolvedValue({
+      connectUrl: 'https://zernio/connect',
+    });
     const req = { auth: { localUser: { userId: 'u1' } } };
-    const res = await controller.connectAccount(req as never, 'instagram');
+    const res = await controller.unlockChannel(req as never, 'instagram');
     expect(res).toEqual({ connectUrl: 'https://zernio/connect' });
   });
 
