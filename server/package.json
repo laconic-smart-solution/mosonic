@@ -23,6 +23,7 @@
     "migrate:keyword-planner": "ts-node -r tsconfig-paths/register scripts/backfill-keyword-planner.ts",
     "migrate:posts": "ts-node -r tsconfig-paths/register scripts/migrate-upload-zernio-to-posts.ts",
     "migrate:bootstrap-db": "ts-node -r tsconfig-paths/register scripts/bootstrap-db.ts",
+    "openai:billing": "ts-node -r tsconfig-paths/register scripts/check-openai-billing.ts",
     "migrate:mongo-to-postgres:phase1": "ts-node -r tsconfig-paths/register scripts/migrate-mongo-to-postgres/phase1-users-plans.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

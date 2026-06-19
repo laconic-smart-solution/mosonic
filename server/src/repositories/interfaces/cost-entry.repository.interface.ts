@@ -21,6 +21,11 @@ export interface ICostEntryRepository {
   sumForPipeline(pipelineRef: string): Promise<number>;
   sumMonthlyForUser(userId: string, billingPeriod: Date): Promise<number>;
   findInCreatedAtRange(from: Date, to: Date): Promise<CostEntryRecord[]>;
+  findInCreatedAtRangeByProvider(
+    provider: string,
+    from: Date,
+    to: Date,
+  ): Promise<CostEntryRecord[]>;
   sumForBillingPeriod(billingPeriod: Date): Promise<number>;
   sumForUsersInBillingPeriod(
     userIds: string[],

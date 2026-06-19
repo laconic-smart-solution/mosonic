@@ -191,7 +191,13 @@ export function WorkflowRunConfirmDialog({
         </DialogContent>
       </Dialog>
 
-      <TopupDialog open={topupOpen} onOpenChange={setTopupOpen} />
+      <TopupDialog
+        open={topupOpen}
+        onOpenChange={setTopupOpen}
+        onToppedUp={() => {
+          void estimateQuery.refetch()
+        }}
+      />
     </>
   )
 }

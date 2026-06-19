@@ -131,4 +131,20 @@ export const adminApi = {
     userId: string,
     params?: { from?: string; to?: string; page?: number; limit?: number },
   ) => apiClient.get(`/admin/usage/user/${userId}`, { params }).then((r) => r.data),
+
+  getOpenAiBilling: (days = 30) =>
+    apiClient.get("/admin/openai/billing", { params: { days } }).then((r) => r.data),
+
+  updateOpenAiPrepaid: (prepaidCreditUsd: number) =>
+    apiClient
+      .put("/admin/openai/billing/prepaid", { prepaidCreditUsd })
+      .then((r) => r.data),
+
+  getApiUsage: (days = 180) =>
+    apiClient.get("/admin/api-usage", { params: { days } }).then((r) => r.data),
+
+  updateApiUsagePrepaid: (provider: string, prepaidCreditUsd: number) =>
+    apiClient
+      .put(`/admin/api-usage/${provider}/prepaid`, { prepaidCreditUsd })
+      .then((r) => r.data),
 }
