@@ -99,6 +99,11 @@
     "linkCopied": "คัดลอกลิงก์แล้ว",
     "copyFailed": "คัดลอกไม่สำเร็จ"
   },
+  "creditUsage": {
+    "amount": "ใช้ไป {{count}} เครดิต",
+    "creditsShort": "เครดิต",
+    "totalLabel": "เครดิตรวมที่ใช้สำหรับเนื้อหานี้"
+  },
   "redirect": {
     "openFailed": "เปิดอัปโหลดสำหรับเนื้อหานี้ไม่ได้",
     "opening": "กำลังเปิดอัปโหลด…"

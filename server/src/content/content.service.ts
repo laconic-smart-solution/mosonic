@@ -11,6 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
 import type { TenancyAuth } from '../auth/tenancy.types';
+import { ContentCreditUsageService } from '../credit/content-credit-usage.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { CreditService } from '../credit/credit.service';
@@ -80,6 +81,10 @@ export type ContentDetailResponse = {
     relevanceScore: number;
     suggestedAngle: string;
   } | null;
+  creditUsage?: {
+    totalCredits: number;
+    byNodeId: Record<string, number>;
+  };
 };
 
 @Injectable()
@@ -96,6 +101,7 @@ export class ContentService {
     private readonly creditService: CreditService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly creditCalculation: CreditCalculationService,
+    private readonly contentCreditUsage: ContentCreditUsageService,
     @InjectModel(Pipeline.name)
     private readonly pipelineModel: Model<PipelineDocument>,
     @InjectModel(WorkflowNode.name)
@@ -115,13 +121,22 @@ export class ContentService {
   }> {
     const result = await this.contentRepository.findPage(query, auth);
     const refs = result.data.map((row) => row.contentId);
-    const uploadMap =
-      await this.uploadService.mapLatestUploadIdByContentRef(refs, auth);
+    const [uploadMap, creditTotals] = await Promise.all([
+      this.uploadService.mapLatestUploadIdByContentRef(refs, auth),
+      this.contentCreditUsage.getTotalsForContents(
+        auth.userId,
+        result.data.map((row) => ({
+          contentId: row.contentId,
+          pipelineRef: row.pipelineRef,
+        })),
+      ),
+    ]);
     return {
       total: result.total,
       data: result.data.map((row) => ({
         ...row,
         uploadId: uploadMap.get(row.contentId),
+        creditsUsed: creditTotals.get(row.contentId) ?? 0,
       })),
     };
   }
@@ -149,7 +164,13 @@ export class ContentService {
     const pipeline = await this.pipelineModel
       .findOne(
         mergeUserIdFilter({ pipelineId: doc.pipelineRef }, auth),
-        { metadata: 1, 'nodes.nodeId': 1, 'nodes.type': 1, 'nodes.order': 1 },
+        {
+          metadata: 1,
+          'nodes.nodeId': 1,
+          'nodes.type': 1,
+          'nodes.order': 1,
+          'nodes.status': 1,
+        },
       )
       .lean()
       .exec();
@@ -175,6 +196,18 @@ export class ContentService {
           }
         : null;
 
+    const pipelineNodesForCredits = (pipeline?.nodes ?? []).map((n) => ({
+      nodeId: n.nodeId,
+      type: String(n.type),
+      status: n.status ? String(n.status) : undefined,
+    }));
+    const creditUsage = await this.contentCreditUsage.getUsageForContent(
+      auth.userId,
+      doc.contentId,
+      doc.pipelineRef,
+      pipelineNodesForCredits,
+    );
+
     return {
       contentId: doc.contentId,
       pipelineRef: doc.pipelineRef,
@@ -188,6 +221,7 @@ export class ContentService {
       variantId: doc.variantId ?? null,
       experimentId: doc.experimentId ?? null,
       newsMeta,
+      creditUsage,
       createdAt: this.versionDateToIso(createdAtRaw ?? new Date()),
       updatedAt: this.versionDateToIso(updatedAtRaw ?? new Date()),
     };

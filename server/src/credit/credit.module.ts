@@ -12,6 +12,7 @@ import { CreditCalculationService } from './credit-calculation.service';
 import { CreditConfigController } from './credit-config.controller';
 import { CreditConfigService } from './credit-config.service';
 import { CreditTopupController } from './credit-topup.controller';
+import { ContentCreditUsageService } from './content-credit-usage.service';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
@@ -85,6 +86,7 @@ const DEFAULT_SERVICE_RATES = [
     CreditBillingService,
     CreditCalculationService,
     CreditService,
+    ContentCreditUsageService,
     FixedCostService,
     ServiceRateService,
     NodeCreditPriceService,
@@ -94,6 +96,7 @@ const DEFAULT_SERVICE_RATES = [
     CreditBillingService,
     CreditCalculationService,
     CreditService,
+    ContentCreditUsageService,
     FixedCostService,
     ServiceRateService,
     NodeCreditPriceService,

@@ -99,6 +99,11 @@
     "linkCopied": "链接已复制",
     "copyFailed": "复制失败"
   },
+  "creditUsage": {
+    "amount": "已使用 {{count}} 积分",
+    "creditsShort": "积分",
+    "totalLabel": "此内容共使用的积分"
+  },
   "redirect": {
     "openFailed": "无法为此内容打开上传页面。",
     "opening": "正在打开上传…"

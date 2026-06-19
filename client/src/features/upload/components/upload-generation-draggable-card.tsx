@@ -2,6 +2,7 @@ import { useDraggable } from "@dnd-kit/core"
 import { GripVertical, Loader2, RefreshCw } from "lucide-react"
 import { useMemo, useState } from "react"
 
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { Button } from "@/components/ui/button"
 import {
   mergeNodeOutputLayers,
@@ -53,6 +54,7 @@ type Props = {
     file: File
   ) => void
   onCopyOutput: (text: string) => void
+  creditsUsed?: number
 }
 
 export function UploadGenerationDraggableCard(props: Props) {
@@ -74,6 +76,7 @@ export function UploadGenerationDraggableCard(props: Props) {
     setLightboxUrl,
     uploadMediaForNode,
     onCopyOutput,
+    creditsUsed = 0,
   } = props
 
   const nodeId = wfNode.nodeId
@@ -124,9 +127,9 @@ export function UploadGenerationDraggableCard(props: Props) {
     run.phase === "streaming" ||
     run.phase === "processing" ||
     run.phase === "retrying"
-      ? "ring-2 ring-[#00C9A7]/35"
+      ? "ring-2 ring-primary/35"
       : run.phase === "error"
-        ? "ring-2 ring-red-400/70"
+        ? "ring-2 ring-destructive/50"
         : ""
 
   const hasBodyOutput =
@@ -203,7 +206,10 @@ export function UploadGenerationDraggableCard(props: Props) {
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-foreground">{title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold text-foreground">{title}</p>
+            <CreditUsageBadge credits={creditsUsed} />
+          </div>
           <p className="text-[10px] text-muted-foreground">
             Step {wfNode.order}
           </p>
