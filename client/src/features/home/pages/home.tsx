@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
@@ -9,6 +9,8 @@ import { HomeFooter } from "@/features/home/components/home-footer"
 import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
 import type { Attachment } from "@/components/core/prompt-area"
 import { buildStrategyInput } from "@/lib/strategy-input"
+import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
+import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
 import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
 import { HomeStage } from "@/features/home/components/home-stage"
 import { HomeNavbar } from "@/features/home/components/home-navbar"
@@ -27,6 +29,7 @@ import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
 import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
 import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { useContentPageQuery } from "@/shared/queries/content.query"
+import { useGenerationCreditCostsQuery } from "@/shared/queries/credit.query"
 import { useRuleByIdQuery, useRulesPageQuery } from "@/shared/queries/rule.query"
 import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
@@ -38,6 +41,8 @@ import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
 
 export default function HomePage() {
   const { t } = useTranslation("home")
+  const { t: tCredit } = useTranslation("credit")
+  const { t: tWorkflow } = useTranslation("workflow")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const homeTemplates = useMemo(
@@ -53,6 +58,7 @@ export default function HomePage() {
   const authHydrated = useAuthStoreHydrated()
   const accessToken = useAuthStore((s) => s.accessToken)
   const isAuthenticated = authHydrated && Boolean(accessToken)
+  const generationCostsQuery = useGenerationCreditCostsQuery(isAuthenticated)
   const [prompt, setPrompt] = useState("")
   const [focused, setFocused] = useState(false)
   const [hovLeft, setHovLeft] = useState<number | null>(null)
@@ -66,6 +72,13 @@ export default function HomePage() {
   const [pendingRuleId, setPendingRuleId] = useState<string | null>(null)
   const [qaWizardOpen, setQaWizardOpen] = useState(false)
   const [qaInitialMessage, setQaInitialMessage] = useState("")
+  const [ruleGenConfirmOpen, setRuleGenConfirmOpen] = useState(false)
+  const [workflowGenConfirmOpen, setWorkflowGenConfirmOpen] = useState(false)
+  const pendingRuleExtractRef = useRef<{
+    text: string
+    attachments: Attachment[]
+  } | null>(null)
+  const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
 
   const rulesPageQuery = useRulesPageQuery(
     {
@@ -235,14 +248,25 @@ export default function HomePage() {
       return
     }
 
+    pendingRuleExtractRef.current = { text, attachments }
+    setRuleGenConfirmOpen(true)
+  }
+
+  function executeRuleGeneration(text: string, attachments: Attachment[]) {
     setOrbPulse(true)
     void runExtract(text, attachments)
   }
 
   function handleQaSubmit(answers: WorkflowQAAnswers) {
     if (!workflowRuleId) return
-    setOrbPulse(true)
+    pendingWorkflowAnswersRef.current = answers
     setQaWizardOpen(false)
+    setWorkflowGenConfirmOpen(true)
+  }
+
+  function executeWorkflowGeneration(answers: WorkflowQAAnswers) {
+    if (!workflowRuleId) return
+    setOrbPulse(true)
 
     generateWorkflow.mutate(
       { ruleId: workflowRuleId, answers },
@@ -264,6 +288,15 @@ export default function HomePage() {
         },
         onSettled: () => {
           setOrbPulse(false)
+        },
+        onError: (err) => {
+          const status = (err as { response?: { status?: number } })?.response
+            ?.status
+          if (status === 402) {
+            toast.error(tCredit("runConfirm.insufficientTitle"))
+          } else {
+            toast.error(tWorkflow("errors.generateWorkflowFailed"))
+          }
         },
       },
     )
@@ -341,6 +374,12 @@ export default function HomePage() {
             disabled={promptBusy}
             submitDisabled={promptBusy}
           />
+          {isAuthenticated && !selectedRuleId ? (
+            <GenerationCreditHint
+              credits={generationCostsQuery.data?.ruleGeneration}
+              className="mt-2"
+            />
+          ) : null}
           <HomeHelperLinks
             rules={ruleOptions}
             showRuleSelector={isAuthenticated}
@@ -362,21 +401,57 @@ export default function HomePage() {
       <HomeFooter />
 
       {isAuthenticated ? (
-        <WorkflowQaWizard
-        key={workflowRuleId ?? "none"}
-        open={qaWizardOpen}
-        onOpenChange={(open) => {
-          setQaWizardOpen(open)
-          if (!open) {
-            setPendingRuleId(null)
-            setOrbPulse(false)
-          }
-        }}
-        ruleChannelIds={activeRuleChannelIds}
-        initialMessage={qaInitialMessage}
-        isSubmitting={generateWorkflow.isPending}
-        onSubmit={handleQaSubmit}
-        />
+        <>
+          <WorkflowQaWizard
+            key={workflowRuleId ?? "none"}
+            open={qaWizardOpen}
+            onOpenChange={(open) => {
+              setQaWizardOpen(open)
+              if (!open) {
+                setPendingRuleId(null)
+                setOrbPulse(false)
+              }
+            }}
+            ruleChannelIds={activeRuleChannelIds}
+            initialMessage={qaInitialMessage}
+            isSubmitting={generateWorkflow.isPending}
+            onSubmit={handleQaSubmit}
+          />
+
+          <GenerationCreditConfirmDialog
+            open={ruleGenConfirmOpen}
+            onOpenChange={(open) => {
+              setRuleGenConfirmOpen(open)
+              if (!open) pendingRuleExtractRef.current = null
+            }}
+            kind="rule"
+            isSubmitting={isExtracting}
+            onConfirm={() => {
+              const pending = pendingRuleExtractRef.current
+              if (!pending) return
+              setRuleGenConfirmOpen(false)
+              pendingRuleExtractRef.current = null
+              executeRuleGeneration(pending.text, pending.attachments)
+            }}
+          />
+
+          <GenerationCreditConfirmDialog
+            open={workflowGenConfirmOpen}
+            onOpenChange={(open) => {
+              setWorkflowGenConfirmOpen(open)
+              if (!open) pendingWorkflowAnswersRef.current = null
+            }}
+            kind="workflow"
+            isSubmitting={generateWorkflow.isPending}
+            onConfirm={() => {
+              const answers = pendingWorkflowAnswersRef.current
+              if (!answers) return
+              setWorkflowGenConfirmOpen(false)
+              pendingWorkflowAnswersRef.current = null
+              executeWorkflowGeneration(answers)
+            }}
+          />
+        </>
       ) : null}
     </div>
   )

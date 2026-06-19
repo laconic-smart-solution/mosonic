@@ -35,7 +35,9 @@
     "summarization": "摘要",
     "adapt": "适配",
     "intelligence": "情报",
-    "social_account_connect": "社交账户解锁"
+    "social_account_connect": "社交账户解锁",
+    "rule_generation": "规则生成",
+    "workflow_generation": "工作流生成"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"
@@ -391,7 +393,9 @@
     "modeTabCurrent": "当前",
     "modeTabAuto": "自动",
     "generateWorkflowPlaceholder": "例如：Instagram + Facebook 文案、泰语翻译、主图…",
-    "autoWorkflowHint": "AI 将根据您的帖子和活动规则构建工作流，然后生成内容。"
+    "autoWorkflowHint": "AI 将根据您的帖子和活动规则构建工作流，然后生成内容。",
+    "hidePrompt": "隐藏提示词区域",
+    "showPrompt": "显示提示词区域"
   },
   "nodesLabel_one": "节点",
   "nodesLabel_other": "节点",

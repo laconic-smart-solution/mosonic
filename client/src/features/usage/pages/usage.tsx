@@ -93,7 +93,10 @@ export default function UsagePage() {
   const creditsPerDollar = Math.round(1 / creditPriceUsd)
   const creditsPerMonth = data?.creditsPerMonth ?? 0
   const creditsUsed = data?.creditsUsed ?? 0
-  const percentUsed = data?.percentUsed ?? 0
+  const percentUsed =
+    creditsPerMonth > 0
+      ? Math.min(100, Math.round((creditsUsed / creditsPerMonth) * 100))
+      : 0
 
   const byTypeChart = (data?.byNodeType ?? []).map((row) => ({
     name: formatOperation(row.nodeType),

@@ -35,7 +35,9 @@
     "summarization": "Summarization",
     "adapt": "Adapt",
     "intelligence": "Intelligence",
-    "social_account_connect": "Social account unlock"
+    "social_account_connect": "Social account unlock",
+    "rule_generation": "Rule generation",
+    "workflow_generation": "Workflow generation"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} For {{channel}}"
@@ -396,7 +398,9 @@
     "modeTabCurrent": "Current",
     "modeTabAuto": "Auto",
     "generateWorkflowPlaceholder": "e.g. Instagram + Facebook captions, Thai translation, hero image…",
-    "autoWorkflowHint": "AI builds a workflow from your post and campaign rule, then generates content."
+    "autoWorkflowHint": "AI builds a workflow from your post and campaign rule, then generates content.",
+    "hidePrompt": "Hide prompt area",
+    "showPrompt": "Show prompt area"
   },
   "nodesLabel_one": "node",
   "nodesLabel_other": "nodes",

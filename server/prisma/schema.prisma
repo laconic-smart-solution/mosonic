@@ -734,4 +734,19 @@ model ApiProviderBillingSettings {
   updatedAt        DateTime @updatedAt
 
   @@map("api_provider_billing_settings")
+  
+}
+model HeygenUserAvatar {
+  id              String   @id @default(uuid())
+  userId          String
+  lookId          String   @unique
+  name            String
+  previewImageUrl String?
+  avatarType      String   @default("photo_avatar")
+  assetId         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("heygen_user_avatars")
 }

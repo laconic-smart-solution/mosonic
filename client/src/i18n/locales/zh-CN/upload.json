@@ -26,6 +26,11 @@
     "mediaCounter": "{{current}} / {{total}}",
     "tiktokVerticalHint": "TikTok 预览使用竖屏 9:16 视频。"
   },
+  "mediaDetail": {
+    "title": "媒体预览",
+    "description": "查看所选媒体的完整尺寸。",
+    "openHint": "查看大图"
+  },
   "scheduledEdit": {
     "title": "编辑定时帖子",
     "hint": "更改仅适用于此渠道。",

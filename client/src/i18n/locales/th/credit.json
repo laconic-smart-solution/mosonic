@@ -44,6 +44,20 @@
     "summarization": "การสรุป",
     "image_generation": "สร้างรูปภาพ",
     "video_generation": "สร้างวิดีโอ",
-    "social_account_connect": "ปลดล็อกบัญชีโซเชียล"
+    "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
+    "rule_generation": "สร้างกฎ",
+    "workflow_generation": "สร้างเวิร์กโฟลว์"
+  },
+  "generationCost": "{{count}} เครดิต",
+  "generationConfirm": {
+    "ruleTitle": "สร้างกฎหรือไม่?",
+    "workflowTitle": "สร้างเวิร์กโฟลว์หรือไม่?",
+    "ruleDescription": "ตรวจสอบค่าใช้จ่ายเครดิตก่อนสร้างกฎแคมเปญจากข้อมูลนี้",
+    "workflowDescription": "ตรวจสอบค่าใช้จ่ายเครดิตก่อนสร้างเวิร์กโฟลว์อัตโนมัติ",
+    "confirmRule": "สร้างกฎ",
+    "confirmWorkflow": "สร้างเวิร์กโฟลว์",
+    "starting": "กำลังเริ่ม…",
+    "loading": "กำลังคำนวณค่าใช้จ่าย…",
+    "noCharge": "การดำเนินการนี้ไม่มีค่าใช้จ่ายตามราคาปัจจุบัน"
   }
 }

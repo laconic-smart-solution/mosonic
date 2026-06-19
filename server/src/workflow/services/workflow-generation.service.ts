@@ -20,7 +20,6 @@ export class WorkflowGenerationService {
   async generate(
     rule: Rule,
     answers: WorkflowQAAnswersDto,
-    billing?: { userId: string; workflowId: string },
   ): Promise<GeneratedWorkflowNode[]> {
     const ruleChannelIds = resolveRuleChannelIds(rule.channels);
     const logical = buildWorkflowNodes(answers, ruleChannelIds);
@@ -28,7 +27,6 @@ export class WorkflowGenerationService {
       logical,
       rule,
       answers.additionalMessage ?? '',
-      billing,
     );
     const graph = toPersistableGraph(configured, ruleChannelIds);
 

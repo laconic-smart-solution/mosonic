@@ -20,6 +20,7 @@ import Logo from "@/assets/icon/logo"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/shared/stores/auth.store"
+import { BrandLogo } from "@/assets/icon/brand-logo"
 
 type NavItem = {
   id: string
@@ -299,8 +300,8 @@ export function SidebarPanel() {
             "group-data-[collapsible=icon]:justify-center"
           )}
         >
-          <div className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#00A589] to-[#254C94] shadow-[0_0_12px_#00A58950]">
-            <Logo width={18} height={18} className="rounded-sm" aria-hidden />
+          <div className="bg-primary-foreground/90 rounded-sm px-1">
+            <BrandLogo size="nav" className="size-[30px] shrink-0" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-white">

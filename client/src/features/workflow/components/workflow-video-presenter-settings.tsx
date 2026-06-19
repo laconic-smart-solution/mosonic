@@ -104,7 +104,7 @@ export function WorkflowVideoPresenterSettings({
 
   const canSyncToServer =
     persistToServer && Boolean(workflowId?.trim()) && Boolean(nodeId?.trim())
-  const canUploadAssets = persistToServer ? canSyncToServer : true
+  const canUploadAssets = true
   const selectedAvatarId = String(config.heygenAvatarId ?? "")
   const motionPrompt = String(config.heygenMotionPrompt ?? "")
 
@@ -276,12 +276,6 @@ export function WorkflowVideoPresenterSettings({
 
   return (
     <div className="flex flex-col gap-3">
-      {persistToServer && !canSyncToServer ? (
-        <p className="text-[11px] text-amber-700">
-          {t("presenter.saveWorkflowToSync")}
-        </p>
-      ) : null}
-
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <p className={labelClass} style={{ color: T.textPrimary, marginBottom: 0 }}>

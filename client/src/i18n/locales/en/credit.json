@@ -44,6 +44,20 @@
     "summarization": "Summarization",
     "image_generation": "Image generation",
     "video_generation": "Video generation",
-    "social_account_connect": "Social account unlock"
+    "social_account_connect": "Social account unlock",
+    "rule_generation": "Rule generation",
+    "workflow_generation": "Workflow generation"
+  },
+  "generationCost": "{{count}} credits",
+  "generationConfirm": {
+    "ruleTitle": "Generate rule?",
+    "workflowTitle": "Generate workflow?",
+    "ruleDescription": "Review the credit cost before generating your campaign rule from this input.",
+    "workflowDescription": "Review the credit cost before auto-building your workflow.",
+    "confirmRule": "Generate rule",
+    "confirmWorkflow": "Generate workflow",
+    "starting": "Starting…",
+    "loading": "Calculating cost…",
+    "noCharge": "This action is free with your current pricing."
   }
 }

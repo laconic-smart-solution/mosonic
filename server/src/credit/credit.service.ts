@@ -29,7 +29,11 @@ import {
 } from './lib/credit-packages';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
-import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from './lib/billable-node-credit-types';
+import {
+  RULE_GENERATION_NODE_TYPE,
+  SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+  WORKFLOW_GENERATION_NODE_TYPE,
+} from './lib/billable-node-credit-types';
 import type { PaymentStatusDto } from './dto/payment-status.dto';
 
 export type InitiateTopupResult = {
@@ -414,6 +418,22 @@ export class CreditService {
       });
     }
     return { creditsEach, creditsRemaining };
+  }
+
+  async getGenerationCreditCosts(): Promise<{
+    ruleGeneration: number;
+    workflowGeneration: number;
+  }> {
+    const [ruleGeneration, workflowGeneration] = await Promise.all([
+      this.nodeCreditPriceService.getActiveCostCredit(RULE_GENERATION_NODE_TYPE),
+      this.nodeCreditPriceService.getActiveCostCredit(
+        WORKFLOW_GENERATION_NODE_TYPE,
+      ),
+    ]);
+    return {
+      ruleGeneration: ruleGeneration ?? 0,
+      workflowGeneration: workflowGeneration ?? 0,
+    };
   }
 
   /** Charge credits when a user unlocks a new publishing channel (before OAuth). */

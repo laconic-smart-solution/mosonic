@@ -61,14 +61,19 @@ export class WorkflowHeygenController {
   }
 
   @Get('heygen/avatars')
-  async listAvatars(@Res({ passthrough: true }) res: Response) {
+  async listAvatars(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     res.setHeader('Cache-Control', 'no-store');
-    return this.heygenWorkflow.listAvatarLooks();
+    return this.heygenWorkflow.listAvatarLooksForUser(auth.userId);
   }
 
   @Delete('heygen/avatars/:lookId')
-  deleteAvatar(@Param('lookId') lookId: string) {
-    return this.heygenWorkflow.deleteAvatarLook(lookId);
+  deleteAvatar(@Req() req: Request, @Param('lookId') lookId: string) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.heygenWorkflow.deleteAvatarLookForUser(auth.userId, lookId);
   }
 
   @Post('heygen/upload-avatar')
@@ -78,8 +83,12 @@ export class WorkflowHeygenController {
       limits: { fileSize: 32 * 1024 * 1024 },
     }),
   )
-  uploadAvatarDraft(@UploadedFile() file: Express.Multer.File | undefined) {
-    return this.heygenWorkflow.uploadAvatarDraft(file);
+  uploadAvatarDraft(
+    @Req() req: Request,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.heygenWorkflow.uploadAvatarDraft(file, auth);
   }
 
   @Post('heygen/upload-background')

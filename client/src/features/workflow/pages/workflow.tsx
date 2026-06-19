@@ -6,7 +6,14 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom"
-import { FileStack, Home, Library, Sparkles } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  FileStack,
+  Home,
+  Library,
+  Sparkles,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import i18n from "@/i18n"
@@ -14,6 +21,8 @@ import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers
 
 import { Button } from "@/components/ui/button"
 import { PromptArea, type Attachment } from "@/components/core/prompt-area"
+import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
+import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
 import {
   WorkflowFlowCanvas,
   type WorkflowFlowCanvasHandle,
@@ -44,6 +53,7 @@ import {
   getVideoPresenterErrorsFromRfNodes,
 } from "@/features/workflow/lib/workflow-node-validation"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
+import { useGenerationCreditCostsQuery } from "@/shared/queries/credit.query"
 import { useRuleByIdQuery } from "@/shared/queries/rule.query"
 import { useContentPageQuery } from "@/shared/queries/content.query"
 import {
@@ -124,6 +134,7 @@ function normalizeBranchNodesForSave(nodes: WfRfNode[]): WfRfNode[] {
 
 export default function WorkflowPage() {
   const { t } = useTranslation("workflow")
+  const generationCostsQuery = useGenerationCreditCostsQuery()
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -174,6 +185,7 @@ export default function WorkflowPage() {
   const [pipelineItems, setPipelineItems] = useState<PipelinePageItem[]>([])
   const [pipelineTotalPages, setPipelineTotalPages] = useState(0)
   const [pipelineListCollapsed, setPipelineListCollapsed] = useState(true)
+  const [promptBarCollapsed, setPromptBarCollapsed] = useState(false)
   const [selectedSnapshotPipelineId, setSelectedSnapshotPipelineId] =
     useState<string>()
   const pipelinePromptHydratedRef = useRef(false)
@@ -202,6 +214,8 @@ export default function WorkflowPage() {
   const [qaWizardOpen, setQaWizardOpen] = useState(false)
   const [qaInitialMessage, setQaInitialMessage] = useState("")
   const [runConfirmOpen, setRunConfirmOpen] = useState(false)
+  const [workflowGenConfirmOpen, setWorkflowGenConfirmOpen] = useState(false)
+  const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
   const [pendingRunPrompt, setPendingRunPrompt] = useState<string | null>(null)
   /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
   const workflowEventTargetRef = useRef<string | undefined>(undefined)
@@ -1037,7 +1051,13 @@ export default function WorkflowPage() {
     setQaWizardOpen(true)
   }
 
-  function submitWorkflowGeneration(answers: WorkflowQAAnswers) {
+  function requestWorkflowGeneration(answers: WorkflowQAAnswers) {
+    pendingWorkflowAnswersRef.current = answers
+    setQaWizardOpen(false)
+    setWorkflowGenConfirmOpen(true)
+  }
+
+  function executeWorkflowGeneration(answers: WorkflowQAAnswers) {
     if (!ruleId) return
     lastQaAnswersRef.current = answers
     const additionalMessage = answers.additionalMessage.trim()
@@ -1068,12 +1088,27 @@ export default function WorkflowPage() {
       void workflowByRuleQuery.refetch()
     }
 
+    const onError = (err: unknown) => {
+      generationInFlightRef.current = false
+      setGenerationStep(null)
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 402) {
+        toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+        return
+      }
+      toast.error(t("errors.generateWorkflowFailed"))
+    }
+
     if (activeWorkflowId) {
-      regenerateWorkflowByRule.mutate({ answers, ruleId }, { onSuccess })
+      regenerateWorkflowByRule.mutate({ answers, ruleId }, { onSuccess, onError })
       return
     }
 
-    generateWorkflow.mutate({ ruleId, answers }, { onSuccess })
+    generateWorkflow.mutate({ ruleId, answers }, { onSuccess, onError })
+  }
+
+  function submitWorkflowGeneration(answers: WorkflowQAAnswers) {
+    requestWorkflowGeneration(answers)
   }
 
   function handlePrimaryAction(text: string, _attachments: Attachment[]) {
@@ -1365,6 +1400,9 @@ export default function WorkflowPage() {
         readOnly={processingMode === "processing"}
         generationDisabled={generationUiLocked}
         generateWorkflowDisabled={generateWorkflowDisabled}
+        workflowGenerationCredits={
+          generationCostsQuery.data?.workflowGeneration
+        }
         showCancel={processingMode === "processing"}
         onCancel={handleRequestStopPipeline}
       />
@@ -1504,47 +1542,80 @@ export default function WorkflowPage() {
         {processingMode === "edit" &&
         (canvasMode === "empty" || canvasMode === "ready") ? (
           <div className="absolute bottom-0 left-1/2 z-40 w-full max-w-[760px] -translate-x-1/2 px-4 pb-4">
-            <div className="w-full space-y-2 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
-              {canvasMode === "empty" ? (
-                <div className="flex flex-col items-center gap-3 py-3">
-                  <p className="text-center text-sm text-muted-foreground">
-                    {t("promptBar.emptyWorkflowHint")}
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={() => handleOpenQaWizard("", false)}
-                    disabled={generateWorkflowDisabled}
-                    className="gap-2"
-                  >
-                    <Sparkles className="size-4" aria-hidden />
-                    {t("toolbar.generateWorkflow")}
-                  </Button>
-                </div>
+            <div className="relative w-full space-y-2 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
+              {promptBarCollapsed ? (
+                <button
+                  type="button"
+                  onClick={() => setPromptBarCollapsed(false)}
+                  className="flex w-full min-w-0 items-center gap-2 py-0.5 text-left"
+                  aria-expanded={false}
+                  aria-label={t("promptBar.showPrompt")}
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                    {canvasMode === "ready" && workflowPrompt.trim()
+                      ? workflowPrompt.trim()
+                      : t("promptBar.postTopic")}
+                  </span>
+                  <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
+                </button>
               ) : (
                 <>
-                  <PromptArea
-                    value={workflowPrompt}
-                    onChange={setWorkflowPrompt}
-                    onSubmit={handlePrimaryAction}
-                    disabled={promptInputDisabled}
-                    submitDisabled={generationUiLocked}
-                    placeholder={t("promptBar.postPlaceholder")}
-                    className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-                  />
-                  {generationBlockedByDrafts ? (
-                    <p className="px-1 pt-0.5 text-[11px] text-amber-700">
-                      {selectedSnapshotPipelineId
-                        ? t("promptBar.exitPreviewHint")
-                        : t("promptBar.saveBeforeGenerateHint")}
-                    </p>
-                  ) : null}
-                  <p className="px-1 pt-0.5 text-[11px] text-canvas-500">
-                    {t("promptBar.usingWorkflow", {
-                      name: wfName,
-                      count: apiNodes?.length ?? 0,
-                      nodesLabel: t("nodesLabel", { count: apiNodes?.length ?? 0 }),
-                    })}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPromptBarCollapsed(true)}
+                    className="absolute top-2 right-2 z-10 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-expanded
+                    aria-label={t("promptBar.hidePrompt")}
+                  >
+                    <ChevronDown className="size-4" />
+                  </button>
+                  {canvasMode === "empty" ? (
+                    <div className="flex flex-col items-center gap-3 py-3">
+                      <p className="text-center text-sm text-muted-foreground">
+                        {t("promptBar.emptyWorkflowHint")}
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => handleOpenQaWizard("", false)}
+                        disabled={generateWorkflowDisabled}
+                        className="gap-2"
+                      >
+                        <Sparkles className="size-4" aria-hidden />
+                        {t("toolbar.generateWorkflow")}
+                      </Button>
+                      <GenerationCreditHint
+                        credits={generationCostsQuery.data?.workflowGeneration}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <PromptArea
+                        value={workflowPrompt}
+                        onChange={setWorkflowPrompt}
+                        onSubmit={handlePrimaryAction}
+                        disabled={promptInputDisabled}
+                        submitDisabled={generationUiLocked}
+                        placeholder={t("promptBar.postPlaceholder")}
+                        className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                      />
+                      {generationBlockedByDrafts ? (
+                        <p className="px-1 pt-0.5 text-[11px] text-amber-700">
+                          {selectedSnapshotPipelineId
+                            ? t("promptBar.exitPreviewHint")
+                            : t("promptBar.saveBeforeGenerateHint")}
+                        </p>
+                      ) : null}
+                      <p className="px-1 pt-0.5 text-[11px] text-canvas-500">
+                        {t("promptBar.usingWorkflow", {
+                          name: wfName,
+                          count: apiNodes?.length ?? 0,
+                          nodesLabel: t("nodesLabel", {
+                            count: apiNodes?.length ?? 0,
+                          }),
+                        })}
+                      </p>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -1657,6 +1728,25 @@ export default function WorkflowPage() {
           if (pendingRunPrompt != null) {
             runStartPipelineMutation(pendingRunPrompt)
           }
+        }}
+      />
+
+      <GenerationCreditConfirmDialog
+        open={workflowGenConfirmOpen}
+        onOpenChange={(open) => {
+          setWorkflowGenConfirmOpen(open)
+          if (!open) pendingWorkflowAnswersRef.current = null
+        }}
+        kind="workflow"
+        isSubmitting={
+          generateWorkflow.isPending || regenerateWorkflowByRule.isPending
+        }
+        onConfirm={() => {
+          const answers = pendingWorkflowAnswersRef.current
+          if (!answers) return
+          setWorkflowGenConfirmOpen(false)
+          executeWorkflowGeneration(answers)
+          pendingWorkflowAnswersRef.current = null
         }}
       />
 

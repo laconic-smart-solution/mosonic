@@ -7,7 +7,7 @@
       "dashboard": "Dashboard",
       "users": "Users",
       "credit": "Credits",
-      "nodeCredits": "Node credits",
+      "nodeCredits": "Credit pricing",
       "plans": "Plans",
       "usage": "Usage",
       "cost": "Cost (USD)",
@@ -334,10 +334,10 @@
     "cancel": "Cancel"
   },
   "nodeCredits": {
-    "title": "Node credit pricing",
-    "subtitle": "Set reference cost (USD) per workflow node run. Credits are computed from",
+    "title": "Credit pricing",
+    "subtitle": "Set reference cost (USD) per billable operation. Credits are computed from",
     "creditSettingsLink": "Credit settings",
-    "creditHint": "Cost credit = ceil((cost USD + overhead) × margin ÷ credit price). Changing margin or credit price on the Credits page updates these values automatically. Social account unlock applies when a customer confirms unlock on Account settings (not workflow nodes).",
+    "creditHint": "Cost credit = ceil((cost USD + overhead) × margin ÷ credit price). Changing margin or credit price on the Credits page updates these values automatically. Rule generation and workflow generation apply when customers generate a rule or auto-build a workflow. Social account unlock applies when a customer confirms unlock on Account settings.",
     "colMetric": "Metric",
     "colCostUsd": "Cost (USD)",
     "colCostCredit": "Cost credit",
@@ -345,9 +345,9 @@
     "saved": "Saved",
     "saveFailed": "Could not save",
     "invalidUsd": "Enter a positive USD amount",
-    "loadFailed": "Could not load node credits. Ensure your account has admin access on the server.",
+    "loadFailed": "Could not load credit pricing. Ensure your account has admin access on the server.",
     "loading": "Loading…",
-    "empty": "No node types configured."
+    "empty": "No pricing metrics configured."
   },
   "plans": {
     "title": "Plan management",

@@ -7,7 +7,7 @@
       "dashboard": "仪表板",
       "users": "用户",
       "credit": "积分",
-      "nodeCredits": "节点积分",
+      "nodeCredits": "积分定价",
       "plans": "套餐",
       "usage": "用量",
       "cost": "费用 (USD)",
@@ -334,10 +334,10 @@
     "cancel": "取消"
   },
   "nodeCredits": {
-    "title": "节点积分定价",
-    "subtitle": "设置每种节点每次运行的参考成本（USD）。积分根据",
+    "title": "积分定价",
+    "subtitle": "设置每种可计费操作的参考成本（USD）。积分根据",
     "creditSettingsLink": "积分设置",
-    "creditHint": "消耗积分 = ceil((成本 USD + 间接费用) × 利润率 ÷ 积分单价)。在积分页修改设置会自动更新此列。社交账户解锁在账户设置中客户确认解锁时计费（非工作流节点）。",
+    "creditHint": "消耗积分 = ceil((成本 USD + 间接费用) × 利润率 ÷ 积分单价)。在积分页修改设置会自动更新此列。规则生成与工作流生成在客户生成规则或自动构建工作流时计费。社交账户解锁在账户设置中客户确认解锁时计费。",
     "colMetric": "指标",
     "colCostUsd": "成本 (USD)",
     "colCostCredit": "消耗积分",
@@ -345,9 +345,9 @@
     "saved": "已保存",
     "saveFailed": "保存失败",
     "invalidUsd": "请输入大于 0 的 USD 金额",
-    "loadFailed": "无法加载节点积分，请确认服务器端账户具有管理员权限。",
+    "loadFailed": "无法加载积分定价，请确认服务器端账户具有管理员权限。",
     "loading": "加载中…",
-    "empty": "暂无节点类型配置"
+    "empty": "暂无定价指标"
   },
   "plans": {
     "title": "套餐管理",

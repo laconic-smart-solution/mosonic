@@ -8,6 +8,7 @@ import { zernioQueryKeys } from "./zernio.query"
 
 export const creditQueryKeys = {
   packages: ["credit", "packages"] as const,
+  generationCosts: ["credit", "generation-costs"] as const,
 }
 
 export function useCreditPackagesQuery(enabled = true) {
@@ -20,6 +21,16 @@ export function useCreditPackagesQuery(enabled = true) {
   })
 }
 
+export function useGenerationCreditCostsQuery(enabled = true) {
+  const token = useAuthStore((s) => s.accessToken)
+  return useQuery({
+    queryKey: creditQueryKeys.generationCosts,
+    queryFn: () => creditService.getGenerationCosts(),
+    enabled: enabled && !!token,
+    staleTime: 60_000,
+  })
+}
+
 export function useCreditTopupMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -27,6 +38,7 @@ export function useCreditTopupMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
+      void queryClient.invalidateQueries({ queryKey: creditQueryKeys.generationCosts })
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
     },
   })
