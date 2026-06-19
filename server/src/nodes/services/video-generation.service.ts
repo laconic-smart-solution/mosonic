@@ -467,16 +467,7 @@ export class VideoGenerationService {
       config.heygenExpressiveness === 'high'
         ? config.heygenExpressiveness
         : 'medium';
-    const durationVal = config.duration;
-    const durationRaw =
-      typeof durationVal === 'number'
-        ? durationVal
-        : typeof durationVal === 'string' && durationVal.trim()
-          ? Number(durationVal)
-          : 20;
-    const durationSeconds = normalizePresenterDurationSeconds(
-      Number.isFinite(durationRaw) ? durationRaw : undefined,
-    );
+    const durationSeconds = normalizePresenterDurationSeconds(config.duration);
     return {
       avatarId,
       voiceId,

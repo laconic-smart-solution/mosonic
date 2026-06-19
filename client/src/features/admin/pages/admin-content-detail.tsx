@@ -1,9 +1,9 @@
-import { ArrowLeft } from "lucide-react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import type { ReactNode } from "react"
 
-import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import {
   Table,
   TableBody,
@@ -66,19 +66,23 @@ export default function AdminContentDetailPage() {
   const navigate = useNavigate()
   const { data, isLoading } = useAdminContentDetail(contentId)
 
+  useSetBreadcrumbLabel(
+    data?.ruleName?.trim() || data?.preview?.slice(0, 80) || undefined,
+  )
+
   if (isLoading) {
     return (
-      <div className="min-h-full bg-background px-7 py-8">
+      <PageShell>
         <p className="text-muted-foreground">{t("common:actions.loading")}</p>
-      </div>
+      </PageShell>
     )
   }
 
   if (!data) {
     return (
-      <div className="min-h-full bg-background px-7 py-8">
+      <PageShell>
         <p className="text-muted-foreground">{t("admin:contentDetail.notFound")}</p>
-      </div>
+      </PageShell>
     )
   }
 
@@ -90,18 +94,8 @@ export default function AdminContentDetailPage() {
   const contentPrompt = data.pipeline?.contentPrompt?.trim()
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-6">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="-ml-2 gap-1.5"
-          onClick={() => navigate("/admin/content")}
-        >
-          <ArrowLeft className="size-4" />
-          {t("admin:contentDetail.back")}
-        </Button>
+    <PageShell>
+      <div className="w-full space-y-6">
 
         <section className={cn(panelClass, "p-6")}>
           <div className="flex flex-wrap items-start gap-3">
@@ -267,6 +261,6 @@ export default function AdminContentDetailPage() {
           </Table>
         </section>
       </div>
-    </div>
+    </PageShell>
   )
 }

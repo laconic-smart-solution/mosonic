@@ -8,6 +8,7 @@ import {
   SidebarProvider,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { BreadcrumbOverrideProvider } from "@/components/app/breadcrumb-override.context"
 import { NotificationProvider } from "@/features/notifications/notification-provider"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 
@@ -24,7 +25,9 @@ function AppLayout() {
       <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[color:var(--nt-canvas)]">
         <Topbar />
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto [animation:fadeUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-          <Outlet />
+          <BreadcrumbOverrideProvider>
+            <Outlet />
+          </BreadcrumbOverrideProvider>
         </div>
       </SidebarInset>
     </SidebarProvider>

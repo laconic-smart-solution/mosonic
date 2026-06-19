@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { LayoutGrid } from "lucide-react"
 
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -394,10 +395,7 @@ export default function PostsPage() {
     queryReady && !listQuery.isError && !listLoading && listTotal > 0
 
   return (
-    <div
-      className="min-h-full w-full bg-[color:var(--nt-canvas)] px-4 py-5 sm:px-5"
-      style={{ minHeight: "100%" }}
-    >
+    <PageShell>
       <motion.div className="flex w-full flex-col gap-5">
         <header className="space-y-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
@@ -694,6 +692,6 @@ export default function PostsPage() {
           </motion.div>
         ) : null}
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

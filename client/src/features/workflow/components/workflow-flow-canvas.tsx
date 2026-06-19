@@ -226,6 +226,8 @@ export type WorkflowFlowCanvasHandle = {
   getRfEdges: () => Edge[]
   /** Removes unassigned Adapt nodes and spawns one per channel from Branch. */
   repairOrphanLaneAdapts: () => boolean
+  /** Drops nodes that are not connected to any edge in the graph. */
+  removeNodesByIds: (nodeIds: string[]) => boolean
   /** Applies open properties-panel draft to canvas nodes. Returns false if validation blocks apply. */
   applyOpenPropertiesPanel: () => boolean
   /** Closes the properties panel and clears unapplied config drafts. */
@@ -1169,10 +1171,31 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           setEdges(result.edges)
           return true
         },
+        removeNodesByIds: (nodeIds: string[]) => {
+          if (nodeIds.length === 0) return false
+          const idSet = new Set(nodeIds)
+          const nextNodes = nodesRef.current.filter((node) => !idSet.has(node.id))
+          if (nextNodes.length === nodesRef.current.length) return false
+          const nextEdges = edgesRef.current.filter(
+            (edge) => !idSet.has(edge.source) && !idSet.has(edge.target),
+          )
+          nodesRef.current = nextNodes
+          edgesRef.current = nextEdges
+          setNodes(nextNodes)
+          setEdges(nextEdges)
+          if (settingsNodeId && idSet.has(settingsNodeId)) {
+            setSettingsNodeId(null)
+            setPropConfig({})
+          }
+          if (selectedId && idSet.has(selectedId)) {
+            setSelectedId(null)
+          }
+          return true
+        },
         applyOpenPropertiesPanel,
         dismissPropertiesPanel: closePanel,
       }),
-      [applyOpenPropertiesPanel, branchChannels, closePanel, setEdges, setNodes],
+      [applyOpenPropertiesPanel, branchChannels, closePanel, selectedId, settingsNodeId, setEdges, setNodes],
     )
 
     const showPalette = !readOnly && !isMaterializedView

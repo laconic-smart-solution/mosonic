@@ -14,6 +14,7 @@ import { CreditCalculationService } from '../credit/credit-calculation.service';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { CreditService } from '../credit/credit.service';
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
+import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { NodeExecutor } from '../orchestration/node-executor.service';
 import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
@@ -420,6 +421,7 @@ export class ContentService {
       pipelineId: pipeline.pipelineId,
       nodeId: dto.nodeId,
       nodeType: nodeForRun.type,
+      nodeConfig: this.asRecord(nodeForRun.config),
     });
 
     void this.runRerunExecution({
@@ -539,6 +541,7 @@ export class ContentService {
       pipelineId: pipeline.pipelineId,
       nodeId,
       nodeType: dto.type,
+      nodeConfig: config as Record<string, unknown>,
     });
 
     void this.runGenerateMoreExecution({
@@ -573,9 +576,14 @@ export class ContentService {
     pipelineId: string;
     nodeId: string;
     nodeType: string;
+    nodeConfig?: Record<string, unknown>;
   }): Promise<number> {
+    const creditNodeType = resolveCreditNodeTypeForPipelineNode(
+      args.nodeType,
+      args.nodeConfig,
+    );
     const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(args.nodeType)) ??
+      (await this.nodeCreditPriceService.getActiveCostCredit(creditNodeType)) ??
       0;
     if (creditsEach <= 0) return 0;
 
@@ -593,7 +601,7 @@ export class ContentService {
       pipelineRef: args.pipelineId,
       contentRef: args.contentId,
       nodeId: args.nodeId,
-      nodeType: args.nodeType,
+      nodeType: creditNodeType,
       credits: creditsEach,
       creditPriceUsd: config.creditPriceUsd,
     });
@@ -606,16 +614,21 @@ export class ContentService {
     pipelineId: string;
     nodeId: string;
     nodeType: string;
+    nodeConfig?: Record<string, unknown>;
     credits: number;
   }): Promise<void> {
     if (args.credits <= 0) return;
+    const creditNodeType = resolveCreditNodeTypeForPipelineNode(
+      args.nodeType,
+      args.nodeConfig,
+    );
     const config = await this.creditCalculation.getConfig();
     await this.creditService.refundSingleNodeRun({
       userId: args.userId,
       pipelineRef: args.pipelineId,
       contentRef: args.contentId,
       nodeId: args.nodeId,
-      nodeType: args.nodeType,
+      nodeType: creditNodeType,
       credits: args.credits,
       creditPriceUsd: config.creditPriceUsd,
     });
@@ -710,6 +723,7 @@ export class ContentService {
         pipelineId: pipeline.pipelineId,
         nodeId,
         nodeType: dto.type,
+        nodeConfig: config as Record<string, unknown>,
         credits: creditsCharged,
       }).catch((refundErr: unknown) => {
         const msg =
@@ -773,6 +787,7 @@ export class ContentService {
         pipelineId: pipeline.pipelineId,
         nodeId: wfNode.nodeId,
         nodeType: wfNode.type,
+        nodeConfig: this.asRecord(wfNode.config),
         credits: creditsCharged,
       }).catch((refundErr: unknown) => {
         const msg =

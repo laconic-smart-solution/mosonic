@@ -1,8 +1,11 @@
 import { useState } from "react"
-import { ArrowLeft, Coins } from "lucide-react"
-import { useParams, useNavigate } from "react-router-dom"
+import { Coins } from "lucide-react"
+import { useParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import type { ReactNode } from "react"
+
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 
 import {
   AlertDialog,
@@ -72,11 +75,14 @@ function formatCredits(remaining: number | null, perMonth: number | null) {
 export default function AdminUserDetailPage() {
   const { t } = useTranslation(["admin", "common"])
   const { userId } = useParams<{ userId: string }>()
-  const navigate = useNavigate()
   const { data, isLoading } = useAdminUserDetail(userId)
   const { suspend, reactivate } = useAdminUserActions()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [topupTarget, setTopupTarget] = useState<AdminUserTopupTarget | null>(null)
+
+  useSetBreadcrumbLabel(
+    data?.user?.email ?? data?.user?.displayName ?? undefined,
+  )
 
   const actionPending = suspend.isPending || reactivate.isPending
 
@@ -92,17 +98,17 @@ export default function AdminUserDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-full bg-background px-7 py-8">
+      <PageShell>
         <p className="text-muted-foreground">{t("admin:userDetail.loading")}</p>
-      </div>
+      </PageShell>
     )
   }
 
   if (!data?.user) {
     return (
-      <div className="min-h-full bg-background px-7 py-8">
+      <PageShell>
         <p className="text-muted-foreground">{t("admin:userDetail.notFound")}</p>
-      </div>
+      </PageShell>
     )
   }
 
@@ -137,18 +143,8 @@ export default function AdminUserDetailPage() {
   const hasPlan = credits?.remaining != null || credits?.perMonth != null
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-6">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="-ml-2 gap-1.5"
-          onClick={() => navigate("/admin/users")}
-        >
-          <ArrowLeft className="size-4" />
-          {t("admin:userDetail.back")}
-        </Button>
+    <PageShell>
+      <div className="w-full space-y-6">
 
         <section className={cn(panelClass, "p-6")}>
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -385,6 +381,6 @@ export default function AdminUserDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   )
 }

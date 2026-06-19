@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
-  ArrowLeft,
   Clock,
   Globe,
   Hash,
@@ -305,15 +304,7 @@ export function NewsTriggerSettingsPanel({ ruleId, ruleName }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-      <Link
-        to="/rules"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        {t("newsTrigger.backToRules")}
-      </Link>
-
+    <div className="w-full">
       <div
         className={cn(
           "overflow-hidden rounded-2xl border border-border/70 bg-linear-to-b from-card/95 to-card/50 shadow-sm ring-1 ring-black/3 dark:ring-white/6",

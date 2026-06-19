@@ -1,38 +1,17 @@
-import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { Check, ChevronRight, Clock, X } from "lucide-react"
+import { Check, Clock, X } from "lucide-react"
 import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { cn } from "@/lib/utils"
 import type { ContentDetail } from "@/shared/types/content.type"
+
 type Props = {
   workflowTitle: string
   data: ContentDetail
-  /** Defaults to Content library */
-  breadcrumbParentHref?: string
-  breadcrumbParentLabel?: string
 }
 
-export function ContentDetailReviewHeader({
-  workflowTitle,
-  data,
-  breadcrumbParentHref = "/content",
-  breadcrumbParentLabel = "Content",
-}: Props) {
+export function ContentDetailReviewHeader({ workflowTitle, data }: Props) {
   return (
     <>
-      <motion.div
-        className="mb-4 flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground"
-        initial={{ opacity: 0, x: -6 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.25 }}
-      >
-        <Link to={breadcrumbParentHref} className="hover:text-foreground">
-          {breadcrumbParentLabel}
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-50" />
-        <span className="font-medium text-foreground">Review</span>
-      </motion.div>
-
       <motion.div
         className="mb-6 flex flex-col gap-3"
         initial={{ opacity: 0, y: 8 }}

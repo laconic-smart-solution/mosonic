@@ -82,6 +82,11 @@
     "settingsAccounts": "ตั้งค่าบัญชี",
     "admin": "ผู้ดูแล"
   },
+  "breadcrumb": {
+    "detail": "รายละเอียด",
+    "review": "ตรวจสอบ",
+    "newsTrigger": "ทริกเกอร์ข่าว"
+  },
   "routes": {
     "dashboard": "แดชบอร์ด",
     "rules": "กฎ",
@@ -166,5 +171,15 @@
   "empty": "ยังไม่มีรายการ",
   "noData": "ไม่มีข้อมูล",
   "optional": "ไม่บังคับ",
-  "required": "จำเป็น"
+  "required": "จำเป็น",
+  "toast": {
+    "eyebrow": {
+      "success": "บันทึกแล้ว",
+      "error": "ล้มเหลว",
+      "warning": "แจ้งเตือน",
+      "info": "หมายเหตุ",
+      "loading": "กำลังดำเนินการ",
+      "default": "หมายเหตุ"
+    }
+  }
 }

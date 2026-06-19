@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
+
+import { PageShell } from "@/components/app/page-shell"
 import {
   LOG_COLORS,
   RUN_NODES,
@@ -106,6 +108,7 @@ export default function RunPage() {
   ]
 
   return (
+    <PageShell variant="canvas">
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
 
       <div style={{ padding: "12px 24px", background: T.surfaceBg, borderBottom: `1px solid ${T.surfaceBorder}`, display: "flex", alignItems: "center", gap: 12 }}>
@@ -214,5 +217,6 @@ export default function RunPage() {
         <Btn variant="primary" onClick={() => navigate("/content")}>{t("page.reviewDraft")}</Btn>
       </div>
     </div>
+    </PageShell>
   )
 }

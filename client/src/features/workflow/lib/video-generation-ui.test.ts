@@ -6,9 +6,13 @@ import {
 } from "./video-generation-ui"
 
 describe("effectiveVideoMode", () => {
-  it("returns presenter when cinematic UI is disabled", () => {
-    expect(VIDEO_CINEMATIC_UI_ENABLED).toBe(false)
-    expect(effectiveVideoMode({ mode: "cinematic" })).toBe("presenter")
-    expect(effectiveVideoMode({})).toBe("presenter")
+  it("returns cinematic when cinematic UI is enabled and mode is unset", () => {
+    expect(VIDEO_CINEMATIC_UI_ENABLED).toBe(true)
+    expect(effectiveVideoMode({})).toBe("cinematic")
+    expect(effectiveVideoMode({ mode: "cinematic" })).toBe("cinematic")
+  })
+
+  it("returns presenter only when mode is explicitly presenter", () => {
+    expect(effectiveVideoMode({ mode: "presenter" })).toBe("presenter")
   })
 })

@@ -60,8 +60,10 @@ import {
   buildWorkflowEdges,
 } from './workflow-graph-edge-builder.util';
 import {
+  assignOrderFromGraph,
   buildLinearEdgesFromOrder,
   normalizeLaneId,
+  stripDisconnectedNodes,
   validateWorkflowGraph,
   type WorkflowGraphEdge,
 } from './workflow-graph.util';
@@ -417,10 +419,12 @@ export class WorkflowService {
       await this.workflows.updateById(workflowId, { name: nameTrimmed }, auth);
     }
 
-    const normalized = this.normalizeAndValidateNodes(body.nodes);
+    const normalized = this.normalizeAndValidateNodes(body.nodes, {
+      skipOrderValidation: true,
+    });
     const ownerUserId = workflow.userId ?? auth.userId;
 
-    const nodeSpecs = normalized.map((n) => ({
+    let nodeSpecs = normalized.map((n) => ({
       nodeId: n.nodeId?.trim() || randomUUID(),
       type: n.type,
       order: n.order,
@@ -445,12 +449,16 @@ export class WorkflowService {
       }))
       .filter((e) => nodeIdSet.has(e.from) && nodeIdSet.has(e.to));
 
+    nodeSpecs = stripDisconnectedNodes(nodeSpecs, edges);
+    nodeSpecs = assignOrderFromGraph(nodeSpecs, edges);
+
     const forValidation = nodeSpecs.map((n) => ({
       nodeId: n.nodeId,
       type: n.type,
       order: n.order,
     }));
     validateWorkflowGraph(forValidation, edges);
+    this.assertWorkflowNodeOrder(nodeSpecs);
     if (edges.length > 0) {
       assertEdgesRespectMatrix(forValidation, edges);
     }
@@ -751,8 +759,25 @@ export class WorkflowService {
     return { nodeId: args.nodeId, order: nextOrder };
   }
 
+  private assertWorkflowNodeOrder(
+    nodes: Array<{
+      type: WorkflowNodeType;
+      order: number;
+      config: WorkflowNodeConfig;
+    }>,
+  ): void {
+    assertValidWorkflowNodeOrder(
+      nodes.map((n) => ({
+        type: n.type,
+        order: n.order,
+        config: n.config as Record<string, unknown>,
+      })),
+    );
+  }
+
   private normalizeAndValidateNodes(
     nodes: SaveWorkflowNodesRequestDto['nodes'],
+    options?: { skipOrderValidation?: boolean },
   ): Array<{
     nodeId?: string;
     type: WorkflowNodeType;
@@ -801,13 +826,9 @@ export class WorkflowService {
         );
       }
     }
-    assertValidWorkflowNodeOrder(
-      normalized.map((n) => ({
-        type: n.type,
-        order: n.order,
-        config: n.config as Record<string, unknown>,
-      })),
-    );
+    if (!options?.skipOrderValidation) {
+      this.assertWorkflowNodeOrder(normalized);
+    }
     return normalized;
   }
 

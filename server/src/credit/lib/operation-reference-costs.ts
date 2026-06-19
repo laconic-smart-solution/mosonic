@@ -11,8 +11,16 @@ export const OPERATION_REFERENCE_COSTS: OperationReferenceCost[] = [
   { nodeType: 'summarization', provider: 'openai', costUsd: 0.006 },
   { nodeType: 'image_generation', provider: 'openai', costUsd: 0.04 },
   { nodeType: 'image_generation', provider: 'ideogram', costUsd: 0.06 },
-  { nodeType: 'video_generation', provider: 'heygen', costUsd: 0.501 },
-  { nodeType: 'video_generation', provider: 'runway', costUsd: 0.5 },
-  { nodeType: 'video_generation', provider: 'openai', costUsd: 0.48 },
+  {
+    nodeType: 'video_generation_presenter',
+    provider: 'heygen',
+    costUsd: 0.501,
+  },
+  {
+    nodeType: 'video_generation_cinematic',
+    provider: 'openai',
+    costUsd: 0.48,
+  },
+  { nodeType: 'video_generation_cinematic', provider: 'runway', costUsd: 0.5 },
   { nodeType: 'transcription', provider: 'openai', costUsd: 0.006 },
 ];

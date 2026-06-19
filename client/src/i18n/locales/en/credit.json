@@ -44,6 +44,8 @@
     "summarization": "Summarization",
     "image_generation": "Image generation",
     "video_generation": "Video generation",
+    "video_generation_presenter": "Presenter video (HeyGen)",
+    "video_generation_cinematic": "Cinematic video (Sora)",
     "social_account_connect": "Social account unlock",
     "rule_generation": "Rule generation",
     "workflow_generation": "Workflow generation"

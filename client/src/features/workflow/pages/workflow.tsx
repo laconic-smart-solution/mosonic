@@ -17,6 +17,8 @@ import {
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits } from "@/shared/lib/api-error"
 
@@ -51,6 +53,7 @@ import {
 } from "@/features/workflow/lib/pipeline-runtime-map"
 import {
   getBranchSubgraphLaneErrors,
+  stripDisconnectedWorkflowNodes,
   getVideoPresenterErrorsFromRfNodes,
 } from "@/features/workflow/lib/workflow-node-validation"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
@@ -208,6 +211,8 @@ export default function WorkflowPage() {
   )
   /** True after submit until completed/failed or nodes arrive (matches rule page processingRuleId pattern). */
   const generationInFlightRef = useRef(false)
+  /** True after pipeline start submit until id is known from HTTP or first socket event. */
+  const pipelineInFlightRef = useRef(false)
   /** When set, start pipeline with this prompt after workflow generation completes. */
   const pendingPipelineAfterWorkflowRef = useRef<string | null>(null)
   const runPipelineAfterQaRef = useRef(false)
@@ -691,20 +696,43 @@ export default function WorkflowPage() {
 
   const resetPipelineProcessingStateRef = useRef<() => void>(() => {})
 
-  // Subscribe once; filter by pipelineIdRef so handlers are not torn down mid-run.
+  // Re-subscribe when pipelineId changes so handlers attach to the live socket; adopt id from first event when HTTP has not returned yet.
   useEffect(() => {
-    function matchesPipeline(id: string): boolean {
-      return id === pipelineIdRef.current
+    function adoptPipelineFromSocket(id: string): void {
+      pipelineInFlightRef.current = false
+      pipelineCompletionHandledRef.current = false
+      stuckFinalizeAttemptedRef.current = false
+      pipelineIdRef.current = id
+      joinPipelineRoom(id)
+      setPipelineId(id)
+      setSearchParams((params) => {
+        params.set("pipelineId", id)
+        return params
+      })
+      setProcessingMode("processing")
+      setPipelinePaused(false)
+      setTotalNodes(null)
+      setCompletedNodes(0)
+      completedNodeIdsRef.current.clear()
+      setNodeRuntimeById({})
+    }
+
+    function allowsPipelineSocket(id: string): boolean {
+      const known = pipelineIdRef.current
+      if (known !== undefined) return id === known
+      if (!pipelineInFlightRef.current) return false
+      adoptPipelineFromSocket(id)
+      return true
     }
 
     const cleanups = [
       onPipelineStarted(({ pipelineId: id, totalNodes: total }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setTotalNodes(total)
         setCompletedNodes(completedNodeIdsRef.current.size)
       }),
       onNodeStarted(({ pipelineId: id, nodeId }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -716,7 +744,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeStreaming(({ pipelineId: id, nodeId, chunk }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -727,7 +755,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeProcessing(({ pipelineId: id, nodeId, message }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -738,7 +766,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeRetrying(({ pipelineId: id, nodeId, attempt, maxAttempts }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -754,7 +782,7 @@ export default function WorkflowPage() {
         }))
       }),
       onNodeCompleted(({ pipelineId: id, nodeId, nodeType, output }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -772,7 +800,7 @@ export default function WorkflowPage() {
         maybeTryFinalizePipelineRef.current(id)
       }),
       onNodeFailedFinal(({ pipelineId: id, nodeId, message }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setNodeRuntimeById((prev) => ({
           ...prev,
           [nodeId]: {
@@ -784,17 +812,18 @@ export default function WorkflowPage() {
         }))
       }),
       onPipelinePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setPipelinePaused(true)
         setPausedLaneId(laneId ?? null)
       }),
       onPipelineLanePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
         setPipelinePaused(true)
         setPausedLaneId(laneId ?? null)
       }),
       onPipelineCompleted(({ pipelineId: id, contentId, uploadId }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
+        pipelineInFlightRef.current = false
         void handlePipelineCompletionRef.current({
           pipelineId: id,
           contentId,
@@ -802,7 +831,8 @@ export default function WorkflowPage() {
         })
       }),
       onPipelineFailed(({ pipelineId: id, message, reason }) => {
-        if (!matchesPipeline(id)) return
+        if (!allowsPipelineSocket(id)) return
+        pipelineInFlightRef.current = false
         setPipelinePaused(false)
         if (reason === "cancelled") {
           resetPipelineProcessingStateRef.current()
@@ -884,6 +914,22 @@ export default function WorkflowPage() {
       toast.error(laneErrors[0])
       return
     }
+    const strippedDisconnected = stripDisconnectedWorkflowNodes(
+      nodesToSave,
+      edgesToSave,
+    )
+    if (strippedDisconnected.removedLabels.length > 0) {
+      nodesToSave = strippedDisconnected.nodes
+      canvasRef.current?.removeNodesByIds(strippedDisconnected.removedIds)
+      const count = strippedDisconnected.removedLabels.length
+      toast.info(
+        count === 1
+          ? t("toasts.removedDisconnectedNode", {
+              label: strippedDisconnected.removedLabels[0],
+            })
+          : t("toasts.removedDisconnectedNodes", { count }),
+      )
+    }
     nodesToSave = normalizeBranchNodesForSave(nodesToSave)
     const payload = rfNodesToApiPayload(nodesToSave, edgesToSave)
     if (payload.nodes.length === 0) {
@@ -939,10 +985,12 @@ export default function WorkflowPage() {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
     const useLearnings = searchParams.get("useLearnings") === "1"
+    pipelineInFlightRef.current = true
     startPipelineMutation.mutate(
       { workflowId, ruleId, contentPrompt, useLearnings },
       {
         onSuccess: ({ pipelineId: id }) => {
+          pipelineInFlightRef.current = false
           pipelineCompletionHandledRef.current = false
           stuckFinalizeAttemptedRef.current = false
           setRunConfirmOpen(false)
@@ -970,6 +1018,7 @@ export default function WorkflowPage() {
           })
         },
         onError: (err) => {
+          pipelineInFlightRef.current = false
           if (isInsufficientCredits(err)) {
             toastApiError(err, "credit:runConfirm.insufficientTitle")
             return
@@ -1016,6 +1065,14 @@ export default function WorkflowPage() {
     const rfEdges = canvasRef.current?.getRfEdges() ?? []
     let nodesToSave = rfNodes
     let edgesToSave = rfEdges
+    const strippedDisconnected = stripDisconnectedWorkflowNodes(
+      nodesToSave,
+      edgesToSave,
+    )
+    if (strippedDisconnected.removedLabels.length > 0) {
+      nodesToSave = strippedDisconnected.nodes
+      canvasRef.current?.removeNodesByIds(strippedDisconnected.removedIds)
+    }
     nodesToSave = normalizeBranchNodesForSave(nodesToSave)
     const payload = rfNodesToApiPayload(nodesToSave, edgesToSave)
     if (payload.nodes.length === 0) {
@@ -1115,6 +1172,7 @@ export default function WorkflowPage() {
   }
 
   function resetPipelineProcessingState() {
+    pipelineInFlightRef.current = false
     pipelineCompletionHandledRef.current = false
     if (pipelineId) leavePipelineRoom(pipelineId)
     pipelineIdRef.current = undefined
@@ -1356,12 +1414,15 @@ export default function WorkflowPage() {
     canvasMode === "ready" &&
     (canvasEdited || configDraftDirty || Boolean(selectedSnapshotPipelineId))
 
+  useSetBreadcrumbLabel(wfName.trim() || ruleName || undefined)
+
   if (!ruleId) {
     return (
-      <div
-        className="flex min-h-0 flex-1 flex-col items-center justify-center p-6"
-        style={{ background: T.canvasBg }}
-      >
+      <PageShell variant="canvas">
+        <div
+          className="flex min-h-0 flex-1 flex-col items-center justify-center"
+          style={{ background: T.canvasBg }}
+        >
         <p className="text-sm" style={{ color: T.textSecondary }}>
           {t("errors.invalidUrl")}
         </p>
@@ -1373,15 +1434,17 @@ export default function WorkflowPage() {
         >
           {t("fab.goToRules")}
         </button>
-      </div>
+        </div>
+      </PageShell>
     )
   }
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      style={{ background: T.canvasBg }}
-    >
+    <PageShell variant="canvas">
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        style={{ background: T.canvasBg }}
+      >
       <WorkflowToolbar
         wfName={wfName}
         onWfNameChange={setWfName}
@@ -1779,6 +1842,7 @@ export default function WorkflowPage() {
       />
 
     </div>
+    </PageShell>
   )
 }
 

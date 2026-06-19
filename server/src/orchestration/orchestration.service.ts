@@ -58,6 +58,7 @@ import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { CreditService } from '../credit/credit.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
 import { isPipelineNodeCreditType } from '../credit/lib/billable-node-credit-types';
+import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { NodeExecutor } from './node-executor.service';
 import { DependencyResolverService } from './dependency-resolver.service';
@@ -192,12 +193,12 @@ export class OrchestrationService {
       (n) => n.type !== WorkflowNodeType.Branch,
     );
 
-    const billableNodeTypes = pipelineStoreNodes
-      .filter((n) => n.type !== WorkflowNodeType.Merge)
-      .map((n) => n.type);
+    const billableCreditNodeTypes = this.collectBillableCreditNodeTypes(
+      pipelineStoreNodes,
+    );
 
     const { totalCredits, breakdown: creditBreakdown } =
-      await this.computeNodeCreditEstimate(billableNodeTypes);
+      await this.computeNodeCreditEstimate(billableCreditNodeTypes);
     if (totalCredits > 0) {
       const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
       if (creditsRemaining < totalCredits) {
@@ -342,10 +343,6 @@ export class OrchestrationService {
     }
 
     if (this.useQueue) {
-      this.events.emitToPipeline(pipelineId, 'pipeline:started', {
-        pipelineId,
-        totalNodes,
-      });
       this.notifyPipelineStarted(input.auth.userId, {
         pipelineId,
         ruleRef: rule.ruleId,
@@ -368,6 +365,10 @@ export class OrchestrationService {
         });
         throw err;
       }
+      this.events.emitToPipeline(pipelineId, 'pipeline:started', {
+        pipelineId,
+        totalNodes,
+      });
       return { pipelineId };
     }
 
@@ -395,7 +396,7 @@ export class OrchestrationService {
     return { pipelineId };
   }
 
-  /** Aggregate per-node-type credit cost for workflow node runs. */
+  /** Aggregate per credit-node-type cost for workflow node runs (video mode-aware). */
   private async computeNodeCreditEstimate(nodeTypes: string[]): Promise<{
     totalCredits: number;
     breakdown: Array<{
@@ -432,6 +433,23 @@ export class OrchestrationService {
     return { totalCredits, breakdown };
   }
 
+  private collectBillableCreditNodeTypes(
+    nodes: Array<{ type: string; config?: Record<string, unknown> | null }>,
+  ): string[] {
+    return nodes
+      .filter(
+        (n) =>
+          n.type !== WorkflowNodeType.Merge &&
+          n.type !== WorkflowNodeType.Branch,
+      )
+      .map((n) =>
+        resolveCreditNodeTypeForPipelineNode(
+          n.type,
+          (n.config ?? undefined) as Record<string, unknown> | undefined,
+        ),
+      );
+  }
+
   private async getCreditsRemaining(userId: string): Promise<number> {
     const userPlan = await this.userPlans.findActiveByUserId(userId);
     return userPlan?.creditsRemaining ?? 0;
@@ -458,19 +476,24 @@ export class OrchestrationService {
         return;
       }
 
-      const completedByType = new Map<string, number>();
+      const completedByCreditType = new Map<string, number>();
       for (const node of parsePipelineNodes(pipeline.nodes)) {
         if (node.status !== PipelineNodeExecutionStatus.Completed) continue;
-        completedByType.set(
+        const creditType = resolveCreditNodeTypeForPipelineNode(
           node.type,
-          (completedByType.get(node.type) ?? 0) + 1,
+          (node.config ?? undefined) as Record<string, unknown> | undefined,
+        );
+        if (!isPipelineNodeCreditType(creditType)) continue;
+        completedByCreditType.set(
+          creditType,
+          (completedByCreditType.get(creditType) ?? 0) + 1,
         );
       }
 
       const refundItems: Array<{ nodeType: string; credits: number }> = [];
       for (const row of breakdown) {
         if (!isPipelineNodeCreditType(row.nodeType)) continue;
-        const completed = completedByType.get(row.nodeType) ?? 0;
+        const completed = completedByCreditType.get(row.nodeType) ?? 0;
         const unused = Math.max(0, row.count - completed);
         const credits = unused * row.creditsEach;
         if (credits > 0) {
@@ -542,7 +565,12 @@ export class OrchestrationService {
     );
 
     if (!input.ruleId) {
-      return nodes.map((n) => n.type);
+      return this.collectBillableCreditNodeTypes(
+        nodes.map((n) => ({
+          type: n.type,
+          config: (n.config ?? undefined) as Record<string, unknown> | undefined,
+        })),
+      );
     }
 
     const rule = await this.rules.findById(input.ruleId, input.auth);
@@ -575,13 +603,7 @@ export class OrchestrationService {
       workflow.version ?? 1,
     );
 
-    return materialized.nodes
-      .filter(
-        (n) =>
-          n.type !== WorkflowNodeType.Branch &&
-          n.type !== WorkflowNodeType.Merge,
-      )
-      .map((n) => n.type);
+    return this.collectBillableCreditNodeTypes(materialized.nodes);
   }
 
   async retryNode(

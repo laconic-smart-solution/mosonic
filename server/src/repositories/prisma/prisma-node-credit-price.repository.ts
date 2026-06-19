@@ -59,6 +59,15 @@ export class PrismaNodeCreditPriceRepository implements INodeCreditPriceReposito
       .then(() => undefined);
   }
 
+  setActiveByNodeType(nodeType: string, isActive: boolean): Promise<void> {
+    return this.prisma.nodeCreditPrice
+      .updateMany({
+        where: { nodeType },
+        data: { isActive },
+      })
+      .then(() => undefined);
+  }
+
   migrateLegacyRow(nodeType: string, costUsd: number): Promise<void> {
     return this.prisma.nodeCreditPrice
       .upsert({

@@ -1,7 +1,7 @@
 export type VideoGenerationMode = "presenter" | "cinematic"
 
-/** Set to true to restore Sora cinematic mode toggle and fields in the UI. */
-export const VIDEO_CINEMATIC_UI_ENABLED = false
+/** When true, users can choose Sora cinematic vs HeyGen presenter on video nodes. */
+export const VIDEO_CINEMATIC_UI_ENABLED = true
 
 export function effectiveVideoMode(
   config: Record<string, unknown> | undefined,

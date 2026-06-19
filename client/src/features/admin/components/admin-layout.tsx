@@ -14,6 +14,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { Link, Outlet, useLocation } from "react-router-dom"
 
+import { BreadcrumbOverrideProvider } from "@/components/app/breadcrumb-override.context"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS: {
@@ -81,7 +82,9 @@ export function AdminLayout() {
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto">
-        <Outlet />
+        <BreadcrumbOverrideProvider>
+          <Outlet />
+        </BreadcrumbOverrideProvider>
       </main>
     </div>
   )

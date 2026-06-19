@@ -1,6 +1,19 @@
 export const RULE_GENERATION_NODE_TYPE = 'rule_generation' as const;
 export const WORKFLOW_GENERATION_NODE_TYPE = 'workflow_generation' as const;
 
+/** Legacy flat video billing key — migrated to presenter/cinematic split. */
+export const LEGACY_VIDEO_GENERATION_CREDIT_TYPE = 'video_generation' as const;
+
+export const VIDEO_GENERATION_PRESENTER_CREDIT_TYPE =
+  'video_generation_presenter' as const;
+export const VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE =
+  'video_generation_cinematic' as const;
+
+/** HeyGen presenter reference USD (fresh installs without legacy row). */
+export const VIDEO_GENERATION_PRESENTER_DEFAULT_COST_USD = 0.501;
+/** OpenAI Sora reference USD. */
+export const VIDEO_GENERATION_CINEMATIC_DEFAULT_COST_USD = 0.48;
+
 /** Flat-fee generation ops — not tied to pipeline node completion / refund logic. */
 export const GENERATION_CREDIT_NODE_TYPES = new Set<string>([
   RULE_GENERATION_NODE_TYPE,
@@ -22,7 +35,14 @@ export const BILLABLE_NODE_CREDIT_DEFAULTS: ReadonlyArray<{
   { nodeType: 'summarization', costUsd: 0.006 },
   { nodeType: 'translation', costUsd: 0.008 },
   { nodeType: 'image_generation', costUsd: 0.04 },
-  { nodeType: 'video_generation', costUsd: 0.48 },
+  {
+    nodeType: VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
+    costUsd: VIDEO_GENERATION_PRESENTER_DEFAULT_COST_USD,
+  },
+  {
+    nodeType: VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE,
+    costUsd: VIDEO_GENERATION_CINEMATIC_DEFAULT_COST_USD,
+  },
   { nodeType: 'social_account_connect', costUsd: 0.001 },
 ] as const;
 
@@ -37,6 +57,13 @@ const BILLABLE_NODE_TYPES = new Set(
 
 export function isBillableNodeCreditType(nodeType: string): boolean {
   return BILLABLE_NODE_TYPES.has(nodeType);
+}
+
+export function isVideoGenerationCreditType(nodeType: string): boolean {
+  return (
+    nodeType === VIDEO_GENERATION_PRESENTER_CREDIT_TYPE ||
+    nodeType === VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE
+  );
 }
 
 export function isPipelineNodeCreditType(nodeType: string): boolean {

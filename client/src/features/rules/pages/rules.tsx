@@ -21,6 +21,8 @@ import {
   type NodeChange,
 } from "@xyflow/react"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ruleFlowNodeTypes,
@@ -270,6 +272,9 @@ export default function RulesPage() {
     Boolean(selectedRuleId)
   )
   const selectedRule = ruleDetailQuery.data
+
+  useSetBreadcrumbLabel(selectedRule?.name)
+
   const showRuleSkeleton =
     Boolean(selectedRuleId) &&
     !ruleDetailQuery.isError &&
@@ -330,7 +335,8 @@ export default function RulesPage() {
   }, [flow.edges, flowTheme])
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-4">
+    <PageShell variant="canvas">
+      <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">{t("page.title")}</h1>
@@ -509,6 +515,7 @@ export default function RulesPage() {
         onExtract={runRuleExtract}
         isExtracting={isExtracting}
       />
-    </div>
+      </div>
+    </PageShell>
   )
 }

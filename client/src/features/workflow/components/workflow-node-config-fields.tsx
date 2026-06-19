@@ -567,11 +567,7 @@ export function WorkflowNodeConfigFields({
   const configFields = visibleFields.filter((field) => field.key !== "mode")
 
   function patchConfig(patch: Record<string, unknown>) {
-    const merged =
-      canvasType === "video" && !VIDEO_CINEMATIC_UI_ENABLED
-        ? { ...patch, mode: "presenter" }
-        : patch
-    onChange({ ...config, ...merged })
+    onChange({ ...config, ...patch })
   }
 
   function updateConfig(key: string, value: string) {

@@ -11,8 +11,10 @@ import {
   BILLABLE_NODE_CREDIT_DEFAULTS,
   defaultCostUsdForNodeType,
   isBillableNodeCreditType,
+  LEGACY_VIDEO_GENERATION_CREDIT_TYPE,
   SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD,
   SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+  VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
 } from './lib/billable-node-credit-types';
 
 export type NodeCreditPriceRow = {
@@ -47,6 +49,7 @@ export class NodeCreditPriceService {
   async seedDefaults(): Promise<void> {
     await this.migrateLegacyCostCredit();
     await this.migrateSocialUnlockCost();
+    await this.migrateVideoGenerationCreditSplit();
     for (const row of BILLABLE_NODE_CREDIT_DEFAULTS) {
       const existing = await this.nodeCreditPrices.findByNodeType(row.nodeType);
       if (!existing) {
@@ -68,6 +71,34 @@ export class NodeCreditPriceService {
       SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD,
       nextDefault,
     );
+  }
+
+  /**
+   * Split legacy `video_generation` pricing into presenter + cinematic rows.
+   * Existing admin price becomes presenter; cinematic seeds from defaults.
+   */
+  private async migrateVideoGenerationCreditSplit(): Promise<void> {
+    const legacy = await this.nodeCreditPrices.findByNodeType(
+      LEGACY_VIDEO_GENERATION_CREDIT_TYPE,
+    );
+    const presenterExisting = await this.nodeCreditPrices.findByNodeType(
+      VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
+    );
+
+    if (legacy && !presenterExisting) {
+      await this.nodeCreditPrices.create({
+        nodeType: VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
+        costUsd: legacy.costUsd,
+        isActive: legacy.isActive,
+      });
+    }
+
+    if (legacy?.isActive) {
+      await this.nodeCreditPrices.setActiveByNodeType(
+        LEGACY_VIDEO_GENERATION_CREDIT_TYPE,
+        false,
+      );
+    }
   }
 
   private async resolveCostUsd(nodeType: string): Promise<number | null> {
