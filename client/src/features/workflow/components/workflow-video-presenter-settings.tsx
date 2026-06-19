@@ -285,7 +285,7 @@ export function WorkflowVideoPresenterSettings({
             <button
               type="button"
               onClick={handleClearAvatar}
-              className="text-[10px] text-gray-500 underline hover:text-gray-700"
+              className="text-[10px] text-muted-foreground underline hover:text-foreground"
             >
               {t("presenter.clearSelection")}
             </button>
@@ -293,7 +293,7 @@ export function WorkflowVideoPresenterSettings({
         </div>
 
         {avatarsQuery.isLoading ? (
-          <div className="flex items-center gap-2 py-2 text-[11px] text-gray-500">
+          <div className="flex items-center gap-2 py-2 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
             {t("presenter.loadingAvatars")}
           </div>
@@ -302,7 +302,7 @@ export function WorkflowVideoPresenterSettings({
             {t("presenter.loadAvatarsFailed")}
           </p>
         ) : visibleAvatars.length === 0 ? (
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-muted-foreground">
             {t("presenter.noAvatars")}
           </p>
         ) : (
@@ -316,11 +316,10 @@ export function WorkflowVideoPresenterSettings({
                 <div
                   key={look.lookId}
                   className={cn(
-                    "group relative overflow-hidden rounded-lg border bg-[#FDFCFA]",
+                    "group relative overflow-hidden rounded-lg border border-border bg-muted/30",
                     selected && "ring-2 ring-teal-500",
                     !selectable && "opacity-60",
                   )}
-                  style={{ borderColor: T.surfaceBorder }}
                 >
                   <button
                     type="button"
@@ -335,15 +334,15 @@ export function WorkflowVideoPresenterSettings({
                         className="aspect-square w-full rounded object-cover"
                       />
                     ) : (
-                      <div className="flex aspect-square w-full items-center justify-center rounded bg-gray-100 text-[10px] text-gray-400">
+                      <div className="flex aspect-square w-full items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">
                         No preview
                       </div>
                     )}
-                    <span className="line-clamp-2 w-full text-center text-[10px] font-medium text-gray-700">
+                    <span className="line-clamp-2 w-full text-center text-[10px] font-medium text-foreground">
                       {look.name}
                     </span>
                     {look.status && look.status !== "completed" ? (
-                      <span className="text-[9px] capitalize text-amber-700">
+                      <span className="text-[9px] capitalize text-amber-700 dark:text-amber-400">
                         {look.status}
                       </span>
                     ) : null}
@@ -406,7 +405,7 @@ export function WorkflowVideoPresenterSettings({
         </label>
         <p
           className={cn(
-            "mb-2 text-gray-500",
+            "mb-2 text-muted-foreground",
             compact ? "text-[9px]" : "text-[10px]",
           )}
         >
@@ -513,16 +512,16 @@ function UploadSlot({
           onFile(file)
         }}
         className={cn(
-          "flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-3 py-4 text-center transition-colors",
-          dragOver && "border-teal-400 bg-teal-50/50",
+          "flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-3 py-4 text-center transition-colors",
+          dragOver &&
+            "border-teal-400 bg-teal-50/50 dark:border-teal-500 dark:bg-teal-950/30",
           disabled && "cursor-not-allowed opacity-60",
         )}
-        style={{ borderColor: dragOver ? undefined : T.surfaceBorder }}
       >
         {busy ? (
           <>
             <Spinner className="size-4" />
-            <span className="text-[11px] text-gray-500">{uploadingLabel}</span>
+            <span className="text-[11px] text-muted-foreground">{uploadingLabel}</span>
           </>
         ) : previewUrl ? (
           <img
@@ -531,9 +530,9 @@ function UploadSlot({
             className="max-h-20 max-w-full rounded object-contain"
           />
         ) : (
-          <span className="text-[11px] text-gray-500">{uploadLabel}</span>
+          <span className="text-[11px] text-muted-foreground">{uploadLabel}</span>
         )}
-        <span className="text-[10px] text-gray-400">{hint}</span>
+        <span className="text-[10px] text-muted-foreground/70">{hint}</span>
       </div>
       <input
         ref={inputRef}

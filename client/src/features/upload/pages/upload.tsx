@@ -1054,7 +1054,7 @@ export default function UploadPage() {
 
   if (!uploadId) {
     return (
-      <PageShell variant="canvas">
+      <PageShell>
         <div className="text-sm text-muted-foreground">Missing upload id.</div>
       </PageShell>
     )
@@ -1062,7 +1062,7 @@ export default function UploadPage() {
 
   if (uploadQuery.isLoading || zernioAccountsQuery.isLoading) {
     return (
-      <PageShell variant="canvas">
+      <PageShell>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner className="size-4" />
           Loading upload…
@@ -1073,7 +1073,7 @@ export default function UploadPage() {
 
   if (uploadQuery.isError || !upload) {
     return (
-      <PageShell variant="canvas">
+      <PageShell>
         <div>
         <Alert variant="destructive">
           <AlertTitle>Could not load upload</AlertTitle>
@@ -1087,7 +1087,7 @@ export default function UploadPage() {
   }
 
   return (
-    <PageShell variant="canvas">
+    <PageShell>
     <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
@@ -1115,7 +1115,7 @@ export default function UploadPage() {
           {upload ? (
             <UploadPublishControls
               scope="global"
-              className="absolute top-8 right-8 w-full min-w-0 flex-1 lg:max-w-none"
+              className="min-w-0 w-full shrink-0 lg:w-auto"
               platformLabel="All channels"
               eligibleCount={eligibleGlobalCount}
               schedulePopoverOpen={showGlobalSchedule}
@@ -1146,7 +1146,7 @@ export default function UploadPage() {
           includeSwitchPending={patchMutation.isPending}
         />
 
-        <div className="min-h-[min(520px,70vh)] min-w-0 overflow-hidden">
+        <div className="min-h-[min(520px,70vh)] min-w-0">
           <UploadContentReviewPanel
             contentId={upload.contentRef}
             uploadId={uploadId}
@@ -1154,7 +1154,7 @@ export default function UploadPage() {
             generationChannelKeys={channelTabs.map((t) => t.channel)}
             onWorkflowLayersChange={handleWorkflowLayersChange}
             preview={
-              <div className="h-full min-w-0 space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="min-w-0 space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                     Editor

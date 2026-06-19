@@ -378,12 +378,24 @@ describe("getBranchSubgraphLaneErrors", () => {
 })
 
 describe("mergeHeygenVideoConfig", () => {
-  it("coerces to cinematic when setting presenter without avatar", () => {
+  it("allows presenter mode before avatar is chosen", () => {
     expect(
       mergeHeygenVideoConfig({}, { mode: "presenter", heygenVoiceId: "voice-1" }),
     ).toEqual({
-      mode: "cinematic",
+      mode: "presenter",
       heygenVoiceId: "voice-1",
+    })
+  })
+
+  it("coerces to cinematic when clearing avatar in presenter mode", () => {
+    expect(
+      mergeHeygenVideoConfig(
+        { mode: "presenter", heygenAvatarId: "avatar-1" },
+        { heygenAvatarId: "" },
+      ),
+    ).toEqual({
+      mode: "cinematic",
+      heygenAvatarId: "",
     })
   })
 

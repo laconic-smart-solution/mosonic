@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import i18n from "@/i18n"
 import { pipelineService } from "../services/pipeline.service"
 import type {
+  GetPipelineResponse,
   PipelinePageQueryPayload,
   PipelineStatsResponse,
   RetryNodePayload,
@@ -74,12 +75,25 @@ export const useSkipNodeMutation = () => {
   })
 }
 
-export const useGetPipelineQuery = (pipelineId: string | undefined) => {
+export type UseGetPipelineQueryOptions = {
+  refetchInterval?:
+    | number
+    | false
+    | ((query: { state: { data?: GetPipelineResponse } }) => number | false)
+  refetchIntervalInBackground?: boolean
+}
+
+export const useGetPipelineQuery = (
+  pipelineId: string | undefined,
+  options?: UseGetPipelineQueryOptions,
+) => {
   return useQuery({
     queryKey: ["pipeline", pipelineId],
     queryFn: () => pipelineService.getById(pipelineId!),
     enabled: !!pipelineId,
     retry: false,
+    refetchInterval: options?.refetchInterval,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground,
   })
 }
 

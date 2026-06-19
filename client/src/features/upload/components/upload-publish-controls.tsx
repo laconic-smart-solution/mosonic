@@ -99,7 +99,7 @@ export function UploadPublishControls({
               size="sm"
               variant="outline"
               disabled={!canAct || publishPending}
-              className="h-9 border-[#1D9E75] px-4 text-[#0F6E56] hover:bg-[#E1F5EE]"
+              className="h-9 border-[#1D9E75] px-4 text-[#0F6E56] hover:bg-[#E1F5EE] dark:hover:bg-[#1D9E75]/10"
               onClick={onPublishNow}
             >
               {serverStatus === "publishing" ? (
@@ -123,7 +123,7 @@ export function UploadPublishControls({
                     size="sm"
                     variant={schedulePopoverOpen ? "secondary" : "outline"}
                     className={cn(
-                      "h-9 border-[#185FA5] px-4 text-[#185FA5] hover:bg-[#E6F1FB]",
+                      "h-9 border-[#185FA5] px-4 text-[#185FA5] hover:bg-[#E6F1FB] dark:hover:bg-[#185FA5]/10",
                       schedulePopoverOpen && "border-[#185FA5] bg-[#E6F1FB]"
                     )}
                     aria-expanded={schedulePopoverOpen}
