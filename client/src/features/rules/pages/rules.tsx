@@ -12,12 +12,14 @@ import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
+  applyNodeChanges,
   Background,
   Controls,
   MarkerType,
   ReactFlow,
   type Edge,
   type Node,
+  type NodeChange,
 } from "@xyflow/react"
 import type { Attachment } from "@/components/core/prompt-area"
 import { Button } from "@/components/ui/button"
@@ -35,6 +37,7 @@ import {
   ruleFlowEdgeTypes,
 } from "@/features/rules/components/rule-flow-edge"
 import { RulesListDrawer } from "@/features/rules/components/rules-list-drawer"
+import { useRuleFlowVisualTheme } from "@/features/rules/lib/rule-flow-theme"
 import {
   buildRuleFlow,
   createRuleFromPrompt,
@@ -157,6 +160,7 @@ export default function RulesPage() {
 
   const extractRuleMutation = useExtractRuleMutation()
   const putRuleMutation = usePutRuleMutation()
+  const flowTheme = useRuleFlowVisualTheme()
 
   const pageList = useMemo(
     () => (rulesPageQuery.data?.data ?? []).filter(isVisibleRuleListItem),
@@ -289,6 +293,16 @@ export default function RulesPage() {
     return buildRuleFlow(selectedRule, t)
   }, [selectedRule, t])
 
+  const [flowNodes, setFlowNodes] = useState<Node[]>([])
+
+  useEffect(() => {
+    setFlowNodes(flow.nodes)
+  }, [flow])
+
+  const onFlowNodesChange = useCallback((changes: NodeChange[]) => {
+    setFlowNodes((nodes) => applyNodeChanges(changes, nodes))
+  }, [])
+
   const handleManageSave = useCallback(
     async (values: RuleEntity) => {
       if (!selectedRuleId) return values
@@ -316,17 +330,17 @@ export default function RulesPage() {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: "#8A96A8",
+        color: flowTheme.edgeColor,
       },
       animated: true,
       style: {
-        stroke: "#8A96A8",
-        strokeOpacity: 0.55,
-        strokeWidth: 1.5,
+        stroke: flowTheme.edgeColor,
+        strokeOpacity: flowTheme.edgeOpacity,
+        strokeWidth: flowTheme.edgeWidth,
         ...edge.style,
       },
     })) as Edge[]
-  }, [flow.edges])
+  }, [flow.edges, flowTheme])
 
   const hydrateCompletedRule = useCallback(
     async (ruleId: string) => {
@@ -452,8 +466,9 @@ export default function RulesPage() {
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">{t("page.title")}</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("drawer.description")}</p>
           {rulesPageQuery.isError ? (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-red-600 dark:text-red-400">
               {t("page.loadError")}
             </p>
           ) : null}
@@ -502,8 +517,8 @@ export default function RulesPage() {
         </div>
       </div>
 
-      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background">
-        <div className="pointer-events-auto absolute top-3 right-3 z-20 rounded-full border border-border/80 bg-background/95 p-0.5 shadow-md backdrop-blur-sm">
+      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background dark:bg-[#0D1118]">
+        <div className="pointer-events-auto absolute top-3 right-3 z-20 rounded-full border border-border/80 bg-background/95 p-0.5 shadow-md backdrop-blur-sm dark:border-border dark:bg-card/95">
           <Tabs
             orientation="horizontal"
             value={viewMode}
@@ -578,22 +593,27 @@ export default function RulesPage() {
           ) : selectedRule && viewMode === "tree" ? (
             <div className="relative min-h-0 flex-1">
               <ReactFlow
-                nodes={flow.nodes}
+                nodes={flowNodes}
                 edges={enhancedEdges}
                 nodeTypes={ruleFlowNodeTypes}
                 edgeTypes={ruleFlowEdgeTypes}
                 connectionLineComponent={FloatingConnectionLine}
+                onNodesChange={onFlowNodesChange}
                 fitView
                 nodesConnectable={false}
-                nodesDraggable={false}
+                nodesDraggable
                 nodesFocusable={false}
                 edgesFocusable={false}
                 elementsSelectable={false}
                 panOnDrag
                 zoomOnScroll
-                className="h-full min-h-0 w-full flex-1"
+                className="rule-flow-canvas h-full min-h-0 w-full flex-1"
               >
-                <Background gap={18} size={1} />
+                <Background
+                  gap={18}
+                  size={1}
+                  color={flowTheme.backgroundDotColor}
+                />
                 <Controls showInteractive={false} />
               </ReactFlow>
             </div>

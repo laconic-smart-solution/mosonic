@@ -1,28 +1,30 @@
-import { T } from "@/lib/tokens"
+import { cn } from "@/lib/utils"
 
 export type RuleChipTone = "gray" | "indigo" | "green" | "amber"
 
-export function RuleChip({ label, color = "gray" }: { label: string; color?: RuleChipTone }) {
-  const map = {
-    gray: { bg: "#EDF2F7", text: "#4A5568", border: "#D9E1EC" },
-    indigo: { bg: T.accentLight, text: T.accent, border: T.accentBorder },
-    green: { bg: T.greenBg, text: T.green, border: T.greenBorder },
-    amber: { bg: T.amberBg, text: T.amber, border: T.amberBorder },
-  }
-  const token = map[color]
+const CHIP_CLASS: Record<RuleChipTone, string> = {
+  gray: "border-border bg-secondary text-muted-foreground dark:bg-muted dark:text-muted-foreground",
+  indigo:
+    "border-primary/25 bg-accent/80 text-accent-foreground dark:border-primary/35 dark:bg-accent/30 dark:text-primary",
+  green:
+    "border-[color:var(--nt-green-border)] bg-[color:var(--nt-green-bg)] text-[color:var(--nt-green)]",
+  amber:
+    "border-[color:var(--nt-amber-border)] bg-[color:var(--nt-amber-bg)] text-[color:var(--nt-amber)]",
+}
+
+export function RuleChip({
+  label,
+  color = "gray",
+}: {
+  label: string
+  color?: RuleChipTone
+}) {
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        borderRadius: 999,
-        border: `1px solid ${token.border}`,
-        background: token.bg,
-        color: token.text,
-        fontSize: 10,
-        fontWeight: 600,
-        padding: "2px 8px",
-      }}
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+        CHIP_CLASS[color],
+      )}
     >
       {label}
     </span>
