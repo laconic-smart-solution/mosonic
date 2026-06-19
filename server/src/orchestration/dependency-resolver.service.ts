@@ -1,7 +1,9 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue } from 'bullmq';
+import type { Prisma } from '@prisma/client';
 import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
 import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -40,6 +42,9 @@ export class DependencyResolverService {
   private readonly logger = new Logger(DependencyResolverService.name);
   private readonly useGraph: boolean;
   private readonly laneScopedPause: boolean;
+  private readonly reconcileEnabled: boolean;
+  private readonly reconcileBatch: number;
+  private reconcileRunning = false;
 
   constructor(
     config: ConfigService,
@@ -62,6 +67,79 @@ export class DependencyResolverService {
     this.laneScopedPause =
       config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() ===
       'true';
+    this.reconcileEnabled =
+      config
+        .get<string>('PIPELINE_RECONCILE_ENABLED', 'true')
+        .toLowerCase() !== 'false';
+    this.reconcileBatch = Number(
+      config.get('PIPELINE_RECONCILE_BATCH', 200),
+    );
+  }
+
+  /**
+   * Safety net for stalled pipelines: a node-completion event can be lost (server
+   * restart mid-run, a transient DB/Redis hiccup, an unclean worker shutdown),
+   * leaving ready downstream nodes stuck in `pending` with nothing to re-trigger
+   * them. This periodically scans running pipelines and re-enqueues any pending
+   * node whose dependencies are all satisfied. Enqueue is deduped by jobId, so
+   * pipelines that are already progressing normally are untouched.
+   */
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async reconcileStuckPipelines(): Promise<void> {
+    if (!this.reconcileEnabled || this.reconcileRunning) {
+      return;
+    }
+    this.reconcileRunning = true;
+    try {
+      const where = {
+        status: PipelineStatus.Running,
+      } as unknown as Prisma.PipelineWhereInput;
+      const { rows } = await this.pipelineRepo.findPage(
+        where,
+        1,
+        this.reconcileBatch,
+        'startedAt',
+        'asc',
+      );
+      let reconciled = 0;
+      for (const pipeline of rows) {
+        if (!this.hasReadyPendingNode(pipeline)) {
+          continue;
+        }
+        reconciled += 1;
+        this.logger.warn(
+          `[pipeline:${pipeline.pipelineId}] reconcile detected ready pending node(s) — re-enqueueing`,
+        );
+        await this.enqueueReadyNodes(pipeline.pipelineId);
+      }
+      if (reconciled > 0) {
+        this.logger.log(
+          `reconcileStuckPipelines re-enqueued ${reconciled}/${rows.length} running pipeline(s)`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `reconcileStuckPipelines failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.reconcileRunning = false;
+    }
+  }
+
+  /**
+   * True when the pipeline has at least one pending node whose dependencies are
+   * all terminal and that is not blocked by a lane pause — i.e. a node that
+   * should be queued but may have been orphaned.
+   */
+  private hasReadyPendingNode(pipeline: PipelineRecord): boolean {
+    const edges = this.getEdges(pipeline);
+    const nodes = parsePipelineNodes(pipeline.nodes);
+    return nodes.some(
+      (node) =>
+        node.status === PipelineNodeExecutionStatus.Pending &&
+        areAllDependenciesMet(node.nodeId, nodes, edges, TERMINAL_STATUSES) &&
+        !isNodeBlockedByLanePause(pipeline, node.nodeId, this.laneScopedPause),
+    );
   }
 
   async enqueueReadyNodes(pipelineId: string): Promise<void> {
@@ -87,7 +165,9 @@ export class DependencyResolverService {
     for (const rootId of roots) {
       const node = this.pipelineRepo.getNode(pipeline, rootId);
       if (node?.status === PipelineNodeExecutionStatus.Pending) {
-        toEnqueue.push(rootId);
+        rootCandidates.push(
+          `${rootId}(${node?.type ?? '?'}:pending-root)`,
+        );
       } else {
         rootCandidates.push(
           `${rootId}(${node?.type ?? '?'}:${node?.status ?? 'missing'})`,
@@ -95,23 +175,17 @@ export class DependencyResolverService {
       }
     }
 
-    let scanMode: 'roots' | 'all_pending' = 'roots';
-    if (toEnqueue.length === 0) {
-      scanMode = 'all_pending';
-      for (const node of nodes) {
-        if (node.status !== PipelineNodeExecutionStatus.Pending) {
-          continue;
-        }
-        if (
-          areAllDependenciesMet(
-            node.nodeId,
-            nodes,
-            edges,
-            TERMINAL_STATUSES,
-          )
-        ) {
-          toEnqueue.push(node.nodeId);
-        }
+    // Always scan every pending node with satisfied dependencies. A roots-only
+    // fast path left parallel branch lanes stuck when another pending root existed.
+    const scanMode = 'all_pending' as const;
+    for (const node of nodes) {
+      if (node.status !== PipelineNodeExecutionStatus.Pending) {
+        continue;
+      }
+      if (
+        areAllDependenciesMet(node.nodeId, nodes, edges, TERMINAL_STATUSES)
+      ) {
+        toEnqueue.push(node.nodeId);
       }
     }
 
@@ -135,7 +209,7 @@ export class DependencyResolverService {
         `[pipeline:${pipelineId}] ready nodes blocked by lane pause (pausedLaneId=${pipeline.pausedLaneId ?? 'none'})`,
       );
     }
-    if (filtered.length === 0 && scanMode === 'all_pending') {
+    if (filtered.length === 0) {
       const pendingIds = nodes
         .filter((n) => n.status === PipelineNodeExecutionStatus.Pending)
         .map((n) => n.nodeId);
@@ -148,7 +222,7 @@ export class DependencyResolverService {
     }
     if (rootCandidates.length > 0) {
       this.logger.debug(
-        `[pipeline:${pipelineId}] non-pending roots skipped: ${rootCandidates.join(', ')}`,
+        `[pipeline:${pipelineId}] graph roots: ${rootCandidates.join(', ')}`,
       );
     }
 
@@ -242,9 +316,8 @@ export class DependencyResolverService {
       );
     }
 
-    await Promise.all(
-      filtered.map((nodeId) => this.enqueueNode(pipeline, nodeId)),
-    );
+    // Full-graph scan catches parallel lanes missed by direct-outbound enqueue only.
+    await this.enqueueReadyNodes(pipelineId);
   }
 
   /**
