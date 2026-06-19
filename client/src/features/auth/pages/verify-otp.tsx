@@ -22,7 +22,6 @@ export default function VerifyOtpPage() {
   const mode = searchParams.get("mode")
   const isForgotPasswordFlow = mode === "forgot"
   const emailFromQuery = searchParams.get("email") || ""
-  const next = searchParams.get("next")?.trim() || "/dashboard"
   const emailLocked = Boolean(emailFromQuery.trim())
 
   const subtitle = emailFromQuery.trim() ? (
@@ -41,7 +40,6 @@ export default function VerifyOtpPage() {
           defaultEmail={emailFromQuery}
           emailLocked={emailLocked}
           isForgotPasswordFlow={isForgotPasswordFlow}
-          next={next}
         />
       </AuthCardSection>
     </AuthPageShell>

@@ -1,9 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 import FormInputText from "@/components/common/form/form-input-text"
@@ -13,6 +13,7 @@ import { login, me } from "@/features/admin/api/auth-api"
 import { setAuthFormApiError } from "@/features/auth/api/auth-flow-api"
 import { AuthFormRootError } from "@/features/auth/components/auth-form-root-error"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
+import { refreshQueriesAfterLogin } from "@/shared/queries/auth.query"
 import {
   createLoginSchema,
   type LoginFormValues,
@@ -24,11 +25,9 @@ export function LoginForm() {
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
   const setSession = useAuthStore((s) => s.setSession)
   const setUser = useUserStore((s) => s.setUser)
-
-  const next = searchParams.get("next")?.trim() || "/dashboard"
 
   const loginSchema = useMemo(() => createLoginSchema(tv), [tv])
 
@@ -64,9 +63,10 @@ export function LoginForm() {
         setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refreshQueriesAfterLogin(queryClient)
       toast.success(t("signIn.loggedIn"))
-      navigate(next, { replace: true })
+      navigate("/dashboard", { replace: true })
     },
     onError: (err: unknown) => {
       setAuthFormApiError(form.setError, err, t("signIn.failed"))

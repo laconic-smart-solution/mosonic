@@ -1,10 +1,5 @@
 import type { ReactNode } from "react"
-import {
-  Navigate,
-  Outlet,
-  useLocation,
-  useSearchParams,
-} from "react-router-dom"
+import { Navigate, Outlet } from "react-router-dom"
 
 import Loader from "@/components/core/loader"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
@@ -14,15 +9,13 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 export function GuestOnlyRoute({ children }: { children: ReactNode }) {
   const hydrated = useAuthStoreHydrated()
   const accessToken = useAuthStore((s) => s.accessToken)
-  const [searchParams] = useSearchParams()
-  const next = searchParams.get("next")?.trim() || "/dashboard"
 
   if (!hydrated) {
     return <Loader />
   }
 
   if (accessToken) {
-    return <Navigate to={next} replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return <>{children}</>
@@ -32,20 +25,13 @@ export function GuestOnlyRoute({ children }: { children: ReactNode }) {
 export function ProtectedLayout() {
   const hydrated = useAuthStoreHydrated()
   const accessToken = useAuthStore((s) => s.accessToken)
-  const location = useLocation()
 
   if (!hydrated) {
     return <Loader />
   }
 
   if (!accessToken) {
-    return (
-      <Navigate
-        to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`}
-        replace
-        state={{ from: location.pathname }}
-      />
-    )
+    return <Navigate to="/login" replace />
   }
 
   return <Outlet />
@@ -57,7 +43,7 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   const role = useAuthStore((s) => s.role)
 
   if (!accessToken) {
-    return <Navigate to="/login?next=/admin/dashboard" replace />
+    return <Navigate to="/login" replace />
   }
 
   if (role !== "ADMIN") {

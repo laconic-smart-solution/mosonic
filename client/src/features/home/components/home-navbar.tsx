@@ -107,7 +107,7 @@ export function HomeNavbar() {
               variant="ghost"
               size="sm"
               className="h-8 rounded-full px-4 text-xs"
-              onClick={() => navigate("/login?next=/")}
+              onClick={() => navigate("/login")}
             >
               {t("home:userStrip.logIn")}
             </Button>

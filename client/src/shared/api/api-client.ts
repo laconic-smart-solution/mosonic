@@ -63,9 +63,8 @@ function forceLogoutToLogin() {
   if (!hadSession) {
     return
   }
-  const path = `${window.location.pathname}${window.location.search}`
   if (!window.location.pathname.startsWith("/login")) {
-    window.location.href = `/login?next=${encodeURIComponent(path)}`
+    window.location.href = "/login"
   }
 }
 

@@ -85,7 +85,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin/login",
-    element: <Navigate to="/login?next=/admin/dashboard" replace />,
+    element: <Navigate to="/login" replace />,
   },
   {
     element: <ProtectedLayout />,
