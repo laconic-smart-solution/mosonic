@@ -21,12 +21,52 @@ export class UsersMaintenanceService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     try {
+      await this.fixZernioProfileIdIndex();
+    } catch (err) {
+      this.logger.warn(
+        `zernioProfileId index fix skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    try {
       await this.dedupeUsersByEmail();
     } catch (err) {
       this.logger.warn(
         `User dedupe skipped: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * Legacy `zernioProfileId_1` was a non-sparse unique index. With
+   * `default: null`, only one user could exist without a profile id.
+   * Unset nulls and replace with a sparse unique index.
+   */
+  private async fixZernioProfileIdIndex(): Promise<void> {
+    const collection = this.userModel.collection;
+
+    const unsetResult = await collection.updateMany(
+      { $or: [{ zernioProfileId: null }, { zernioProfileId: '' }] },
+      { $unset: { zernioProfileId: '' } },
+    );
+    if (unsetResult.modifiedCount > 0) {
+      this.logger.log(
+        `Cleared null/empty zernioProfileId on ${unsetResult.modifiedCount} user(s)`,
+      );
+    }
+
+    try {
+      await collection.dropIndex('zernioProfileId_1');
+      this.logger.log('Dropped legacy zernioProfileId_1 index');
+    } catch (err) {
+      const code = (err as { code?: number }).code;
+      if (code !== 27) {
+        throw err;
+      }
+    }
+
+    await this.userModel.syncIndexes();
+    this.logger.log('Synced user indexes (sparse unique zernioProfileId)');
   }
 
   /**
