@@ -71,20 +71,12 @@ export const useSkipNodeMutation = () => {
   })
 }
 
-export type UseGetPipelineQueryOptions = {
-  refetchInterval?: number | false
-}
-
-export const useGetPipelineQuery = (
-  pipelineId: string | undefined,
-  options?: UseGetPipelineQueryOptions,
-) => {
+export const useGetPipelineQuery = (pipelineId: string | undefined) => {
   return useQuery({
     queryKey: ["pipeline", pipelineId],
     queryFn: () => pipelineService.getById(pipelineId!),
     enabled: !!pipelineId,
     retry: false,
-    refetchInterval: options?.refetchInterval,
   })
 }
 

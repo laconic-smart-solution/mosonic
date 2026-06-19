@@ -227,9 +227,7 @@ export default function WorkflowPage() {
   const replanMutation = useReplanPipelineMutation()
   const applyPipelineToWorkflow = useApplyPipelineToWorkflowMutation()
   const updatePipelineNameMutation = useUpdatePipelineNameMutation()
-  const runningPipelineQuery = useGetPipelineQuery(pipelineId, {
-    refetchInterval: processingMode === "processing" ? 2500 : false,
-  })
+  const runningPipelineQuery = useGetPipelineQuery(pipelineId)
   const selectedPipelineSnapshotQuery = useGetPipelineQuery(
     selectedSnapshotPipelineId
   )
@@ -618,7 +616,7 @@ export default function WorkflowPage() {
     joinPipelineRoom(pipelineId)
     void runningPipelineQuery.refetch()
     return () => leavePipelineRoom(pipelineId)
-  }, [pipelineId, runningPipelineQuery.refetch])
+  }, [pipelineId])
 
   // Subscribe once; adopt workflow id from first event when HTTP has not set state yet (fixes race before onSuccess).
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { getSharedSocket } from "./socket-client"
+import { getSharedSocket, joinSocketRoom, leaveSocketRoom } from "./socket-client"
 
 export type PipelineStartedEvent = { pipelineId: string; totalNodes: number }
 export type PipelinePausedEvent = {
@@ -57,14 +57,11 @@ export type NodeFailedFinalEvent = {
 }
 
 export function joinPipelineRoom(pipelineId: string) {
-  const socket = getSharedSocket()
-  socket.emit("join", { room: `pipeline:${pipelineId}` })
-  return socket
+  return joinSocketRoom(`pipeline:${pipelineId}`)
 }
 
 export function leavePipelineRoom(pipelineId: string) {
-  const socket = getSharedSocket()
-  socket.emit("leave", { room: `pipeline:${pipelineId}` })
+  leaveSocketRoom(`pipeline:${pipelineId}`)
 }
 
 export function onPipelineStarted(handler: (payload: PipelineStartedEvent) => void) {
