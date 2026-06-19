@@ -187,16 +187,16 @@ export class OrchestrationService {
       workflow.version ?? 1,
     );
 
-    const executableNodes = materialized.nodes.filter(
-      (n) =>
-        n.type !== WorkflowNodeType.Branch &&
-        n.type !== WorkflowNodeType.Merge,
+    const pipelineStoreNodes = materialized.nodes.filter(
+      (n) => n.type !== WorkflowNodeType.Branch,
     );
 
+    const billableNodeTypes = pipelineStoreNodes
+      .filter((n) => n.type !== WorkflowNodeType.Merge)
+      .map((n) => n.type);
+
     const { totalCredits, breakdown: creditBreakdown } =
-      await this.computeNodeCreditEstimate(
-        executableNodes.map((n) => n.type),
-      );
+      await this.computeNodeCreditEstimate(billableNodeTypes);
     if (totalCredits > 0) {
       const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
       if (creditsRemaining < totalCredits) {
@@ -260,7 +260,7 @@ export class OrchestrationService {
         materializedFromWorkflowVersion: workflow.version ?? 1,
         layout: pipelineLayout,
       },
-      nodes: executableNodes.map((node) => ({
+      nodes: pipelineStoreNodes.map((node) => ({
         nodeId: node.nodeId,
         type: node.type,
         order: node.order,
@@ -302,7 +302,7 @@ export class OrchestrationService {
     });
 
     const pipelineId = pipeline.pipelineId;
-    const totalNodes = executableNodes.length;
+    const totalNodes = pipelineStoreNodes.length;
 
     if (totalCredits > 0) {
       const config = await this.creditCalculation.getConfig();
@@ -331,7 +331,7 @@ export class OrchestrationService {
         `mode=${this.useQueue ? 'queue' : 'inline'} nodes=${totalNodes} ` +
         `templateEdges=${templateEdges.length} materializedEdges=${materialized.edges.length} ` +
         `lanes=[${materialized.lanes.join(', ')}] ` +
-        `types=[${executableNodes.map((n) => n.type).join(' → ')}]`,
+        `types=[${pipelineStoreNodes.map((n) => n.type).join(' → ')}]`,
     );
     if (materialized.edges.length > 0) {
       this.logger.debug(

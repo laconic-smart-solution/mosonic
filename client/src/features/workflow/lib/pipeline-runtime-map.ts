@@ -1,14 +1,14 @@
 import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 
 const RUNTIME_STATUS_PRIORITY: Record<string, number> = {
+  failed_final: 60,
+  failed: 58,
+  completed: 55,
+  skipped: 53,
   running: 50,
   streaming: 45,
   processing: 40,
   retrying: 35,
-  failed_final: 30,
-  failed: 28,
-  completed: 10,
-  skipped: 8,
   pending: 5,
   idle: 0,
 }
@@ -32,7 +32,7 @@ function runtimeStatusPriority(
   return RUNTIME_STATUS_PRIORITY[status] ?? 0
 }
 
-function mergeRuntimeState(
+export function mergeRuntimeState(
   existing: Record<string, unknown>,
   incoming: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -40,6 +40,19 @@ function mergeRuntimeState(
     return { ...existing, ...incoming }
   }
   return { ...incoming, ...existing }
+}
+
+/** Merge two node runtime maps without regressing higher-priority socket state. */
+export function mergePipelineRuntimeMaps(
+  existing: Record<string, Record<string, unknown>>,
+  incoming: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const out = { ...existing }
+  for (const [nodeId, state] of Object.entries(incoming)) {
+    const prev = out[nodeId]
+    out[nodeId] = prev ? mergeRuntimeState(prev, state) : { ...state }
+  }
+  return out
 }
 
 /**
