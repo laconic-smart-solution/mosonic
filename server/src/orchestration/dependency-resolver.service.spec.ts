@@ -76,4 +76,89 @@ describe('dependency resolver graph helpers', () => {
     expect(allTerminal).toBe(true);
     expect(PipelineStatus.Running).toBe('running');
   });
+
+  it('finds ready parallel lane nodes after text completes', () => {
+    const edges = [
+      { from: 'text', to: 'adapt_fb' },
+      { from: 'text', to: 'adapt_ig' },
+      { from: 'text', to: 'adapt_tw' },
+      { from: 'adapt_fb', to: 'merge' },
+      { from: 'adapt_ig', to: 'merge' },
+      { from: 'adapt_tw', to: 'merge' },
+    ];
+    const nodes = [
+      { nodeId: 'text', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'adapt_fb', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'adapt_ig', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'adapt_tw', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'merge', status: PipelineNodeExecutionStatus.Pending },
+    ];
+    const ready = nodes
+      .filter((n) => n.status === PipelineNodeExecutionStatus.Pending)
+      .filter((n) => areAllDependenciesMet(n.nodeId, nodes, edges, terminal))
+      .map((n) => n.nodeId);
+    expect(ready).toEqual(['adapt_ig']);
+  });
+
+  it('reconcile detects orphaned ready lane nodes (one lane completed, others stuck)', () => {
+    const edges = [
+      { from: 'text', to: 'adapt_fb' },
+      { from: 'text', to: 'adapt_ig' },
+      { from: 'text', to: 'adapt_tw' },
+      { from: 'adapt_fb', to: 'merge' },
+      { from: 'adapt_ig', to: 'merge' },
+      { from: 'adapt_tw', to: 'merge' },
+    ];
+    const nodes = [
+      { nodeId: 'text', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'adapt_fb', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'adapt_ig', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'adapt_tw', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'merge', status: PipelineNodeExecutionStatus.Pending },
+    ];
+    const hasReadyPending = nodes.some(
+      (n) =>
+        n.status === PipelineNodeExecutionStatus.Pending &&
+        areAllDependenciesMet(n.nodeId, nodes, edges, terminal),
+    );
+    expect(hasReadyPending).toBe(true);
+  });
+
+  it('reconcile ignores pipelines whose pending nodes wait on a running dep', () => {
+    const edges = [
+      { from: 'text', to: 'image' },
+      { from: 'image', to: 'video' },
+    ];
+    const nodes = [
+      { nodeId: 'text', status: PipelineNodeExecutionStatus.Completed },
+      { nodeId: 'image', status: PipelineNodeExecutionStatus.Running },
+      { nodeId: 'video', status: PipelineNodeExecutionStatus.Pending },
+    ];
+    const hasReadyPending = nodes.some(
+      (n) =>
+        n.status === PipelineNodeExecutionStatus.Pending &&
+        areAllDependenciesMet(n.nodeId, nodes, edges, terminal),
+    );
+    expect(hasReadyPending).toBe(false);
+  });
+
+  it('at pipeline start only enqueues nodes with satisfied dependencies', () => {
+    const edges = [
+      { from: 'text', to: 'adapt_fb' },
+      { from: 'text', to: 'adapt_tw' },
+      { from: 'adapt_fb', to: 'merge' },
+      { from: 'adapt_tw', to: 'merge' },
+    ];
+    const nodes = [
+      { nodeId: 'text', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'adapt_fb', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'adapt_tw', status: PipelineNodeExecutionStatus.Pending },
+      { nodeId: 'merge', status: PipelineNodeExecutionStatus.Pending },
+    ];
+    const ready = nodes
+      .filter((n) => n.status === PipelineNodeExecutionStatus.Pending)
+      .filter((n) => areAllDependenciesMet(n.nodeId, nodes, edges, terminal))
+      .map((n) => n.nodeId);
+    expect(ready).toEqual(['text']);
+  });
 });
