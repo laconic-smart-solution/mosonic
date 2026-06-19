@@ -1,10 +1,19 @@
 import {
+  getSharedSocket,
   joinSocketRoom,
   leaveSocketRoom,
   subscribeSocketEvent,
 } from "./socket-client"
 
 type SocketHandler = (...args: unknown[]) => void
+
+function subscribePipelineEvent(
+  event: string,
+  handler: SocketHandler,
+): () => void {
+  getSharedSocket()
+  return subscribeSocketEvent(event, handler)
+}
 
 export type PipelineStartedEvent = { pipelineId: string; totalNodes: number }
 export type PipelinePausedEvent = {
@@ -71,38 +80,38 @@ export function leavePipelineRoom(pipelineId: string) {
 }
 
 export function onPipelineStarted(handler: (payload: PipelineStartedEvent) => void) {
-  return subscribeSocketEvent("pipeline:started", handler as SocketHandler)
+  return subscribePipelineEvent("pipeline:started", handler as SocketHandler)
 }
 export function onPipelinePaused(handler: (payload: PipelinePausedEvent) => void) {
-  return subscribeSocketEvent("pipeline:paused", handler as SocketHandler)
+  return subscribePipelineEvent("pipeline:paused", handler as SocketHandler)
 }
 export function onPipelineLanePaused(
   handler: (payload: PipelineLanePausedEvent) => void,
 ) {
-  return subscribeSocketEvent("pipeline:lane_paused", handler as SocketHandler)
+  return subscribePipelineEvent("pipeline:lane_paused", handler as SocketHandler)
 }
 export function onPipelineCompleted(handler: (payload: PipelineCompletedEvent) => void) {
-  return subscribeSocketEvent("pipeline:completed", handler as SocketHandler)
+  return subscribePipelineEvent("pipeline:completed", handler as SocketHandler)
 }
 export function onPipelineFailed(handler: (payload: PipelineFailedEvent) => void) {
-  return subscribeSocketEvent("pipeline:failed", handler as SocketHandler)
+  return subscribePipelineEvent("pipeline:failed", handler as SocketHandler)
 }
 
 export function onNodeStarted(handler: (payload: NodeStartedEvent) => void) {
-  return subscribeSocketEvent("node:started", handler as SocketHandler)
+  return subscribePipelineEvent("node:started", handler as SocketHandler)
 }
 export function onNodeStreaming(handler: (payload: NodeStreamingEvent) => void) {
-  return subscribeSocketEvent("node:streaming", handler as SocketHandler)
+  return subscribePipelineEvent("node:streaming", handler as SocketHandler)
 }
 export function onNodeProcessing(handler: (payload: NodeProcessingEvent) => void) {
-  return subscribeSocketEvent("node:processing", handler as SocketHandler)
+  return subscribePipelineEvent("node:processing", handler as SocketHandler)
 }
 export function onNodeRetrying(handler: (payload: NodeRetryingEvent) => void) {
-  return subscribeSocketEvent("node:retrying", handler as SocketHandler)
+  return subscribePipelineEvent("node:retrying", handler as SocketHandler)
 }
 export function onNodeCompleted(handler: (payload: NodeCompletedEvent) => void) {
-  return subscribeSocketEvent("node:completed", handler as SocketHandler)
+  return subscribePipelineEvent("node:completed", handler as SocketHandler)
 }
 export function onNodeFailedFinal(handler: (payload: NodeFailedFinalEvent) => void) {
-  return subscribeSocketEvent("node:failed_final", handler as SocketHandler)
+  return subscribePipelineEvent("node:failed_final", handler as SocketHandler)
 }

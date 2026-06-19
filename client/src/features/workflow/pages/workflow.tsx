@@ -48,6 +48,7 @@ import {
 import type { WfRfNode } from "@/features/workflow/data/workflow-model"
 import { pipelineGraphToRf } from "@/features/workflow/lib/branch-layout"
 import {
+  mapPipelineRuntimeToCanvas,
   mergePipelineRuntimeMaps,
   resolveCanvasNodeIdToPipeline,
 } from "@/features/workflow/lib/pipeline-runtime-map"
@@ -94,6 +95,7 @@ import {
   onPipelineLanePaused,
   onPipelineStarted,
 } from "@/shared/socket/pipeline-events"
+import { getSharedSocket } from "@/shared/socket/socket-client"
 import {
   joinWorkflowRoom,
   leaveWorkflowRoom,
@@ -247,7 +249,16 @@ export default function WorkflowPage() {
   const replanMutation = useReplanPipelineMutation()
   const applyPipelineToWorkflow = useApplyPipelineToWorkflowMutation()
   const updatePipelineNameMutation = useUpdatePipelineNameMutation()
-  const runningPipelineQuery = useGetPipelineQuery(pipelineId)
+  const runningPipelineQuery = useGetPipelineQuery(pipelineId, {
+    refetchInterval: (query) => {
+      if (!pipelineId) return false
+      if (processingMode === "processing") return 3000
+      const status = query.state.data?.pipeline?.status
+      if (status === "running" || status === "paused") return 3000
+      return false
+    },
+    refetchIntervalInBackground: false,
+  })
   const selectedPipelineSnapshotQuery = useGetPipelineQuery(
     selectedSnapshotPipelineId
   )
@@ -364,8 +375,10 @@ export default function WorkflowPage() {
 
   const displayRuntimeById = useMemo(() => {
     if (selectedSnapshotPipelineId) return {}
-    return nodeRuntimeById
-  }, [nodeRuntimeById, selectedSnapshotPipelineId])
+    // Materialized pipeline canvas uses pipeline node ids; template canvas uses workflow node ids.
+    if (pipelineCanvasOverride) return nodeRuntimeById
+    return mapPipelineRuntimeToCanvas(nodeRuntimeById)
+  }, [nodeRuntimeById, pipelineCanvasOverride, selectedSnapshotPipelineId])
 
   useEffect(() => {
     setCanvasEdited(false)
@@ -696,8 +709,10 @@ export default function WorkflowPage() {
 
   const resetPipelineProcessingStateRef = useRef<() => void>(() => {})
 
-  // Re-subscribe when pipelineId changes so handlers attach to the live socket; adopt id from first event when HTTP has not returned yet.
+  // Subscribe once; adopt pipeline id from first event when HTTP has not returned yet.
   useEffect(() => {
+    getSharedSocket()
+
     function adoptPipelineFromSocket(id: string): void {
       pipelineInFlightRef.current = false
       pipelineCompletionHandledRef.current = false
