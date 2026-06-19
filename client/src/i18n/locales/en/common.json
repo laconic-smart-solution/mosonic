@@ -22,9 +22,9 @@
   "systemMessagesEnglish": "System messages from the server may appear in English.",
   "searchPlaceholder": "Search pages…",
   "search": {
-    "ariaLabel": "Search content and pages",
-    "placeholder": "Search content and pages…",
-    "noMatches": "No matching pages or content.",
+    "ariaLabel": "Search pages and routes",
+    "placeholder": "Search pages and routes…",
+    "noMatches": "No matching pages or routes.",
     "goTo": "Go to",
     "content": "Content",
     "searching": "Searching…",
