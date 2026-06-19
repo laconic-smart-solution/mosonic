@@ -32,7 +32,9 @@
     "video_generation": "วิดีโอ",
     "translation": "แปลภาษา",
     "transcription": "ถอดเสียง",
-    "summarization": "สรุปเนื้อหา"
+    "summarization": "สรุปเนื้อหา",
+    "adapt": "ปรับแต่ง",
+    "intelligence": "ข่าวกรอง"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"

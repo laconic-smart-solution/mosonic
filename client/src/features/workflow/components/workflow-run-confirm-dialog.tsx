@@ -19,6 +19,7 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   workflowId: string | undefined
+  ruleId: string | undefined
   onConfirm: () => void
   isStarting?: boolean
 }
@@ -31,12 +32,13 @@ export function WorkflowRunConfirmDialog({
   open,
   onOpenChange,
   workflowId,
+  ruleId,
   onConfirm,
   isStarting = false,
 }: Props) {
   const { t } = useTranslation("credit")
   const [topupOpen, setTopupOpen] = useState(false)
-  const estimateQuery = usePipelineEstimateQuery(workflowId, open)
+  const estimateQuery = usePipelineEstimateQuery(workflowId, ruleId, open)
 
   const estimate = estimateQuery.data
   const loading = estimateQuery.isLoading || estimateQuery.isFetching

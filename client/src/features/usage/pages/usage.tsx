@@ -36,6 +36,7 @@ import { T } from "@/lib/tokens"
 import {
   useUsageHistoryQuery,
   useUsageSummaryQuery,
+  useCreditBalanceSocketRefresh,
 } from "@/shared/queries/usage.query"
 import { onCreditLowBalance } from "@/shared/socket/credit-events"
 
@@ -48,6 +49,7 @@ function formatCredits(value: number): string {
 export default function UsagePage() {
   const { t } = useTranslation("usage")
   const { t: tc } = useTranslation("common")
+  useCreditBalanceSocketRefresh()
   const [range, setRange] = useState<UsageRangeKey>("month")
   const [page, setPage] = useState(1)
   const [lowBalance, setLowBalance] = useState(false)

@@ -3,9 +3,13 @@ export const BILLABLE_NODE_CREDIT_DEFAULTS: ReadonlyArray<{
   nodeType: string;
   costUsd: number;
 }> = [
+  { nodeType: 'keyword_planner', costUsd: 0.01 },
+  { nodeType: 'intelligence', costUsd: 0.01 },
   { nodeType: 'text_generation', costUsd: 0.01 },
-  { nodeType: 'translation', costUsd: 0.008 },
+  { nodeType: 'adapt', costUsd: 0.008 },
+  { nodeType: 'transcription', costUsd: 0.006 },
   { nodeType: 'summarization', costUsd: 0.006 },
+  { nodeType: 'translation', costUsd: 0.008 },
   { nodeType: 'image_generation', costUsd: 0.04 },
   { nodeType: 'video_generation', costUsd: 0.48 },
 ] as const;

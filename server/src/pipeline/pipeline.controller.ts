@@ -86,7 +86,7 @@ export class PipelineController {
   )
   estimatePipeline(@Req() req: Request, @Body() dto: EstimatePipelineDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
-    return this.pipelineService.estimatePipeline(dto.workflowId, auth);
+    return this.pipelineService.estimatePipeline(dto, auth);
   }
 
   @Post('start')

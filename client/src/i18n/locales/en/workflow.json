@@ -32,7 +32,9 @@
     "video_generation": "Video",
     "translation": "Translation",
     "transcription": "Transcription",
-    "summarization": "Summarization"
+    "summarization": "Summarization",
+    "adapt": "Adapt",
+    "intelligence": "Intelligence"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} For {{channel}}"

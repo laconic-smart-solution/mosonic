@@ -31,7 +31,11 @@
     "loading": "กำลังโหลดแพ็กเกจ…"
   },
   "nodeType": {
+    "keyword_planner": "วางแผนคีย์เวิร์ด",
+    "intelligence": "ข่าวกรอง",
     "text_generation": "สร้างข้อความ",
+    "adapt": "ปรับแต่ง",
+    "transcription": "ถอดเสียง",
     "translation": "การแปล",
     "summarization": "การสรุป",
     "image_generation": "สร้างรูปภาพ",

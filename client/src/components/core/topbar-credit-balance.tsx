@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
-import { useUsageSummaryQuery } from "@/shared/queries/usage.query"
+import { useUsageSummaryQuery, useCreditBalanceSocketRefresh } from "@/shared/queries/usage.query"
 
 function formatCredits(value: number): string {
   return Math.round(value).toLocaleString()
@@ -17,6 +17,7 @@ function formatCredits(value: number): string {
 
 export function TopbarCreditBalance() {
   const { t } = useTranslation("common")
+  useCreditBalanceSocketRefresh()
   const { data, isLoading, isError } = useUsageSummaryQuery()
 
   const creditsRemaining = data?.creditsRemaining ?? 0
