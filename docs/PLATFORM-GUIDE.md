@@ -1,6 +1,6 @@
-# NeuralTex Platform Guide
+# Mosonic Platform Guide
 
-**Neutral Tex** is the monorepo name; **NeuralTex** is the product — a Thailand-based SaaS platform for AI-driven digital content generation and multi-channel publishing.
+**Mosonic** is a Thailand-based SaaS platform for AI-driven digital content generation and multi-channel publishing.
 
 This document explains the product concept, end-to-end flow, technology, architecture, how the system behaves, the user interface, user journeys, manuals for customers and admins, and role differences.
 
@@ -26,9 +26,9 @@ For local development setup, see the [root README](../README.md).
 
 ## 1. Product concept
 
-### What NeuralTex is
+### What Mosonic is
 
-NeuralTex helps businesses produce marketing content — text, images, video, translations — and publish it to social channels (Facebook, Instagram, Twitter/X, LinkedIn) through an **orchestration layer** that controls tone, format, length, keywords, and validation.
+Mosonic helps businesses produce marketing content — text, images, video, translations — and publish it to social channels (Facebook, Instagram, Twitter/X, LinkedIn) through an **orchestration layer** that controls tone, format, length, keywords, and validation.
 
 The platform does **not** train foundational language models. The proprietary value is in **how** user strategy and prompts are turned into precise, sequential AI instructions, with live progress, review, publishing, and performance feedback.
 

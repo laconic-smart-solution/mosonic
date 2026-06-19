@@ -1,0 +1,11 @@
+{
+  "emailInvalid": "Please enter a valid email address.",
+  "passwordMin": "Password must be at least 8 characters.",
+  "confirmPasswordMin": "Confirm password must be at least 8 characters.",
+  "passwordsMismatch": "Passwords do not match.",
+  "otpCode6Digits": "Please enter the 6-digit code.",
+  "usernameRequired": "Username is required.",
+  "firstNameRequired": "First name is required.",
+  "lastNameRequired": "Last name is required.",
+  "fieldRequired": "This field is required."
+}

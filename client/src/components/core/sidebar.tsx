@@ -16,6 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import Logo from "@/assets/icon/logo"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/shared/stores/auth.store"
@@ -299,31 +300,7 @@ export function SidebarPanel() {
           )}
         >
           <div className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#00A589] to-[#254C94] shadow-[0_0_12px_#00A58950]">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden
-            >
-              <circle cx="8" cy="8" r="3" fill="white" opacity="0.9" />
-              <circle
-                cx="8"
-                cy="8"
-                r="6"
-                stroke="white"
-                strokeWidth="1.2"
-                opacity="0.4"
-              />
-              <circle
-                cx="8"
-                cy="8"
-                r="7.5"
-                stroke="white"
-                strokeWidth="0.6"
-                opacity="0.2"
-              />
-            </svg>
+            <Logo width={18} height={18} className="rounded-sm" aria-hidden />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-white">

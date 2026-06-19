@@ -4,6 +4,7 @@ import i18n from "@/i18n"
 import type { WfNodeData, WfRfNode } from "@/features/workflow/data/workflow-model"
 import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
 import { laneKeyFromRfNode } from "@/features/workflow/lib/workflow-lane-layout"
+import { VIDEO_CINEMATIC_UI_ENABLED } from "@/features/workflow/lib/video-generation-ui"
 
 import { canvasNextMatrix, type PlusPopoverKey } from "@workflow-next-matrix"
 
@@ -432,6 +433,7 @@ export function mergeHeygenVideoConfig(
     !String(patch.heygenAvatarId ?? "").trim()
 
   if (
+    VIDEO_CINEMATIC_UI_ENABLED &&
     next.mode === "presenter" &&
     !hasAvatar &&
     (settingPresenterMode || clearingAvatar)

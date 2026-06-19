@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
 import { motion } from "framer-motion"
+import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
 
@@ -8,6 +9,7 @@ type HomeOrbProps = {
 }
 
 export function HomeOrb({ orbPulse }: HomeOrbProps) {
+  const { t } = useTranslation("common")
   const [wiggle, setWiggle] = useState(false)
   const [rippleKey, setRippleKey] = useState(0)
   const [spinFast, setSpinFast] = useState(false)
@@ -47,7 +49,7 @@ export function HomeOrb({ orbPulse }: HomeOrbProps) {
 
         <motion.button
           type="button"
-          aria-label="NeuralTex — tap for a surprise"
+          aria-label={`${t("appName")} — tap for a surprise`}
           onClick={handleClick}
           className={cn(
             "relative flex size-[260px] cursor-pointer items-center justify-center rounded-full border outline-none",
@@ -110,7 +112,7 @@ export function HomeOrb({ orbPulse }: HomeOrbProps) {
             </motion.div>
             <div className="text-center">
               <div className="text-[13px] font-bold tracking-[2px] text-navy-700 uppercase dark:text-foreground">
-                NeuralTex
+                {t("appName")}
               </div>
               <div className="mt-px text-[9px] font-semibold tracking-wide text-primary uppercase">
                 AI Platform

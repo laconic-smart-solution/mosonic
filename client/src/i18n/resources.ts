@@ -1,6 +1,7 @@
 import enAdmin from "./locales/en/admin.json"
 import enAuth from "./locales/en/auth.json"
 import enCommon from "./locales/en/common.json"
+import enValidation from "./locales/en/validation.json"
 import enComponentsLib from "./locales/en/componentsLib.json"
 import enContent from "./locales/en/content.json"
 import enCost from "./locales/en/cost.json"
@@ -21,6 +22,7 @@ import enWorkflow from "./locales/en/workflow.json"
 import thAdmin from "./locales/th/admin.json"
 import thAuth from "./locales/th/auth.json"
 import thCommon from "./locales/th/common.json"
+import thValidation from "./locales/th/validation.json"
 import thComponentsLib from "./locales/th/componentsLib.json"
 import thContent from "./locales/th/content.json"
 import thCost from "./locales/th/cost.json"
@@ -41,6 +43,7 @@ import thWorkflow from "./locales/th/workflow.json"
 import zhAdmin from "./locales/zh-CN/admin.json"
 import zhAuth from "./locales/zh-CN/auth.json"
 import zhCommon from "./locales/zh-CN/common.json"
+import zhValidation from "./locales/zh-CN/validation.json"
 import zhComponentsLib from "./locales/zh-CN/componentsLib.json"
 import zhContent from "./locales/zh-CN/content.json"
 import zhCost from "./locales/zh-CN/cost.json"
@@ -60,6 +63,7 @@ import zhWorkflow from "./locales/zh-CN/workflow.json"
 
 export const I18N_NAMESPACES = [
   "common",
+  "validation",
   "auth",
   "home",
   "dashboard",
@@ -85,6 +89,7 @@ export type I18nNamespace = (typeof I18N_NAMESPACES)[number]
 export const resources = {
   en: {
     common: enCommon,
+    validation: enValidation,
     auth: enAuth,
     home: enHome,
     dashboard: enDashboard,
@@ -106,6 +111,7 @@ export const resources = {
   },
   th: {
     common: thCommon,
+    validation: thValidation,
     auth: thAuth,
     home: thHome,
     dashboard: thDashboard,
@@ -127,6 +133,7 @@ export const resources = {
   },
   "zh-CN": {
     common: zhCommon,
+    validation: zhValidation,
     auth: zhAuth,
     home: zhHome,
     dashboard: zhDashboard,

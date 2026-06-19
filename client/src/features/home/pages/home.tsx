@@ -188,7 +188,6 @@ export default function HomePage() {
           onOpenRecentContent={(contentId, uid) =>
             navigate(uid ? `/upload/${uid}` : `/content/${contentId}`)
           }
-          onOpenRecentLibrary={() => navigate("/content")}
         >
           <HomePromptBar
             prompt={prompt}

@@ -23,7 +23,7 @@ describe('NewsRelevanceService keyword pre-filter', () => {
 
   const baseRule = {
     ruleId: 'rule-1',
-    brand: { industry: 'SaaS / Technology', brandName: 'NeuralTex' },
+    brand: { industry: 'SaaS / Technology', brandName: 'Mosonic' },
     campaign: { goals: ['brand awareness'] },
     newsTrigger: { keywords: [] as string[] },
   } as Rule;

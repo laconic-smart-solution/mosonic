@@ -1,5 +1,5 @@
 {
-  "appName": "NeuralTex",
+  "appName": "Mosonic",
   "appTagline": "แพลตฟอร์ม AI",
   "platform": "แพลตฟอร์ม",
   "account": "บัญชี",
@@ -14,6 +14,8 @@
   "pendingSuggestions": "คำแนะนำ AI ที่รอดำเนินการ",
   "language": "ภาษา",
   "languageDescription": "เลือกภาษาสำหรับส่วนติดต่อของแอปพลิเคชัน",
+  "showPassword": "แสดงรหัสผ่าน",
+  "hidePassword": "ซ่อนรหัสผ่าน",
   "languages": {
     "en": "English",
     "th": "ไทย",

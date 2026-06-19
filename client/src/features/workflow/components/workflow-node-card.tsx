@@ -8,6 +8,7 @@ import {
   backendTypeToCanvas,
   getWfNodeTypeLabel,
 } from "@/features/workflow/data/workflow-model"
+import { effectiveVideoMode } from "@/features/workflow/lib/video-generation-ui"
 import type { WorkflowNode, WorkflowNodeType } from "@/shared/types/workflow.type"
 
 function summarizeNodeConfig(
@@ -45,7 +46,7 @@ function summarizeNodeConfig(
         t("nodeCard.defaultImageSettings")
       )
     case "video_generation":
-      if (c.mode === "presenter") {
+      if (effectiveVideoMode(c) === "presenter") {
         return [
           t("nodeCard.presenter"),
           c.duration !== undefined && c.duration !== null
