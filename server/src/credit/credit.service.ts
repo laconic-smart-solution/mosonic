@@ -158,49 +158,141 @@ export class CreditService {
     const total = rows.reduce((sum, row) => sum + row.credits, 0);
     if (total <= 0) return;
 
-    try {
-      await this.ledgerModel.insertMany(
-        rows.map((row) => ({
-          userId: args.userId,
-          pipelineRef: args.pipelineId,
-          nodeId: `${args.pipelineId}:${row.nodeType}`,
-          nodeType: row.nodeType,
-          provider: 'system',
-          model: '',
-          rawCostUsd: 0,
-          overheadUsd: 0,
-          marginAppliedUsd: 0,
-          creditPriceUsdSnapshot: args.creditPriceUsd,
-          creditsCharged: row.credits,
-          billingPeriod: currentBillingPeriod(),
-        })),
-      );
+    await this.ledgerModel.insertMany(
+      rows.map((row) => ({
+        userId: args.userId,
+        pipelineRef: args.pipelineId,
+        nodeId: `${args.pipelineId}:${row.nodeType}`,
+        nodeType: row.nodeType,
+        provider: 'system',
+        model: '',
+        rawCostUsd: 0,
+        overheadUsd: 0,
+        marginAppliedUsd: 0,
+        creditPriceUsdSnapshot: args.creditPriceUsd,
+        creditsCharged: row.credits,
+        billingPeriod: currentBillingPeriod(),
+      })),
+    );
 
-      const updated = await this.userPlanModel
-        .findOneAndUpdate(
-          { userId: args.userId, status: 'active' },
-          {
-            $inc: {
-              creditsUsed: total,
-              creditsRemaining: -total,
-            },
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId: args.userId, status: 'active' },
+        {
+          $inc: {
+            creditsUsed: total,
+            creditsRemaining: -total,
           },
-          { new: true },
-        )
-        .exec();
+        },
+        { new: true },
+      )
+      .exec();
 
-      if (!updated) {
-        this.logger.warn(
-          `No active user_plan for userId=${args.userId}; pipeline charge logged without balance update`,
-        );
-        return;
-      }
-
-      await this.maybeEmitLowBalance(updated);
-    } catch (err) {
-      this.logger.warn(
-        `Pipeline credit charge failed: ${err instanceof Error ? err.message : String(err)}`,
+    if (!updated) {
+      throw new NotFoundException(
+        `No active plan found for userId=${args.userId}`,
       );
+    }
+
+    await this.maybeEmitLowBalance(updated);
+    this.emitBalanceUpdated(updated);
+  }
+
+  /** Charge credits for a single content node rerun or generate-more execution. */
+  async chargeSingleNodeRun(args: {
+    userId: string;
+    pipelineRef: string;
+    contentRef: string;
+    nodeId: string;
+    nodeType: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+
+    await new this.ledgerModel({
+      userId: args.userId,
+      pipelineRef: args.pipelineRef,
+      contentRef: args.contentRef,
+      nodeId: args.nodeId,
+      nodeType: args.nodeType,
+      provider: 'system',
+      model: '',
+      rawCostUsd: 0,
+      overheadUsd: 0,
+      marginAppliedUsd: 0,
+      creditPriceUsdSnapshot: args.creditPriceUsd,
+      creditsCharged: args.credits,
+      billingPeriod: currentBillingPeriod(),
+    }).save();
+
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId: args.userId, status: 'active' },
+        {
+          $inc: {
+            creditsUsed: args.credits,
+            creditsRemaining: -args.credits,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(
+        `No active plan found for userId=${args.userId}`,
+      );
+    }
+
+    await this.maybeEmitLowBalance(updated);
+    this.emitBalanceUpdated(updated);
+  }
+
+  /** Refund a single-node content charge when execution fails. */
+  async refundSingleNodeRun(args: {
+    userId: string;
+    pipelineRef: string;
+    contentRef: string;
+    nodeId: string;
+    nodeType: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+
+    await new this.ledgerModel({
+      userId: args.userId,
+      pipelineRef: args.pipelineRef,
+      contentRef: args.contentRef,
+      nodeId: `${args.nodeId}:refund`,
+      nodeType: args.nodeType,
+      provider: 'system',
+      model: '',
+      rawCostUsd: 0,
+      overheadUsd: 0,
+      marginAppliedUsd: 0,
+      creditPriceUsdSnapshot: args.creditPriceUsd,
+      creditsCharged: -args.credits,
+      billingPeriod: currentBillingPeriod(),
+    }).save();
+
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId: args.userId, status: 'active' },
+        {
+          $inc: {
+            creditsUsed: -args.credits,
+            creditsRemaining: args.credits,
+          },
+          $set: { lowBalanceNotifiedAt: null },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (updated) {
+      this.emitBalanceUpdated(updated);
     }
   }
 
@@ -247,8 +339,12 @@ export class CreditService {
             },
             $set: { lowBalanceNotifiedAt: null },
           },
+          { new: true },
         )
-        .exec();
+        .exec()
+        .then((updated) => {
+          if (updated) this.emitBalanceUpdated(updated);
+        });
     } catch (err) {
       this.logger.warn(
         `Pipeline credit refund failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -324,10 +420,25 @@ export class CreditService {
       }
 
       await this.maybeEmitLowBalance(updated);
+      this.emitBalanceUpdated(updated);
     } catch (err) {
       this.logger.warn(
         `Credit deduction failed: ${err instanceof Error ? err.message : String(err)}`,
       );
+      throw err;
+    }
+  }
+
+  private emitBalanceUpdated(userPlan: UserPlanDocument): void {
+    try {
+      this.events.emitToRoom(userRoom(userPlan.userId), 'credit:balance_updated', {
+        userId: userPlan.userId,
+        creditsRemaining: userPlan.creditsRemaining,
+        creditsUsed: userPlan.creditsUsed,
+        creditsPerMonth: userPlan.creditsPerMonth,
+      });
+    } catch {
+      // noop — credit layer must not break pipelines
     }
   }
 

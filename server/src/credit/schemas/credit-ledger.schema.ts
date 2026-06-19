@@ -24,7 +24,7 @@ export class CreditLedger {
   @Prop({ required: true })
   provider: string;
 
-  @Prop({ required: true, default: '' })
+  @Prop({ default: 'openai' })
   model: string;
 
   @Prop({ required: true })

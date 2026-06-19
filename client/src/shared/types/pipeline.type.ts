@@ -13,6 +13,7 @@ export type StartPipelineResponse = {
 
 export type PipelineEstimatePayload = {
   workflowId: string
+  ruleId?: string
 }
 
 export type PipelineEstimateBreakdownItem = {

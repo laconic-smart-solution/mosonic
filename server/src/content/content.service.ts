@@ -11,6 +11,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { mergeUserIdFilter } from '../auth/tenancy.util';
 import type { TenancyAuth } from '../auth/tenancy.types';
+import { CreditCalculationService } from '../credit/credit-calculation.service';
+import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
+import { CreditService } from '../credit/credit.service';
+import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { NodeExecutor } from '../orchestration/node-executor.service';
 import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
@@ -22,6 +26,7 @@ import {
 import { Pipeline } from '../pipeline/schemas/pipeline.schema';
 import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
 import { EventsService } from '../events/events.service';
 import { UploadService } from '../upload/upload.service';
 import {
@@ -88,12 +93,17 @@ export class ContentService {
     private readonly uploadService: UploadService,
     private readonly workflowService: WorkflowService,
     private readonly nodeExecutor: NodeExecutor,
+    private readonly creditService: CreditService,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly creditCalculation: CreditCalculationService,
     @InjectModel(Pipeline.name)
     private readonly pipelineModel: Model<PipelineDocument>,
     @InjectModel(WorkflowNode.name)
     private readonly workflowNodeModel: Model<WorkflowNodeDocument>,
     @InjectModel(Rule.name)
     private readonly ruleModel: Model<RuleDocument>,
+    @InjectModel(UserPlan.name)
+    private readonly userPlanModel: Model<UserPlanDocument>,
   ) {}
 
   async findPage(
@@ -356,6 +366,14 @@ export class ContentService {
       nodeForRun.config = mergedConfig;
     }
 
+    const creditsCharged = await this.chargeForContentNode({
+      userId: auth.userId,
+      contentId: content.contentId,
+      pipelineId: pipeline.pipelineId,
+      nodeId: dto.nodeId,
+      nodeType: nodeForRun.type,
+    });
+
     void this.runRerunExecution({
       content,
       pipeline,
@@ -364,6 +382,7 @@ export class ContentService {
       dto,
       previousOutputs,
       auth,
+      creditsCharged,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -469,6 +488,14 @@ export class ContentService {
       auth,
     );
 
+    const creditsCharged = await this.chargeForContentNode({
+      userId: auth.userId,
+      contentId: content.contentId,
+      pipelineId: pipeline.pipelineId,
+      nodeId,
+      nodeType: dto.type,
+    });
+
     void this.runGenerateMoreExecution({
       content,
       pipeline,
@@ -479,6 +506,7 @@ export class ContentService {
       config,
       previousOutputs: previousOutputsFromDb,
       auth,
+      creditsCharged,
     }).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -487,6 +515,68 @@ export class ContentService {
     });
 
     return { success: true, nodeId };
+  }
+
+  private async getCreditsRemaining(userId: string): Promise<number> {
+    const userPlan = await this.userPlanModel
+      .findOne({ userId, status: 'active' })
+      .lean<{ creditsRemaining?: number }>()
+      .exec();
+    return userPlan?.creditsRemaining ?? 0;
+  }
+
+  private async chargeForContentNode(args: {
+    userId: string;
+    contentId: string;
+    pipelineId: string;
+    nodeId: string;
+    nodeType: string;
+  }): Promise<number> {
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(args.nodeType)) ??
+      0;
+    if (creditsEach <= 0) return 0;
+
+    const creditsRemaining = await this.getCreditsRemaining(args.userId);
+    if (creditsRemaining < creditsEach) {
+      throw new InsufficientCreditsException({
+        requiredCredits: creditsEach,
+        creditsRemaining,
+      });
+    }
+
+    const config = await this.creditCalculation.getConfig();
+    await this.creditService.chargeSingleNodeRun({
+      userId: args.userId,
+      pipelineRef: args.pipelineId,
+      contentRef: args.contentId,
+      nodeId: args.nodeId,
+      nodeType: args.nodeType,
+      credits: creditsEach,
+      creditPriceUsd: config.creditPriceUsd,
+    });
+    return creditsEach;
+  }
+
+  private async refundContentNodeCharge(args: {
+    userId: string;
+    contentId: string;
+    pipelineId: string;
+    nodeId: string;
+    nodeType: string;
+    credits: number;
+  }): Promise<void> {
+    if (args.credits <= 0) return;
+    const config = await this.creditCalculation.getConfig();
+    await this.creditService.refundSingleNodeRun({
+      userId: args.userId,
+      pipelineRef: args.pipelineId,
+      contentRef: args.contentId,
+      nodeId: args.nodeId,
+      nodeType: args.nodeType,
+      credits: args.credits,
+      creditPriceUsd: config.creditPriceUsd,
+    });
   }
 
   private typeOutputSlotFilled(
@@ -524,6 +614,7 @@ export class ContentService {
     config: WorkflowNodeConfig;
     previousOutputs: PreviousOutputs;
     auth: TenancyAuth;
+    creditsCharged: number;
   }): Promise<void> {
     const {
       content,
@@ -535,7 +626,9 @@ export class ContentService {
       config,
       previousOutputs,
       auth,
+      creditsCharged,
     } = args;
+    const userId = auth.userId;
     try {
       const contentPrompt = pipeline.contentPrompt;
       const totalNodes = await this.workflowNodeModel.countDocuments(
@@ -568,7 +661,20 @@ export class ContentService {
         auth,
       );
     } catch {
-      // Final failure already emitted on content room by NodeExecutor.
+      await this.refundContentNodeCharge({
+        userId,
+        contentId: content.contentId,
+        pipelineId: pipeline.pipelineId,
+        nodeId,
+        nodeType: dto.type,
+        credits: creditsCharged,
+      }).catch((refundErr: unknown) => {
+        const msg =
+          refundErr instanceof Error ? refundErr.message : String(refundErr);
+        this.logger.warn(
+          `Content generate-more credit refund failed (${content.contentId}): ${msg}`,
+        );
+      });
     }
   }
 
@@ -580,8 +686,11 @@ export class ContentService {
     dto: RerunNodeDto;
     previousOutputs: PreviousOutputs;
     auth: TenancyAuth;
+    creditsCharged: number;
   }): Promise<void> {
-    const { content, pipeline, wfNode, rule, previousOutputs, auth } = args;
+    const { content, pipeline, wfNode, rule, previousOutputs, auth, creditsCharged } =
+      args;
+    const userId = auth.userId;
     const contentPrompt = pipeline.contentPrompt;
     try {
       const totalNodes = await this.workflowNodeModel.countDocuments(
@@ -614,7 +723,20 @@ export class ContentService {
         auth,
       );
     } catch {
-      // Final failure already emitted on pipeline + content rooms by NodeExecutor.
+      await this.refundContentNodeCharge({
+        userId,
+        contentId: content.contentId,
+        pipelineId: pipeline.pipelineId,
+        nodeId: wfNode.nodeId,
+        nodeType: wfNode.type,
+        credits: creditsCharged,
+      }).catch((refundErr: unknown) => {
+        const msg =
+          refundErr instanceof Error ? refundErr.message : String(refundErr);
+        this.logger.warn(
+          `Content rerun credit refund failed (${content.contentId}): ${msg}`,
+        );
+      });
     }
   }
 

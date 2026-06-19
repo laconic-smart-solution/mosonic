@@ -31,7 +31,11 @@
     "loading": "正在加载套餐…"
   },
   "nodeType": {
+    "keyword_planner": "关键词规划",
+    "intelligence": "情报",
     "text_generation": "文本生成",
+    "adapt": "适配",
+    "transcription": "转录",
     "translation": "翻译",
     "summarization": "摘要",
     "image_generation": "图像生成",

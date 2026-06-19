@@ -32,7 +32,9 @@
     "video_generation": "视频",
     "translation": "翻译",
     "transcription": "转录",
-    "summarization": "摘要"
+    "summarization": "摘要",
+    "adapt": "适配",
+    "intelligence": "情报"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"

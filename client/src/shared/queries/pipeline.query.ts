@@ -30,11 +30,16 @@ export const useStartPipelineMutation = () => {
 
 export const usePipelineEstimateQuery = (
   workflowId: string | undefined,
+  ruleId: string | undefined,
   enabled = true,
 ) => {
   return useQuery({
-    queryKey: ["pipeline", "estimate", workflowId ?? ""],
-    queryFn: () => pipelineService.estimate({ workflowId: workflowId! }),
+    queryKey: ["pipeline", "estimate", workflowId ?? "", ruleId ?? ""],
+    queryFn: () =>
+      pipelineService.estimate({
+        workflowId: workflowId!,
+        ...(ruleId ? { ruleId } : {}),
+      }),
     enabled: enabled && !!workflowId,
     retry: false,
     staleTime: 0,

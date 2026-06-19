@@ -9,6 +9,7 @@ import type {
   PipelinePageItemDto,
   PipelinePageQueryDto,
 } from './dto/pipeline-page-query.dto';
+import type { EstimatePipelineDto } from './dto/estimate-pipeline.dto';
 import {
   Pipeline,
   PipelineStatus,
@@ -177,8 +178,12 @@ export class PipelineService {
     return this.orchestration.startPipeline(args);
   }
 
-  estimatePipeline(workflowId: string, auth: TenancyAuth) {
-    return this.orchestration.estimatePipelineCredits({ workflowId, auth });
+  estimatePipeline(dto: EstimatePipelineDto, auth: TenancyAuth) {
+    return this.orchestration.estimatePipelineCredits({
+      workflowId: dto.workflowId,
+      ruleId: dto.ruleId,
+      auth,
+    });
   }
 
   async retryNode(

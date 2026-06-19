@@ -254,6 +254,8 @@ export default function WorkflowPage() {
       if (pipelineCompletionHandledRef.current) return
       pipelineCompletionHandledRef.current = true
       setPipelinePaused(false)
+      void queryClient.invalidateQueries({ queryKey: ["usage", "summary"] })
+      void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
       const completedPipelineId = args.pipelineId
       window.setTimeout(async () => {
         leavePipelineRoom(completedPipelineId)
@@ -273,7 +275,7 @@ export default function WorkflowPage() {
         }
       }, 1000)
     },
-    [navigate, setSearchParams],
+    [navigate, queryClient, setSearchParams],
   )
 
   const workflowByRuleQuery = useGetWorkflowByRuleIdQuery(ruleId, {
@@ -1594,6 +1596,7 @@ export default function WorkflowPage() {
           if (!open) setPendingRunPrompt(null)
         }}
         workflowId={activeWorkflowId}
+        ruleId={ruleId}
         isStarting={startPipelineMutation.isPending}
         onConfirm={() => {
           if (pendingRunPrompt != null) {

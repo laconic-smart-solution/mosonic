@@ -31,7 +31,11 @@
     "loading": "Loading packages…"
   },
   "nodeType": {
+    "keyword_planner": "Keyword planner",
+    "intelligence": "Intelligence",
     "text_generation": "Text generation",
+    "adapt": "Adapt",
+    "transcription": "Transcription",
     "translation": "Translation",
     "summarization": "Summarization",
     "image_generation": "Image generation",

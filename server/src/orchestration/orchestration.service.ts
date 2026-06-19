@@ -163,18 +163,6 @@ export class OrchestrationService {
       throw new BadRequestException('Workflow has no nodes to execute');
     }
 
-    const { totalCredits, breakdown: creditBreakdown } =
-      await this.computeNodeCreditEstimate(nodes.map((n) => n.type));
-    if (totalCredits > 0) {
-      const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
-      if (creditsRemaining < totalCredits) {
-        throw new InsufficientCreditsException({
-          requiredCredits: totalCredits,
-          creditsRemaining,
-        });
-      }
-    }
-
     const templateEdges =
       (workflow.edges ?? []).length > 0
         ? (workflow.edges ?? []).map((e) => ({ from: e.from, to: e.to }))
@@ -198,6 +186,26 @@ export class OrchestrationService {
       rule.toObject(),
       workflow.version ?? 1,
     );
+
+    const executableNodes = materialized.nodes.filter(
+      (n) =>
+        n.type !== WorkflowNodeType.Branch &&
+        n.type !== WorkflowNodeType.Merge,
+    );
+
+    const { totalCredits, breakdown: creditBreakdown } =
+      await this.computeNodeCreditEstimate(
+        executableNodes.map((n) => n.type),
+      );
+    if (totalCredits > 0) {
+      const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
+      if (creditsRemaining < totalCredits) {
+        throw new InsufficientCreditsException({
+          requiredCredits: totalCredits,
+          creditsRemaining,
+        });
+      }
+    }
 
     const templateLayout = new Map<string, { x: number; y: number }>();
     for (const n of nodes) {
@@ -226,10 +234,6 @@ export class OrchestrationService {
         pipelineLayout[n.nodeId] = { x: pos.x, y: pos.y };
       }
     }
-
-    const executableNodes = materialized.nodes.filter(
-      (n) => n.type !== WorkflowNodeType.Branch,
-    );
 
     const ruleOverlay = await this.ruleOverlayBuilder.buildForPipeline(rule, {
       useLearnings: input.useLearnings === true,
@@ -302,16 +306,24 @@ export class OrchestrationService {
 
     if (totalCredits > 0) {
       const config = await this.creditCalculation.getConfig();
-      await this.creditService.chargePipelineRun({
-        userId: input.auth.userId,
-        pipelineId,
-        creditPriceUsd: config.creditPriceUsd,
-        items: creditBreakdown.map((row) => ({
-          nodeType: row.nodeType,
-          count: row.count,
-          creditsEach: row.creditsEach,
-        })),
-      });
+      try {
+        await this.creditService.chargePipelineRun({
+          userId: input.auth.userId,
+          pipelineId,
+          creditPriceUsd: config.creditPriceUsd,
+          items: creditBreakdown.map((row) => ({
+            nodeType: row.nodeType,
+            count: row.count,
+            creditsEach: row.creditsEach,
+          })),
+        });
+      } catch (err) {
+        await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Failed, {
+          completedAt: new Date(),
+        });
+        await this.reconcilePipelineCredits(pipelineId);
+        throw err;
+      }
     }
 
     this.logger.log(
@@ -495,6 +507,7 @@ export class OrchestrationService {
   /** Pre-run estimate of the credits a workflow will charge plus the user's balance. */
   async estimatePipelineCredits(input: {
     workflowId: string;
+    ruleId?: string;
     auth: TenancyAuth;
   }): Promise<{
     totalCredits: number;
@@ -507,6 +520,24 @@ export class OrchestrationService {
     creditsRemaining: number;
     sufficient: boolean;
   }> {
+    const nodeTypes = await this.resolveBillableNodeTypesForEstimate(input);
+    const { totalCredits, breakdown } =
+      await this.computeNodeCreditEstimate(nodeTypes);
+    const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
+
+    return {
+      totalCredits,
+      breakdown,
+      creditsRemaining,
+      sufficient: creditsRemaining >= totalCredits,
+    };
+  }
+
+  private async resolveBillableNodeTypesForEstimate(input: {
+    workflowId: string;
+    ruleId?: string;
+    auth: TenancyAuth;
+  }): Promise<string[]> {
     const workflow = await this.workflowModel
       .findOne(mergeUserIdFilter({ workflowId: input.workflowId }, input.auth))
       .exec();
@@ -516,21 +547,51 @@ export class OrchestrationService {
 
     const nodes = await this.workflowNodeModel
       .find(mergeUserIdFilter({ workflowRef: workflow.workflowId }, input.auth))
-      .select({ type: 1 })
-      .lean<Array<{ type: string }>>()
+      .sort({ order: 1 })
       .exec();
 
-    const { totalCredits, breakdown } = await this.computeNodeCreditEstimate(
-      nodes.map((n) => n.type),
-    );
-    const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
+    if (!input.ruleId) {
+      return nodes.map((n) => n.type);
+    }
 
-    return {
-      totalCredits,
-      breakdown,
-      creditsRemaining,
-      sufficient: creditsRemaining >= totalCredits,
-    };
+    const rule = await this.ruleModel
+      .findOne(mergeUserIdFilter({ ruleId: input.ruleId }, input.auth))
+      .exec();
+    if (!rule) {
+      throw new NotFoundException(`Rule ${input.ruleId} not found`);
+    }
+
+    const templateEdges =
+      (workflow.edges ?? []).length > 0
+        ? (workflow.edges ?? []).map((e) => ({ from: e.from, to: e.to }))
+        : buildLinearEdgesFromOrder(
+            nodes.map((n) => ({ nodeId: n.nodeId, order: n.order })),
+          );
+
+    const materialized = this.graphMaterialization.materialize(
+      nodes.map((node) => ({
+        nodeId: node.nodeId,
+        type: node.type,
+        order: node.order,
+        isLocked: node.isLocked,
+        userPrompt: node.userPrompt,
+        config: mergeWorkflowLaneIntoConfig(
+          (node.config ?? {}) as Record<string, unknown>,
+          node.lane,
+        ),
+      })),
+      templateEdges,
+      rule.toObject(),
+      workflow.version ?? 1,
+    );
+
+    return materialized.nodes
+      .filter(
+        (n) =>
+          n.type !== WorkflowNodeType.Branch &&
+          n.type !== WorkflowNodeType.Merge,
+      )
+      .map((n) => n.type);
   }
 
   async retryNode(
