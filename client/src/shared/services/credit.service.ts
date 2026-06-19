@@ -1,16 +1,16 @@
 import apiClient from "@/shared/api/api-client"
 import type {
   CreditPackage,
+  InitiateTopupResponse,
   TopupCreditsPayload,
-  TopupCreditsResponse,
 } from "@/shared/types/credit.type"
 
 export const creditService = {
   getPackages: () =>
     apiClient.get<CreditPackage[]>("/credit/packages").then((r) => r.data),
 
-  topup: (payload: TopupCreditsPayload) =>
+  initiateTopup: (payload: TopupCreditsPayload) =>
     apiClient
-      .post<TopupCreditsResponse>("/credit/topup", payload)
+      .post<InitiateTopupResponse>("/credit/topup/initiate", payload)
       .then((r) => r.data),
 }

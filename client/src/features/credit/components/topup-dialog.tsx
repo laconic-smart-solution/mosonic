@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { Check, Loader2, Sparkles } from "lucide-react"
+import { Check, ExternalLink, Loader2, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,7 @@ import {
   useCreditPackagesQuery,
   useCreditTopupMutation,
 } from "@/shared/queries/credit.query"
+import { onCreditBalanceUpdated } from "@/shared/socket/credit-events"
 
 type Props = {
   open: boolean
@@ -24,11 +25,17 @@ type Props = {
   onToppedUp?: (creditsRemaining: number) => void
 }
 
+function formatThb(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 0 })
+}
+
 export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
   const { t } = useTranslation("credit")
   const packagesQuery = useCreditPackagesQuery(open)
   const topupMutation = useCreditTopupMutation()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [awaitingPayment, setAwaitingPayment] = useState(false)
+  const [pendingCredits, setPendingCredits] = useState<number | null>(null)
 
   const packages = packagesQuery.data ?? []
 
@@ -38,8 +45,25 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
     }
     if (!open) {
       setSelectedId(null)
+      setAwaitingPayment(false)
+      setPendingCredits(null)
     }
   }, [open, packages, selectedId])
+
+  useEffect(() => {
+    if (!awaitingPayment) return
+    return onCreditBalanceUpdated((payload) => {
+      toast.success(
+        t("topup.success", {
+          credits: (pendingCredits ?? payload.creditsRemaining).toLocaleString(),
+        }),
+      )
+      onToppedUp?.(payload.creditsRemaining)
+      setAwaitingPayment(false)
+      setPendingCredits(null)
+      onOpenChange(false)
+    })
+  }, [awaitingPayment, onOpenChange, onToppedUp, pendingCredits, t])
 
   function handleConfirm() {
     if (!selectedId) return
@@ -48,11 +72,26 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
       { packageId: selectedId },
       {
         onSuccess: (data) => {
-          toast.success(
-            t("topup.success", { credits: (pkg?.credits ?? data.creditsAdded).toLocaleString() }),
-          )
-          onToppedUp?.(data.creditsRemaining)
-          onOpenChange(false)
+          if (data.instant) {
+            toast.success(
+              t("topup.success", {
+                credits: (pkg?.credits ?? data.instant.creditsAdded).toLocaleString(),
+              }),
+            )
+            onToppedUp?.(data.instant.creditsRemaining)
+            onOpenChange(false)
+            return
+          }
+
+          const redirectUrl = data.payniResponse?.redirectUrl
+          if (redirectUrl) {
+            window.open(redirectUrl, "_blank", "noopener,noreferrer")
+            setPendingCredits(pkg?.credits ?? null)
+            setAwaitingPayment(true)
+            return
+          }
+
+          toast.error(t("topup.error"))
         },
         onError: () => toast.error(t("topup.error")),
       },
@@ -60,23 +99,44 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (topupMutation.isPending) return
+        onOpenChange(next)
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
+            <Sparkles className="size-4 text-primary" aria-hidden />
             {t("topup.title")}
           </DialogTitle>
-          <DialogDescription>{t("topup.description")}</DialogDescription>
+          <DialogDescription>
+            {awaitingPayment ? t("topup.awaitingPayment") : t("topup.description")}
+          </DialogDescription>
         </DialogHeader>
 
-        {packagesQuery.isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
+        {awaitingPayment ? (
+          <div
+            className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 px-4 py-8 text-center"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+            <p className="text-sm font-medium text-foreground">{t("topup.paymentWindowHint")}</p>
+            <p className="text-xs text-muted-foreground">{t("topup.balanceUpdatesAutomatically")}</p>
+          </div>
+        ) : packagesQuery.isLoading ? (
+          <div
+            className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"
+            role="status"
+          >
+            <Loader2 className="size-4 animate-spin" aria-hidden />
             {t("topup.loading")}
           </div>
         ) : packagesQuery.isError ? (
-          <p className="py-6 text-center text-sm text-destructive">
+          <p className="py-6 text-center text-sm text-destructive" role="alert">
             {t("topup.loadError")}
           </p>
         ) : (
@@ -103,17 +163,15 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
                 >
                   {selected && (
                     <span className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Check className="size-3" />
+                      <Check className="size-3" aria-hidden />
                     </span>
                   )}
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {pkg.label}
-                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">{pkg.label}</span>
                   <span className="font-heading text-xl font-semibold tabular-nums">
                     {pkg.credits.toLocaleString()}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {t("topup.credits")} · ${pkg.priceUsd}
+                    {t("topup.credits")} · ฿{formatThb(pkg.priceThb)}
                   </span>
                 </button>
               )
@@ -122,24 +180,29 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
         )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={topupMutation.isPending}
-          >
-            {t("topup.cancel")}
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={!selectedId || topupMutation.isPending}
-          >
-            {topupMutation.isPending && (
-              <Loader2 className="size-4 animate-spin" />
-            )}
-            {topupMutation.isPending
-              ? t("topup.processing")
-              : t("topup.confirm")}
-          </Button>
+          {awaitingPayment ? (
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {t("topup.close")}
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={topupMutation.isPending}
+              >
+                {t("topup.cancel")}
+              </Button>
+              <Button onClick={handleConfirm} disabled={!selectedId || topupMutation.isPending}>
+                {topupMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <ExternalLink className="size-4" aria-hidden />
+                )}
+                {topupMutation.isPending ? t("topup.processing") : t("topup.confirm")}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

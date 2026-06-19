@@ -20,15 +20,19 @@
   },
   "topup": {
     "title": "Top up credits",
-    "description": "Choose a package to add credits to your balance instantly.",
+    "description": "Choose a package, then complete payment securely via Payni.",
     "credits": "credits",
-    "confirm": "Add credits",
-    "processing": "Adding…",
+    "confirm": "Pay with Payni",
+    "processing": "Starting payment…",
     "cancel": "Cancel",
+    "close": "Close",
     "success": "Added {{credits}} credits",
-    "error": "Could not add credits. Please try again.",
+    "error": "Could not start payment. Please try again.",
     "loadError": "Could not load credit packages.",
-    "loading": "Loading packages…"
+    "loading": "Loading packages…",
+    "awaitingPayment": "Complete your payment in the Payni window.",
+    "paymentWindowHint": "Finish payment in the Payni tab we opened. PayNow and bank transfer are available there.",
+    "balanceUpdatesAutomatically": "Your balance will update automatically when payment succeeds."
   },
   "nodeType": {
     "keyword_planner": "Keyword planner",
