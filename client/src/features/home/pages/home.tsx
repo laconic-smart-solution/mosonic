@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { isInsufficientCredits } from "@/shared/lib/api-error"
 
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
 import { HomeFooter } from "@/features/home/components/home-footer"
@@ -41,8 +43,6 @@ import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
 
 export default function HomePage() {
   const { t } = useTranslation("home")
-  const { t: tCredit } = useTranslation("credit")
-  const { t: tWorkflow } = useTranslation("workflow")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const homeTemplates = useMemo(
@@ -290,13 +290,11 @@ export default function HomePage() {
           setOrbPulse(false)
         },
         onError: (err) => {
-          const status = (err as { response?: { status?: number } })?.response
-            ?.status
-          if (status === 402) {
-            toast.error(tCredit("runConfirm.insufficientTitle"))
-          } else {
-            toast.error(tWorkflow("errors.generateWorkflowFailed"))
+          if (isInsufficientCredits(err)) {
+            toastApiError(err, "credit:runConfirm.insufficientTitle")
+            return
           }
+          toastApiError(err, "workflow:errors.generateWorkflowFailed")
         },
       },
     )

@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
+import { AdminChartDaysQueryDto } from '../dto/admin-query-ext.dto';
 import { AdminDashboardService } from '../services/admin-dashboard.service';
 
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -17,18 +18,18 @@ export class AdminDashboardController {
   }
 
   @Get('user-growth')
-  getUserGrowth(@Query('days') days?: string) {
-    return this.service.getUserGrowthChart(days ? Number(days) : 30);
+  getUserGrowth(@Query() query: AdminChartDaysQueryDto) {
+    return this.service.getUserGrowthChart(query.days ?? 30);
   }
 
   @Get('pipeline-trend')
-  getPipelineTrend(@Query('days') days?: string) {
-    return this.service.getPipelineChart(days ? Number(days) : 30);
+  getPipelineTrend(@Query() query: AdminChartDaysQueryDto) {
+    return this.service.getPipelineChart(query.days ?? 30);
   }
 
   @Get('cost-trend')
-  getCostTrend(@Query('days') days?: string) {
-    return this.service.getCostChart(days ? Number(days) : 30);
+  getCostTrend(@Query() query: AdminChartDaysQueryDto) {
+    return this.service.getCostChart(query.days ?? 30);
   }
 
   @Get('node-types')
@@ -42,7 +43,7 @@ export class AdminDashboardController {
   }
 
   @Get('pipeline-slo')
-  getPipelineSlo(@Query('days') days?: string) {
-    return this.service.getPipelineSlo(days ? Number(days) : 7);
+  getPipelineSlo(@Query() query: AdminChartDaysQueryDto) {
+    return this.service.getPipelineSlo(query.days ?? 7);
   }
 }

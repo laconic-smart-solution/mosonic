@@ -1,7 +1,6 @@
 import "@xyflow/react/dist/style.css"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { isAxiosError } from "axios"
 import {
   useCallback,
   useEffect,
@@ -43,6 +42,7 @@ import {
   type RuleEntity,
 } from "@/features/rules/data/rules-mock"
 import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
+import { toastApiError } from "@/shared/lib/toast-error"
 import {
   usePutRuleMutation,
   useRuleByIdQuery,
@@ -56,22 +56,6 @@ const RULES_DRAWER_PAGE_LIMIT = 8
 
 function isVisibleRuleListItem(rule: { status: string }): boolean {
   return rule.status !== "failed"
-}
-
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const data = error.response?.data as unknown
-    if (typeof data === "string" && data.trim()) return data
-    if (data && typeof data === "object") {
-      const msg = (data as Record<string, unknown>).message
-      if (typeof msg === "string" && msg.trim()) return msg
-      if (Array.isArray(msg) && typeof msg[0] === "string")
-        return msg.join(", ")
-    }
-    if (error.message) return error.message
-  }
-  if (error instanceof Error && error.message) return error.message
-  return fallback
 }
 
 function toReplacePayload(rule: RuleEntity): RuleReplacePayload {
@@ -318,7 +302,7 @@ export default function RulesPage() {
         toast.success(t("toast.ruleSaved"), { id: "rule-detail-save" })
         return data
       } catch (err) {
-        toast.error(apiErrorMessage(err, t("toast.couldNotSaveRule")))
+        toastApiError(err, "rules:toast.couldNotSaveRule", { id: "rule-detail-save" })
         return values
       }
     },

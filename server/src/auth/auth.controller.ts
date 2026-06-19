@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Post,
   Req,
   UnauthorizedException,
@@ -21,15 +20,6 @@ import { AuthSignupDto } from './dto/auth-signup.dto';
 import { AuthVerifyOtpDto } from './dto/auth-verify-otp.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SsoClientService } from './sso-client.service';
-
-function extractBearerToken(authorization: string | undefined): string | null {
-  if (!authorization || typeof authorization !== 'string') {
-    return null;
-  }
-  const m = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  const token = m?.[1]?.trim();
-  return token || null;
-}
 
 const bodyPipe = new ValidationPipe({
   transform: true,
@@ -76,14 +66,16 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @UseGuards(JwtAuthGuard)
   @UsePipes(bodyPipe)
-  async changePassword(
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: AuthChangePasswordDto,
-  ) {
-    const accessToken = extractBearerToken(authorization);
+  async changePassword(@Req() req: Request, @Body() body: AuthChangePasswordDto) {
+    const accessToken = req.auth?.accessToken?.trim();
     if (!accessToken) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: 'InvalidToken',
+        message: 'Missing or invalid Authorization header',
+      });
     }
     return this.sso.changePassword({
       accessToken,

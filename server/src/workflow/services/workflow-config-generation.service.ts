@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { safeJsonParse as sharedSafeJsonParse } from '../../common/utils/json-parse.util';
 import { LlmService } from '../../llm/llm.service';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../../nodes/workflow-node-config.zod';
@@ -6,13 +7,6 @@ import type { Rule } from '../../rule/schemas/rule.schema';
 import type { LogicalWorkflowNode } from '../workflow-structure.builder';
 
 const CONFIG_GEN_TEMPERATURE = 0.55;
-
-function safeJsonParse(text: string): unknown {
-  const trimmed = text.trim();
-  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
-  const body = fence ? fence[1].trim() : trimmed;
-  return JSON.parse(body);
-}
 
 function mergeValidatedNodeConfig(
   type: WorkflowNodeType,
@@ -68,8 +62,10 @@ export class WorkflowConfigGenerationService {
     > = {};
 
     try {
-      const parsed = safeJsonParse(text) as Record<string, unknown>;
-      configByNodeId = parsed as typeof configByNodeId;
+      const parsed = sharedSafeJsonParse(text) as Record<string, unknown> | null;
+      if (parsed && typeof parsed === 'object') {
+        configByNodeId = parsed as typeof configByNodeId;
+      }
     } catch (err) {
       this.logger.warn(
         `Failed to parse workflow config JSON: ${err instanceof Error ? err.message : String(err)}`,

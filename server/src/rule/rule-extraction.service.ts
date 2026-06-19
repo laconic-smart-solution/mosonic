@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
+import { parseJsonWithFenceOrThrow } from '../common/utils/json-parse.util';
 import { extractUsageFromAiMessage } from '../nodes/langchain-usage.util';
 import type { RuleStatus } from './schemas/rule.schema';
 
@@ -172,11 +173,10 @@ export class RuleExtractionService {
       typeof res.content === 'string'
         ? res.content
         : JSON.stringify(res.content ?? {});
-    const cleaned = text
-      .replace(/^```json\s*/i, '')
-      .replace(/```$/i, '')
-      .trim();
-    const parsed = JSON.parse(cleaned) as Omit<ExtractedRuleDraft, 'status'>;
+    const parsed = parseJsonWithFenceOrThrow(text) as Omit<
+      ExtractedRuleDraft,
+      'status'
+    >;
     const usage = extractUsageFromAiMessage(res);
     const channels = Array.isArray(parsed.channels)
       ? parsed.channels.map((ch) => normalizeExtractedChannel(ch))

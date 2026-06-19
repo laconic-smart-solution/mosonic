@@ -1,5 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query"
-import { isAxiosError } from "axios"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -10,6 +9,8 @@ import {
   RULE_EXTRACT_MAX_FILE_BYTES,
 } from "@/lib/rule-extract-limits"
 import { buildRuleExtractFormData } from "@/lib/strategy-input"
+import { getApiErrorMessage, isInsufficientCredits } from "@/shared/lib/api-error"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useExtractRuleMutation } from "@/shared/queries/rule.query"
 import {
   joinRuleRoom,
@@ -37,22 +38,6 @@ type UseRuleExtractionOptions = {
   onExtractStarted?: (ruleId: string, previewLabel: string) => void
   onCompleted?: (ruleId: string) => void | Promise<void>
   onFailed?: (ruleId: string, message: string) => void
-}
-
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const data = error.response?.data as unknown
-    if (typeof data === "string" && data.trim()) return data
-    if (data && typeof data === "object") {
-      const msg = (data as Record<string, unknown>).message
-      if (typeof msg === "string" && msg.trim()) return msg
-      if (Array.isArray(msg) && typeof msg[0] === "string")
-        return msg.join(", ")
-    }
-    if (error.message) return error.message
-  }
-  if (error instanceof Error && error.message) return error.message
-  return fallback
 }
 
 export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
@@ -202,19 +187,21 @@ export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
           toast.success(t("toast.extractionStarted"))
         }
       } catch (err) {
-        if (isAxiosError(err) && err.response?.status === 402) {
-          toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+        if (isInsufficientCredits(err)) {
+          toastApiError(err, "credit:runConfirm.insufficientTitle")
           setProgressStep("failed")
-          setFailureMessage(i18n.t("credit:runConfirm.insufficientTitle"))
+          setFailureMessage(
+            getApiErrorMessage(err, t("toast.couldNotStartExtraction")),
+          )
           return
         }
-        const message = apiErrorMessage(
+        const message = getApiErrorMessage(
           err,
           t("toast.couldNotStartExtraction"),
         )
         setProgressStep("failed")
         setFailureMessage(message)
-        toast.error(message)
+        toastApiError(err, "rules:toast.couldNotStartExtraction")
       }
     },
     [extractRuleMutation, onExtractStarted, showExtractionStartedToast, t],

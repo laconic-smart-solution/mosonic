@@ -7,8 +7,6 @@ import {
   Query,
   Req,
   UseGuards,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,12 +16,6 @@ import { CostService } from './cost.service';
 import { UpdateBudgetSettingsDto } from './dto/budget-settings.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { parseDashboardFromIsoDay, parseDashboardToIsoDay } from './dashboard-date.util';
-
-const bodyPipe = new ValidationPipe({
-  transform: true,
-  whitelist: true,
-  forbidNonWhitelisted: true,
-});
 
 @UseGuards(JwtAuthGuard)
 @Controller('cost')
@@ -82,7 +74,6 @@ export class CostController {
   }
 
   @Put('budget')
-  @UsePipes(bodyPipe)
   async updateBudget(
     @Req() req: Request,
     @Body() dto: UpdateBudgetSettingsDto,

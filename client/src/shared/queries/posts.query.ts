@@ -3,8 +3,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { useAuthStore } from "@/shared/stores/auth.store"
 import { postService } from "@/shared/services/post.service"
+import { useAuthStore } from "@/shared/stores/auth.store"
 import type {
   BulkPostIdsBody,
   BulkScheduleBody,
@@ -89,6 +89,7 @@ export function usePatchPostMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -99,6 +100,7 @@ export function useBulkSchedulePostsMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -109,6 +111,7 @@ export function useBulkPublishNowMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -119,6 +122,7 @@ export function usePublishPostMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -129,6 +133,7 @@ export function useRetryPostMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -141,6 +146,7 @@ export function useSyncPostAnalyticsMutation(postId: string | undefined) {
         queryKey: postsQueryKeys.detail(postId, true),
       })
     },
+    meta: { silent: true },
   })
 }
 
@@ -151,6 +157,7 @@ export function useDeletePostMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }
 
@@ -161,5 +168,6 @@ export function useBulkDeletePostsMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: postsQueryKeys.root })
     },
+    meta: { silent: true },
   })
 }

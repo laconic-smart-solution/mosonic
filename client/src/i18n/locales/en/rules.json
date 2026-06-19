@@ -27,7 +27,9 @@
     "generationFailed": "Rule generation failed",
     "fileTooLarge": "File \"{{name}}\" exceeds maximum size ({{maxMb}} MB).",
     "autonomySaved": "Autonomy policy saved.",
-    "couldNotSaveAutonomy": "Could not save autonomy policy."
+    "couldNotSaveAutonomy": "Could not save autonomy policy.",
+    "couldNotSaveNewsTrigger": "Could not save news trigger settings.",
+    "newsRunFailed": "News trigger run failed."
   },
   "status": {
     "active": "Active",

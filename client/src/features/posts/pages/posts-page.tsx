@@ -7,7 +7,7 @@ import {
 } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { AxiosError } from "axios"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { LayoutGrid } from "lucide-react"
@@ -31,7 +31,6 @@ import {
   SORT_OPTIONS,
   VALID_CHANNELS,
 } from "@/features/posts/lib/posts-filter-config"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { cn } from "@/lib/utils"
 import {
   navigateSearchParams,
@@ -334,7 +333,7 @@ export default function PostsPage() {
       })
       setBulkScheduleLocal("")
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.scheduleFailed")
     }
   }
 
@@ -350,7 +349,7 @@ export default function PostsPage() {
         }),
       })
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.publishFailed")
     }
   }
 
@@ -362,7 +361,7 @@ export default function PostsPage() {
       toastBulkDeleteResult(res)
       setSelectedIds(new Set())
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.deleteFailed")
     }
   }
 
@@ -377,7 +376,7 @@ export default function PostsPage() {
           : undefined,
       })
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.retryFailed")
     }
   }
 

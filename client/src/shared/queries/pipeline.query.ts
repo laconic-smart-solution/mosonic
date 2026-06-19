@@ -25,6 +25,7 @@ function assertPipelineStatsPayload(data: unknown): PipelineStatsResponse {
 export const useStartPipelineMutation = () => {
   return useMutation({
     mutationFn: (payload: StartPipelinePayload) => pipelineService.startPipeline(payload),
+    meta: { toastNs: "pipeline", toastKey: "errors.startFailed", silent: true },
   })
 }
 
@@ -56,6 +57,7 @@ export const useRetryNodeMutation = () => {
       pipelineId: string
       payload: RetryNodePayload
     }) => pipelineService.retryNode(pipelineId, payload),
+    meta: { toastNs: "workflow", toastKey: "toasts.retryFailed", silent: true },
   })
 }
 
@@ -68,6 +70,7 @@ export const useSkipNodeMutation = () => {
       pipelineId: string
       payload: SkipNodePayload
     }) => pipelineService.skipNode(pipelineId, payload),
+    meta: { toastNs: "workflow", toastKey: "toasts.skipFailed", silent: true },
   })
 }
 
@@ -114,12 +117,14 @@ export const useReplanPipelineMutation = () => {
       pipelineId: string
       operations: Parameters<typeof pipelineService.replan>[1]
     }) => pipelineService.replan(pipelineId, operations),
+    meta: { toastNs: "workflow", toastKey: "toasts.replanFailed", silent: true },
   })
 }
 
 export const useCancelPipelineMutation = () => {
   return useMutation({
     mutationFn: (pipelineId: string) => pipelineService.cancel(pipelineId),
+    meta: { toastNs: "pipeline", toastKey: "errors.startFailed", silent: true },
   })
 }
 

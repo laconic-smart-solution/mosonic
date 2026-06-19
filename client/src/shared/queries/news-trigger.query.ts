@@ -4,6 +4,7 @@ import {
   newsTriggerService,
   type NewsTriggerUpdatePayload,
 } from "@/shared/services/news-trigger.service"
+import { toastApiError } from "@/shared/lib/toast-error"
 
 export function useNewsTriggerSettingsQuery(ruleId: string | undefined) {
   return useQuery({
@@ -29,6 +30,9 @@ export function useUpdateNewsTriggerMutation(ruleId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["news-trigger", ruleId] })
     },
+    onError: (err) => {
+      toastApiError(err, "rules:toast.couldNotSaveNewsTrigger")
+    },
   })
 }
 
@@ -39,6 +43,9 @@ export function useTriggerNewsRunMutation(ruleId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["news-trigger", ruleId] })
       void qc.invalidateQueries({ queryKey: ["news-trigger-run-latest", ruleId] })
+    },
+    onError: (err) => {
+      toastApiError(err, "rules:toast.newsRunFailed")
     },
   })
 }

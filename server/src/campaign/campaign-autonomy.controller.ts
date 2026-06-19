@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Inject, Param, Put, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
@@ -6,6 +15,7 @@ import type { ICampaignAutonomyPolicyRepository } from '../repositories/interfac
 import { CAMPAIGN_AUTONOMY_POLICY_REPOSITORY } from '../repositories/tokens';
 import { User } from '../users/schemas/user.schema';
 import { AutonomyMode } from './schemas/campaign-autonomy-policy.schema';
+import { UpsertCampaignAutonomyDto } from './dto/upsert-campaign-autonomy.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('campaign/autonomy')
@@ -25,14 +35,7 @@ export class CampaignAutonomyController {
   async upsert(
     @Req() req: Request,
     @Param('ruleId') ruleId: string,
-    @Body()
-    body: {
-      enabled?: boolean;
-      mode?: AutonomyMode;
-      allowedChannels?: string[];
-      maxPostsPerDay?: number;
-      blockIfPendingSuggestions?: boolean;
-    },
+    @Body() body: UpsertCampaignAutonomyDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.policies.upsert(ruleId, auth.userId, {

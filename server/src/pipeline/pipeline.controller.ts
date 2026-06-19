@@ -20,6 +20,7 @@ import {
   PipelinePageResponseDto,
 } from './dto/pipeline-page-query.dto';
 import { EstimatePipelineDto } from './dto/estimate-pipeline.dto';
+import { ReplanPipelineDto } from './dto/replan-pipeline.dto';
 import { PipelineStatsQueryDto } from './dto/pipeline-stats-query.dto';
 import { RetryNodeDto } from './dto/retry-node.dto';
 import { SkipNodeDto } from './dto/skip-node.dto';
@@ -115,7 +116,7 @@ export class PipelineController {
   replan(
     @Req() req: Request,
     @Param('id') pipelineId: string,
-    @Body() body: { operations: unknown[] },
+    @Body() body: ReplanPipelineDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.replanPipeline(

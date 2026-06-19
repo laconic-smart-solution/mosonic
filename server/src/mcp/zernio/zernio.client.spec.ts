@@ -1,7 +1,14 @@
 import {
+  buildZernioProfileNameForUser,
   pickZernioProfileForUser,
   type ZernioProfileDto,
 } from './zernio.client';
+
+describe('buildZernioProfileNameForUser', () => {
+  it('uses a deterministic mosonic prefix with user id', () => {
+    expect(buildZernioProfileNameForUser('abc-123')).toBe('mosonic:abc-123');
+  });
+});
 
 describe('pickZernioProfileForUser', () => {
   const profiles: ZernioProfileDto[] = [

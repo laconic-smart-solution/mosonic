@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
@@ -480,8 +481,8 @@ export function UploadContentReviewPanel({
       setHasUnsavedChanges(false)
       setApproveEnabled(true)
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.saveFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.saveFailed")
     },
   })
 
@@ -505,9 +506,9 @@ export function UploadContentReviewPanel({
         setAvailableTypes(generateMoreTypes.filter((t) => supported.has(t)))
         setAvailableTypesLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
-        toast.error(i18n.t("upload:toast.loadOutputsFailed"))
+        toastApiError(err, "upload:toast.loadOutputsFailed")
         setAvailableTypesLoading(false)
         setAvailableTypes(generateMoreTypes)
       })
@@ -544,8 +545,8 @@ export function UploadContentReviewPanel({
             queryKey: ["workflow", data.workflowRef],
           })
         }
-      } catch {
-        toast.error(i18n.t("upload:toast.startGenerationFailed"))
+      } catch (err) {
+        toastApiError(err, "upload:toast.startGenerationFailed")
         generateMoreRetryRef.current = { type, config, nodeId: "" }
         setIsGeneratingMore(false)
       }
@@ -570,8 +571,8 @@ export function UploadContentReviewPanel({
         navigate(`/upload/${approvedId}`)
       }
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.approveFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.approveFailed")
     },
   })
 
@@ -585,8 +586,8 @@ export function UploadContentReviewPanel({
         (old) => (old ? { ...old, status: "rejected" } : old)
       )
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.rejectFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.rejectFailed")
     },
   })
 
@@ -619,8 +620,8 @@ export function UploadContentReviewPanel({
         data.contentId
       )
       navigate(`/upload/${uploadId}`)
-    } catch {
-      toast.error(i18n.t("upload:toast.openUploadFailed"))
+    } catch (err) {
+      toastApiError(err, "upload:toast.openUploadFailed")
       navigate("/upload")
     } finally {
       setUploadNavLoading(false)
@@ -662,8 +663,8 @@ export function UploadContentReviewPanel({
         },
       })
       setRerunNodeId(null)
-    } catch {
-      toast.error(i18n.t("upload:toast.rerunFailed"))
+    } catch (err) {
+      toastApiError(err, "upload:toast.rerunFailed")
       setGlobalRerunning(false)
       setRunState(nodeId, {
         phase: "error",
@@ -687,12 +688,12 @@ export function UploadContentReviewPanel({
       const outKey: OutputKey = key === "image" ? "image" : "video"
       updateNodeUserEdit(nodeId, outKey, url)
       setRunState(nodeId, emptyRunState())
-    } catch {
+    } catch (err) {
       setRunState(nodeId, {
         phase: "error",
         errorMessage: "Upload failed. Try again.",
       })
-      toast.error(i18n.t("upload:toast.mediaUploadFailed"))
+      toastApiError(err, "upload:toast.mediaUploadFailed")
     }
   }
 

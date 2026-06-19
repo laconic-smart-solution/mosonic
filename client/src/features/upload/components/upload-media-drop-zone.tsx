@@ -3,6 +3,7 @@ import { ImageIcon, Upload, Video, X } from "lucide-react"
 import { useCallback, useId, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { toastApiError } from "@/shared/lib/toast-error"
 
 import { buttonVariants } from "@/lib/button-variants"
 import { Button } from "@/components/ui/button"
@@ -127,8 +128,8 @@ export function UploadMediaDropZone({
           urls.push(url)
         }
         onUploadedUrls(urls)
-      } catch {
-        toast.error("Upload failed. Try again.")
+      } catch (err) {
+        toastApiError(err, "upload:toast.mediaUploadFailed")
       } finally {
         setUploading(false)
       }

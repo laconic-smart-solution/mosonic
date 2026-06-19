@@ -33,7 +33,8 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { KeywordTagInput } from "@/features/rules/components/news-trigger/keyword-tag-input"
 import { cn } from "@/lib/utils"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { getApiErrorMessage } from "@/shared/lib/api-error"
 import {
   useLatestNewsRunQuery,
   useNewsTriggerSettingsQuery,
@@ -285,11 +286,11 @@ export function NewsTriggerSettingsPanel({ ruleId, ruleName }: Props) {
         runningSinceRef.current = Date.now()
       },
       onError: (err) => {
-        const msg = getApiErrorMessage(err)
+        const msg = getApiErrorMessage(err, "")
         if (msg.toLowerCase().includes("already in progress")) {
           toast.error(t("newsTrigger.runInProgress"))
         } else {
-          toast.error(msg)
+          toastApiError(err, "rules:toast.newsRunFailed")
         }
       },
     })

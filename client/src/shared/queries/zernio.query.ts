@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { zernioService } from "../services/zernio.service"
 import { usageQueryKeys } from "./usage.query"
 
@@ -33,6 +34,9 @@ export const useSyncZernioAccountsMutation = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.accounts })
     },
+    onError: (err) => {
+      toastApiError(err, "settings:oauth.syncFailed")
+    },
   })
 }
 
@@ -45,6 +49,9 @@ export const useZernioUnlockMutation = () => {
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+    },
+    onError: (err) => {
+      toastApiError(err, "settings:oauth.unlockFailed")
     },
   })
 }
@@ -61,6 +68,9 @@ export const useDisconnectZernioAccountMutation = () => {
     mutationFn: (channel: string) => zernioService.disconnectAccount(channel),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.accounts })
+    },
+    onError: (err) => {
+      toastApiError(err, "settings:oauth.disconnectFailed")
     },
   })
 }

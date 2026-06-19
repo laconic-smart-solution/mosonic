@@ -25,6 +25,7 @@
     "migrate:bootstrap-db": "ts-node -r tsconfig-paths/register scripts/bootstrap-db.ts",
     "openai:billing": "ts-node -r tsconfig-paths/register scripts/check-openai-billing.ts",
     "migrate:mongo-to-postgres:phase1": "ts-node -r tsconfig-paths/register scripts/migrate-mongo-to-postgres/phase1-users-plans.ts",
+    "migrate:repair-zernio-profiles": "ts-node -r tsconfig-paths/register scripts/repair-zernio-profile-isolation.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",

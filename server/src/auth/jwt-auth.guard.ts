@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -141,6 +142,7 @@ export class JwtAuthGuard implements CanActivate {
     req.auth = {
       claims,
       authServerUserId: authServerUserIdRaw,
+      accessToken: token,
     };
 
     try {
@@ -157,7 +159,11 @@ export class JwtAuthGuard implements CanActivate {
       this.logger.error(
         `[${route}] upsertFromSsoClaims failed for authServerUserId=${authServerUserIdRaw}: ${this.formatError(err)}`,
       );
-      throw new UnauthorizedException('Failed to provision local user');
+      throw new ServiceUnavailableException({
+        statusCode: 503,
+        error: 'InternalError',
+        message: 'Failed to provision local user',
+      });
     }
   }
 

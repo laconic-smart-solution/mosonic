@@ -119,7 +119,8 @@
     "copied": "Copied to clipboard",
     "copyFailed": "Copy failed",
     "mediaUploadFailed": "Media upload failed.",
-    "noMediaSlot": "No media slot for upload."
+    "noMediaSlot": "No media slot for upload.",
+    "publishFailed": "Publish failed. Please try again."
   },
   "review": {
     "defaultTitle": "Content review",

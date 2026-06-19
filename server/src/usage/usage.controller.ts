@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
+import { UsageHistoryQueryDto } from './dto/usage-history-query.dto';
 import { UsageService } from './usage.service';
 
 @UseGuards(JwtAuthGuard)
@@ -14,21 +15,14 @@ export class UsageController {
   constructor(private readonly usageService: UsageService) {}
 
   @Get('history')
-  getHistory(
-    @Req() req: Request,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('nodeType') nodeType?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
+  getHistory(@Req() req: Request, @Query() query: UsageHistoryQueryDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.usageService.getUserHistory(auth.userId, {
-      from,
-      to,
-      nodeType,
-      page: Number(page),
-      limit: Number(limit),
+      from: query.from,
+      to: query.to,
+      nodeType: query.nodeType,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
     });
   }
 

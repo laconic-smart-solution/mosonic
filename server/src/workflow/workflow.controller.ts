@@ -34,6 +34,10 @@ import {
   WorkflowPageResponseDto,
 } from './dto/workflow-page-query.dto';
 import {
+  ApplyTemplateDto,
+  SaveAsTemplateDto,
+} from './dto/workflow-template.dto';
+import {
   UpdateWorkflowDto,
   UpdateWorkflowResponseDto,
 } from './dto/update-workflow.dto';
@@ -94,7 +98,7 @@ export class WorkflowController {
   saveAsTemplate(
     @Req() req: Request,
     @Param('workflowId') workflowId: string,
-    @Body() body: { templateName: string },
+    @Body() body: SaveAsTemplateDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.saveAsTemplate(
@@ -108,7 +112,7 @@ export class WorkflowController {
   applyTemplate(
     @Req() req: Request,
     @Param('templateId') templateId: string,
-    @Body() body: { ruleId: string },
+    @Body() body: ApplyTemplateDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.applyTemplate(templateId, body.ruleId, auth);
