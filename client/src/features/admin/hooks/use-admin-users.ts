@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { toastApiError } from "@/shared/lib/toast-error"
 
 import { adminApi } from "../api/admin.api"
 
@@ -39,7 +40,7 @@ export const useAdminUserActions = () => {
       invalidateUser(userId)
       toast.success(t("users.disableSuccess"))
     },
-    onError: () => toast.error(t("users.disableError")),
+    onError: (err) => toastApiError(err, "admin:users.disableError"),
   })
 
   const reactivate = useMutation({
@@ -48,7 +49,7 @@ export const useAdminUserActions = () => {
       invalidateUser(userId)
       toast.success(t("users.enableSuccess"))
     },
-    onError: () => toast.error(t("users.enableError")),
+    onError: (err) => toastApiError(err, "admin:users.enableError"),
   })
 
   const topup = useMutation({
@@ -70,7 +71,7 @@ export const useAdminUserActions = () => {
         }),
       )
     },
-    onError: () => toast.error(t("users.topup.error")),
+    onError: (err) => toastApiError(err, "admin:users.topup.error"),
   })
 
   return { suspend, reactivate, topup }

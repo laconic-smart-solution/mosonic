@@ -17,7 +17,8 @@ import {
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import i18n from "@/i18n"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { isInsufficientCredits } from "@/shared/lib/api-error"
 
 import { Button } from "@/components/ui/button"
 import { PromptArea, type Attachment } from "@/components/core/prompt-area"
@@ -969,13 +970,11 @@ export default function WorkflowPage() {
           })
         },
         onError: (err) => {
-          const status = (err as { response?: { status?: number } })?.response
-            ?.status
-          if (status === 402) {
-            toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+          if (isInsufficientCredits(err)) {
+            toastApiError(err, "credit:runConfirm.insufficientTitle")
             return
           }
-          toast.error(t("toasts.pipelineStartFailed"))
+          toastApiError(err, "workflow:toasts.pipelineStartFailed")
         },
       },
     )
@@ -1091,12 +1090,11 @@ export default function WorkflowPage() {
     const onError = (err: unknown) => {
       generationInFlightRef.current = false
       setGenerationStep(null)
-      const status = (err as { response?: { status?: number } })?.response?.status
-      if (status === 402) {
-        toast.error(i18n.t("credit:runConfirm.insufficientTitle"))
+      if (isInsufficientCredits(err)) {
+        toastApiError(err, "credit:runConfirm.insufficientTitle")
         return
       }
-      toast.error(t("errors.generateWorkflowFailed"))
+      toastApiError(err, "workflow:errors.generateWorkflowFailed")
     }
 
     if (activeWorkflowId) {
@@ -1170,8 +1168,8 @@ export default function WorkflowPage() {
             },
           }))
         },
-        onError: () => {
-          toast.error(t("toasts.retryFailed"))
+        onError: (err) => {
+          toastApiError(err, "workflow:toasts.retryFailed")
         },
       }
     )
@@ -1195,8 +1193,8 @@ export default function WorkflowPage() {
             },
           }))
         },
-        onError: () => {
-          toast.error(t("toasts.skipFailed"))
+        onError: (err) => {
+          toastApiError(err, "workflow:toasts.skipFailed")
         },
       }
     )
@@ -1268,7 +1266,7 @@ export default function WorkflowPage() {
           toast.success(t("usedPipelines.applySuccess"))
         },
         onError: (err) => {
-          toast.error(getApiErrorMessage(err) || t("usedPipelines.applyFailed"))
+          toastApiError(err, "workflow:usedPipelines.applyFailed")
         },
       },
     )
@@ -1452,7 +1450,7 @@ export default function WorkflowPage() {
                           setPipelinePaused(false)
                           void runningPipelineQuery.refetch()
                         })
-                        .catch(() => toast.error(t("toasts.replanFailed")))
+                        .catch((err) => toastApiError(err, "workflow:toasts.replanFailed"))
                     }}
                   >
                     {t("processing.addTranslationLane")}

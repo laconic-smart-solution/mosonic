@@ -72,7 +72,7 @@ export class PipelineNodeRunnerService {
 
     const rule = await this.rules.findById(payload.ruleId);
     if (!rule) {
-      throw new Error(`Rule ${payload.ruleId} not found`);
+      throw new UnrecoverableError(`Rule ${payload.ruleId} not found`);
     }
 
     await this.pipelineRepo.updateNodeStatus(

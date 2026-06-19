@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
+import { toastApiError } from "@/shared/lib/toast-error"
 import {
   ruleService,
   type ExtractRulePayload,
@@ -13,6 +14,7 @@ import {
 export function useExtractRuleMutation() {
   return useMutation({
     mutationFn: (payload: ExtractRulePayload) => ruleService.extract(payload),
+    meta: { silent: true },
   })
 }
 
@@ -56,8 +58,9 @@ export function usePutRuleMutation() {
       queryClient.setQueryData<RuleEntity>(["rule", ruleId], { ...data })
       void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
     },
-    onError: (_err, { ruleId }) => {
+    onError: (err, { ruleId }) => {
       void queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
+      toastApiError(err, "rules:toast.couldNotSaveRule")
     },
   })
 }

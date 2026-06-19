@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -10,6 +11,14 @@ async function bootstrap() {
     rawBody: true,
   });
   app.enableCors({ origin: true, credentials: true });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   // Public dev assets: GET /uploads/* → ./uploads (URLs use APP_URL or PUBLIC_URL + /uploads/...).
   const uploadsDir = path.join(process.cwd(), 'uploads');

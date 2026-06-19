@@ -8,6 +8,8 @@ describe('UsersService Zernio accounts', () => {
     findByUserId: jest.fn(),
     findByAuthServerUserId: jest.fn(),
     findByZernioProfileId: jest.fn(),
+    findOtherUserByZernioProfileId: jest.fn(),
+    listDuplicateZernioProfileGroups: jest.fn(),
     findByEmailOrUsernameInsensitive: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),

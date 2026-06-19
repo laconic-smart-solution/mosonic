@@ -166,7 +166,7 @@ model User {
   role                   UserRole @default(CUSTOMER)
   status                 UserStatus @default(ACTIVE)
   lastLoginAt            DateTime?
-  zernioProfileId        String?
+  zernioProfileId        String?  @unique
   zernioConnectedAccounts Json    @default("[]")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt

@@ -13,7 +13,8 @@ import { AccountSettingsToolbar } from "@/features/settings/components/account-s
 import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
 import { SocialUnlockConfirmDialog } from "@/features/settings/components/social-unlock-confirm-dialog"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { isInsufficientCredits, parseApiError } from "@/shared/lib/api-error"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { usageQueryKeys } from "@/shared/queries/usage.query"
 import {
@@ -68,7 +69,7 @@ export default function SettingsAccountsPage() {
     if (initialSyncRef.current) return
     initialSyncRef.current = true
     syncMutation.mutate(undefined, {
-      onError: (err) => toast.error(getApiErrorMessage(err) || t("oauth.syncFailed")),
+      onError: (err) => toastApiError(err, "settings:oauth.syncFailed"),
     })
   }, [searchParams, syncMutation, t])
 
@@ -126,14 +127,12 @@ export default function SettingsAccountsPage() {
         toast.success(t("oauth.unlockedToast"))
       },
       onError: (err) => {
-        const status = (err as { response?: { status?: number } })?.response
-          ?.status
-        if (status === 402) {
-          toast.error(t("unlockConfirm.insufficientTitle"))
+        if (isInsufficientCredits(err)) {
+          toastApiError(err, "settings:unlockConfirm.insufficientTitle")
           void connectionCreditQuery.refetch()
           return
         }
-        toast.error(t("oauth.unlockFailed"))
+        toastApiError(err, "settings:oauth.unlockFailed")
       },
     })
   }
@@ -144,14 +143,12 @@ export default function SettingsAccountsPage() {
         window.location.href = connectUrl
       },
       onError: (err) => {
-        const status = (err as { response?: { status?: number } })?.response
-          ?.status
-        if (status === 403) {
+        if (parseApiError(err).status === 403) {
           toast.error(t("oauth.unlockRequired"))
           void accountsQuery.refetch()
           return
         }
-        toast.error(t("oauth.connectUrlFailed"))
+        toastApiError(err, "settings:oauth.connectUrlFailed")
       },
     })
   }
@@ -159,7 +156,7 @@ export default function SettingsAccountsPage() {
   function disconnect(channel: string) {
     disconnectMutation.mutate(channel, {
       onSuccess: () => toast.success(t("oauth.disconnected")),
-      onError: () => toast.error(t("oauth.disconnectFailed")),
+      onError: (err) => toastApiError(err, "settings:oauth.disconnectFailed"),
     })
   }
 
@@ -205,7 +202,7 @@ export default function SettingsAccountsPage() {
                   onSyncAccounts={() =>
                     syncMutation.mutate(undefined, {
                       onError: (err) =>
-                        toast.error(getApiErrorMessage(err) || t("oauth.syncFailed")),
+                        toastApiError(err, "settings:oauth.syncFailed"),
                     })
                   }
                   createBusy={profileBusy}

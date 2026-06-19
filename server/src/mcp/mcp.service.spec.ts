@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { UsersService } from '../users/users.service';
 import { McpService } from './mcp.service';
+import { buildZernioProfileNameForUser } from './zernio/zernio.client';
 import type { ZernioClient } from './zernio/zernio.client';
 import type { ZernioMcpClient } from './zernio/zernio.mcp';
 import type { ZernioRestClient } from './zernio/zernio-rest.client';
@@ -15,7 +16,6 @@ jest.mock('jose', () => ({
 describe('McpService', () => {
   const zernio = {
     listAccounts: jest.fn(),
-    listProfiles: jest.fn(),
     createProfile: jest.fn(),
   } as unknown as jest.Mocked<ZernioClient>;
   const zernioMcp = {} as unknown as jest.Mocked<ZernioMcpClient>;
@@ -29,6 +29,7 @@ describe('McpService', () => {
     getZernioPublishContext: jest.fn(),
     syncZernioConnectedAccounts: jest.fn(),
     findByUserId: jest.fn(),
+    findOtherUserByZernioProfileId: jest.fn(),
     getZernioConnectedAccounts: jest.fn(),
     disconnectZernioConnectedAccount: jest.fn(),
     setZernioProfileId: jest.fn(),
@@ -47,26 +48,69 @@ describe('McpService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    usersService.findOtherUserByZernioProfileId.mockResolvedValue(null);
   });
 
-  it('syncAccounts reuses an existing Zernio profile when none is stored locally', async () => {
+  it('syncAccounts creates a dedicated Zernio profile when none is stored locally', async () => {
     usersService.findByUserId.mockResolvedValue({
       userId: 'u1',
       email: 'user@example.com',
     } as never);
-    zernio.listProfiles.mockResolvedValue([
-      { _id: 'prof_existing', name: 'user@example.com' },
-    ]);
+    zernio.createProfile.mockResolvedValue({
+      _id: 'prof_new',
+      name: buildZernioProfileNameForUser('u1'),
+    });
+    zernio.listAccounts.mockResolvedValue([]);
+
+    await service.syncAccounts('u1');
+
+    expect(zernio.createProfile).toHaveBeenCalledWith(
+      buildZernioProfileNameForUser('u1'),
+    );
+    expect(usersService.setZernioProfileId).toHaveBeenCalledWith(
+      'u1',
+      'prof_new',
+    );
+    expect(zernio.listAccounts).toHaveBeenCalledWith('prof_new');
+  });
+
+  it('syncAccounts reprovisions when stored profile is owned by another user', async () => {
+    usersService.findByUserId.mockResolvedValue({
+      userId: 'u2',
+      zernioProfileId: 'prof_shared',
+    } as never);
+    usersService.findOtherUserByZernioProfileId.mockResolvedValue({
+      userId: 'u1',
+    } as never);
+    zernio.createProfile.mockResolvedValue({
+      _id: 'prof_u2',
+      name: buildZernioProfileNameForUser('u2'),
+    });
+    zernio.listAccounts.mockResolvedValue([]);
+
+    await service.syncAccounts('u2');
+
+    expect(zernio.createProfile).toHaveBeenCalledWith(
+      buildZernioProfileNameForUser('u2'),
+    );
+    expect(usersService.setZernioProfileId).toHaveBeenCalledWith(
+      'u2',
+      'prof_u2',
+    );
+  });
+
+  it('syncAccounts keeps exclusive profile without creating a new one', async () => {
+    usersService.findByUserId.mockResolvedValue({
+      userId: 'u1',
+      zernioProfileId: 'prof_1',
+    } as never);
     zernio.listAccounts.mockResolvedValue([]);
 
     await service.syncAccounts('u1');
 
     expect(zernio.createProfile).not.toHaveBeenCalled();
-    expect(usersService.setZernioProfileId).toHaveBeenCalledWith(
-      'u1',
-      'prof_existing',
-    );
-    expect(zernio.listAccounts).toHaveBeenCalledWith('prof_existing');
+    expect(usersService.setZernioProfileId).not.toHaveBeenCalled();
+    expect(zernio.listAccounts).toHaveBeenCalledWith('prof_1');
   });
 
   it('syncAccounts normalizes channels/accounts and deduplicates by channel', async () => {
@@ -187,4 +231,3 @@ describe('McpService', () => {
     expect(zernioRest.deleteAccount).not.toHaveBeenCalled();
   });
 });
-

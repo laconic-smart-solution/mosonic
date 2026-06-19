@@ -4,11 +4,13 @@ import {
   Post,
   ServiceUnavailableException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   isMirrorToLocalUploadEnabled,
   mirrorFetchedBytesToPublicUploadsUrl,
@@ -31,6 +33,7 @@ import {
  *   the buffer straight to `./uploads` and returns `{PUBLIC_BASE}/uploads/...`.
  */
 @Controller('upload')
+@UseGuards(JwtAuthGuard)
 export class UploadMediaController {
   constructor(private readonly config: ConfigService) {}
 

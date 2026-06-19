@@ -50,6 +50,7 @@ import {
   mediaTabLabels,
   normalizeChannelKey,
 } from "@/features/upload/lib/upload-platform-media"
+import { toastApiError } from "@/shared/lib/toast-error"
 import {
   buildGlobalPublishRequest,
   getApiErrorMessage,
@@ -599,7 +600,7 @@ export default function UploadPage() {
               : i18n.t("upload:toast.channelExcluded"),
           )
         })
-        .catch((err) => toast.error(getApiErrorMessage(err)))
+        .catch((err) => toastApiError(err, "upload:toast.saveFailed"))
     },
     [uploadId, channelTabs, patchMutation, channels]
   )
@@ -777,7 +778,7 @@ export default function UploadPage() {
           setDraft(activeKey, { dirty: false })
           toast.success(i18n.t("upload:toast.savedChannel"))
         },
-        onError: (err) => toast.error(getApiErrorMessage(err)),
+        onError: (err) => toastApiError(err, "upload:toast.saveFailed"),
       }
     )
   }
@@ -857,7 +858,7 @@ export default function UploadPage() {
       setDraft(activeKey, { dirty: false })
       toast.success(i18n.t("upload:toast.postUpdated"))
     } catch (err) {
-      toast.error(getApiErrorMessage(err))
+      toastApiError(err, "upload:toast.saveFailed")
     }
   }
 
@@ -936,7 +937,7 @@ export default function UploadPage() {
       )
       setShowChannelSchedule(false)
     } catch (err) {
-      toast.error(getApiErrorMessage(err))
+      toastApiError(err, "upload:toast.publishFailed")
     }
   }
 
@@ -1034,7 +1035,7 @@ export default function UploadPage() {
       )
       setShowGlobalSchedule(false)
     } catch (err) {
-      toast.error(getApiErrorMessage(err))
+      toastApiError(err, "upload:toast.publishFailed")
     }
   }
 

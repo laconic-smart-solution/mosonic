@@ -150,7 +150,10 @@
     "network": "Network error. Check your connection and try again.",
     "unauthorized": "You are not signed in.",
     "forbidden": "You do not have permission to do that.",
-    "notFound": "Not found."
+    "notFound": "Not found.",
+    "validation": "Please check your input and try again.",
+    "payloadTooLarge": "The file is too large.",
+    "serviceUnavailable": "Service is temporarily unavailable. Please try again."
   },
   "pagination": {
     "page": "Page {{page}}",

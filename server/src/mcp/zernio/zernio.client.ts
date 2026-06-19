@@ -40,6 +40,12 @@ function readZernioErrorBody(data: unknown): {
   };
 }
 
+/** Deterministic Zernio profile name — one profile per Mosonic user. */
+export function buildZernioProfileNameForUser(userId: string): string {
+  return `mosonic:${userId.trim()}`;
+}
+
+/** @deprecated Do not reuse org-wide profiles; use buildZernioProfileNameForUser + createProfile. */
 export function pickZernioProfileForUser(
   profiles: readonly ZernioProfileDto[],
   preferredName: string,

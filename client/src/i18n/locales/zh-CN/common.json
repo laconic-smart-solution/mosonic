@@ -150,7 +150,10 @@
     "network": "网络错误，请检查连接后重试。",
     "unauthorized": "您尚未登录。",
     "forbidden": "您没有执行此操作的权限。",
-    "notFound": "未找到。"
+    "notFound": "未找到。",
+    "validation": "请检查输入后重试。",
+    "payloadTooLarge": "文件过大。",
+    "serviceUnavailable": "服务暂时不可用，请稍后重试。"
   },
   "pagination": {
     "page": "第 {{page}} 页",

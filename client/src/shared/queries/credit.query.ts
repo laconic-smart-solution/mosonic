@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { creditService } from "@/shared/services/credit.service"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import type { TopupCreditsPayload } from "@/shared/types/credit.type"
 import { usageQueryKeys } from "./usage.query"
@@ -40,6 +41,9 @@ export function useCreditTopupMutation() {
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
       void queryClient.invalidateQueries({ queryKey: creditQueryKeys.generationCosts })
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
+    },
+    onError: (err) => {
+      toastApiError(err, "credit:topup.error")
     },
   })
 }

@@ -3,6 +3,7 @@ import { useEffect } from "react"
 import { me } from "@/features/admin/api/auth-api"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
+import { parseApiError } from "@/shared/lib/api-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
@@ -40,8 +41,15 @@ export function useSessionBootstrap() {
         useUserStore
           .getState()
           .setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))
-      } catch {
-        // keep UI usable; protected routes still have token
+      } catch (err) {
+        const { status } = parseApiError(err)
+        if (status === 401) {
+          useUserStore.getState().clearUser()
+          useAuthStore.getState().clearSession()
+          if (!window.location.pathname.startsWith("/login")) {
+            window.location.href = "/login"
+          }
+        }
       }
     })()
 

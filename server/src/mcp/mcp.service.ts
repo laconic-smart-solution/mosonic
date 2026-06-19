@@ -15,7 +15,7 @@ import {
   UsersService,
 } from '../users/users.service';
 import {
-  pickZernioProfileForUser,
+  buildZernioProfileNameForUser,
   ZernioClient,
   ZernioClientError,
 } from './zernio/zernio.client';
@@ -363,34 +363,47 @@ export class McpService {
     }
     const existing = user.zernioProfileId?.trim();
     if (existing) {
-      return existing;
+      const otherOwner =
+        await this.usersService.findOtherUserByZernioProfileId(
+          existing,
+          userId,
+        );
+      if (!otherOwner) {
+        return existing;
+      }
+      this.logger.warn(
+        `User ${userId} had shared Zernio profile ${existing} (also assigned to ${otherOwner.userId}); provisioning a dedicated profile`,
+      );
     }
-    const name =
-      user.email?.trim() ||
-      user.username?.trim() ||
-      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
-      user.userId;
 
     try {
-      const profiles = await this.zernio.listProfiles(true);
-      const reused = pickZernioProfileForUser(profiles, name);
-      if (reused?._id?.trim()) {
-        const profileId = reused._id.trim();
-        await this.usersService.setZernioProfileId(userId, profileId);
-        this.logger.log(
-          `Reused Zernio profile ${profileId} for user ${userId}`,
-        );
-        return profileId;
-      }
-
-      const profile = await this.zernio.createProfile(name);
+      const profile = await this.createDedicatedZernioProfile(userId);
       await this.usersService.setZernioProfileId(userId, profile._id);
+      this.logger.log(
+        `Created dedicated Zernio profile ${profile._id} for user ${userId}`,
+      );
       return profile._id;
     } catch (err: unknown) {
       if (err instanceof ZernioClientError) {
         throw new BadRequestException(err.message);
       }
       throw err;
+    }
+  }
+
+  private async createDedicatedZernioProfile(userId: string) {
+    const baseName = buildZernioProfileNameForUser(userId);
+    try {
+      return await this.zernio.createProfile(baseName);
+    } catch (err: unknown) {
+      if (!(err instanceof ZernioClientError)) {
+        throw err;
+      }
+      const fallbackName = `${baseName}:${Date.now()}`;
+      this.logger.warn(
+        `Zernio createProfile failed for ${baseName}; retrying as ${fallbackName}`,
+      );
+      return await this.zernio.createProfile(fallbackName);
     }
   }
 

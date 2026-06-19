@@ -80,6 +80,7 @@
   },
   "errors": {
     "loadFailed": "Failed to load pipelines.",
-    "invalidStatsResponse": "Invalid pipeline stats response"
+    "invalidStatsResponse": "Invalid pipeline stats response",
+    "startFailed": "Could not start pipeline."
   }
 }

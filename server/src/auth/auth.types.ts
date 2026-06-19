@@ -19,5 +19,7 @@ export interface SsoTokenClaims {
 export interface RequestAuthContext {
   claims: SsoTokenClaims;
   authServerUserId: string;
+  /** Raw Bearer token when verified via JwtAuthGuard (for SSO proxy calls). */
+  accessToken?: string;
   localUser?: UserRecord;
 }

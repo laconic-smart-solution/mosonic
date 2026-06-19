@@ -22,6 +22,60 @@ export class PrismaUserRepository implements IUserRepository {
     return this.prisma.user.findFirst({ where: { zernioProfileId: id } });
   }
 
+  findOtherUserByZernioProfileId(
+    profileId: string,
+    excludeUserId: string,
+  ): Promise<UserRecord | null> {
+    const id = profileId.trim();
+    if (!id) return Promise.resolve(null);
+    return this.prisma.user.findFirst({
+      where: { zernioProfileId: id, userId: { not: excludeUserId } },
+    });
+  }
+
+  async listDuplicateZernioProfileGroups(): Promise<
+    Array<{
+      profileId: string;
+      users: Array<{
+        userId: string;
+        createdAt: Date;
+        email: string | null;
+      }>;
+    }>
+  > {
+    const rows = await this.prisma.user.findMany({
+      where: { zernioProfileId: { not: null } },
+      select: {
+        userId: true,
+        zernioProfileId: true,
+        createdAt: true,
+        email: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const groups = new Map<
+      string,
+      Array<{ userId: string; createdAt: Date; email: string | null }>
+    >();
+
+    for (const row of rows) {
+      const profileId = row.zernioProfileId?.trim();
+      if (!profileId) continue;
+      const bucket = groups.get(profileId) ?? [];
+      bucket.push({
+        userId: row.userId,
+        createdAt: row.createdAt,
+        email: row.email,
+      });
+      groups.set(profileId, bucket);
+    }
+
+    return Array.from(groups.entries())
+      .filter(([, users]) => users.length > 1)
+      .map(([profileId, users]) => ({ profileId, users }));
+  }
+
   async findByEmailOrUsernameInsensitive(
     email?: string,
     username?: string,

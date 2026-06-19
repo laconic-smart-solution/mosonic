@@ -5,6 +5,20 @@ export interface IUserRepository {
   findByUserId(userId: string): Promise<UserRecord | null>;
   findByAuthServerUserId(authServerUserId: string): Promise<UserRecord | null>;
   findByZernioProfileId(profileId: string): Promise<UserRecord | null>;
+  findOtherUserByZernioProfileId(
+    profileId: string,
+    excludeUserId: string,
+  ): Promise<UserRecord | null>;
+  listDuplicateZernioProfileGroups(): Promise<
+    Array<{
+      profileId: string;
+      users: Array<{
+        userId: string;
+        createdAt: Date;
+        email: string | null;
+      }>;
+    }>
+  >;
   findByEmailOrUsernameInsensitive(
     email?: string,
     username?: string,

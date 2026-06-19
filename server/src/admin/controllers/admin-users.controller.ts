@@ -21,6 +21,7 @@ import { CreditService } from '../../credit/credit.service';
 import { User } from '../../users/schemas/user.schema';
 import { AdminCreateUserDto } from '../dto/admin-create-user.dto';
 import { AdminManualTopupDto } from '../dto/admin-manual-topup.dto';
+import { AdminListUsersQueryDto } from '../dto/admin-query-ext.dto';
 import { AdminUpdateRoleDto } from '../dto/admin-update-role.dto';
 import { AdminUpdateStatusDto } from '../dto/admin-update-status.dto';
 import { AdminUserProvisioningService } from '../services/admin-user-provisioning.service';
@@ -44,17 +45,12 @@ export class AdminUsersController {
   ) {}
 
   @Get()
-  listUsers(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-    @Query('search') search?: string,
-    @Query('status') status?: 'active' | 'suspended',
-  ) {
+  listUsers(@Query() query: AdminListUsersQueryDto) {
     return this.users.listUsers({
-      page: Number(page),
-      limit: Number(limit),
-      search,
-      status,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+      search: query.search,
+      status: query.status,
     });
   }
 

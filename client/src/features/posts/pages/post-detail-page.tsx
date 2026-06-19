@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 
 import { Link, useNavigate, useParams } from "react-router-dom"
 
-import { AxiosError } from "axios"
-
 import { ArrowLeft, ExternalLink, Loader2, Pencil, Send } from "lucide-react"
 
 import { useTranslation } from "react-i18next"
@@ -75,7 +73,7 @@ import {
 
 import { normalizeChannelKey } from "@/features/upload/lib/upload-platform-media"
 
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
+import { toastApiError } from "@/shared/lib/toast-error"
 
 import { buttonVariants } from "@/lib/button-variants"
 
@@ -387,7 +385,7 @@ export default function PostDetailPage() {
 
     } catch (e: unknown) {
 
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:drawer.publishFailed")
 
     }
 
@@ -457,7 +455,7 @@ export default function PostDetailPage() {
 
     } catch (e: unknown) {
 
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:drawer.saveFailed")
 
     }
 
@@ -479,7 +477,7 @@ export default function PostDetailPage() {
 
     } catch (e: unknown) {
 
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:detail.analytics.syncFailed")
 
     }
 
