@@ -34,7 +34,8 @@
     "transcription": "ถอดเสียง",
     "summarization": "สรุปเนื้อหา",
     "adapt": "ปรับแต่ง",
-    "intelligence": "ข่าวกรอง"
+    "intelligence": "ข่าวกรอง",
+    "social_account_connect": "การเชื่อมบัญชีโซเชียล"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"

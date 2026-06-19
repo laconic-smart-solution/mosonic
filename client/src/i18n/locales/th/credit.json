@@ -39,6 +39,7 @@
     "translation": "การแปล",
     "summarization": "การสรุป",
     "image_generation": "สร้างรูปภาพ",
-    "video_generation": "สร้างวิดีโอ"
+    "video_generation": "สร้างวิดีโอ",
+    "social_account_connect": "การเชื่อมบัญชีโซเชียล"
   }
 }

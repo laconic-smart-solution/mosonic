@@ -15,6 +15,7 @@ type AccountChannelsSectionProps = {
   connectPending: boolean
   disconnectPending: boolean
   hideHeader?: boolean
+  creditsEach?: number
 }
 
 export function AccountChannelsSection({
@@ -25,6 +26,7 @@ export function AccountChannelsSection({
   connectPending,
   disconnectPending,
   hideHeader = false,
+  creditsEach = 0,
 }: AccountChannelsSectionProps) {
   const { t } = useTranslation("settings")
 
@@ -73,6 +75,7 @@ export function AccountChannelsSection({
             onDisconnect={onDisconnect}
             connectPending={connectPending}
             disconnectPending={disconnectPending}
+            creditsEach={creditsEach}
           />
         ))}
       </CardContent>

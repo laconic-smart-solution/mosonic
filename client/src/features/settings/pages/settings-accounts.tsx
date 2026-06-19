@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Info } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
@@ -10,13 +11,18 @@ import { AccountChannelsSection } from "@/features/settings/components/account-c
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
 import { AccountSettingsToolbar } from "@/features/settings/components/account-settings-toolbar"
 import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
+import { SocialConnectConfirmDialog } from "@/features/settings/components/social-connect-confirm-dialog"
+import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
 import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { usageQueryKeys } from "@/shared/queries/usage.query"
 import {
   useDisconnectZernioAccountMutation,
   useSyncZernioAccountsMutation,
   useZernioAccountsQuery,
+  useZernioConnectionCreditQuery,
   useZernioConnectMutation,
+  zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
 import { useUserStore } from "@/shared/stores/user.store"
 import { zernioService } from "@/shared/services/zernio.service"
@@ -25,16 +31,30 @@ const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
 export default function SettingsAccountsPage() {
   const { t } = useTranslation("settings")
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const hydrated = useAuthStoreHydrated()
   const user = useUserStore((s) => s.user)
   const accountsQuery = useZernioAccountsQuery()
+  const connectionCreditQuery = useZernioConnectionCreditQuery()
   const connectMutation = useZernioConnectMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
   const initialSyncRef = useRef(false)
   const [profileBusy, setProfileBusy] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingPlatform, setPendingPlatform] = useState<string | null>(null)
+
+  const creditsEach = connectionCreditQuery.data?.creditsEach ?? 0
+  const creditsRemaining = connectionCreditQuery.data?.creditsRemaining ?? 0
+
+  const pendingChannelDef = pendingPlatform
+    ? ACCOUNT_CHANNELS.find((c) => c.apiKey === pendingPlatform)
+    : undefined
+  const pendingChannelLabel = pendingChannelDef
+    ? t(`channels.${pendingChannelDef.id}.label`)
+    : pendingPlatform ?? ""
 
   useEffect(() => {
     const connected = searchParams.get("connected")
@@ -58,6 +78,11 @@ export default function SettingsAccountsPage() {
     handledOAuthRef.current = true
     if (connected) {
       toast.success(t("oauth.connectedToast", { platform: connected }))
+      void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
+      void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+      void queryClient.invalidateQueries({
+        queryKey: zernioQueryKeys.connectionCredit,
+      })
       syncMutation.mutate(undefined, {
         onSuccess: () => {
           toast.success(t("oauth.syncedToast"))
@@ -71,7 +96,7 @@ export default function SettingsAccountsPage() {
       return
     }
     toast.error(t("oauth.callbackFailed"))
-  }, [searchParams, setSearchParams, syncMutation, t])
+  }, [queryClient, searchParams, setSearchParams, syncMutation, t])
 
   async function ensureProfile() {
     setProfileBusy(true)
@@ -85,12 +110,29 @@ export default function SettingsAccountsPage() {
     }
   }
 
-  function connect(platform: string) {
-    connectMutation.mutate(platform, {
+  function requestConnect(platform: string) {
+    setPendingPlatform(platform)
+    setConfirmOpen(true)
+  }
+
+  function confirmConnect() {
+    if (!pendingPlatform) return
+    connectMutation.mutate(pendingPlatform, {
       onSuccess: ({ connectUrl }) => {
+        setConfirmOpen(false)
+        setPendingPlatform(null)
         window.location.href = connectUrl
       },
-      onError: () => toast.error(t("oauth.connectUrlFailed")),
+      onError: (err) => {
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status
+        if (status === 402) {
+          toast.error(t("connectConfirm.insufficientTitle"))
+          void connectionCreditQuery.refetch()
+          return
+        }
+        toast.error(t("oauth.connectUrlFailed"))
+      },
     })
   }
 
@@ -154,16 +196,31 @@ export default function SettingsAccountsPage() {
               <AccountChannelsSection
                 accounts={accountsQuery.data?.accounts}
                 loading={accountsQuery.isLoading}
-                onConnect={connect}
+                onConnect={requestConnect}
                 onDisconnect={disconnect}
                 connectPending={connectMutation.isPending}
                 disconnectPending={disconnectMutation.isPending}
+                creditsEach={creditsEach}
                 hideHeader
               />
             </div>
           </div>
         </div>
       </div>
+
+      <SocialConnectConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open)
+          if (!open) setPendingPlatform(null)
+        }}
+        channelLabel={pendingChannelLabel}
+        creditsEach={creditsEach}
+        creditsRemaining={creditsRemaining}
+        loading={connectionCreditQuery.isLoading}
+        onConfirm={confirmConnect}
+        isConnecting={connectMutation.isPending}
+      />
     </div>
   )
 }

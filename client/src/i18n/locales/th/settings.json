@@ -32,6 +32,7 @@
     "profileReady": "โปรไฟล์ Zernio พร้อมแล้ว",
     "profileFailed": "สร้างโปรไฟล์ไม่ได้",
     "connectUrlFailed": "รับ URL เชื่อมต่อไม่ได้",
+    "insufficientCredits": "เครดิตไม่เพียงพอสำหรับเชื่อมช่องทางนี้",
     "disconnected": "ยกเลิกการเชื่อมช่องทางแล้ว",
     "disconnectFailed": "ยกเลิกการเชื่อมบัญชีไม่ได้"
   },
@@ -43,7 +44,10 @@
     "accountId": "รหัสบัญชี",
     "disconnect": "ยกเลิกการเชื่อม",
     "connect": "เชื่อม",
+    "connectWithCredits": "เชื่อม · {{count}}",
+    "connectCost": "ใช้ {{count}} เครดิตต่อการเชื่อมใหม่",
     "connectAria": "เชื่อม {{channel}}",
+    "connectAriaWithCost": "เชื่อม {{channel}} ใช้ {{count}} เครดิต",
     "facebook": {
       "label": "Facebook",
       "description": "เพจและโปรไฟล์สำหรับการเผยแพร่บน Meta"
@@ -68,5 +72,21 @@
       "label": "TikTok",
       "description": "วิดีโอแนวตั้งและรูปแบบเฉพาะ TikTok"
     }
+  },
+  "connectConfirm": {
+    "title": "เชื่อม {{channel}}",
+    "description": "การเชื่อมช่องทางเผยแพร่ใหม่จะหักเครดิตจากยอดคงเหลือของคุณ คุณจะถูกนำไปยังหน้าอนุญาตเครือข่าย",
+    "loading": "กำลังโหลดการประมาณเครดิต…",
+    "estimatedCost": "ค่าใช้จ่ายการเชื่อม",
+    "currentBalance": "ยอดคงเหลือ",
+    "credits": "เครดิต",
+    "balanceAfter": "ยอดหลังเชื่อม",
+    "noCharge": "การเชื่อมนี้ไม่หักเครดิต",
+    "insufficientTitle": "เครดิตไม่เพียงพอ",
+    "insufficientDescription": "การเชื่อมนี้ต้องใช้ {{required}} เครดิต แต่คุณมีเหลือ {{remaining}} เครดิต",
+    "refill": "เติมเครดิต",
+    "cancel": "ยกเลิก",
+    "confirm": "ดำเนินการเชื่อมต่อ",
+    "connecting": "กำลังเชื่อม…"
   }
 }

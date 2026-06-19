@@ -32,6 +32,7 @@
     "profileReady": "Zernio 配置文件已就绪。",
     "profileFailed": "无法创建配置文件。",
     "connectUrlFailed": "无法获取连接 URL。",
+    "insufficientCredits": "积分不足，无法连接此渠道。",
     "disconnected": "渠道已断开。",
     "disconnectFailed": "无法断开账户。"
   },
@@ -43,7 +44,10 @@
     "accountId": "账户 ID",
     "disconnect": "断开",
     "connect": "连接",
+    "connectWithCredits": "连接 · {{count}}",
+    "connectCost": "每次新连接消耗 {{count}} 积分",
     "connectAria": "连接 {{channel}}",
+    "connectAriaWithCost": "连接 {{channel}}，消耗 {{count}} 积分",
     "facebook": {
       "label": "Facebook",
       "description": "用于 Meta 发布的页面和个人资料。"
@@ -68,5 +72,21 @@
       "label": "TikTok",
       "description": "竖屏视频和 TikTok 原生格式。"
     }
+  },
+  "connectConfirm": {
+    "title": "连接 {{channel}}",
+    "description": "连接新的发布渠道将从您的余额中扣除积分。您将被重定向以授权该社交网络。",
+    "loading": "正在加载积分估算…",
+    "estimatedCost": "连接费用",
+    "currentBalance": "当前余额",
+    "credits": "积分",
+    "balanceAfter": "连接后余额",
+    "noCharge": "此连接不消耗积分。",
+    "insufficientTitle": "积分不足",
+    "insufficientDescription": "此连接需要 {{required}} 积分，但您仅剩 {{remaining}} 积分。",
+    "refill": "充值积分",
+    "cancel": "取消",
+    "confirm": "继续连接",
+    "connecting": "正在连接…"
   }
 }

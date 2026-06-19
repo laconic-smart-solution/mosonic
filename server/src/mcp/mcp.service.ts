@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CreditCalculationService } from '../credit/credit-calculation.service';
+import { CreditService } from '../credit/credit.service';
+import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
+import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import {
   type ConnectedAccountRecord,
   UsersService,
@@ -29,6 +33,9 @@ export class McpService {
     private readonly usersService: UsersService,
     private readonly oauthState: ZernioOauthStateService,
     private readonly config: ConfigService,
+    private readonly creditService: CreditService,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly creditCalculation: CreditCalculationService,
   ) {}
 
   /** Lazy-create Zernio REST profile and persist on the user. */
@@ -40,6 +47,14 @@ export class McpService {
   }
 
   async getConnectUrl(platform: string, userId: string): Promise<string> {
+    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    if (!this.isChannelConnected(accounts, platform)) {
+      await this.creditService.assertCreditsForNodeType(
+        userId,
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      );
+    }
+
     const profileId = await this.ensureZernioProfileId(userId);
     const state = await this.oauthState.signState(userId);
     const base = this.config.get<string>('ZERNIO_CALLBACK_URL')?.trim();
@@ -68,11 +83,34 @@ export class McpService {
         'Missing platform or accountId from Zernio',
       );
     }
+
+    const accountsBefore =
+      await this.usersService.getZernioConnectedAccounts(userId);
+    const wasConnected = this.isChannelConnected(accountsBefore, platform);
+
     await this.usersService.setZernioConnectedAccount(
       userId,
       platform,
       accountId,
     );
+
+    if (!wasConnected) {
+      const creditsEach =
+        (await this.nodeCreditPriceService.getActiveCostCredit(
+          SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+        )) ?? 0;
+      if (creditsEach > 0) {
+        const config = await this.creditCalculation.getConfig();
+        const channel = platform.trim().toLowerCase();
+        await this.creditService.chargeSocialAccountConnect({
+          userId,
+          channel,
+          credits: creditsEach,
+          creditPriceUsd: config.creditPriceUsd,
+        });
+      }
+    }
+
     try {
       await this.syncAccounts(userId);
     } catch (err: unknown) {
@@ -103,6 +141,23 @@ export class McpService {
     return { accounts };
   }
 
+  async getConnectionCreditQuote(userId: string): Promise<{
+    nodeType: typeof SOCIAL_ACCOUNT_CONNECT_NODE_TYPE;
+    creditsEach: number;
+    creditsRemaining: number;
+  }> {
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+    const creditsRemaining = await this.creditService.getCreditsRemaining(userId);
+    return {
+      nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      creditsEach,
+      creditsRemaining,
+    };
+  }
+
   async disconnectAccount(userId: string, channel: string): Promise<void> {
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     const record = this.findConnectedAccountForDisconnect(accounts, channel);
@@ -119,6 +174,13 @@ export class McpService {
   }
 
   /** Resolve stored row when UI uses `twitter` vs Zernio storing `x` (or vice versa). */
+  private isChannelConnected(
+    accounts: ConnectedAccountRecord[],
+    platform: string,
+  ): boolean {
+    return Boolean(this.findConnectedAccountForDisconnect(accounts, platform));
+  }
+
   private findConnectedAccountForDisconnect(
     accounts: ConnectedAccountRecord[],
     requestChannel: string,
