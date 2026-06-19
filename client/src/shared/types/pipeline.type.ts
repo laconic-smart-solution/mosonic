@@ -7,6 +7,28 @@ export type StartPipelinePayload = {
   useLearnings?: boolean
 }
 
+export type StartPipelineResponse = {
+  pipelineId: string
+}
+
+export type PipelineEstimatePayload = {
+  workflowId: string
+}
+
+export type PipelineEstimateBreakdownItem = {
+  nodeType: string
+  count: number
+  creditsEach: number
+  creditsTotal: number
+}
+
+export type PipelineEstimateResponse = {
+  totalCredits: number
+  breakdown: PipelineEstimateBreakdownItem[]
+  creditsRemaining: number
+  sufficient: boolean
+}
+
 export type PipelinePageQueryPayload = {
   page?: number
   limit?: number

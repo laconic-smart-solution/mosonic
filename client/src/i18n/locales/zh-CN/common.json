@@ -5,6 +5,12 @@
   "account": "账户",
   "accountMenu": "账户菜单",
   "logOut": "退出登录",
+  "credits": {
+    "remaining": "剩余 {{count}} 积分",
+    "loading": "正在加载积分",
+    "unavailable": "无法加载积分",
+    "viewUsage": "查看用量详情"
+  },
   "pendingSuggestions": "待处理的 AI 建议",
   "language": "语言",
   "languageDescription": "选择应用程序界面的显示语言。",

@@ -6,12 +6,15 @@ import { CostModule } from '../cost/cost.module';
 import { EventsModule } from '../events/events.module';
 import { Plan, PlanSchema } from '../plan/schemas/plan.schema';
 import { UserPlan, UserPlanSchema } from '../plan/schemas/user-plan.schema';
+import { AdminNodeCreditController } from './admin-node-credit.controller';
 import { CreditBillingService } from './credit-billing.service';
 import { CreditCalculationService } from './credit-calculation.service';
 import { CreditConfigController } from './credit-config.controller';
 import { CreditConfigService } from './credit-config.service';
+import { CreditTopupController } from './credit-topup.controller';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
+import { NodeCreditPriceService } from './node-credit-price.service';
 import { OPERATION_REFERENCE_COSTS } from './lib/operation-reference-costs';
 import {
   CreditConfig,
@@ -22,9 +25,17 @@ import {
   CreditLedgerSchema,
 } from './schemas/credit-ledger.schema';
 import {
+  CreditTopup,
+  CreditTopupSchema,
+} from './schemas/credit-topup.schema';
+import {
   FixedCost,
   FixedCostSchema,
 } from './schemas/fixed-cost.schema';
+import {
+  NodeCreditPrice,
+  NodeCreditPriceSchema,
+} from './schemas/node-credit-price.schema';
 import {
   ServiceRate,
   ServiceRateSchema,
@@ -56,13 +67,19 @@ const DEFAULT_SERVICE_RATES = [
     MongooseModule.forFeature([
       { name: CreditConfig.name, schema: CreditConfigSchema },
       { name: CreditLedger.name, schema: CreditLedgerSchema },
+      { name: CreditTopup.name, schema: CreditTopupSchema },
       { name: UserPlan.name, schema: UserPlanSchema },
       { name: FixedCost.name, schema: FixedCostSchema },
       { name: ServiceRate.name, schema: ServiceRateSchema },
+      { name: NodeCreditPrice.name, schema: NodeCreditPriceSchema },
       { name: Plan.name, schema: PlanSchema },
     ]),
   ],
-  controllers: [CreditConfigController],
+  controllers: [
+    CreditConfigController,
+    AdminNodeCreditController,
+    CreditTopupController,
+  ],
   providers: [
     CreditConfigService,
     CreditBillingService,
@@ -70,6 +87,7 @@ const DEFAULT_SERVICE_RATES = [
     CreditService,
     FixedCostService,
     ServiceRateService,
+    NodeCreditPriceService,
   ],
   exports: [
     CreditConfigService,
@@ -78,6 +96,7 @@ const DEFAULT_SERVICE_RATES = [
     CreditService,
     FixedCostService,
     ServiceRateService,
+    NodeCreditPriceService,
     MongooseModule,
   ],
 })
@@ -88,10 +107,12 @@ export class CreditModule implements OnModuleInit {
     @InjectModel(ServiceRate.name)
     private readonly serviceRateModel: Model<ServiceRate>,
     private readonly calculation: CreditCalculationService,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.seedDefaults();
+    await this.nodeCreditPriceService.seedDefaults();
     await this.calculation.ensureLegacyConfigMigrated();
     await this.calculation.recalculateOverheadFactor();
   }

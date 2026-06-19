@@ -177,6 +177,10 @@ export class PipelineService {
     return this.orchestration.startPipeline(args);
   }
 
+  estimatePipeline(workflowId: string, auth: TenancyAuth) {
+    return this.orchestration.estimatePipelineCredits({ workflowId, auth });
+  }
+
   async retryNode(
     pipelineId: string,
     nodeId: string,

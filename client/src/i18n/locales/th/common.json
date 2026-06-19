@@ -5,6 +5,12 @@
   "account": "บัญชี",
   "accountMenu": "เมนูบัญชี",
   "logOut": "ออกจากระบบ",
+  "credits": {
+    "remaining": "เหลือ {{count}} เครดิต",
+    "loading": "กำลังโหลดเครดิต",
+    "unavailable": "ไม่สามารถโหลดเครดิตได้",
+    "viewUsage": "ดูรายละเอียดการใช้งาน"
+  },
   "pendingSuggestions": "คำแนะนำ AI ที่รอดำเนินการ",
   "language": "ภาษา",
   "languageDescription": "เลือกภาษาสำหรับส่วนติดต่อของแอปพลิเคชัน",

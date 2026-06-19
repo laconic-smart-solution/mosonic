@@ -1,0 +1,40 @@
+{
+  "runConfirm": {
+    "title": "Run workflow?",
+    "description": "Review the estimated credit cost before running this workflow.",
+    "estimatedCost": "Estimated cost",
+    "currentBalance": "Current balance",
+    "balanceAfter": "Balance after run",
+    "credits": "credits",
+    "noBillableNodes": "This workflow has no billable nodes — running it is free.",
+    "breakdownTitle": "Cost breakdown",
+    "perRun": "each",
+    "loading": "Calculating estimate…",
+    "estimateError": "Could not calculate the estimate. Please try again.",
+    "insufficientTitle": "Not enough credits",
+    "insufficientDescription": "You need {{required}} credits but only have {{remaining}}.",
+    "refill": "Refill credits",
+    "cancel": "Cancel",
+    "confirm": "Run workflow",
+    "starting": "Starting…"
+  },
+  "topup": {
+    "title": "Top up credits",
+    "description": "Choose a package to add credits to your balance instantly.",
+    "credits": "credits",
+    "confirm": "Add credits",
+    "processing": "Adding…",
+    "cancel": "Cancel",
+    "success": "Added {{credits}} credits",
+    "error": "Could not add credits. Please try again.",
+    "loadError": "Could not load credit packages.",
+    "loading": "Loading packages…"
+  },
+  "nodeType": {
+    "text_generation": "Text generation",
+    "translation": "Translation",
+    "summarization": "Summarization",
+    "image_generation": "Image generation",
+    "video_generation": "Video generation"
+  }
+}

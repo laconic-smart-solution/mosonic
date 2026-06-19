@@ -49,6 +49,12 @@ import {
 } from '../workflow/schemas/workflow.schema';
 import { UploadService } from '../upload/upload.service';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
+import { UserPlan, type UserPlanDocument } from '../plan/schemas/user-plan.schema';
+import { NodeCreditPriceService } from '../credit/node-credit-price.service';
+import { CreditService } from '../credit/credit.service';
+import { CreditCalculationService } from '../credit/credit-calculation.service';
+import { isBillableNodeCreditType } from '../credit/lib/billable-node-credit-types';
+import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { NodeExecutor } from './node-executor.service';
 import { DependencyResolverService } from './dependency-resolver.service';
 import {
@@ -86,6 +92,11 @@ export class OrchestrationService {
     private readonly ruleModel: Model<RuleDocument>,
     @InjectModel(Content.name)
     private readonly contentModel: Model<ContentDocument>,
+    @InjectModel(UserPlan.name)
+    private readonly userPlanModel: Model<UserPlanDocument>,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly creditService: CreditService,
+    private readonly creditCalculation: CreditCalculationService,
     private readonly nodeExecutor: NodeExecutor,
     private readonly events: EventsService,
     private readonly uploadService: UploadService,
@@ -150,6 +161,18 @@ export class OrchestrationService {
       .exec();
     if (nodes.length === 0) {
       throw new BadRequestException('Workflow has no nodes to execute');
+    }
+
+    const { totalCredits, breakdown: creditBreakdown } =
+      await this.computeNodeCreditEstimate(nodes.map((n) => n.type));
+    if (totalCredits > 0) {
+      const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
+      if (creditsRemaining < totalCredits) {
+        throw new InsufficientCreditsException({
+          requiredCredits: totalCredits,
+          creditsRemaining,
+        });
+      }
     }
 
     const templateEdges =
@@ -265,10 +288,27 @@ export class OrchestrationService {
         experimentId,
         newsMeta: input.metadata?.newsMeta ?? null,
       },
+      creditsCharged: totalCredits,
+      creditChargeBreakdown: creditBreakdown.map((row) => ({
+        nodeType: row.nodeType,
+        count: row.count,
+        creditsEach: row.creditsEach,
+      })),
+      creditsReconciled: false,
     });
 
     const pipelineId = pipeline.pipelineId;
     const totalNodes = executableNodes.length;
+
+    if (totalCredits > 0) {
+      const config = await this.creditCalculation.getConfig();
+      await this.creditService.chargePipelineRun({
+        userId: input.auth.userId,
+        pipelineId,
+        credits: totalCredits,
+        creditPriceUsd: config.creditPriceUsd,
+      });
+    }
 
     this.logger.log(
       `[pipeline:${pipelineId}] started workflow=${workflow.workflowId} ` +
@@ -304,6 +344,7 @@ export class OrchestrationService {
         await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Failed, {
           completedAt: new Date(),
         });
+        await this.reconcilePipelineCredits(pipelineId);
         this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
           pipelineId,
           message: 'Could not start pipeline queue. Is Redis running?',
@@ -328,12 +369,161 @@ export class OrchestrationService {
       await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Failed, {
         completedAt: new Date(),
       });
+      await this.reconcilePipelineCredits(pipelineId);
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
         pipelineId,
         message: 'An unexpected error occurred. Please try again.',
       });
     });
     return { pipelineId };
+  }
+
+  /** Aggregate per-node-type credit cost for a set of node types. */
+  private async computeNodeCreditEstimate(nodeTypes: string[]): Promise<{
+    totalCredits: number;
+    breakdown: Array<{
+      nodeType: string;
+      count: number;
+      creditsEach: number;
+      creditsTotal: number;
+    }>;
+  }> {
+    const counts = new Map<string, number>();
+    for (const type of nodeTypes) {
+      if (isBillableNodeCreditType(type)) {
+        counts.set(type, (counts.get(type) ?? 0) + 1);
+      }
+    }
+
+    const breakdown: Array<{
+      nodeType: string;
+      count: number;
+      creditsEach: number;
+      creditsTotal: number;
+    }> = [];
+    let totalCredits = 0;
+
+    for (const [nodeType, count] of counts) {
+      const creditsEach =
+        (await this.nodeCreditPriceService.getActiveCostCredit(nodeType)) ?? 0;
+      const creditsTotal = creditsEach * count;
+      totalCredits += creditsTotal;
+      breakdown.push({ nodeType, count, creditsEach, creditsTotal });
+    }
+
+    breakdown.sort((a, b) => a.nodeType.localeCompare(b.nodeType));
+    return { totalCredits, breakdown };
+  }
+
+  private async getCreditsRemaining(userId: string): Promise<number> {
+    const userPlan = await this.userPlanModel
+      .findOne({ userId, status: 'active' })
+      .lean<{ creditsRemaining?: number }>()
+      .exec();
+    return userPlan?.creditsRemaining ?? 0;
+  }
+
+  /**
+   * Refund up-front credits for billable nodes that did not complete. Idempotent
+   * via the pipeline's `creditsReconciled` flag, so it is safe to call from every
+   * terminal transition (success, failure, cancel).
+   */
+  async reconcilePipelineCredits(pipelineId: string): Promise<void> {
+    try {
+      const pipeline = await this.pipelineModel
+        .findOne({ pipelineId })
+        .exec();
+      if (!pipeline) return;
+      if (pipeline.creditsReconciled) return;
+      const charged = pipeline.creditsCharged ?? 0;
+      const breakdown = pipeline.creditChargeBreakdown ?? [];
+      if (charged <= 0 || breakdown.length === 0) {
+        await this.pipelineModel
+          .updateOne({ pipelineId }, { $set: { creditsReconciled: true } })
+          .exec();
+        return;
+      }
+
+      const completedByType = new Map<string, number>();
+      for (const node of pipeline.nodes ?? []) {
+        if (node.status !== PipelineNodeExecutionStatus.Completed) continue;
+        completedByType.set(
+          node.type,
+          (completedByType.get(node.type) ?? 0) + 1,
+        );
+      }
+
+      let refund = 0;
+      for (const row of breakdown) {
+        const completed = completedByType.get(row.nodeType) ?? 0;
+        const unused = Math.max(0, row.count - completed);
+        refund += unused * row.creditsEach;
+      }
+
+      // Mark reconciled first so concurrent terminal transitions don't double-refund.
+      const claim = await this.pipelineModel
+        .updateOne(
+          { pipelineId, creditsReconciled: { $ne: true } },
+          { $set: { creditsReconciled: true } },
+        )
+        .exec();
+      if (claim.modifiedCount === 0) return;
+
+      if (refund > 0 && pipeline.userId) {
+        const config = await this.creditCalculation.getConfig();
+        await this.creditService.refundPipelineRun({
+          userId: pipeline.userId,
+          pipelineId,
+          credits: refund,
+          creditPriceUsd: config.creditPriceUsd,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Credit reconciliation failed for ${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Pre-run estimate of the credits a workflow will charge plus the user's balance. */
+  async estimatePipelineCredits(input: {
+    workflowId: string;
+    auth: TenancyAuth;
+  }): Promise<{
+    totalCredits: number;
+    breakdown: Array<{
+      nodeType: string;
+      count: number;
+      creditsEach: number;
+      creditsTotal: number;
+    }>;
+    creditsRemaining: number;
+    sufficient: boolean;
+  }> {
+    const workflow = await this.workflowModel
+      .findOne(mergeUserIdFilter({ workflowId: input.workflowId }, input.auth))
+      .exec();
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${input.workflowId} not found`);
+    }
+
+    const nodes = await this.workflowNodeModel
+      .find(mergeUserIdFilter({ workflowRef: workflow.workflowId }, input.auth))
+      .select({ type: 1 })
+      .lean<Array<{ type: string }>>()
+      .exec();
+
+    const { totalCredits, breakdown } = await this.computeNodeCreditEstimate(
+      nodes.map((n) => n.type),
+    );
+    const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
+
+    return {
+      totalCredits,
+      breakdown,
+      creditsRemaining,
+      sufficient: creditsRemaining >= totalCredits,
+    };
   }
 
   async retryNode(
@@ -457,6 +647,8 @@ export class OrchestrationService {
         },
       );
 
+      await this.reconcilePipelineCredits(pipelineId);
+
       this.events.emitToPipeline(pipelineId, 'pipeline:completed', {
         pipelineId,
         contentId: primaryContentId,
@@ -499,6 +691,7 @@ export class OrchestrationService {
         pausedNodeId: null,
         pausedLaneId: null,
       });
+      await this.reconcilePipelineCredits(pipelineId);
       const message =
         error instanceof Error
           ? error.message
@@ -782,6 +975,8 @@ export class OrchestrationService {
       pausedNodeId: null,
       pausedLaneId: null,
     });
+
+    await this.reconcilePipelineCredits(pipelineId);
 
     const paused = this.pausedPipelines.get(pipelineId);
     if (paused) {

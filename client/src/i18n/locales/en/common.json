@@ -5,6 +5,12 @@
   "account": "Account",
   "accountMenu": "Account menu",
   "logOut": "Log out",
+  "credits": {
+    "remaining": "{{count}} credits remaining",
+    "loading": "Loading credits",
+    "unavailable": "Credits unavailable",
+    "viewUsage": "View usage details"
+  },
   "pendingSuggestions": "Pending AI suggestions",
   "language": "Language",
   "languageDescription": "Choose the language for the application interface.",

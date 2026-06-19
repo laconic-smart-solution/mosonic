@@ -92,6 +92,12 @@ export const adminApi = {
     }>
   }) => apiClient.post("/admin/credit/preview", body).then((r) => r.data),
 
+  listNodeCredits: () =>
+    apiClient.get("/admin/node-credits").then((r) => r.data),
+
+  updateNodeCredit: (nodeType: string, body: { costUsd: number }) =>
+    apiClient.put(`/admin/node-credits/${encodeURIComponent(nodeType)}`, body).then((r) => r.data),
+
   listPlans: () => apiClient.get("/admin/plans").then((r) => r.data),
 
   createPlan: (body: Record<string, unknown>) =>

@@ -38,6 +38,7 @@ type PlanRow = {
   priceThb: number
   priceUsd: number
   creditsPerMonth: number
+  creditsOverride?: number | null
   isActive: boolean
   description?: string
   features?: string[]
@@ -60,6 +61,7 @@ export default function AdminPlansPage() {
     name: "",
     priceThb: "1200",
     priceUsd: "35",
+    creditsOverride: "",
     description: "",
     features: "",
     isActive: true,
@@ -67,9 +69,10 @@ export default function AdminPlansPage() {
 
   const { data: planUsers } = useAdminPlanUsers(usersPlanId ?? undefined)
 
-  const computedCredits = Math.floor(
-    Number(form.priceUsd) / (creditConfig?.creditPriceUsd ?? 0.01),
-  )
+  const hasOverride = form.creditsOverride.trim() !== ""
+  const computedCredits = hasOverride
+    ? Math.floor(Number(form.creditsOverride))
+    : Math.floor(Number(form.priceUsd) / (creditConfig?.creditPriceUsd ?? 0.01))
 
   const openCreate = () => {
     setEditing(null)
@@ -77,6 +80,7 @@ export default function AdminPlansPage() {
       name: "",
       priceThb: "1200",
       priceUsd: "35",
+      creditsOverride: "",
       description: "",
       features: "",
       isActive: true,
@@ -90,6 +94,8 @@ export default function AdminPlansPage() {
       name: plan.name,
       priceThb: String(plan.priceThb),
       priceUsd: String(plan.priceUsd),
+      creditsOverride:
+        plan.creditsOverride != null ? String(plan.creditsOverride) : "",
       description: plan.description ?? "",
       features: (plan.features ?? []).join("\n"),
       isActive: plan.isActive,
@@ -103,7 +109,7 @@ export default function AdminPlansPage() {
   }
 
   const handleSave = () => {
-    const body = {
+    const body: Record<string, unknown> = {
       name: form.name,
       priceThb: Number(form.priceThb),
       priceUsd: Number(form.priceUsd),
@@ -113,6 +119,9 @@ export default function AdminPlansPage() {
         .map((s) => s.trim())
         .filter(Boolean),
       isActive: form.isActive,
+    }
+    if (hasOverride && Number.isFinite(Number(form.creditsOverride))) {
+      body.creditsOverride = Math.max(0, Math.floor(Number(form.creditsOverride)))
     }
     if (editing) {
       updatePlan.mutate({ planId: editing.planId, body }, { onSuccess: () => setDrawerOpen(false) })
@@ -248,7 +257,26 @@ export default function AdminPlansPage() {
                   />
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">{t("plans.computedCreditsHint")}</p>
+              <div className="space-y-1">
+                <Label>{t("plans.fieldCreditsOverride")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.creditsOverride}
+                  placeholder={t("plans.creditsOverridePlaceholder")}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, creditsOverride: e.target.value }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("plans.creditsOverrideHint")}
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {hasOverride
+                  ? t("plans.overrideCreditsHint")
+                  : t("plans.computedCreditsHint")}
+              </p>
               <p className="text-sm font-semibold tabular-nums">
                 {t("plans.computedCredits", { count: computedCredits.toLocaleString() })}
               </p>

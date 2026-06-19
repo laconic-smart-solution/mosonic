@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
-import { CreditService } from '../credit/credit.service';
-import { currentBillingPeriod } from '../credit/lib/billing-period.util';
 import { EventsService } from '../events/events.service';
 import {
   LlmProvider,
@@ -48,7 +46,6 @@ export class NodeExecutor {
     private readonly intelligenceNode: IntelligenceNodeService,
     private readonly mergeBarrier: MergeBarrierService,
     private readonly costService: CostService,
-    private readonly creditService: CreditService,
   ) {}
 
   getFriendlyError(error: unknown): string {
@@ -280,19 +277,9 @@ export class NodeExecutor {
       return;
     }
     try {
-      const { costUsd } = await this.costService.recordNodeCost(dto);
-      await this.creditService.deductCredits({
-        userId: dto.userId,
-        pipelineRef: dto.pipelineRef,
-        campaignRef: dto.campaignRef,
-        contentRef: dto.contentRef,
-        nodeId: dto.nodeId!,
-        nodeType: dto.nodeType!,
-        provider: dto.provider,
-        model: dto.providerModel,
-        rawCostUsd: costUsd,
-        billingPeriod: currentBillingPeriod(),
-      });
+      // Credits are charged up-front at pipeline start and reconciled on
+      // completion; only record raw cost here for analytics/budget tracking.
+      await this.costService.recordNodeCost(dto);
     } catch (e) {
       if (e instanceof PipelineBudgetExceededError) {
         throw e;

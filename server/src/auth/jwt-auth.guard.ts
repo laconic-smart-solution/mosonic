@@ -100,9 +100,9 @@ export class JwtAuthGuard implements CanActivate {
       });
       const claims = payload as unknown as SsoTokenClaims;
 
+      const rawId = claims.userid ?? claims.sub;
       const authServerUserIdRaw =
-        (typeof claims.userid === 'string' && claims.userid) ||
-        (typeof claims.sub === 'string' && claims.sub);
+        rawId != null && rawId !== '' ? String(rawId).trim() : '';
       if (!authServerUserIdRaw) {
         throw new UnauthorizedException('Token missing userid/sub');
       }

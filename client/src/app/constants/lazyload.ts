@@ -39,6 +39,9 @@ export const AdminCostPage = PageLoader(lazy(() => import("@/features/admin/page
 export const AdminCreditConfigPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-credit-config")),
 )
+export const AdminNodeCreditsPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-node-credits")),
+)
 export const AdminPlansPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-plans")))
 export const AdminUsagePage = PageLoader(lazy(() => import("@/features/admin/pages/admin-usage")))
 export const AdminContentPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-content")))
