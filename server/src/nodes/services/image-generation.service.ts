@@ -1,4 +1,5 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { buildFileStorageFolderPath } from '../../common/utils/file-storage-path.util';
 import OpenAI from 'openai';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -146,7 +147,7 @@ export class ImageGenerationService {
       base64: generated.base64,
       mimeType: generated.mimeType,
       fileName: `workflow-${workflowRef}-image-${timePart}.png`,
-      folderPath: `neural-tex/workflow-images/${workflowRef}`,
+      folderPath: buildFileStorageFolderPath('workflow-images', workflowRef),
     });
 
     return { image };
