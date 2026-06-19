@@ -13,7 +13,6 @@ import {
 import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
 import {
   effectiveVideoMode,
-  VIDEO_CINEMATIC_UI_ENABLED,
 } from "@/features/workflow/lib/video-generation-ui"
 import type {
   WorkflowEdge,
@@ -330,7 +329,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "video":
       return {
-        mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
+        mode: "cinematic",
         model,
         aspectRatio: "16:9",
         resolution: "720p",
@@ -880,22 +879,35 @@ function deriveNodeOrder(rfNodes: WfRfNode[], edges: Edge[]): string[] {
 
   const nodeIds = rfNodes.map((n) => n.id)
   const nodesById = new Map(rfNodes.map((node) => [node.id, node]))
-  const indegree = new Map<string, number>(nodeIds.map((id) => [id, 0]))
-  const outgoing = new Map<string, string[]>(nodeIds.map((id) => [id, []]))
+  const edgeIncidentIds = new Set<string>()
+  for (const edge of edges) {
+    if (nodesById.has(edge.source)) edgeIncidentIds.add(edge.source)
+    if (nodesById.has(edge.target)) edgeIncidentIds.add(edge.target)
+  }
+
+  const connectedIds = nodeIds.filter((id) => edgeIncidentIds.has(id))
+  const disconnectedNodes = rfNodes.filter((node) => !edgeIncidentIds.has(node.id))
+
+  const sortByPosition = (a: WfRfNode, b: WfRfNode) =>
+    a.position.x === b.position.x
+      ? a.position.y - b.position.y
+      : a.position.x - b.position.x
+
+  if (connectedIds.length === 0) {
+    return [...rfNodes].sort(sortByPosition).map((node) => node.id)
+  }
+
+  const indegree = new Map<string, number>(connectedIds.map((id) => [id, 0]))
+  const outgoing = new Map<string, string[]>(connectedIds.map((id) => [id, []]))
 
   for (const edge of edges) {
     if (!nodesById.has(edge.source) || !nodesById.has(edge.target)) continue
+    if (!indegree.has(edge.source) || !indegree.has(edge.target)) continue
     outgoing.get(edge.source)!.push(edge.target)
     indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1)
   }
 
-  const queue = nodeIds
-    .filter((id) => (indegree.get(id) ?? 0) === 0)
-    .sort((a, b) => {
-      const na = nodesById.get(a)!
-      const nb = nodesById.get(b)!
-      return na.position.x - nb.position.x || na.position.y - nb.position.y
-    })
+  const queue = connectedIds.filter((id) => (indegree.get(id) ?? 0) === 0)
 
   const ordered: string[] = []
   while (queue.length > 0) {
@@ -907,23 +919,14 @@ function deriveNodeOrder(rfNodes: WfRfNode[], edges: Edge[]): string[] {
       indegree.set(next, deg)
       if (deg === 0) {
         queue.push(next)
-        queue.sort((a, b) => {
-          const na = nodesById.get(a)!
-          const nb = nodesById.get(b)!
-          return na.position.x - nb.position.x || na.position.y - nb.position.y
-        })
       }
     }
   }
 
-  if (ordered.length === rfNodes.length) return ordered
-
-  const remainder = rfNodes
-    .filter((node) => !ordered.includes(node.id))
-    .sort((a, b) =>
-      a.position.x === b.position.x ? a.position.y - b.position.y : a.position.x - b.position.x,
-    )
+  const remainder = connectedIds.filter((id) => !ordered.includes(id))
+  const disconnected = [...disconnectedNodes]
+    .sort(sortByPosition)
     .map((node) => node.id)
 
-  return [...ordered, ...remainder]
+  return [...ordered, ...remainder, ...disconnected]
 }

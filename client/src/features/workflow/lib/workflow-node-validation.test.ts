@@ -378,11 +378,11 @@ describe("getBranchSubgraphLaneErrors", () => {
 })
 
 describe("mergeHeygenVideoConfig", () => {
-  it("keeps presenter mode when cinematic UI is disabled and avatar is missing", () => {
+  it("coerces to cinematic when setting presenter without avatar", () => {
     expect(
       mergeHeygenVideoConfig({}, { mode: "presenter", heygenVoiceId: "voice-1" }),
     ).toEqual({
-      mode: "presenter",
+      mode: "cinematic",
       heygenVoiceId: "voice-1",
     })
   })

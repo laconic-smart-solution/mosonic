@@ -82,6 +82,11 @@
     "settingsAccounts": "账户设置",
     "admin": "管理"
   },
+  "breadcrumb": {
+    "detail": "详情",
+    "review": "审核",
+    "newsTrigger": "新闻触发器"
+  },
   "routes": {
     "dashboard": "仪表板",
     "rules": "规则",
@@ -166,5 +171,15 @@
   "empty": "暂无项目",
   "noData": "无数据",
   "optional": "可选",
-  "required": "必填"
+  "required": "必填",
+  "toast": {
+    "eyebrow": {
+      "success": "已保存",
+      "error": "失败",
+      "warning": "注意",
+      "info": "提示",
+      "loading": "加载中",
+      "default": "提示"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { Save } from "lucide-react"
 import { useTranslation } from "react-i18next"
+
+import { PageShell } from "@/components/app/page-shell"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
@@ -115,8 +117,8 @@ export default function AdminNodeCreditsPage() {
   }
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[860px] space-y-6">
+    <PageShell>
+      <div className="w-full space-y-6">
         <div>
           <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
             {t("nodeCredits.title")}
@@ -224,6 +226,6 @@ export default function AdminNodeCreditsPage() {
           </Table>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

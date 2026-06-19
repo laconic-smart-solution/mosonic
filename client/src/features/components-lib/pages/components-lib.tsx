@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 
+import { PageShell } from "@/components/app/page-shell"
 import { T } from "@/lib/tokens"
 
 function Btn({ children, variant = "primary", size = "md", style: ex = {} }: { children: React.ReactNode; variant?: string; size?: string; style?: React.CSSProperties }) {
@@ -69,7 +70,48 @@ const CHIP_ITEMS: { key: string; color: string }[] = [
   { key: "scheduled", color: "indigo" },
 ]
 
-const TOAST_KEYS = ["ruleSaved", "twitterLimit", "imageFailed", "pipelineRunning"] as const
+const TOAST_PREVIEW_ITEMS = [
+  {
+    key: "ruleSaved" as const,
+    type: "success" as const,
+    eyebrowKey: "toast.eyebrow.success",
+    rail: "#00C9A7",
+    iconBg: "#E0FAF5",
+    iconColor: "#005C4D",
+    eyebrowColor: "#00806B",
+    icon: "✓",
+  },
+  {
+    key: "twitterLimit" as const,
+    type: "warning" as const,
+    eyebrowKey: "toast.eyebrow.warning",
+    rail: "#F5A623",
+    iconBg: "#FEF6E4",
+    iconColor: "#7C4F07",
+    eyebrowColor: "#7C4F07",
+    icon: "⚠",
+  },
+  {
+    key: "imageFailed" as const,
+    type: "error" as const,
+    eyebrowKey: "toast.eyebrow.error",
+    rail: "#EF4444",
+    iconBg: "#FEF2F2",
+    iconColor: "#B91C1C",
+    eyebrowColor: "#DC2626",
+    icon: "✕",
+  },
+  {
+    key: "pipelineRunning" as const,
+    type: "info" as const,
+    eyebrowKey: "toast.eyebrow.info",
+    rail: "#254C94",
+    iconBg: "#E8EDF6",
+    iconColor: "#1A3260",
+    eyebrowColor: "#254C94",
+    icon: "ℹ",
+  },
+]
 
 const TYPOGRAPHY_ITEMS = [
   { labelKey: "typography.pageTitle", sampleKey: "typography.pageTitleSample", style: { fontSize: 22, fontWeight: 700, color: T.textPrimary, letterSpacing: "-0.5px" } },
@@ -98,9 +140,11 @@ const COLOR_ITEMS = [
 
 export default function ComponentsLibPage() {
   const { t } = useTranslation("componentsLib")
+  const { t: tCommon } = useTranslation("common")
 
   return (
-    <div style={{ padding: "28px 28px 40px", maxWidth: 1100, display: "flex", flexDirection: "column", gap: 20 }}>
+    <PageShell>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%" }}>
       <div style={{ marginBottom: 4 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.textPrimary, letterSpacing: "-0.5px" }}>{t("page.title")}</h1>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textSecondary }}>{t("page.subtitle")}</p>
@@ -155,19 +199,49 @@ export default function ComponentsLibPage() {
       </SectionCard>
 
       <SectionCard title={t("sections.toasts")}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 380 }}>
-          {([
-            { c: T.green, bg: T.greenBg, bd: T.greenBorder, icon: "✓", key: "ruleSaved" as const },
-            { c: T.amber, bg: T.amberBg, bd: T.amberBorder, icon: "⚠", key: "twitterLimit" as const },
-            { c: T.red,   bg: T.redBg,   bd: T.redBorder,   icon: "✕", key: "imageFailed" as const },
-            { c: T.blue,  bg: T.blueBg,  bd: T.blueBorder,  icon: "ℹ", key: "pipelineRunning" as const },
-          ]).map((toastItem, i) => (
-            <div key={TOAST_KEYS[i]} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", background: toastItem.bg, border: `1px solid ${toastItem.bd}`, borderRadius: 9, boxShadow: `0 1px 3px ${toastItem.bd}40` }}>
-              <span style={{ color: toastItem.c, fontWeight: 700, fontSize: 13, flexShrink: 0, marginTop: 1 }}>{toastItem.icon}</span>
-              <span style={{ fontSize: 12, color: T.textPrimary, lineHeight: 1.55, flex: 1 }}>{t(`toasts.${toastItem.key}`)}</span>
-              <button style={{ background: "none", border: "none", cursor: "pointer", color: toastItem.c, flexShrink: 0, display: "flex", padding: 0, opacity: 0.7 }}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-              </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 340 }}>
+          {TOAST_PREVIEW_ITEMS.map((toastItem) => (
+            <div
+              key={toastItem.key}
+              style={{
+                display: "flex",
+                background: T.surfaceBg,
+                borderRadius: 14,
+                overflow: "hidden",
+                boxShadow: "0 1px 2px rgba(15,31,61,.04), 0 12px 32px rgba(15,31,61,.14)",
+              }}
+            >
+              <div style={{ width: 4, flexShrink: 0, background: toastItem.rail }} />
+              <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 11, padding: "13px 12px 13px 14px", minWidth: 0 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: toastItem.iconBg, color: toastItem.iconColor, fontSize: 15, marginTop: 1,
+                }}>
+                  {toastItem.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0, paddingTop: 1 }}>
+                  <div style={{
+                    fontFamily: "ui-monospace, monospace", fontSize: 9.5, fontWeight: 600,
+                    letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2, color: toastItem.eyebrowColor,
+                  }}>
+                    {tCommon(toastItem.eyebrowKey)}
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.45, color: "#0F1F3D", fontWeight: 500 }}>
+                    {t(`toasts.${toastItem.key}`)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", color: "#A89D8E",
+                    flexShrink: 0, display: "flex", padding: 0, marginTop: 2, opacity: 0.5,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -209,5 +283,6 @@ export default function ComponentsLibPage() {
         </div>
       </SectionCard>
     </div>
+    </PageShell>
   )
 }

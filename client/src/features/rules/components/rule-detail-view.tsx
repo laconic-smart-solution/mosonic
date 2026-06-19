@@ -53,7 +53,7 @@ export function RuleDetailView({ form, ruleId }: RuleDetailViewProps) {
 
   return (
     <FormProvider {...form}>
-      <div className="mx-auto flex max-w-6xl gap-8 lg:gap-10">
+      <div className="flex w-full gap-8 lg:gap-10">
         <nav
           aria-label={t("detail.navAria")}
           className="hidden w-44 shrink-0 lg:block"

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { Link, useNavigate, useParams } from "react-router-dom"
 
-import { ArrowLeft, ExternalLink, Loader2, Pencil, Send } from "lucide-react"
+import { ExternalLink, Loader2, Pencil, Send } from "lucide-react"
 
 import { useTranslation } from "react-i18next"
 
@@ -11,6 +11,8 @@ import { toast } from "sonner"
 
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 
 import { Badge } from "@/components/ui/badge"
 
@@ -250,6 +252,12 @@ export default function PostDetailPage() {
   const publishable = !!local && isPostPublishable(local)
 
   const analyticsEligible = isAnalyticsEligible(local)
+
+  useSetBreadcrumbLabel(
+    local?.youtubeTitlePreview?.trim() ||
+      local?.captionPreview?.trim() ||
+      postId,
+  )
 
   const primaryChannel = local?.channels?.[0] ?? "instagram"
 
@@ -530,37 +538,8 @@ export default function PostDetailPage() {
 
 
   return (
-
-    <div className="min-h-full w-full bg-[color:var(--nt-canvas)] px-4 py-5 sm:px-6">
-
-      <div className="mx-auto flex flex-col gap-5">
-
-        <div className="flex flex-wrap items-center gap-3">
-
-          <Button
-
-            type="button"
-
-            variant="ghost"
-
-            size="sm"
-
-            className="gap-1.5"
-
-            onClick={() => navigate("/posts")}
-
-          >
-
-            <ArrowLeft className="size-4" aria-hidden />
-
-            {t("detail.backToPosts")}
-
-          </Button>
-
-        </div>
-
-
-
+    <PageShell>
+      <div className="flex flex-col gap-5">
         {detailQuery.isLoading ? (
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1055,11 +1034,6 @@ export default function PostDetailPage() {
         )}
 
       </div>
-
-    </div>
-
+    </PageShell>
   )
-
 }
-
-

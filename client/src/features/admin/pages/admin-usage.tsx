@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react"
 import { ChevronDown, X } from "lucide-react"
+
+import { PageShell } from "@/components/app/page-shell"
 import {
   Bar,
   BarChart,
@@ -146,8 +148,8 @@ export default function AdminUsagePage() {
   }
 
   return (
-    <div className="min-h-full bg-background px-7 py-8 pb-20">
-      <div className="mx-auto max-w-[1180px] space-y-6">
+    <PageShell>
+      <div className="w-full space-y-6">
         <div>
           <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
             {t("usage.title")}
@@ -477,7 +479,7 @@ export default function AdminUsagePage() {
           </div>
         </section>
       </div>
-    </div>
+    </PageShell>
   )
 }
 

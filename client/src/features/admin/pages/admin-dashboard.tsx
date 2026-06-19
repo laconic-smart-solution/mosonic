@@ -12,6 +12,8 @@ import {
 } from "recharts"
 import { useTranslation } from "react-i18next"
 
+import { PageShell } from "@/components/app/page-shell"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -50,7 +52,8 @@ export default function AdminDashboardPage() {
     overview != null ? `$${Number(overview.cost.totalThisMonthUsd).toFixed(4)}` : "—"
 
   return (
-    <div className="space-y-8 p-6 md:p-8">
+    <PageShell>
+      <div className="w-full space-y-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <h1 className="text-2xl font-bold tracking-tight">{t("dashboard.title")}</h1>
           <div className="flex flex-wrap gap-2">
@@ -132,7 +135,8 @@ export default function AdminDashboardPage() {
             </ResponsiveContainer>
           </ChartCard>
         </div>
-    </div>
+      </div>
+    </PageShell>
   )
 }
 

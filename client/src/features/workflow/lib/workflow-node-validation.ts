@@ -364,6 +364,63 @@ function wfTypeLabel(wfType: string): string {
   return i18n.t(`workflow:nodeTypesShort.${wfType}`, { defaultValue: wfType })
 }
 
+function workflowNodeLabel(node: WfRfNode): string {
+  if (node.type === "plus_placeholder") return node.id
+  return wfTypeLabel(node.data.wfType)
+}
+
+/** Nodes with no incident edges while the workflow graph has connections. */
+export function getDisconnectedWorkflowNodeIds(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): string[] {
+  const persistable = rfNodes.filter((node) => node.type !== "plus_placeholder")
+  if (persistable.length <= 1 || edges.length === 0) {
+    return []
+  }
+
+  const incident = new Set<string>()
+  for (const edge of edges) {
+    if (edge.source) incident.add(edge.source)
+    if (edge.target) incident.add(edge.target)
+  }
+
+  return persistable
+    .filter((node) => !incident.has(node.id))
+    .map((node) => node.id)
+}
+
+export function getDisconnectedWorkflowNodeLabels(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): string[] {
+  const ids = new Set(getDisconnectedWorkflowNodeIds(rfNodes, edges))
+  return rfNodes
+    .filter((node) => ids.has(node.id))
+    .map((node) => workflowNodeLabel(node))
+}
+
+export function stripDisconnectedWorkflowNodes(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): { nodes: WfRfNode[]; removedIds: string[]; removedLabels: string[] } {
+  const disconnectedIds = getDisconnectedWorkflowNodeIds(rfNodes, edges)
+  if (disconnectedIds.length === 0) {
+    return { nodes: rfNodes, removedIds: [], removedLabels: [] }
+  }
+
+  const idSet = new Set(disconnectedIds)
+  const removedLabels = rfNodes
+    .filter((node) => idSet.has(node.id))
+    .map((node) => workflowNodeLabel(node))
+
+  return {
+    nodes: rfNodes.filter((node) => !idSet.has(node.id)),
+    removedIds: disconnectedIds,
+    removedLabels,
+  }
+}
+
 function laneIdFromRfNode(node: WfRfNode): string {
   return laneKeyFromRfNode(node)
 }

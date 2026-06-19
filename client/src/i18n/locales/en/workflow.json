@@ -360,10 +360,19 @@
     "removedLanes": "Removed lanes: {{lanes}}",
     "videoSettingsSaveFailed": "Could not save video settings to the server. Use Save workflow before running."
   },
+  "toast": {
+    "saved": "Workflow saved successfully",
+    "saveFailed": "Could not save workflow. Please try again.",
+    "nameUpdated": "Workflow name updated",
+    "nameUpdateFailed": "Could not update workflow name. Please try again."
+  },
   "toasts": {
     "replacedAdaptNodes": "Replaced unassigned Adapt nodes with one Adapt per channel from Branch.",
     "branchNeedsChannels": "Branch requires at least two distribution channels on the campaign rule.",
     "addNodeBeforeSave": "Add at least one node before saving.",
+    "disconnectedNode": "{{label}} is not connected to the workflow. Connect it or delete it.",
+    "removedDisconnectedNode": "Removed unconnected {{label}} node from the workflow.",
+    "removedDisconnectedNodes": "Removed {{count}} unconnected nodes from the workflow.",
     "pipelineStartFailed": "Could not start pipeline. Please try again.",
     "enterPostTopic": "Please enter what you want to post about.",
     "addNodeBeforeRun": "Add at least one node before running.",

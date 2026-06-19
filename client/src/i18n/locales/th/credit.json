@@ -44,6 +44,8 @@
     "summarization": "การสรุป",
     "image_generation": "สร้างรูปภาพ",
     "video_generation": "สร้างวิดีโอ",
+    "video_generation_presenter": "วิดีโอพรีเซนเตอร์ (HeyGen)",
+    "video_generation_cinematic": "วิดีโอภาพยนตร์ (Sora)",
     "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
     "rule_generation": "สร้างกฎ",
     "workflow_generation": "สร้างเวิร์กโฟลว์"

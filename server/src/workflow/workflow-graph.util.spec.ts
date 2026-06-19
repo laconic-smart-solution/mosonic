@@ -1,6 +1,7 @@
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import {
   areAllDependenciesMet,
+  assignOrderFromGraph,
   buildLinearEdgesFromOrder,
   getAncestors,
   getRoots,
@@ -151,6 +152,96 @@ describe('workflow-graph.util', () => {
           { nodeId: 'c', type: WorkflowNodeType.VideoGeneration, order: 3 },
         ],
         [{ from: 'a', to: 'b' }],
+      ),
+    ).toThrow(/disconnected/i);
+  });
+
+  it('rejects video without text ancestor when text exists in graph', () => {
+    expect(() =>
+      validateWorkflowGraph(
+        [
+          { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 1 },
+          { nodeId: 'image', type: WorkflowNodeType.ImageGeneration, order: 2 },
+          { nodeId: 'video', type: WorkflowNodeType.VideoGeneration, order: 3 },
+        ],
+        [
+          { from: 'text', to: 'image' },
+          { from: 'image', to: 'video' },
+        ],
+      ),
+    ).not.toThrow();
+
+    expect(() =>
+      validateWorkflowGraph(
+        [
+          { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 1 },
+          { nodeId: 'video', type: WorkflowNodeType.VideoGeneration, order: 2 },
+        ],
+        [{ from: 'text', to: 'video' }],
+      ),
+    ).not.toThrow();
+
+    expect(() =>
+      validateWorkflowGraph(
+        [
+          { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 1 },
+          { nodeId: 'branch', type: WorkflowNodeType.Branch, order: 2 },
+          { nodeId: 'adapt', type: WorkflowNodeType.Adapt, order: 3 },
+          { nodeId: 'video', type: WorkflowNodeType.VideoGeneration, order: 4 },
+          { nodeId: 'merge', type: WorkflowNodeType.Merge, order: 5 },
+        ],
+        [
+          { from: 'text', to: 'branch' },
+          { from: 'branch', to: 'adapt', sourceHandle: 'instagram' },
+          { from: 'adapt', to: 'video' },
+          { from: 'video', to: 'merge', targetHandle: 'instagram' },
+        ],
+      ),
+    ).not.toThrow();
+  });
+
+  it('assignOrderFromGraph uses topological order instead of client order', () => {
+    const nodes = [
+      { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 5 },
+      { nodeId: 'video', type: WorkflowNodeType.VideoGeneration, order: 1 },
+    ];
+    const edges = [{ from: 'text', to: 'video' }];
+    const ordered = assignOrderFromGraph(nodes, edges);
+    expect(ordered.find((n) => n.nodeId === 'text')?.order).toBe(1);
+    expect(ordered.find((n) => n.nodeId === 'video')?.order).toBe(2);
+  });
+
+  it('assignOrderFromGraph keeps disconnected nodes after the connected graph', () => {
+    const nodes = [
+      { nodeId: 'keyword', type: WorkflowNodeType.KeywordPlanner, order: 1 },
+      { nodeId: 'orphan_video', type: WorkflowNodeType.VideoGeneration, order: 2 },
+      { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 3 },
+      { nodeId: 'branch', type: WorkflowNodeType.Branch, order: 4 },
+    ];
+    const edges = [
+      { from: 'keyword', to: 'text' },
+      { from: 'text', to: 'branch' },
+    ];
+    const ordered = assignOrderFromGraph(nodes, edges);
+    expect(ordered.find((n) => n.nodeId === 'keyword')?.order).toBe(1);
+    expect(ordered.find((n) => n.nodeId === 'text')?.order).toBe(2);
+    expect(ordered.find((n) => n.nodeId === 'branch')?.order).toBe(3);
+    expect(ordered.find((n) => n.nodeId === 'orphan_video')?.order).toBe(4);
+  });
+
+  it('rejects workflows with disconnected nodes before order checks', () => {
+    expect(() =>
+      validateWorkflowGraph(
+        [
+          { nodeId: 'keyword', type: WorkflowNodeType.KeywordPlanner, order: 1 },
+          { nodeId: 'orphan_video', type: WorkflowNodeType.VideoGeneration, order: 2 },
+          { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 3 },
+          { nodeId: 'branch', type: WorkflowNodeType.Branch, order: 4 },
+        ],
+        [
+          { from: 'keyword', to: 'text' },
+          { from: 'text', to: 'branch' },
+        ],
       ),
     ).toThrow(/disconnected/i);
   });

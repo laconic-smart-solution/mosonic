@@ -355,10 +355,19 @@
     "removedLanes": "已移除分支：{{lanes}}",
     "videoSettingsSaveFailed": "无法将视频设置保存到服务器。运行前请先保存工作流。"
   },
+  "toast": {
+    "saved": "工作流已保存",
+    "saveFailed": "无法保存工作流，请重试。",
+    "nameUpdated": "工作流名称已更新",
+    "nameUpdateFailed": "无法更新工作流名称，请重试。"
+  },
   "toasts": {
     "replacedAdaptNodes": "已用 Branch 的每个渠道一个 Adapt 替换未分配分支的 Adapt 节点。",
     "branchNeedsChannels": "Branch 需要在活动规则中至少两个分发渠道。",
     "addNodeBeforeSave": "保存前请至少添加一个节点。",
+    "disconnectedNode": "“{{label}}”节点未连接到工作流，请连接或删除该节点。",
+    "removedDisconnectedNode": "已从工作流中移除未连接的“{{label}}”节点。",
+    "removedDisconnectedNodes": "已从工作流中移除 {{count}} 个未连接的节点。",
     "pipelineStartFailed": "无法启动流水线。请重试。",
     "enterPostTopic": "请输入您要发布的内容主题。",
     "addNodeBeforeRun": "运行前请至少添加一个节点。",

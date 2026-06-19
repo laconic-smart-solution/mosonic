@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router-dom"
 
 import { Input } from "@/components/ui/input"
+import { PageShell } from "@/components/app/page-shell"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -82,7 +83,8 @@ export default function AdminApiUsagePage() {
   const updateMutation = updateByProvider[providerId]
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <PageShell>
+      <div className="w-full space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl tracking-tight text-foreground">
@@ -148,6 +150,7 @@ export default function AdminApiUsagePage() {
         onSavePrepaid={(amount) => updateMutation.mutateAsync(amount)}
         isSaving={updateMutation.isPending}
       />
-    </div>
+      </div>
+    </PageShell>
   )
 }

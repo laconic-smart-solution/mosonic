@@ -15,6 +15,7 @@ import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
 import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -714,6 +715,8 @@ export function UploadContentReviewPanel({
 
   const workflowTitle = workflowQuery.data?.workflow?.name ?? "Content review"
 
+  useSetBreadcrumbLabel(workflowTitle)
+
   const workflowDisplayName = workflowQuery.data?.workflow?.name
 
   const copyOutput = useCallback(async (text: string) => {
@@ -1059,8 +1062,6 @@ export function UploadContentReviewPanel({
               <ContentDetailReviewHeader
                 workflowTitle={workflowTitle}
                 data={data}
-                breadcrumbParentHref={embedInUpload ? "/upload" : "/content"}
-                breadcrumbParentLabel={embedInUpload ? "Upload" : "Content"}
               />
 
               {data.newsMeta ? (

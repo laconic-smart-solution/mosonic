@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { PageShell } from "@/components/app/page-shell"
 import { cn } from "@/lib/utils"
 import {
   navigateSearchParams,
@@ -181,7 +182,7 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <div className="mx-auto w-full px-4 py-8 sm:px-6">
+    <PageShell>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-1 flex items-center gap-2 text-muted-foreground">
@@ -396,6 +397,6 @@ export default function WorkflowsPage() {
           />
         </div>
       ) : null}
-    </div>
+    </PageShell>
   )
 }
