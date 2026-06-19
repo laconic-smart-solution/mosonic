@@ -12,7 +12,7 @@
     "sectorNews": "News"
   },
   "browser": {
-    "iosBrowser": "On iPhone and iPad, add NeuralTex to your Home Screen to get background alerts. Until then, use the bell and in-app toasts.",
+    "iosBrowser": "On iPhone and iPad, add Mosonic to your Home Screen to get background alerts. Until then, use the bell and in-app toasts.",
     "unsupported": "This browser does not support background alerts. You will still see in-app notifications.",
     "grantedPwa": "Home Screen alerts are on.",
     "grantedDesktop": "Browser alerts are on when this tab is in the background.",
@@ -24,6 +24,6 @@
     "iosPwaEnabled": "Home Screen alerts enabled",
     "browserEnabled": "Browser alerts enabled",
     "notEnabledTitle": "Alerts not enabled",
-    "notEnabledDesc": "You can still use the notification bell and in-app toasts while using NeuralTex."
+    "notEnabledDesc": "You can still use the notification bell and in-app toasts while using Mosonic."
   }
 }

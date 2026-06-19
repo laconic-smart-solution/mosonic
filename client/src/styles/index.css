@@ -107,7 +107,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* NeuralTex design tokens — navy / teal / canvas palette */
+/* Mosonic design tokens — navy / teal / canvas palette */
 :root {
   /* Canvas / main surface */
   --background: #F7F4EF;
@@ -161,7 +161,7 @@
   --sidebar-border: #0F1F3D;
   --sidebar-ring: #00C9A7;
 
-  /* NeuralTex JS/Tailwind bridge (mirrors src/lib/tokens.ts) */
+  /* Mosonic JS/Tailwind bridge (mirrors src/lib/tokens.ts) */
   --nt-canvas: #F7F4EF;
   --nt-surface: #FFFFFF;
   --nt-border: #EDE9E1;
@@ -297,7 +297,7 @@
   opacity: 0.45;
 }
 
-/* NeuralTex animations */
+/* Mosonic animations */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }

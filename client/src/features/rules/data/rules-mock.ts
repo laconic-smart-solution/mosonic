@@ -161,7 +161,7 @@ export const RULES_MOCK: RuleEntity[] = [
     ruleId: "b0872dad-ec95-4f9e-a1e4-0b39bd14d112",
     name: "Black Friday Campaign 2024",
     brand: {
-      brandName: "NeuralTex",
+      brandName: "Mosonic",
       industry: "SaaS / Technology",
       brandDescription: "AI-powered content orchestration platform for marketing teams.",
       brandTone: ["casual", "inspirational"],

@@ -2,11 +2,11 @@
 alwaysApply: true
 ---
 
-# NeuralTex — AI-Driven Digital Content Generation Platform
+# Mosonic — AI-Driven Digital Content Generation Platform
 
 ## Project Flow & Complete Functionality Specification
 
-**Company:** NeuralTex Software Co., Ltd.
+**Company:** Mosonic Software Co., Ltd.
 **Product Type:** Cloud-based SaaS — AI Content Orchestration Platform
 **Primary Markets:** SMEs, Startups, Marketing Agencies, E-Commerce, Large Enterprises
 
@@ -31,7 +31,7 @@ alwaysApply: true
 
 ## 1. Project Overview
 
-NeuralTex is a Thailand-based **Software-as-a-Service (SaaS)** platform that helps businesses automatically produce marketing content, social media materials, and digital media assets through AI orchestration.
+Mosonic is a Thailand-based **Software-as-a-Service (SaaS)** platform that helps businesses automatically produce marketing content, social media materials, and digital media assets through AI orchestration.
 
 ### Mission
 
@@ -39,7 +39,7 @@ Replace manual content workflows with intelligent, automated AI orchestration �
 
 ### Core Innovation
 
-NeuralTex does **not** train foundational AI language models. The proprietary innovation lives in the **Orchestration Layer** — how user inputs are translated into precise AI instructions controlling **tone, format, length, keywords, and validation**.
+Mosonic does **not** train foundational AI language models. The proprietary innovation lives in the **Orchestration Layer** — how user inputs are translated into precise AI instructions controlling **tone, format, length, keywords, and validation**.
 
 ### Platform Capabilities (High Level)
 
@@ -57,7 +57,7 @@ The platform is composed of **seven interconnected modules** that move content f
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│                    NEURALTEX PLATFORM FLOW                         │
+│                    MOSONIC PLATFORM FLOW                         │
 └────────────────────────────────────────────────────────────────────┘
 
   [ ONE-TIME PER CAMPAIGN ]
@@ -590,7 +590,7 @@ Send to Rule Module → User Accept or Reject
   "ruleId": "uuid",
   "name": "Black Friday Campaign 2024",
   "brand": {
-    "brandName": "NeuralTex",
+    "brandName": "Mosonic",
     "industry": "SaaS / Technology",
     "brandDescription": "short brand description",
     "brandTone": ["casual", "inspirational"],

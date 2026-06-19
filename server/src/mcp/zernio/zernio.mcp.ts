@@ -72,7 +72,7 @@ export class ZernioMcpClient implements OnModuleInit {
     }
 
     const client = new Client({
-      name: 'neuraltex',
+      name: 'mosonic',
       version: '1.0.0',
     });
 

@@ -14,6 +14,10 @@ function pick(obj: unknown, path: string[]): unknown {
 }
 
 export function authFlowErrorMessage(err: unknown, fallback: string): string {
+  return parseAuthApiViolations(err, fallback)
+}
+
+export function parseAuthApiViolations(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "response" in err) {
     const data = (err as { response?: { data?: { message?: unknown } } }).response?.data
     const m = data?.message
@@ -22,6 +26,15 @@ export function authFlowErrorMessage(err: unknown, fallback: string): string {
   }
   if (err instanceof Error) return err.message
   return fallback
+}
+
+export function setAuthFormApiError(
+  setError: (name: "root", error: { message: string }) => void,
+  err: unknown,
+  fallback: string,
+): void {
+  const message = parseAuthApiViolations(err, fallback)
+  setError("root", { message })
 }
 
 export type SignupBody = {

@@ -1,5 +1,5 @@
 {
-  "appName": "NeuralTex",
+  "appName": "Mosonic",
   "appTagline": "AI 平台",
   "platform": "平台",
   "account": "账户",
@@ -14,6 +14,8 @@
   "pendingSuggestions": "待处理的 AI 建议",
   "language": "语言",
   "languageDescription": "选择应用程序界面的显示语言。",
+  "showPassword": "显示密码",
+  "hidePassword": "隐藏密码",
   "languages": {
     "en": "English",
     "th": "ไทย",

@@ -297,21 +297,6 @@ export default function DashboardPage() {
                         {t("dashboard:actionQueue.review")}
                       </Button>
                     </div>
-                    <Separator />
-                    <div className="flex items-start justify-between gap-3 px-6 py-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-snug">
-                          {t("dashboard:actionQueue.failedPublishes", {
-                            count: actionItems?.failedPostsCount ?? 0,
-                          })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{t("dashboard:actionQueue.failedHint")}</p>
-                      </div>
-                      <Button size="sm" variant="ghost" className="shrink-0 gap-1" onClick={() => navigate("/upload")}>
-                        {t("dashboard:actionQueue.uploads")}
-                        <ArrowUpRight className="size-3.5" />
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
 

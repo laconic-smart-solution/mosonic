@@ -9,6 +9,9 @@ type RuleExtractionProgressProps = {
   progressStep: string
   failureMessage: string
   streamedContent: string
+  translationNamespace?: string
+  title?: string
+  subtitle?: string
   onDismiss?: () => void
   onTryAgain?: () => void
 }
@@ -18,10 +21,13 @@ export function RuleExtractionProgress({
   progressStep,
   failureMessage,
   streamedContent,
+  translationNamespace = "rules",
+  title,
+  subtitle,
   onDismiss,
   onTryAgain,
 }: RuleExtractionProgressProps) {
-  const { t } = useTranslation("rules")
+  const { t } = useTranslation(translationNamespace)
   const [displayedProgress, setDisplayedProgress] = useState(8)
   const stepToProgress = useMemo(
     () =>
@@ -65,9 +71,10 @@ export function RuleExtractionProgress({
   }, [displayedProgress, softCap])
 
   const progress = Math.round(displayedProgress)
-  const title = failureMessage
-    ? t("extraction.titleFailed")
-    : t("extraction.titleGenerating")
+  const resolvedTitle = failureMessage
+    ? title ?? t("extraction.titleFailed")
+    : title ?? t("extraction.titleGenerating")
+  const resolvedSubtitle = subtitle ?? t("extraction.subtitle")
   const stepLabel = t(`progressStep.${progressStep}`, {
     defaultValue: progressStep.replace(/_/g, " "),
   })
@@ -76,11 +83,11 @@ export function RuleExtractionProgress({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
       <div className="w-full max-w-md rounded-2xl border border-border/70 bg-background/95 p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-sm font-semibold text-foreground">{resolvedTitle}</p>
           <RuleChip label={stepLabel} color="amber" />
         </div>
         <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>{t("extraction.subtitle")}</span>
+          <span>{resolvedSubtitle}</span>
           <span>{progress}%</span>
         </div>
         <div className="mb-2 h-2.5 w-full overflow-hidden rounded-full bg-muted/70">

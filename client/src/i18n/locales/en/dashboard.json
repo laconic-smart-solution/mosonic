@@ -7,7 +7,7 @@
   },
   "header": {
     "overview": "Overview",
-    "subtitle": "Campaign health, engagement, and what needs your attention—updated as your content moves through NeuralTex.",
+    "subtitle": "Campaign health, engagement, and what needs your attention—updated as your content moves through Mosonic.",
     "startGeneration": "Start new generation"
   },
   "stats": {
@@ -72,7 +72,7 @@
     "viewPosts": "View posts"
   },
   "quickStart": {
-    "title": "Welcome to NeuralTex",
+    "title": "Welcome to Mosonic",
     "desc": "Three quick steps to your first publish",
     "step1": "Create your Rule",
     "step2": "Generate your first content",

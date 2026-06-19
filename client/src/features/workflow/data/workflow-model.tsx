@@ -11,6 +11,10 @@ import {
   resolveWorkflowLayout,
 } from "@/features/workflow/lib/branch-layout"
 import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
+import {
+  effectiveVideoMode,
+  VIDEO_CINEMATIC_UI_ENABLED,
+} from "@/features/workflow/lib/video-generation-ui"
 import type {
   WorkflowEdge,
   WorkflowNode,
@@ -326,7 +330,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "video":
       return {
-        mode: "cinematic",
+        mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
         model,
         aspectRatio: "16:9",
         resolution: "720p",
@@ -499,7 +503,7 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
         ]) || i18n.t("workflow:configSummary.imageSettings")
       )
     case "video": {
-      const mode = configString(config, "mode") ?? "cinematic"
+      const mode = effectiveVideoMode(config)
       if (mode === "presenter") {
         return (
           joinConfigParts([

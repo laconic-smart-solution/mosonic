@@ -1,7 +1,8 @@
 {
   "prompt": {
     "focusedPlaceholder": "Describe what you want to create today…",
-    "generatingWorkflow": "Generating workflow…"
+    "generatingWorkflow": "Generating workflow…",
+    "extractingSubtitle": "We'll open a few quick questions when your rule is ready."
   },
   "promptSuggestions": {
     "songkran": "Write a Songkran festival promotion for Facebook and Instagram",
@@ -34,16 +35,31 @@
     "loadingMore": "Loading..."
   },
   "footer": {
-    "copyright": "© 2026 NeuralTex Co., Ltd. — Bangkok, Thailand"
+    "copyright": "© 2026 Mosonic Co., Ltd. — Bangkok, Thailand"
   },
   "toast": {
-    "selectRuleFirst": "Select a campaign rule before generating a workflow."
+    "extractionFailed": "Could not build a campaign rule from your prompt. Please try again.",
+    "noChannelsAfterExtract": "The extracted rule has no channels. Add channels in Rules, then try again.",
+    "generationFailed": "Rule generation failed",
+    "couldNotStartExtraction": "Unable to start rule extraction",
+    "fileTooLarge": "File \"{{name}}\" exceeds maximum size ({{maxMb}} MB)."
+  },
+  "extraction": {
+    "titleGenerating": "Building your campaign rule…",
+    "titleFailed": "Could not build rule",
+    "subtitle": "Analyzing your prompt and preparing your campaign rule.",
+    "waitMessage": "Analyzing your prompt…",
+    "dismiss": "Dismiss",
+    "tryAgain": "Try again"
   },
   "userStrip": {
     "loading": "Loading…",
+    "logIn": "Log in",
+    "signUp": "Sign up",
     "admin": "Admin",
     "member": "Member",
     "account": "Account",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "usage": "Usage & credits"
   }
 }

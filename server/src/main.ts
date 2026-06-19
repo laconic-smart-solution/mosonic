@@ -20,8 +20,8 @@ async function bootstrap() {
     (process.env.SWAGGER_ENABLED ?? 'true').toLowerCase() === 'true';
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
-      .setTitle('Neutral Tex API')
-      .setDescription('Neutral Tex backend API')
+      .setTitle('Mosonic API')
+      .setDescription('Mosonic backend API')
       .setVersion('1.0')
       .addBearerAuth(
         {
