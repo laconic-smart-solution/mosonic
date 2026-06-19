@@ -294,14 +294,16 @@ export const IntelligenceSearchType = z.enum([
 ]);
 export type IntelligenceSearchTypeValue = z.infer<typeof IntelligenceSearchType>;
 
-const intelligenceConfigSchema = z
+const intelligenceConfigObjectSchema = z
   .object({
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     searchType: IntelligenceSearchType.default('all'),
     customPrompt: z.string().nullable().optional(),
   })
-  .strict()
+  .strict();
+
+const intelligenceConfigSchema = intelligenceConfigObjectSchema
   .superRefine((val, ctx) => {
     if (val.searchType === 'custom') {
       const p = val.customPrompt?.trim();
@@ -315,10 +317,7 @@ const intelligenceConfigSchema = z
     }
   });
 
-const SCHEMAS: Record<
-  WorkflowNodeType,
-  z.ZodObject<Record<string, z.ZodTypeAny>>
-> = {
+const SCHEMAS: Record<WorkflowNodeType, z.ZodTypeAny> = {
   [WorkflowNodeType.KeywordPlanner]: keywordPlannerConfigSchema,
   [WorkflowNodeType.TextGeneration]: textConfigSchema,
   [WorkflowNodeType.ImageGeneration]: imageConfigSchema,
@@ -450,6 +449,20 @@ export function coerceVideoConfigForPersist(
   return raw;
 }
 
+function configShapeKeys(type: WorkflowNodeType): string[] {
+  if (type === WorkflowNodeType.VideoGeneration) {
+    return Object.keys(videoConfigObjectSchema.shape);
+  }
+  if (type === WorkflowNodeType.Intelligence) {
+    return Object.keys(intelligenceConfigObjectSchema.shape);
+  }
+  const schema = SCHEMAS[type];
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+  return [];
+}
+
 export function parseWorkflowNodeConfig(
   type: WorkflowNodeType,
   raw: unknown,
@@ -461,11 +474,7 @@ export function parseWorkflowNodeConfig(
       : {};
 
   const picked: Record<string, unknown> = {};
-  const allowed = new Set(
-    type === WorkflowNodeType.VideoGeneration
-      ? Object.keys(videoConfigObjectSchema.shape)
-      : Object.keys(schema.shape),
-  );
+  const allowed = new Set(configShapeKeys(type));
   for (const [k, v] of Object.entries(obj)) {
     if (allowed.has(k)) {
       picked[k] = v;
@@ -492,7 +501,10 @@ export function parseWorkflowNodeConfig(
     };
   }
 
-  return { ok: true, data: mergeWithDefaults(type, result.data) };
+  return {
+    ok: true,
+    data: mergeWithDefaults(type, result.data as Record<string, unknown>),
+  };
 }
 
 export function parseWorkflowNodeConfigOrThrow(
