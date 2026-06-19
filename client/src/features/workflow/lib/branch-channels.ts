@@ -1,6 +1,5 @@
 import {
   channelIdsToHandles,
-  normalizeChannelId,
   resolveDistributionChannelId,
   ruleChannelNamesToIds,
 } from "@/shared/constants/distribution-channels"

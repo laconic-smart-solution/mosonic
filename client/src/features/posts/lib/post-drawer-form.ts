@@ -123,11 +123,13 @@ export function editableFieldsFromZernio(
   const title = optionalString(root.title)
 
   const scheduledLocal = toDatetimeLocalValue(scheduledIso)
+  const media = draftMediaFromItems(localFallback?.mediaItems ?? [])
 
   return {
     content,
     title,
     scheduledLocal,
+    ...media,
   }
 }
 

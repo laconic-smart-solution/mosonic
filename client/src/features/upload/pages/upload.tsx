@@ -1133,7 +1133,7 @@ export default function UploadPage() {
           activeKey={activeKey}
           onSelect={(key) => {
             setSelectedChannelKey(key)
-            setScheduledEditOpen(false)
+            setShowGlobalSchedule(false)
           }}
           dotStatusByKey={dotStatusByKey}
           includedByKey={includedByKey}
