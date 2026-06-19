@@ -477,14 +477,13 @@ export function getBranchSubgraphLaneErrors(
   return errors
 }
 
-/** Merge HeyGen/video patch; coerce incomplete presenter setup only when setting presenter or clearing avatar. */
+/** Merge HeyGen/video patch; fall back to cinematic only when avatar is cleared in presenter mode. */
 export function mergeHeygenVideoConfig(
   current: Record<string, unknown>,
   patch: Record<string, unknown>,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...current, ...patch }
   const hasAvatar = Boolean(String(next.heygenAvatarId ?? "").trim())
-  const settingPresenterMode = patch.mode === "presenter"
   const clearingAvatar =
     "heygenAvatarId" in patch &&
     !String(patch.heygenAvatarId ?? "").trim()
@@ -493,7 +492,7 @@ export function mergeHeygenVideoConfig(
     VIDEO_CINEMATIC_UI_ENABLED &&
     next.mode === "presenter" &&
     !hasAvatar &&
-    (settingPresenterMode || clearingAvatar)
+    clearingAvatar
   ) {
     next.mode = "cinematic"
   }

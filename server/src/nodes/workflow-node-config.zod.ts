@@ -203,25 +203,14 @@ const videoConfigObjectSchema = z
   })
   .strict();
 
-const videoConfigSchema = videoConfigObjectSchema
-  .transform((data) => {
-    const mode = data.mode ?? 'cinematic';
-    const duration =
-      mode === 'presenter'
-        ? snapToPresenterDuration(data.duration)
-        : snapToSoraDuration(data.duration);
-    return { ...data, duration };
-  })
-  .superRefine((data, ctx) => {
-    const mode = data.mode ?? 'cinematic';
-    if (mode === 'presenter' && !data.heygenAvatarId?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'heygenAvatarId is required when mode is presenter',
-        path: ['heygenAvatarId'],
-      });
-    }
-  });
+const videoConfigSchema = videoConfigObjectSchema.transform((data) => {
+  const mode = data.mode ?? 'cinematic';
+  const duration =
+    mode === 'presenter'
+      ? snapToPresenterDuration(data.duration)
+      : snapToSoraDuration(data.duration);
+  return { ...data, duration };
+});
 
 const transcriptionConfigSchema = z
   .object({
@@ -446,18 +435,21 @@ export type ParseWorkflowNodeConfigResult =
  * Unknown keys are rejected by `.strict()` then stripped by parsing only known shape.
  */
 /**
- * Incomplete presenter setup (mode without avatar) is stored as cinematic until an
- * avatar is chosen. Pipeline start still requires avatar+voice when mode is presenter.
+ * Fall back to cinematic only when clearing avatar in presenter mode.
+ * Pipeline execution still requires avatar+voice via video-generation.service.
  */
 export function coerceVideoConfigForPersist(
   raw: Record<string, unknown>,
 ): Record<string, unknown> {
-  const mode = raw.mode ?? 'cinematic';
-  const hasAvatar = String(raw.heygenAvatarId ?? '').trim().length > 0;
-  if (mode === 'presenter' && !hasAvatar) {
-    return { ...raw, mode: 'cinematic' };
+  const next = { ...raw };
+  const hasAvatar = String(next.heygenAvatarId ?? '').trim().length > 0;
+  const clearingAvatar =
+    'heygenAvatarId' in raw && !String(raw.heygenAvatarId ?? '').trim();
+
+  if (next.mode === 'presenter' && !hasAvatar && clearingAvatar) {
+    next.mode = 'cinematic';
   }
-  return raw;
+  return next;
 }
 
 function configShapeKeys(type: WorkflowNodeType): string[] {

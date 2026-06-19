@@ -893,10 +893,10 @@ export function UploadContentReviewPanel({
         ) : null}
 
         {embedInUpload && preview !== undefined ? (
-          <div className="grid max-h-[100vh] min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-5">
-            <div className="h-full min-w-0 overflow-y-auto">{preview}</div>
+          <div className="grid min-w-0 gap-4 px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-5">
+            <div className="min-w-0">{preview}</div>
 
-            <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex min-w-0 max-h-[89vh] overflow-y-auto flex-col rounded-xl border border-border bg-card shadow-sm">
               <div className="border-b border-border px-4 py-2.5">
                 <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Generation
@@ -907,7 +907,7 @@ export function UploadContentReviewPanel({
                   </p>
                 ) : null}
               </div>
-              <div className="h-full min-h-0 flex-1 overflow-y-auto">
+              <div className="min-w-0">
                 <div className="w-full border-b border-border px-4 py-3 [&_button]:w-full">
                   {genMoreButton}
                 </div>
