@@ -79,6 +79,7 @@ export default function AdminApiUsagePage() {
 
       <AdminApiUsageProviderPanel
         key={providerId}
+        providerId={providerId}
         i18nPrefix={config.i18nPrefix}
         brandColor={config.brandColor}
         billingUrl={config.billingUrl}

@@ -28,6 +28,19 @@ export type ApiProviderBillingSummaryDto = {
   connectedAccountsCount?: number | null;
   adminKeyConfigured?: boolean;
   projectKeyConfigured?: boolean;
+  zernioProfiles?: ZernioProfileSummaryDto[];
+  zernioProfilesTotal?: number | null;
+  zernioDefaultProfiles?: number | null;
+  zernioOverLimitProfiles?: number | null;
+  zernioConnectedAccountsTotal?: number | null;
+};
+
+export type ZernioProfileSummaryDto = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  overLimit: boolean;
+  accountCount: number | null;
 };
 
 export type ApiUsageSummaryDto = {
