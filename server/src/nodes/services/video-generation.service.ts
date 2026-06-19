@@ -77,6 +77,25 @@ export function normalizeSoraDurationSeconds(
   return best;
 }
 
+export const PRESENTER_VIDEO_DURATIONS = [10, 20, 30, 40, 60] as const;
+export type PresenterVideoDuration = (typeof PRESENTER_VIDEO_DURATIONS)[number];
+
+export function normalizePresenterDurationSeconds(
+  raw: number | undefined,
+): PresenterVideoDuration {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 20;
+  let best: PresenterVideoDuration = PRESENTER_VIDEO_DURATIONS[1];
+  let bestDiff = Math.abs(n - best);
+  for (const s of PRESENTER_VIDEO_DURATIONS) {
+    const d = Math.abs(n - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
+
 /** Global Sora prompt constraints — no on-screen text, logos, or contact details. */
 export const VIDEO_OUTPUT_GUARDRAILS = [
   'No on-screen text of any kind: no captions, subtitles, titles, labels, typography, or readable words.',
@@ -448,7 +467,16 @@ export class VideoGenerationService {
       config.heygenExpressiveness === 'high'
         ? config.heygenExpressiveness
         : 'medium';
-    const normalized = normalizeVideoConfig(config);
+    const durationVal = config.duration;
+    const durationRaw =
+      typeof durationVal === 'number'
+        ? durationVal
+        : typeof durationVal === 'string' && durationVal.trim()
+          ? Number(durationVal)
+          : 20;
+    const durationSeconds = normalizePresenterDurationSeconds(
+      Number.isFinite(durationRaw) ? durationRaw : undefined,
+    );
     return {
       avatarId,
       voiceId,
@@ -457,7 +485,7 @@ export class VideoGenerationService {
       motionPrompt: config.heygenMotionPrompt?.trim() || undefined,
       removeBackground: config.removeBackground !== false,
       backgroundAssetId: config.heygenBackgroundAssetId?.trim() || undefined,
-      durationSeconds: normalized.duration,
+      durationSeconds,
     };
   }
 
@@ -772,7 +800,7 @@ export class VideoGenerationService {
         video: storage,
         videoCost: {
           model: 'heygen-presenter',
-          videoSeconds: config.duration ?? 8,
+          videoSeconds: normalizePresenterDurationSeconds(config.duration),
           videoResolution: presenterResolutionLabel(config),
         },
       };

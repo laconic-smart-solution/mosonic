@@ -4,11 +4,11 @@ import type {
   ApiProviderId,
   ApiUsageSummaryDto,
 } from './api-provider.types';
+import type { SpendDateRange } from './cost-spend.util';
+import { parseSpendDateRange } from './cost-spend.util';
 import { HeygenBillingService } from '../heygen-billing/heygen-billing.service';
 import { OpenAiBillingService } from '../openai-billing/openai-billing.service';
 import { ZernioBillingService } from '../zernio-billing/zernio-billing.service';
-
-const DEFAULT_SPEND_DAYS = 180;
 
 @Injectable()
 export class ApiUsageService {
@@ -18,11 +18,13 @@ export class ApiUsageService {
     private readonly zernio: ZernioBillingService,
   ) {}
 
-  async getAllSummaries(spendDays = DEFAULT_SPEND_DAYS): Promise<ApiUsageSummaryDto> {
+  async getAllSummaries(
+    range: SpendDateRange = parseSpendDateRange(),
+  ): Promise<ApiUsageSummaryDto> {
     const [openai, heygen, zernio] = await Promise.all([
-      this.openai.getSummary(spendDays),
-      this.heygen.getSummary(spendDays),
-      this.zernio.getSummary(spendDays),
+      this.openai.getSummary(range),
+      this.heygen.getSummary(range),
+      this.zernio.getSummary(range),
     ]);
     return { openai, heygen, zernio };
   }

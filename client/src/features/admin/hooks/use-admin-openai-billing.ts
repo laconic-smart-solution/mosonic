@@ -7,7 +7,7 @@ export const useAdminOpenAiBilling = () =>
   useQuery({
     queryKey: ["admin-openai-billing"],
     queryFn: async () => {
-      const data = await adminApi.getApiUsage(180)
+      const data = await adminApi.getApiUsage()
       return data.openai
     },
     staleTime: 60_000,

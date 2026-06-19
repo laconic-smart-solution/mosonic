@@ -20,6 +20,7 @@ import {
   type ApiProviderId,
 } from '../../api-usage/api-provider.types';
 import { ApiUsageService } from '../../api-usage/api-usage.service';
+import { parseSpendDateRange } from '../../api-usage/cost-spend.util';
 import { User } from '../../users/schemas/user.schema';
 import { UpdateOpenAiPrepaidDto } from '../dto/update-openai-prepaid.dto';
 
@@ -46,9 +47,16 @@ export class AdminApiUsageController {
   constructor(private readonly apiUsage: ApiUsageService) {}
 
   @Get()
-  getAll(@Query('days') days?: string) {
-    const spendDays = days ? Math.min(365, Math.max(7, Number(days) || 180)) : 180;
-    return this.apiUsage.getAllSummaries(spendDays);
+  getAll(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('days') days?: string,
+  ) {
+    const fallbackDays = days
+      ? Math.min(365, Math.max(7, Number(days) || 180))
+      : 180;
+    const range = parseSpendDateRange(from, to, fallbackDays);
+    return this.apiUsage.getAllSummaries(range);
   }
 
   @Put(':provider/prepaid')

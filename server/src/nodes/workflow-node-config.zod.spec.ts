@@ -136,6 +136,18 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.duration).toBe(20);
   });
 
+  it('snaps presenter duration to allowed HeyGen values', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      mode: 'presenter',
+      heygenAvatarId: 'av-1',
+      heygenVoiceId: 'voice-1',
+      duration: 35,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.duration).toBe(30);
+  });
+
   it('defaults video mode to cinematic', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {});
     expect(r.ok).toBe(true);
