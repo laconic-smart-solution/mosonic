@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { Ban, Eye, UserCheck } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 
@@ -26,6 +25,14 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 
+import {
+  AdminUserActionsMenu,
+  type AdminUserActionTarget,
+} from "../components/admin-user-actions-menu"
+import {
+  AdminUserTopupDialog,
+  type AdminUserTopupTarget,
+} from "../components/admin-user-topup-dialog"
 import { useAdminUserActions, useAdminUsers } from "../hooks/use-admin-users"
 
 type AdminUserRow = {
@@ -63,6 +70,26 @@ function formatCredits(user: AdminUserRow) {
   return `${remaining.toLocaleString()} / ${total.toLocaleString()}`
 }
 
+function toActionTarget(user: AdminUserRow): AdminUserActionTarget {
+  return {
+    userId: user._id,
+    email: user.email ?? user.displayName ?? user._id,
+    role: user.role,
+    isSuspended: user.isSuspended,
+    creditsRemaining: user.creditsRemaining,
+    creditsPerMonth: user.creditsPerMonth,
+  }
+}
+
+function toTopupTarget(user: AdminUserRow): AdminUserTopupTarget {
+  return {
+    userId: user._id,
+    email: user.email ?? user.displayName ?? user._id,
+    creditsRemaining: user.creditsRemaining,
+    creditsPerMonth: user.creditsPerMonth,
+  }
+}
+
 export default function AdminUsersPage() {
   const { t } = useTranslation("admin")
   const { t: tc } = useTranslation("common")
@@ -71,6 +98,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<string | undefined>()
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [topupTarget, setTopupTarget] = useState<AdminUserTopupTarget | null>(null)
   const { data, isLoading } = useAdminUsers({ page, limit: 20, search, status })
   const { suspend, reactivate } = useAdminUserActions()
 
@@ -125,17 +153,17 @@ export default function AdminUsersPage() {
           <Table className="table-fixed min-w-[920px]">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[24%] whitespace-normal">{t("users.tableUser")}</TableHead>
-                <TableHead className="w-[10%] whitespace-normal">{t("users.tableRole")}</TableHead>
-                <TableHead className="w-[12%] whitespace-normal text-right">
+                <TableHead className="w-[22%] whitespace-normal">{t("users.tableUser")}</TableHead>
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableRole")}</TableHead>
+                <TableHead className="w-[11%] whitespace-normal text-right">
                   {t("users.tableCredits")}
                 </TableHead>
-                <TableHead className="w-[10%] whitespace-normal">{t("users.tableJoined")}</TableHead>
-                <TableHead className="w-[10%] whitespace-normal">{t("users.tableLastActive")}</TableHead>
-                <TableHead className="w-[9%] text-right">{t("users.tablePipelinesMtd")}</TableHead>
-                <TableHead className="w-[10%] text-right">{t("users.tableCostMtd")}</TableHead>
-                <TableHead className="w-[9%] text-center">{t("users.tableStatus")}</TableHead>
-                <TableHead className="w-[96px]" />
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableJoined")}</TableHead>
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableLastActive")}</TableHead>
+                <TableHead className="w-[8%] text-right">{t("users.tablePipelinesMtd")}</TableHead>
+                <TableHead className="w-[9%] text-right">{t("users.tableCostMtd")}</TableHead>
+                <TableHead className="w-[8%] text-center">{t("users.tableStatus")}</TableHead>
+                <TableHead className="w-[115px] text-right">{t("users.tableActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,57 +227,30 @@ export default function AdminUsersPage() {
                       </span>
                     </TableCell>
                     <TableCell
-                      className="align-top"
+                      className="align-top text-right"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex justify-end gap-0.5">
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={t("users.viewUser")}
-                          onClick={() => navigate(`/admin/users/${user._id}`)}
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
-                        {user.role !== "ADMIN" ? (
-                          user.isSuspended ? (
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={t("users.reactivate")}
-                              disabled={actionPending}
-                              onClick={() =>
-                                setConfirmAction({
-                                  userId: user._id,
-                                  email: user.email ?? user.displayName ?? user._id,
-                                  action: "reactivate",
-                                })
-                              }
-                            >
-                              <UserCheck className="size-3.5" />
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive"
-                              aria-label={t("users.suspend")}
-                              disabled={actionPending}
-                              onClick={() =>
-                                setConfirmAction({
-                                  userId: user._id,
-                                  email: user.email ?? user.displayName ?? user._id,
-                                  action: "suspend",
-                                })
-                              }
-                            >
-                              <Ban className="size-3.5" />
-                            </Button>
-                          )
-                        ) : null}
+                      <div className="flex justify-end">
+                        <AdminUserActionsMenu
+                          user={toActionTarget(user)}
+                          disabled={actionPending}
+                          onViewDetail={() => navigate(`/admin/users/${user._id}`)}
+                          onDisable={() =>
+                            setConfirmAction({
+                              userId: user._id,
+                              email: user.email ?? user.displayName ?? user._id,
+                              action: "suspend",
+                            })
+                          }
+                          onEnable={() =>
+                            setConfirmAction({
+                              userId: user._id,
+                              email: user.email ?? user.displayName ?? user._id,
+                              action: "reactivate",
+                            })
+                          }
+                          onTopUp={() => setTopupTarget(toTopupTarget(user))}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -276,7 +277,7 @@ export default function AdminUsersPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                {tc("actions.previous")}
+                {tc("pagination.previous")}
               </Button>
               <Button
                 type="button"
@@ -285,12 +286,20 @@ export default function AdminUsersPage() {
                 disabled={page >= (data.totalPages ?? 1)}
                 onClick={() => setPage((p) => p + 1)}
               >
-                {tc("actions.next")}
+                {tc("pagination.next")}
               </Button>
             </div>
           </div>
         ) : null}
       </div>
+
+      <AdminUserTopupDialog
+        target={topupTarget}
+        open={topupTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setTopupTarget(null)
+        }}
+      />
 
       <AlertDialog
         open={confirmAction != null}
@@ -325,7 +334,9 @@ export default function AdminUsersPage() {
                 handleConfirm()
               }}
             >
-              {confirmAction?.action === "suspend" ? t("users.suspend") : t("users.reactivate")}
+              {confirmAction?.action === "suspend"
+                ? t("users.disableAccount")
+                : t("users.enableAccount")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

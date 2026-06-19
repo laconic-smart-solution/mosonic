@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import { adminApi } from "../api/admin.api"
 
@@ -23,23 +25,53 @@ export const useAdminUserDetail = (userId: string | undefined) =>
   })
 
 export const useAdminUserActions = () => {
+  const { t } = useTranslation("admin")
   const queryClient = useQueryClient()
+
+  const invalidateUser = (userId: string) => {
+    void queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+    void queryClient.invalidateQueries({ queryKey: ["admin-user", userId] })
+  }
 
   const suspend = useMutation({
     mutationFn: adminApi.suspendUser,
     onSuccess: (_d, userId) => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-users"] })
-      void queryClient.invalidateQueries({ queryKey: ["admin-user", userId] })
+      invalidateUser(userId)
+      toast.success(t("users.disableSuccess"))
     },
+    onError: () => toast.error(t("users.disableError")),
   })
 
   const reactivate = useMutation({
     mutationFn: adminApi.reactivateUser,
     onSuccess: (_d, userId) => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-users"] })
-      void queryClient.invalidateQueries({ queryKey: ["admin-user", userId] })
+      invalidateUser(userId)
+      toast.success(t("users.enableSuccess"))
     },
+    onError: () => toast.error(t("users.enableError")),
   })
 
-  return { suspend, reactivate }
+  const topup = useMutation({
+    mutationFn: ({
+      userId,
+      credits,
+      reason,
+    }: {
+      userId: string
+      credits: number
+      reason: string
+    }) => adminApi.topupUserCredits(userId, { credits, reason }),
+    onSuccess: (data, { userId, credits }) => {
+      invalidateUser(userId)
+      toast.success(
+        t("users.topup.success", {
+          credits: credits.toLocaleString(),
+          remaining: data.creditsRemaining.toLocaleString(),
+        }),
+      )
+    },
+    onError: () => toast.error(t("users.topup.error")),
+  })
+
+  return { suspend, reactivate, topup }
 }
