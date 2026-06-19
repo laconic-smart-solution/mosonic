@@ -99,6 +99,11 @@
     "linkCopied": "Link copied",
     "copyFailed": "Copy failed"
   },
+  "creditUsage": {
+    "amount": "{{count}} credits used",
+    "creditsShort": "credits",
+    "totalLabel": "Total credits used for this content"
+  },
   "redirect": {
     "openFailed": "Could not open upload for this content.",
     "opening": "Opening upload…"

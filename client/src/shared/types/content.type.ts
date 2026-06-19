@@ -50,6 +50,8 @@ export type ContentPageItem = {
   /** Per-channel adapt outputs (multi-lane runs). */
   laneOutputs?: Record<string, Record<string, unknown>>
   uploadId?: string
+  /** Net credits charged for this content (pipeline + reruns). */
+  creditsUsed?: number
 }
 
 export type ContentPageResponse = {
@@ -100,6 +102,10 @@ export type ContentDetail = {
     relevanceScore: number
     suggestedAngle: string
   } | null
+  creditUsage?: {
+    totalCredits: number
+    byNodeId: Record<string, number>
+  }
 }
 
 export type AvailableNodeTypesResponse = {

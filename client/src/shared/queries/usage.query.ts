@@ -18,6 +18,7 @@ export function useCreditBalanceSocketRefresh() {
     return onCreditBalanceUpdated(() => {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+      void queryClient.invalidateQueries({ queryKey: ["content"] })
     })
   }, [queryClient])
 }

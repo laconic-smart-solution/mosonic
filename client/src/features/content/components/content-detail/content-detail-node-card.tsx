@@ -70,10 +70,10 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
     >
       <div className="space-y-3 px-[18px] py-[18px]">
         {run.phase === "running" && !run.stream && (
-          <p className="text-xs text-[#254C94]">Generating…</p>
+          <p className="text-xs text-primary">Generating…</p>
         )}
         {run.phase === "processing" && run.processingMessage && (
-          <p className="text-xs text-[#254C94]">{run.processingMessage}</p>
+          <p className="text-xs text-primary">{run.processingMessage}</p>
         )}
         {run.phase === "retrying" && run.retryLabel && (
           <p className="text-xs text-amber-800">{run.retryLabel}</p>
@@ -95,10 +95,10 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
 
         {key === "translatedText" ? (
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-[rgba(37,76,148,0.2)] bg-[#E8EDF6] px-2 py-0.5 text-[11px] font-semibold text-[#1A3260]">
+            <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
               TH
             </span>
-            <span className="text-[11px] text-[#A89D8E]">Target language</span>
+            <span className="text-[11px] text-muted-foreground">Target language</span>
           </div>
         ) : null}
 
@@ -115,9 +115,9 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                   })
                 }
               }}
-              className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:bg-[color:var(--nt-canvas)] focus-visible:ring-2 focus-visible:ring-[#00C9A7]/40"
+              className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary/40"
             />
-            <p className="flex items-center gap-1 text-[11px] text-[#C4BBAC]">
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Pencil className="size-3 shrink-0" />
               Edit directly; save from the sidebar.
             </p>
@@ -134,7 +134,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                 onRemove={() => updateOutput("image", undefined)}
               />
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-[#D9D3C7] py-7 text-center text-[13px] text-[#857A6C] transition-colors hover:border-[#00C9A7] hover:bg-[#E0FAF5]/50 hover:text-[#005C4D]">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">
                 <ImageIcon className="mb-2 size-7 opacity-70" />
                 <input
                   type="file"
@@ -159,7 +159,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                 <MediaVideoBlock url={editedOutputs.video} />
               </div>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-[#D9D3C7] py-7 text-center text-[13px] text-[#857A6C] transition-colors hover:border-[#00C9A7] hover:bg-[#E0FAF5]/50 hover:text-[#005C4D]">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">
                 <Video className="mb-2 size-7 opacity-70" />
                 <input
                   type="file"

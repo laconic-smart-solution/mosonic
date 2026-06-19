@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import type {
   ContentPageItem,
 } from "@/shared/types/content.type"
@@ -227,6 +228,9 @@ export function ContentListCard({ item, index, onOpen }: Props) {
               >
                 P
               </span>
+              {(item.creditsUsed ?? 0) > 0 ? (
+                <CreditUsageBadge credits={item.creditsUsed ?? 0} />
+              ) : null}
               <span className="ml-auto text-[11px] text-muted-foreground/70">
                 {formatRelativeTime(item.updatedAt)}
               </span>

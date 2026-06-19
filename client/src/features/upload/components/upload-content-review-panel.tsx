@@ -13,6 +13,7 @@ import i18n from "@/i18n"
 import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -154,6 +155,12 @@ export function UploadContentReviewPanel({
       ),
     [sortedWorkflowNodes, nodeOutputs, nodeUserEdits]
   )
+
+  const creditByNodeId = useMemo(
+    () => data?.creditUsage?.byNodeId ?? {},
+    [data?.creditUsage?.byNodeId],
+  )
+  const totalCreditsUsed = data?.creditUsage?.totalCredits ?? 0
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approveEnabled, setApproveEnabled] = useState(false)
@@ -432,6 +439,7 @@ export function UploadContentReviewPanel({
         }
         setGlobalRerunning(false)
         setRerunNodeId(null)
+        void queryClient.invalidateQueries({ queryKey: ["content", contentId] })
         toast.success(i18n.t("upload:toast.nodeUpdated"))
       }),
     ]
@@ -772,11 +780,11 @@ export function UploadContentReviewPanel({
       type="button"
       variant="outline"
       size="sm"
-      className="h-9 border-[#EDE9E1] bg-card text-xs text-[#0F1F3D] shadow-sm"
+      className="h-9 text-xs shadow-sm"
       disabled={blockPipeline || saveLoading}
       onClick={() => setGenMoreOpen(true)}
     >
-      <Sparkles className="mr-1.5 size-3.5 text-[#00A589]" />
+      <Sparkles className="mr-1.5 size-3.5 text-primary" />
       Generate more
     </Button>
   )
@@ -794,17 +802,17 @@ export function UploadContentReviewPanel({
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-[#0F1F3D]">
+          <DialogTitle className="text-base font-semibold">
             {selectedGenType
               ? pipelineStepLabel(selectedGenType)
               : "Add another output"}
           </DialogTitle>
         </DialogHeader>
         {availableTypesLoading ? (
-          <p className="text-xs text-[#A89D8E]">Loading…</p>
+          <p className="text-xs text-muted-foreground">Loading…</p>
         ) : !selectedGenType ? (
           availableTypes.length === 0 ? (
-            <p className="text-xs leading-relaxed text-[#857A6C]">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               No output types are available.
             </p>
           ) : (
@@ -813,7 +821,7 @@ export function UploadContentReviewPanel({
                 <button
                   key={t}
                   type="button"
-                  className="flex w-full items-center gap-2.5 rounded-xl border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2.5 text-left text-sm text-[#0F1F3D] transition-colors hover:border-[#00C9A7]/50 hover:bg-[#E0FAF5]/30"
+                  className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
                   onClick={() => {
                     setSelectedGenType(t)
                     setGenMoreDraftNodeId(randomUuid())
@@ -822,7 +830,7 @@ export function UploadContentReviewPanel({
                     )
                   }}
                 >
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#E0FAF5]">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <PipelineTypeIcon type={t} />
                   </span>
                   <span className="font-medium">{pipelineStepLabel(t)}</span>
@@ -836,7 +844,7 @@ export function UploadContentReviewPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="-ml-2 h-8 justify-start text-xs text-[#857A6C]"
+              className="-ml-2 h-8 justify-start text-xs text-muted-foreground"
               onClick={() => {
                 setSelectedGenType(null)
                 setGenMoreDraftNodeId(null)
@@ -861,7 +869,7 @@ export function UploadContentReviewPanel({
             <Button
               type="button"
               size="sm"
-              className="h-9 w-full bg-[#254C94] text-white hover:bg-[#1A3260]"
+              className="h-9 w-full"
               disabled={blockPipeline}
               onClick={() =>
                 void submitGenerateMore(selectedGenType, genMoreConfigDraft)
@@ -879,7 +887,7 @@ export function UploadContentReviewPanel({
     <TooltipProvider>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {showRejectedBanner ? (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-900 dark:text-amber-200">
             This content has been rejected. You can continue editing.
           </div>
         ) : null}
@@ -888,9 +896,9 @@ export function UploadContentReviewPanel({
           <div className="grid max-h-[100vh] min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-5">
             <div className="h-full min-w-0 overflow-y-auto">{preview}</div>
 
-            <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-[#EDE9E1] bg-card shadow-sm">
-              <div className="border-b border-[#EDE9E1] px-4 py-2.5">
-                <p className="text-[11px] font-semibold tracking-wide text-[#A89D8E] uppercase">
+            <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-4 py-2.5">
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Generation
                 </p>
                 {generationFilterLabel ? (
@@ -900,19 +908,27 @@ export function UploadContentReviewPanel({
                 ) : null}
               </div>
               <div className="h-full min-h-0 flex-1 overflow-y-auto">
-                <div className="w-full border-b border-[#EDE9E1] px-4 py-3 [&_button]:w-full">
+                <div className="w-full border-b border-border px-4 py-3 [&_button]:w-full">
                   {genMoreButton}
                 </div>
                 <div className="px-4 py-3">
                   <div className="mb-3 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
-                        Generated contents
-                      </p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                          Generated contents
+                        </p>
+                        {totalCreditsUsed > 0 ? (
+                          <CreditUsageBadge
+                            credits={totalCreditsUsed}
+                            showLabel
+                          />
+                        ) : null}
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
-                        className="relative h-9 shrink-0 border-[#EDE9E1] text-[#62594E] hover:bg-[#F7F4EF] sm:min-w-[140px]"
+                        className="relative h-9 shrink-0 sm:min-w-[140px]"
                         disabled={saveLoading || blockPipeline}
                         onClick={() => void handleSave()}
                       >
@@ -939,7 +955,7 @@ export function UploadContentReviewPanel({
                       >
                         <TabsList
                           variant="default"
-                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-[#EDE9E1] bg-[#F7F4EF] p-0.5"
+                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-border bg-muted/50 p-0.5"
                         >
                           <TabsTrigger
                             value="all"
@@ -1019,6 +1035,7 @@ export function UploadContentReviewPanel({
                           setLightboxUrl={setLightboxUrl}
                           uploadMediaForNode={uploadMediaForNode}
                           onCopyOutput={(t) => void copyOutput(t)}
+                          creditsUsed={creditByNodeId[nodeId] ?? 0}
                         />
                       )
                     })}

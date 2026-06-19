@@ -55,6 +55,7 @@ import {
   isChannelPublishEligible,
 } from "@/features/upload/lib/upload-publish.helpers"
 import { cn } from "@/lib/utils"
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { useGetContentQuery } from "@/shared/queries/content.query"
 import {
   usePatchUploadChannelMutation,
@@ -191,6 +192,7 @@ export default function UploadPage() {
   const upload = uploadQuery.data
   const contentQuery = useGetContentQuery(upload?.contentRef)
   const workflowRuleId = contentQuery.data?.ruleRef
+  const totalCreditsUsed = contentQuery.data?.creditUsage?.totalCredits ?? 0
   const zernioAccountsQuery = useZernioAccountsQuery(Boolean(uploadId))
   const publishMutation = usePublishUploadMutation()
   const patchMutation = usePatchUploadChannelMutation()
@@ -1104,9 +1106,14 @@ export default function UploadPage() {
 
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <div className="min-w-0 shrink-0 space-y-1 lg:max-w-[280px]">
-            <h1 className="text-base font-medium text-foreground">
-              Upload content
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base font-medium text-foreground">
+                Upload content
+              </h1>
+              {totalCreditsUsed > 0 ? (
+                <CreditUsageBadge credits={totalCreditsUsed} showLabel />
+              ) : null}
+            </div>
           </div>
           {upload ? (
             <UploadPublishControls
