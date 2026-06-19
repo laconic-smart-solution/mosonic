@@ -80,11 +80,61 @@ export class CreditService {
       packageId: pkg.id,
       credits: pkg.credits,
       priceUsd: pkg.priceUsd,
+      source: 'self_serve',
     }).save();
 
     return {
       creditsRemaining: updated.creditsRemaining,
       creditsAdded: pkg.credits,
+    };
+  }
+
+  /**
+   * Admin manual top-up: grants a custom credit amount with an audit reason.
+   * No real payment is processed.
+   */
+  async adminManualTopup(
+    userId: string,
+    credits: number,
+    adminUserId: string,
+    reason: string,
+  ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
+    if (!Number.isInteger(credits) || credits < 1 || credits > 100_000) {
+      throw new BadRequestException('Credits must be an integer between 1 and 100000');
+    }
+
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 3 || trimmedReason.length > 500) {
+      throw new BadRequestException('Reason must be between 3 and 500 characters');
+    }
+
+    const updated = await this.userPlanModel
+      .findOneAndUpdate(
+        { userId, status: 'active' },
+        {
+          $inc: { creditsRemaining: credits },
+          $set: { lowBalanceNotifiedAt: null },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException('No active plan found for user');
+    }
+
+    await new this.topupModel({
+      userId,
+      credits,
+      priceUsd: 0,
+      source: 'admin',
+      adminUserId,
+      reason: trimmedReason,
+    }).save();
+
+    return {
+      creditsRemaining: updated.creditsRemaining,
+      creditsAdded: credits,
     };
   }
 
