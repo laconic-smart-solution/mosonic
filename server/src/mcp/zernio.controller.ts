@@ -43,7 +43,17 @@ export class ZernioController {
     @Param('platform') platform: string,
   ) {
     const user = req.auth!.localUser as User;
-    return await this.mcpService.unlockChannelForConnect(platform, user.userId);
+    return await this.mcpService.unlockChannel(platform, user.userId);
+  }
+
+  @Post('connect/:platform')
+  @UseGuards(JwtAuthGuard)
+  async connectChannel(
+    @Req() req: Request,
+    @Param('platform') platform: string,
+  ) {
+    const user = req.auth!.localUser as User;
+    return await this.mcpService.connectChannel(platform, user.userId);
   }
 
   @Get('callback')

@@ -22,3 +22,13 @@ export function findConnectedForChannel(
   }
   return undefined
 }
+
+export function isChannelUnlocked(
+  def: AccountChannelDef,
+  unlockedChannels: readonly string[] | undefined,
+): boolean {
+  const unlocked = new Set(
+    (unlockedChannels ?? []).map((channel) => channel.trim().toLowerCase()),
+  )
+  return def.matchKeys.some((key) => unlocked.has(key))
+}

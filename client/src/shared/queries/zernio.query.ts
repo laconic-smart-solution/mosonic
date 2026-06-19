@@ -41,10 +41,17 @@ export const useZernioUnlockMutation = () => {
   return useMutation({
     mutationFn: (platform: string) => zernioService.unlockChannel(platform),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.accounts })
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
     },
+  })
+}
+
+export const useZernioConnectMutation = () => {
+  return useMutation({
+    mutationFn: (platform: string) => zernioService.connectChannel(platform),
   })
 }
 

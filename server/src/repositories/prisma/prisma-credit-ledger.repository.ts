@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from '../../credit/lib/billable-node-credit-types';
 import { PrismaService } from '../../database/prisma.service';
 import type { CreditLedgerRecord } from '../../domain/credit/credit.types';
 import type {
@@ -100,5 +101,35 @@ export class PrismaCreditLedgerRepository implements ICreditLedgerRepository {
     filter: LedgerDateFilter & { userId?: string },
   ): Promise<CreditLedgerRecord[]> {
     return this.prisma.creditLedger.findMany({ where: filter });
+  }
+
+  async hasUserSocialChannelUnlock(
+    userId: string,
+    nodeIds: string[],
+  ): Promise<boolean> {
+    if (nodeIds.length === 0) return false;
+    const count = await this.prisma.creditLedger.count({
+      where: {
+        userId,
+        nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+        nodeId: { in: nodeIds },
+      },
+    });
+    return count > 0;
+  }
+
+  async listUserSocialChannelUnlocks(userId: string): Promise<string[]> {
+    const rows = await this.prisma.creditLedger.findMany({
+      where: {
+        userId,
+        nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+        nodeId: { startsWith: 'social:' },
+      },
+      select: { nodeId: true },
+      distinct: ['nodeId'],
+    });
+    return rows
+      .map((row) => row.nodeId.replace(/^social:/, '').trim().toLowerCase())
+      .filter(Boolean);
   }
 }

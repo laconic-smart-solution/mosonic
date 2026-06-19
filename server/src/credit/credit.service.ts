@@ -436,16 +436,55 @@ export class CreditService {
     };
   }
 
-  /** Charge credits when a user unlocks a new publishing channel (before OAuth). */
-  async chargeSocialAccountConnect(args: {
+  socialUnlockNodeIds(channel: string): string[] {
+    const key = channel.trim().toLowerCase();
+    if (key === 'twitter' || key === 'x') {
+      return ['social:twitter', 'social:x'];
+    }
+    return [`social:${key}`];
+  }
+
+  async hasSocialChannelUnlock(
+    userId: string,
+    channel: string,
+  ): Promise<boolean> {
+    return await this.ledger.hasUserSocialChannelUnlock(
+      userId,
+      this.socialUnlockNodeIds(channel),
+    );
+  }
+
+  async listUnlockedSocialChannels(userId: string): Promise<string[]> {
+    return await this.ledger.listUserSocialChannelUnlocks(userId);
+  }
+
+  /**
+   * Unlock a publishing channel slot (idempotent). Charges credits on first
+   * unlock; persists via ledger so disconnect does not require re-unlock.
+   */
+  async unlockSocialChannel(args: {
     userId: string;
     channel: string;
     credits: number;
     creditPriceUsd: number;
-  }): Promise<void> {
-    if (args.credits <= 0) return;
-
+  }): Promise<{ alreadyUnlocked: boolean }> {
     const channel = args.channel.trim().toLowerCase();
+    const nodeIds = this.socialUnlockNodeIds(channel);
+    const alreadyUnlocked = await this.ledger.hasUserSocialChannelUnlock(
+      args.userId,
+      nodeIds,
+    );
+    if (alreadyUnlocked) {
+      return { alreadyUnlocked: true };
+    }
+
+    if (args.credits > 0) {
+      await this.assertCreditsForNodeType(
+        args.userId,
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      );
+    }
+
     await this.ledger.create({
       userId: args.userId,
       pipelineRef: 'social-connect',
@@ -457,23 +496,37 @@ export class CreditService {
       overheadUsd: 0,
       marginAppliedUsd: 0,
       creditPriceUsdSnapshot: args.creditPriceUsd,
-      creditsCharged: args.credits,
+      creditsCharged: Math.max(0, args.credits),
       billingPeriod: currentBillingPeriod(),
     });
 
-    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
-      creditsUsed: args.credits,
-      creditsRemaining: -args.credits,
-    });
+    if (args.credits > 0) {
+      const updated = await this.userPlans.adjustActiveCredits(args.userId, {
+        creditsUsed: args.credits,
+        creditsRemaining: -args.credits,
+      });
 
-    if (!updated) {
-      throw new NotFoundException(
-        `No active plan found for userId=${args.userId}`,
-      );
+      if (!updated) {
+        throw new NotFoundException(
+          `No active plan found for userId=${args.userId}`,
+        );
+      }
+
+      await this.maybeEmitLowBalance(updated);
+      this.emitBalanceUpdated(updated);
     }
 
-    await this.maybeEmitLowBalance(updated);
-    this.emitBalanceUpdated(updated);
+    return { alreadyUnlocked: false };
+  }
+
+  /** @deprecated Use `unlockSocialChannel` */
+  async chargeSocialAccountConnect(args: {
+    userId: string;
+    channel: string;
+    credits: number;
+    creditPriceUsd: number;
+  }): Promise<void> {
+    await this.unlockSocialChannel(args);
   }
 
   /**

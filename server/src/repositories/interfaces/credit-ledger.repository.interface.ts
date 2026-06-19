@@ -42,4 +42,9 @@ export interface ICreditLedgerRepository {
   findAdminSummary(
     filter: LedgerDateFilter & { userId?: string },
   ): Promise<CreditLedgerRecord[]>;
+  hasUserSocialChannelUnlock(
+    userId: string,
+    nodeIds: string[],
+  ): Promise<boolean>;
+  listUserSocialChannelUnlocks(userId: string): Promise<string[]>;
 }
