@@ -1,9 +1,19 @@
-import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
+import {
+  InjectQueue,
+  OnWorkerEvent,
+  Processor,
+  WorkerHost,
+} from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { VideoGenerationService } from '../../nodes/services/video-generation.service';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
-import { POLL_CONFIG, QUEUES, videoCheckJobId } from '../types/queue.constants';
+import {
+  POLL_CONFIG,
+  QUEUES,
+  videoCheckJobId,
+  videoPollIntervalMs,
+} from '../types/queue.constants';
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 
 @Processor(QUEUES.VIDEO_CHECK, {
@@ -121,18 +131,51 @@ export class VideoCheckProcessor extends WorkerHost {
 
   private async scheduleNextCheck(payload: MediaCheckJobPayload): Promise<void> {
     const nextCount = payload.checkCount + 1;
-    await this.videoCheckQueue.add(
-      'video_check',
-      { ...payload, checkCount: nextCount },
-      {
-        jobId: videoCheckJobId(
-          payload.pipelineId,
-          payload.nodeId,
-          nextCount,
-        ),
-        delay: POLL_CONFIG.video.intervalMs,
-        attempts: 1,
-      },
-    );
+    const intervalMs = videoPollIntervalMs(payload.videoProvider ?? 'sora');
+    try {
+      await this.videoCheckQueue.add(
+        'video_check',
+        { ...payload, checkCount: nextCount },
+        {
+          jobId: videoCheckJobId(
+            payload.pipelineId,
+            payload.nodeId,
+            nextCount,
+          ),
+          delay: intervalMs,
+          attempts: 2,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `[video:check] failed to schedule next poll pipeline=${payload.pipelineId} ` +
+          `node=${payload.nodeId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw err;
+    }
+  }
+
+  @OnWorkerEvent('failed')
+  async onFailed(
+    job: Job<MediaCheckJobPayload> | undefined,
+    error: Error,
+  ): Promise<void> {
+    if (!job?.data) {
+      return;
+    }
+    if (job.opts.attempts && job.attemptsMade >= job.opts.attempts) {
+      this.logger.warn(
+        `[video:check] job exhausted attempts pipeline=${job.data.pipelineId} ` +
+          `node=${job.data.nodeId} check=${job.data.checkCount}: ${error.message}`,
+      );
+      try {
+        await this.scheduleNextCheck(job.data);
+      } catch (err) {
+        this.logger.error(
+          `[video:check] recovery schedule failed pipeline=${job.data.pipelineId}: ` +
+            `${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 }
