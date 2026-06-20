@@ -4,9 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
-import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import type { PipelineRecord, PipelineNodeExecution } from '../domain/pipeline/pipeline.types';
 import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
-import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { WorkflowNodeType, type WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
+import {
+  getVideoGenerationMode,
+  normalizeVideoConfig,
+} from '../nodes/services/video-generation.service';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
@@ -23,7 +27,8 @@ import {
 } from '../workflow/workflow-graph.util';
 import { isNodeBlockedByLanePause } from './lane-pause.util';
 import { OrchestrationService } from './orchestration.service';
-import { QUEUES } from './types/queue.constants';
+import { QUEUES, videoCheckJobId } from './types/queue.constants';
+import type { MediaCheckJobPayload } from './types/media-check-job.payload';
 import {
   type NodeJobPayload,
   PIPELINE_NODES_QUEUE,
@@ -55,7 +60,7 @@ export class DependencyResolverService {
     @InjectQueue(QUEUES.VIDEO_GENERATE)
     private readonly videoGenerateQueue: Queue<NodeJobPayload>,
     @InjectQueue(QUEUES.VIDEO_CHECK)
-    private readonly videoCheckQueue: Queue<NodeJobPayload>,
+    private readonly videoCheckQueue: Queue<MediaCheckJobPayload>,
     @InjectQueue(PIPELINE_NODES_VIDEO_QUEUE)
     private readonly legacyPipelineVideoQueue: Queue<NodeJobPayload>,
     @Inject(forwardRef(() => OrchestrationService))
@@ -102,19 +107,21 @@ export class DependencyResolverService {
         'asc',
       );
       let reconciled = 0;
+      let videoRecovered = 0;
       for (const pipeline of rows) {
-        if (!this.hasReadyPendingNode(pipeline)) {
-          continue;
+        if (this.hasReadyPendingNode(pipeline)) {
+          reconciled += 1;
+          this.logger.warn(
+            `[pipeline:${pipeline.pipelineId}] reconcile detected ready pending node(s) — re-enqueueing`,
+          );
+          await this.enqueueReadyNodes(pipeline.pipelineId);
         }
-        reconciled += 1;
-        this.logger.warn(
-          `[pipeline:${pipeline.pipelineId}] reconcile detected ready pending node(s) — re-enqueueing`,
-        );
-        await this.enqueueReadyNodes(pipeline.pipelineId);
+        videoRecovered += await this.reconcileOrphanedVideoChecks(pipeline);
       }
-      if (reconciled > 0) {
+      if (reconciled > 0 || videoRecovered > 0) {
         this.logger.log(
-          `reconcileStuckPipelines re-enqueued ${reconciled}/${rows.length} running pipeline(s)`,
+          `reconcileStuckPipelines pending=${reconciled} videoPoll=${videoRecovered} ` +
+            `of ${rows.length} running pipeline(s)`,
         );
       }
     } catch (err) {
@@ -139,6 +146,93 @@ export class DependencyResolverService {
         node.status === PipelineNodeExecutionStatus.Pending &&
         areAllDependenciesMet(node.nodeId, nodes, edges, TERMINAL_STATUSES) &&
         !isNodeBlockedByLanePause(pipeline, node.nodeId, this.laneScopedPause),
+    );
+  }
+
+  /**
+   * Re-schedule status polls when a video node is `running` with an external job id
+   * but no waiting/delayed/active check job exists (lost delayed job after Redis
+   * ECONNRESET, server restart, etc.).
+   */
+  private async reconcileOrphanedVideoChecks(
+    pipeline: PipelineRecord,
+  ): Promise<number> {
+    const nodes = parsePipelineNodes(pipeline.nodes);
+    let recovered = 0;
+    for (const node of nodes) {
+      if (
+        node.type !== WorkflowNodeType.VideoGeneration ||
+        node.status !== PipelineNodeExecutionStatus.Running ||
+        !node.externalJobId?.trim()
+      ) {
+        continue;
+      }
+      if (await this.hasActiveVideoCheckJob(pipeline.pipelineId, node.nodeId)) {
+        continue;
+      }
+      recovered += 1;
+      await this.scheduleRecoveredVideoCheck(pipeline, node);
+    }
+    return recovered;
+  }
+
+  private async hasActiveVideoCheckJob(
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<boolean> {
+    const prefix = `${pipelineId}__${nodeId}__check__`;
+    const states = ['waiting', 'delayed', 'active'] as const;
+    for (const state of states) {
+      const jobs = await this.videoCheckQueue.getJobs([state]);
+      if (jobs.some((job) => job.id?.startsWith(prefix))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async scheduleRecoveredVideoCheck(
+    pipeline: PipelineRecord,
+    node: PipelineNodeExecution,
+  ): Promise<void> {
+    const allNodes = parsePipelineNodes(pipeline.nodes);
+    const config = (node.config ?? {}) as WorkflowNodeConfig;
+    const isPresenter = getVideoGenerationMode(config) === 'presenter';
+    const videoProvider = isPresenter ? 'heygen' : 'sora';
+    const payload: MediaCheckJobPayload = {
+      pipelineId: pipeline.pipelineId,
+      workflowId: pipeline.workflowRef,
+      ruleId: pipeline.ruleRef,
+      userId: pipeline.userId ?? '',
+      nodeId: node.nodeId,
+      nodeType: WorkflowNodeType.VideoGeneration,
+      order: node.order,
+      totalNodes: allNodes.length,
+      contentPrompt: pipeline.contentPrompt,
+      lane: node.lane ?? null,
+      externalJobId: node.externalJobId!.trim(),
+      checkCount: 0,
+      submittedAt: new Date().toISOString(),
+      videoProvider,
+      normalized: isPresenter ? undefined : normalizeVideoConfig(config),
+    };
+    const jobId = videoCheckJobId(pipeline.pipelineId, node.nodeId, 0);
+    const existing = await this.videoCheckQueue.getJob(jobId);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'waiting' || state === 'delayed' || state === 'active') {
+        return;
+      }
+      await existing.remove();
+    }
+    await this.videoCheckQueue.add('video_check', payload, {
+      jobId,
+      delay: 0,
+      attempts: 2,
+    });
+    this.logger.warn(
+      `[pipeline:${pipeline.pipelineId}] recovered orphaned video poll node=${node.nodeId} ` +
+        `externalJobId=${node.externalJobId}`,
     );
   }
 
