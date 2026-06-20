@@ -53,7 +53,7 @@ function redisOptionsFromUrl(url: string): RedisOptions {
 export function buildRedisConnectionOptions(source: RedisEnvSource): RedisOptions {
   const url = source.REDIS_URL?.trim();
   if (url) {
-    return redisOptionsFromUrl(url);
+    return withBullMqConnectionDefaults(redisOptionsFromUrl(url));
   }
 
   const host = (source.REDIS_HOST ?? '127.0.0.1').trim();
@@ -64,7 +64,23 @@ export function buildRedisConnectionOptions(source: RedisEnvSource): RedisOption
   if (password) {
     options.password = password;
   }
-  return options;
+  return withBullMqConnectionDefaults(options);
+}
+
+/** ioredis settings required for BullMQ workers over flaky / remote Redis. */
+function withBullMqConnectionDefaults(
+  options: RedisOptions,
+): RedisOptions {
+  return {
+    ...options,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    retryStrategy: (times: number) => Math.min(times * 200, 5_000),
+    reconnectOnError: (err: Error) => {
+      const msg = err.message.toUpperCase();
+      return msg.includes('ECONNRESET') || msg.includes('READONLY');
+    },
+  };
 }
 
 /**

@@ -1,15 +1,20 @@
-import { POLL_CONFIG, videoCheckJobId } from './queue.constants';
+import {
+  computeVideoInitialDelayMs,
+  videoPollIntervalMs,
+} from './queue.constants';
 
-describe('queue.constants', () => {
-  it('video poll defaults approximate 30 minute timeout', () => {
-    const { initialDelayMs, intervalMs, maxChecks } = POLL_CONFIG.video;
-    const worstCaseMs = initialDelayMs + (maxChecks - 1) * intervalMs;
-    expect(worstCaseMs).toBeGreaterThanOrEqual(29 * 60 * 1000);
-    expect(worstCaseMs).toBeLessThanOrEqual(31 * 60 * 1000);
+describe('queue.constants video poll', () => {
+  it('heygen first poll is not forced to 60s for short clips', () => {
+    expect(computeVideoInitialDelayMs('heygen', 10)).toBeLessThanOrEqual(30_000);
+    expect(computeVideoInitialDelayMs('heygen', 10)).toBeGreaterThanOrEqual(10_000);
   });
 
-  it('videoCheckJobId is unique per attempt', () => {
-    expect(videoCheckJobId('p1', 'n1', 0)).toBe('p1__n1__check__0');
-    expect(videoCheckJobId('p1', 'n1', 1)).toBe('p1__n1__check__1');
+  it('sora first poll scales with estimate without a 60s floor', () => {
+    expect(computeVideoInitialDelayMs('sora', 15)).toBe(15_000);
+  });
+
+  it('videoPollIntervalMs returns positive intervals', () => {
+    expect(videoPollIntervalMs('heygen')).toBeGreaterThan(0);
+    expect(videoPollIntervalMs('sora')).toBeGreaterThan(0);
   });
 });

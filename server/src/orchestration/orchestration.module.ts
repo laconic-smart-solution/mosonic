@@ -168,7 +168,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
       imports: [ConfigModule],
       useFactory: () => ({
         defaultJobOptions: {
-          attempts: 1,
+          attempts: 2,
           removeOnComplete: true,
         },
       }),
