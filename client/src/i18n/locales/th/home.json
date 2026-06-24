@@ -1,7 +1,8 @@
 {
   "prompt": {
     "focusedPlaceholder": "อธิบายสิ่งที่คุณต้องการสร้างวันนี้…",
-    "generatingWorkflow": "กำลังสร้างเวิร์กโฟลว์…"
+    "generatingWorkflow": "กำลังสร้างเวิร์กโฟลว์…",
+    "extractingSubtitle": "เราจะเปิดคำถามสั้นๆ เมื่อกฎของคุณพร้อมแล้ว"
   },
   "promptSuggestions": {
     "songkran": "เขียนโปรโมชั่นเทศกาลสงกรานต์สำหรับ Facebook และ Instagram",
@@ -34,13 +35,31 @@
     "loadingMore": "กำลังโหลด..."
   },
   "footer": {
-    "copyright": "© 2026 NeuralTex Co., Ltd. — กรุงเทพฯ ประเทศไทย"
+    "copyright": "© 2026 Mosonic Co., Ltd. — กรุงเทพฯ ประเทศไทย"
+  },
+  "toast": {
+    "extractionFailed": "ไม่สามารถสร้างกฎแคมเปญจากพรอมป์ตของคุณได้ กรุณาลองอีกครั้ง",
+    "noChannelsAfterExtract": "กฎที่สกัดได้ไม่มีช่องทาง กรุณาเพิ่มช่องทางในหน้ากฎ แล้วลองอีกครั้ง",
+    "generationFailed": "การสร้างกฎล้มเหลว",
+    "couldNotStartExtraction": "ไม่สามารถเริ่มการสกัดกฎได้",
+    "fileTooLarge": "ไฟล์ \"{{name}}\" มีขนาดเกิน {{maxMb}} MB"
+  },
+  "extraction": {
+    "titleGenerating": "กำลังสร้างกฎแคมเปญของคุณ…",
+    "titleFailed": "ไม่สามารถสร้างกฎได้",
+    "subtitle": "กำลังวิเคราะห์พรอมป์ตและเตรียมกฎแคมเปญของคุณ",
+    "waitMessage": "กำลังวิเคราะห์พรอมป์ตของคุณ…",
+    "dismiss": "ปิด",
+    "tryAgain": "ลองอีกครั้ง"
   },
   "userStrip": {
     "loading": "กำลังโหลด…",
+    "logIn": "เข้าสู่ระบบ",
+    "signUp": "สมัครสมาชิก",
     "admin": "ผู้ดูแล",
     "member": "สมาชิก",
     "account": "บัญชี",
-    "dashboard": "แดชบอร์ด"
+    "dashboard": "แดชบอร์ด",
+    "usage": "การใช้งานและเครดิต"
   }
 }

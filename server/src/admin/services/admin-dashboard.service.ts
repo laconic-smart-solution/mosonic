@@ -1,10 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Content, type ContentDocument } from '../../content/schemas/content.schema';
-import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
-import { Pipeline, type PipelineDocument } from '../../pipeline/schemas/pipeline.schema';
-import { User, type UserDocument } from '../../users/schemas/user.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import type { IContentRepository } from '../../repositories/interfaces/content.repository.interface';
+import type { ICostEntryRepository } from '../../repositories/interfaces/cost-entry.repository.interface';
+import type { IPipelineRepository } from '../../repositories/interfaces/pipeline.repository.interface';
+import type { IRuleRepository } from '../../repositories/interfaces/rule.repository.interface';
+import type { IUserRepository } from '../../repositories/interfaces/user.repository.interface';
+import {
+  CONTENT_REPOSITORY,
+  COST_ENTRY_REPOSITORY,
+  PIPELINE_REPOSITORY,
+  RULE_REPOSITORY,
+  USER_REPOSITORY,
+} from '../../repositories/tokens';
 
 function monthStart(d = new Date()): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -12,16 +18,22 @@ function monthStart(d = new Date()): Date {
   return x;
 }
 
+function ruleChannelNames(rule: { channels: unknown }): string[] {
+  if (!Array.isArray(rule.channels)) return [];
+  return (rule.channels as Array<{ channel?: string }>)
+    .map((x) => x.channel)
+    .filter((c): c is string => Boolean(c));
+}
+
 @Injectable()
 export class AdminDashboardService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
-    @InjectModel(Content.name)
-    private readonly contentModel: Model<ContentDocument>,
-    @InjectModel(CostEntry.name)
-    private readonly costModel: Model<CostEntryDocument>,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(CONTENT_REPOSITORY) private readonly content: IContentRepository,
+    @Inject(COST_ENTRY_REPOSITORY)
+    private readonly costEntries: ICostEntryRepository,
+    @Inject(RULE_REPOSITORY) private readonly rules: IRuleRepository,
   ) {}
 
   async getOverview() {
@@ -34,28 +46,18 @@ export class AdminDashboardService {
       totalUsers,
       newUsersThisMonth,
       newUsersThisWeek,
-      activeUsersThisMonth,
+      activeUserIds,
       totalPipelinesThisMonth,
       totalContentThisMonth,
       platformCostThisMonth,
     ] = await Promise.all([
-      this.userModel.countDocuments(),
-      this.userModel.countDocuments({ createdAt: { $gte: mStart } }),
-      this.userModel.countDocuments({ createdAt: { $gte: weekStart } }),
-      this.pipelineModel
-        .distinct('userId', {
-          startedAt: { $gte: mStart },
-          userId: { $exists: true, $nin: [null, ''] },
-        })
-        .then((ids) => ids.filter(Boolean).length),
-      this.pipelineModel.countDocuments({ startedAt: { $gte: mStart } }),
-      this.contentModel.countDocuments({ createdAt: { $gte: mStart } }),
-      this.costModel
-        .aggregate([
-          { $match: { billingPeriod: mStart } },
-          { $group: { _id: null, total: { $sum: '$costUsd' } } },
-        ])
-        .then((r) => r[0]?.total ?? 0),
+      this.users.count(),
+      this.users.count({ createdAt: { gte: mStart } }),
+      this.users.count({ createdAt: { gte: weekStart } }),
+      this.pipelines.distinctUserIdsSince(mStart),
+      this.pipelines.count({ startedAt: { gte: mStart } }),
+      this.content.countSince(mStart),
+      this.costEntries.sumForBillingPeriod(mStart),
     ]);
 
     return {
@@ -63,7 +65,7 @@ export class AdminDashboardService {
         total: totalUsers,
         newThisMonth: newUsersThisMonth,
         newThisWeek: newUsersThisWeek,
-        activeThisMonth: activeUsersThisMonth,
+        activeThisMonth: activeUserIds.length,
       },
       usage: {
         pipelinesThisMonth: totalPipelinesThisMonth,
@@ -79,9 +81,7 @@ export class AdminDashboardService {
     const from = new Date();
     from.setDate(from.getDate() - days);
 
-    const users = await this.userModel
-      .find({ createdAt: { $gte: from } }, { createdAt: 1 })
-      .lean();
+    const users = await this.users.findCreatedSince(from);
 
     return this.groupByDay(
       users as unknown as { [k: string]: unknown }[],
@@ -93,9 +93,14 @@ export class AdminDashboardService {
     const from = new Date();
     from.setDate(from.getDate() - days);
 
-    const pipelines = await this.pipelineModel
-      .find({ startedAt: { $gte: from } }, { startedAt: 1 })
-      .lean();
+    const total = await this.pipelines.count({ startedAt: { gte: from } });
+    const { rows: pipelines } = await this.pipelines.findPage(
+      { startedAt: { gte: from } },
+      1,
+      Math.max(total, 1),
+      'startedAt',
+      'asc',
+    );
 
     return this.groupByDay(
       pipelines as unknown as { [k: string]: unknown }[],
@@ -107,9 +112,7 @@ export class AdminDashboardService {
     const from = new Date();
     from.setDate(from.getDate() - days);
 
-    const entries = await this.costModel
-      .find({ createdAt: { $gte: from } }, { createdAt: 1, costUsd: 1 })
-      .lean();
+    const entries = await this.costEntries.findInCreatedAtRange(from, new Date());
 
     return this.groupSumByDay(
       entries as unknown as { [k: string]: unknown }[],
@@ -121,33 +124,42 @@ export class AdminDashboardService {
   async getNodeTypeBreakdown() {
     const mStart = monthStart();
 
-    const result = await this.costModel.aggregate([
-      { $match: { createdAt: { $gte: mStart } } },
-      {
-        $group: {
-          _id: '$nodeType',
-          count: { $sum: 1 },
-          totalCost: { $sum: '$costUsd' },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
+    const entries = await this.costEntries.aggregateSummary({
+      createdAt: { gte: mStart },
+    });
 
-    return result.map((r) => ({
-      nodeType: r._id ?? 'unknown',
-      count: r.count,
-      costUsd: r.totalCost,
-    }));
+    const grouped = new Map<
+      string,
+      { count: number; totalCost: number }
+    >();
+    for (const row of entries) {
+      const key = row.nodeType ?? 'unknown';
+      const cur = grouped.get(key) ?? { count: 0, totalCost: 0 };
+      cur.count += 1;
+      cur.totalCost += row.costUsd;
+      grouped.set(key, cur);
+    }
+
+    return [...grouped.entries()]
+      .map(([nodeType, stats]) => ({
+        nodeType,
+        count: stats.count,
+        costUsd: stats.totalCost,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   async getPipelineSlo(days = 7) {
     const from = new Date();
     from.setDate(from.getDate() - days);
-    const pipelines = await this.pipelineModel
-      .find({ startedAt: { $gte: from } })
-      .select({ status: 1, startedAt: 1, completedAt: 1 })
-      .lean()
-      .exec();
+    const total = await this.pipelines.count({ startedAt: { gte: from } });
+    const { rows: pipelines } = await this.pipelines.findPage(
+      { startedAt: { gte: from } },
+      1,
+      Math.max(total, 1),
+      'startedAt',
+      'desc',
+    );
 
     const durations: number[] = [];
     let failed = 0;
@@ -172,7 +184,7 @@ export class AdminDashboardService {
       durations.length > 0
         ? durations[Math.floor(durations.length * 0.95)]!
         : 0;
-  return {
+    return {
       total: pipelines.length,
       completed,
       failed,
@@ -183,30 +195,34 @@ export class AdminDashboardService {
 
   async getChannelBreakdown() {
     const mStart = monthStart();
+    const total = await this.content.countSince(mStart);
+    const { rows: contents } = await this.content.findPageAdmin(
+      { createdAt: { gte: mStart } },
+      1,
+      Math.max(total, 1),
+    );
 
-    const result = await this.contentModel.aggregate([
-      { $match: { createdAt: { $gte: mStart } } },
-      {
-        $lookup: {
-          from: 'rules',
-          localField: 'ruleRef',
-          foreignField: 'ruleId',
-          as: 'ruleDoc',
-        },
-      },
-      { $unwind: { path: '$ruleDoc', preserveNullAndEmptyArrays: false } },
-      { $unwind: { path: '$ruleDoc.channels', preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: '$ruleDoc.channels.channel',
-          count: { $sum: 1 },
-        },
-      },
-      { $match: { _id: { $nin: [null, ''] } } },
-      { $sort: { count: -1 } },
-    ]);
+    const ruleRefs = [
+      ...new Set(contents.map((c) => c.ruleRef).filter(Boolean)),
+    ];
+    const rules = ruleRefs.length
+      ? await this.rules.findByIds(ruleRefs)
+      : [];
+    const ruleChannelMap = new Map(
+      rules.map((r) => [r.ruleId, ruleChannelNames(r)]),
+    );
 
-    return result.map((r) => ({ channel: r._id, count: r.count }));
+    const counts = new Map<string, number>();
+    for (const c of contents) {
+      const channels = ruleChannelMap.get(c.ruleRef) ?? [];
+      for (const channel of channels) {
+        counts.set(channel, (counts.get(channel) ?? 0) + 1);
+      }
+    }
+
+    return [...counts.entries()]
+      .map(([channel, count]) => ({ channel, count }))
+      .sort((a, b) => b.count - a.count);
   }
 
   private groupByDay(

@@ -7,6 +7,29 @@ export type StartPipelinePayload = {
   useLearnings?: boolean
 }
 
+export type StartPipelineResponse = {
+  pipelineId: string
+}
+
+export type PipelineEstimatePayload = {
+  workflowId: string
+  ruleId?: string
+}
+
+export type PipelineEstimateBreakdownItem = {
+  nodeType: string
+  count: number
+  creditsEach: number
+  creditsTotal: number
+}
+
+export type PipelineEstimateResponse = {
+  totalCredits: number
+  breakdown: PipelineEstimateBreakdownItem[]
+  creditsRemaining: number
+  sufficient: boolean
+}
+
 export type PipelinePageQueryPayload = {
   page?: number
   limit?: number
@@ -23,6 +46,7 @@ export type PipelinePageItem = {
   workflowRef: string
   ruleRef: string
   status: PipelineStatus
+  name: string
   contentPrompt: string
   nodeCount: number
   nodeTypes: string[]
@@ -30,6 +54,7 @@ export type PipelinePageItem = {
   completedAt: string | null
   metadataSource?: string
   newsTitle?: string
+  ruleName?: string
 }
 
 export type PipelinePageResponse = {
@@ -47,8 +72,13 @@ export type PipelineStatsResponse = {
   byStatus: Partial<Record<PipelineStatus, number>>
 }
 
-export type StartPipelineResponse = {
+export type UpdatePipelineNamePayload = {
+  name: string
+}
+
+export type UpdatePipelineNameResponse = {
   pipelineId: string
+  name: string
 }
 
 export type RetryNodePayload = {
@@ -94,6 +124,7 @@ export type GetPipelineResponse = {
     pipelineId: string
     workflowRef: string
     ruleRef: string
+    name: string
     contentPrompt: string
     status: PipelineStatus
     pausedNodeId?: string | null

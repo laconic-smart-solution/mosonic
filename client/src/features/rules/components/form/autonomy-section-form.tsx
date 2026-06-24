@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { Button } from "@/components/ui/button"
 import { FormSection } from "./rule-form-helpers"
 import {
@@ -44,8 +45,8 @@ export function AutonomySectionForm() {
       })
       setPolicy(saved)
       toast.success(t("toast.autonomySaved"))
-    } catch {
-      toast.error(t("toast.couldNotSaveAutonomy"))
+    } catch (err) {
+      toastApiError(err, "rules:toast.couldNotSaveAutonomy")
     } finally {
       setSaving(false)
     }

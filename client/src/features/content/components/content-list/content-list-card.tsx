@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import type {
   ContentPageItem,
 } from "@/shared/types/content.type"
@@ -21,6 +22,10 @@ import {
   displayLinkedRef,
   laneOutputChannelCount,
   listCardPrimaryTitle,
+  pageItemHasImage,
+  pageItemHasVideo,
+  resolvePageItemImage,
+  resolvePageItemVideo,
 } from "@/features/content/lib/content-display"
 import {
   FileServiceImage,
@@ -48,11 +53,13 @@ type GridHeroResolved =
 /** Preview priority for grid hero: video → image → lane/page text → other fields. */
 function resolveGridHeroOutput(item: ContentPageItem): GridHeroResolved {
   const o = item.outputs
-  if (hasOutput(o?.video)) {
-    return { kind: "video", url: o!.video!.trim() }
+  const videoUrl = resolvePageItemVideo(item)
+  if (videoUrl) {
+    return { kind: "video", url: videoUrl }
   }
-  if (hasOutput(o?.image)) {
-    return { kind: "image", url: o!.image!.trim() }
+  const imageUrl = resolvePageItemImage(item)
+  if (imageUrl) {
+    return { kind: "image", url: imageUrl }
   }
   const pagePreview = contentPreviewFromPageItem(item)
   if (pagePreview) {
@@ -111,9 +118,9 @@ export function ContentListCard({ item, index, onOpen }: Props) {
   const title = listCardPrimaryTitle(item.status)
   const o = item.outputs
   const hasText = hasOutput(o?.text) || hasOutput(o?.transcription)
-  const hasImage = hasOutput(o?.image)
+  const hasImage = pageItemHasImage(item)
   const hasTranslation = hasOutput(o?.translatedText)
-  const hasVideo = hasOutput(o?.video)
+  const hasVideo = pageItemHasVideo(item)
   const hasSummary = hasOutput(o?.summary)
   const laneCount = laneOutputChannelCount(item.laneOutputs)
   const gridHero = resolveGridHeroOutput(item)
@@ -141,7 +148,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         "hover:border-muted-foreground/30 hover:shadow-lg"
       )}
     >
-      <div className="relative flex h-40 items-center justify-center overflow-hidden">
+      <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted/30">
         {gridHero?.kind === "video" ? (
           <FileServiceVideo
             url={gridHero.url}
@@ -160,15 +167,15 @@ export function ContentListCard({ item, index, onOpen }: Props) {
             loadingClassName="absolute inset-0 flex size-full items-center justify-center bg-muted/50 text-[10px] text-muted-foreground"
           />
         ) : null}
-        <div
-          className={cn(
-            "absolute inset-0",
-            showMediaHero ? "opacity-80" : "opacity-95"
-          )}
-        />
+        {showMediaHero ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-black/35 to-transparent"
+            aria-hidden
+          />
+        ) : null}
         <div className="relative z-10 flex max-h-full w-full flex-col items-center justify-center gap-1.5 px-3 text-center">
           {gridHero?.kind === "text" ? (
-            <div className="flex max-h-30 w-full flex-col items-start gap-1">
+            <div className="flex max-h-30 w-full flex-col items-start gap-1 rounded-md bg-background/85 px-2.5 py-2 text-foreground shadow-sm backdrop-blur-sm">
               <span className="text-[10px] font-semibold tracking-widest uppercase">
                 {gridHero.label}
               </span>
@@ -176,13 +183,11 @@ export function ContentListCard({ item, index, onOpen }: Props) {
                 {gridHero.body}
               </p>
             </div>
-          ) : (
-            <>
-              <span className="text-3xl text-foreground/90">
-                {previewEmoji(item.status)}
-              </span>
-            </>
-          )}
+          ) : !showMediaHero ? (
+            <span className="text-3xl text-foreground/90">
+              {previewEmoji(item.status)}
+            </span>
+          ) : null}
         </div>
         <div className="absolute top-2.5 right-2.5 z-20">
           <ContentListStatusBadge status={item.status} />
@@ -223,6 +228,9 @@ export function ContentListCard({ item, index, onOpen }: Props) {
               >
                 P
               </span>
+              {(item.creditsUsed ?? 0) > 0 ? (
+                <CreditUsageBadge credits={item.creditsUsed ?? 0} />
+              ) : null}
               <span className="ml-auto text-[11px] text-muted-foreground/70">
                 {formatRelativeTime(item.updatedAt)}
               </span>

@@ -1,13 +1,21 @@
 {
-  "appName": "NeuralTex",
+  "appName": "Mosonic",
   "appTagline": "AI 平台",
   "platform": "平台",
   "account": "账户",
   "accountMenu": "账户菜单",
   "logOut": "退出登录",
+  "credits": {
+    "remaining": "剩余 {{count}} 积分",
+    "loading": "正在加载积分",
+    "unavailable": "无法加载积分",
+    "viewUsage": "查看用量详情"
+  },
   "pendingSuggestions": "待处理的 AI 建议",
   "language": "语言",
   "languageDescription": "选择应用程序界面的显示语言。",
+  "showPassword": "显示密码",
+  "hidePassword": "隐藏密码",
   "languages": {
     "en": "English",
     "th": "ไทย",
@@ -16,9 +24,9 @@
   "systemMessagesEnglish": "来自服务器的系统消息可能显示为英文。",
   "searchPlaceholder": "搜索页面…",
   "search": {
-    "ariaLabel": "搜索内容和页面",
-    "placeholder": "搜索内容和页面…",
-    "noMatches": "没有匹配的页面或内容。",
+    "ariaLabel": "搜索页面和路由",
+    "placeholder": "搜索页面和路由…",
+    "noMatches": "没有匹配的页面或路由。",
     "goTo": "前往",
     "content": "内容",
     "searching": "搜索中…",
@@ -70,8 +78,14 @@
     "posts": "帖子",
     "analytics": "分析",
     "cost": "费用",
+    "usage": "用量",
     "settingsAccounts": "账户设置",
     "admin": "管理"
+  },
+  "breadcrumb": {
+    "detail": "详情",
+    "review": "审核",
+    "newsTrigger": "新闻触发器"
   },
   "routes": {
     "dashboard": "仪表板",
@@ -86,6 +100,7 @@
     "components": "组件",
     "pipelines": "流水线",
     "cost": "费用",
+    "usage": "用量",
     "settings": "设置",
     "admin": "管理"
   },
@@ -115,10 +130,10 @@
       "subtitle": "已关联账户",
       "keywords": "设置 账户 个人资料 settings account"
     },
-    "analytics": {
-      "title": "分析",
-      "subtitle": "指标与报告",
-      "keywords": "分析 指标 analytics metrics"
+    "posts": {
+      "title": "帖子",
+      "subtitle": "已发布和已排期的帖子",
+      "keywords": "帖子 发布 社交 posts publish"
     }
   },
   "status": {
@@ -140,7 +155,10 @@
     "network": "网络错误，请检查连接后重试。",
     "unauthorized": "您尚未登录。",
     "forbidden": "您没有执行此操作的权限。",
-    "notFound": "未找到。"
+    "notFound": "未找到。",
+    "validation": "请检查输入后重试。",
+    "payloadTooLarge": "文件过大。",
+    "serviceUnavailable": "服务暂时不可用，请稍后重试。"
   },
   "pagination": {
     "page": "第 {{page}} 页",
@@ -153,5 +171,15 @@
   "empty": "暂无项目",
   "noData": "无数据",
   "optional": "可选",
-  "required": "必填"
+  "required": "必填",
+  "toast": {
+    "eyebrow": {
+      "success": "已保存",
+      "error": "失败",
+      "warning": "注意",
+      "info": "提示",
+      "loading": "加载中",
+      "default": "提示"
+    }
+  }
 }

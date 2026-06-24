@@ -77,7 +77,7 @@ export class McpController {
     const user = req.auth!.localUser as User;
     return await this.mcpService.publishContent(user.userId, {
       channels: ['instagram'],
-      content: 'Test post from NeuralTex',
+      content: 'Test post from Mosonic',
     });
   }
 

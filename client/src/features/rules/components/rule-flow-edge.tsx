@@ -5,6 +5,7 @@ import {
   type ConnectionLineComponentProps,
   type EdgeProps,
 } from "@xyflow/react"
+import { useRuleFlowVisualTheme } from "@/features/rules/lib/rule-flow-theme"
 
 export function FloatingEdge({
   id,
@@ -38,6 +39,7 @@ export function FloatingConnectionLine({
   toY,
   toPosition,
 }: ConnectionLineComponentProps) {
+  const flowTheme = useRuleFlowVisualTheme()
   const [edgePath] = getBezierPath({
     sourceX: fromX,
     sourceY: fromY,
@@ -52,10 +54,10 @@ export function FloatingConnectionLine({
     <path
       d={edgePath}
       fill="none"
-      stroke="#7E8BA0"
-      strokeWidth={1.6}
+      stroke={flowTheme.connectionLineColor}
+      strokeWidth={flowTheme.edgeWidth}
       strokeDasharray="6 4"
-      opacity={0.9}
+      opacity={flowTheme.edgeOpacity + 0.2}
     />
   )
 }

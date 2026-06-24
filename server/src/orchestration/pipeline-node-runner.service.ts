@@ -1,21 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Inject } from '@nestjs/common';
 import { UnrecoverableError } from 'bullmq';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { AnalyticsRepository } from '../analytics/analytics.repository';
-import { buildIntelligenceContextFromAnalytics } from '../analytics/intelligence-context.util';
+import { buildIntelligenceContextFromPostMetrics } from '../analytics/intelligence-context.util';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
 import type { NodeExecutorInput } from '../nodes/types/node-execution.types';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
   PipelineStatus,
 } from '../pipeline/schemas/pipeline.schema';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
 import { NodeExecutor } from './node-executor.service';
 import { isSharedTrunkFailure } from './lane-pause.util';
@@ -29,13 +30,14 @@ export class PipelineNodeRunnerService {
 
   constructor(
     config: ConfigService,
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     private readonly nodeExecutor: NodeExecutor,
     private readonly resolver: DependencyResolverService,
     private readonly events: EventsService,
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    private readonly analyticsRepo: AnalyticsRepository,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {
     this.laneScopedPause =
       config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() === 'true';
@@ -68,9 +70,9 @@ export class PipelineNodeRunnerService {
       throw new UnrecoverableError(msg);
     }
 
-    const rule = await this.ruleModel.findOne({ ruleId: payload.ruleId }).exec();
+    const rule = await this.rules.findById(payload.ruleId);
     if (!rule) {
-      throw new Error(`Rule ${payload.ruleId} not found`);
+      throw new UnrecoverableError(`Rule ${payload.ruleId} not found`);
     }
 
     await this.pipelineRepo.updateNodeStatus(
@@ -89,14 +91,22 @@ export class PipelineNodeRunnerService {
     const executionRule = resolveExecutionRule(pipeline, rule);
     let intelligenceContext;
     if (node.type === WorkflowNodeType.Intelligence) {
-      const analytics = await this.analyticsRepo.findByRuleRef(payload.ruleId);
-      intelligenceContext = buildIntelligenceContextFromAnalytics(analytics);
+      const rows = await this.postAnalyticsService.aggregateMetricsForRule(
+        payload.ruleId,
+      );
+      intelligenceContext = buildIntelligenceContextFromPostMetrics(
+        rows.map((row) => ({
+          channel: row.platform,
+          contentRef: row.contentRef,
+          metrics: row.metrics,
+        })),
+      );
     }
 
     const executorInput: NodeExecutorInput = {
       node: {
         nodeId: node.nodeId,
-        type: node.type,
+        type: node.type as unknown as WorkflowNodeType,
         order: node.order,
         config: (node.config ?? {}) as WorkflowNodeConfig,
         workflowRef: payload.workflowId,

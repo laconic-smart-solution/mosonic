@@ -5,6 +5,7 @@ import type {
   ContentOutputs,
   ContentPageQueryPayload,
   ContentPageResponse,
+  ContentStatsResponse,
   GenerateNodeBody,
   GenerateNodeResponse,
 } from "../types/content.type"
@@ -26,6 +27,11 @@ export type RerunNodeBody = {
 export const contentService = {
   pageable: async (payload: ContentPageQueryPayload): Promise<ContentPageResponse> => {
     const response = await apiClient.post("/contents/pageable", payload)
+    return response.data
+  },
+
+  stats: async (): Promise<ContentStatsResponse> => {
+    const response = await apiClient.get("/contents/stats")
     return response.data
   },
 

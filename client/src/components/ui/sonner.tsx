@@ -1,39 +1,53 @@
-import { useTheme } from "@/components/theme-provider"
 import {
-  CircleCheckIcon,
-  InfoIcon,
-  TriangleAlertIcon,
-  OctagonXIcon,
-  Loader2Icon,
+  AlertTriangle,
+  Check,
+  Info,
+  Loader2,
+  X,
 } from "lucide-react"
 import type { CSSProperties } from "react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
+import { NtToastDismiss } from "@/components/ui/nt-toast-dismiss"
+import { useToastEyebrowVars } from "@/shared/hooks/use-toast-eyebrow-vars"
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme } = useTheme()
+  useToastEyebrowVars()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      position="top-right"
+      offset={20}
+      gap={10}
+      closeButton
+      className="nt-toaster"
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
+        success: <Check className="size-[15px]" strokeWidth={2.5} />,
+        error: <X className="size-[15px]" strokeWidth={2.5} />,
+        warning: <AlertTriangle className="size-[15px]" strokeWidth={2.5} />,
+        info: <Info className="size-[15px]" strokeWidth={2.5} />,
+        loading: <Loader2 className="size-[14px] animate-spin" strokeWidth={2.5} />,
+        close: <NtToastDismiss />,
       }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as CSSProperties
-      }
       toastOptions={{
+        unstyled: true,
+        duration: 4000,
+        style: {
+          "--nt-duration": "4000ms",
+        } as CSSProperties,
         classNames: {
-          toast: "cn-toast",
+          toast: "nt-toast",
+          icon: "nt-icon",
+          content: "nt-text",
+          title: "nt-msg",
+          description: "nt-desc",
+          actionButton: "nt-action",
+          closeButton: "nt-dismiss",
+          success: "nt-toast--success",
+          error: "nt-toast--error",
+          warning: "nt-toast--warning",
+          info: "nt-toast--info",
+          loading: "nt-toast--loading",
         },
       }}
       {...props}

@@ -1,23 +1,13 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { AnalyticsModule } from '../analytics/analytics.module';
+import { PostModule } from '../post/post.module';
 import { AuthModule } from '../auth/auth.module';
-import { Content, ContentSchema } from '../content/schemas/content.schema';
-import { Upload, UploadSchema } from '../upload/schemas/upload.schema';
+import { RepositoriesModule } from '../repositories/repositories.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
 @Module({
-  imports: [
-    AuthModule,
-    AnalyticsModule,
-    MongooseModule.forFeature([
-      { name: Content.name, schema: ContentSchema },
-      { name: Upload.name, schema: UploadSchema },
-    ]),
-  ],
+  imports: [AuthModule, PostModule, RepositoriesModule],
   controllers: [DashboardController],
   providers: [DashboardService],
 })
 export class DashboardModule {}
-

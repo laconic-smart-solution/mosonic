@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { uploadService } from "../services/upload.service"
 import type {
   PatchUploadChannelBody,
@@ -29,6 +30,9 @@ export const usePublishUploadMutation = () => {
       void queryClient.invalidateQueries({ queryKey: ["upload", uploadId] })
       void queryClient.invalidateQueries({ queryKey: ["content"] })
     },
+    onError: (err) => {
+      toastApiError(err, "upload:toast.publishFailed")
+    },
   })
 }
 
@@ -47,6 +51,9 @@ export const usePatchUploadChannelMutation = () => {
     onSuccess: (_data, { uploadId }) => {
       void queryClient.invalidateQueries({ queryKey: ["upload", uploadId] })
     },
+    onError: (err) => {
+      toastApiError(err, "upload:toast.saveFailed")
+    },
   })
 }
 
@@ -63,6 +70,9 @@ export const useUpdateUploadMutation = () => {
     onSuccess: (_data, { uploadId }) => {
       void queryClient.invalidateQueries({ queryKey: ["upload", uploadId] })
     },
+    onError: (err) => {
+      toastApiError(err, "upload:toast.saveFailed")
+    },
   })
 }
 
@@ -73,6 +83,9 @@ export const useRetryUploadMutation = () => {
       uploadService.retry(uploadId),
     onSuccess: (_data, { uploadId }) => {
       void queryClient.invalidateQueries({ queryKey: ["upload", uploadId] })
+    },
+    onError: (err) => {
+      toastApiError(err, "upload:toast.publishFailed")
     },
   })
 }

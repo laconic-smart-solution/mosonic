@@ -277,6 +277,8 @@ export class NodeExecutor {
       return;
     }
     try {
+      // Credits are charged up-front at pipeline start and reconciled on
+      // completion; only record raw cost here for analytics/budget tracking.
       await this.costService.recordNodeCost(dto);
     } catch (e) {
       if (e instanceof PipelineBudgetExceededError) {
@@ -371,6 +373,19 @@ export class NodeExecutor {
           providerModel: model,
           entryType: 'openai_llm',
           audioDurationSeconds: result.audioDurationSeconds,
+        };
+      }
+      case WorkflowNodeType.Adapt: {
+        const model =
+          typeof cfg.model === 'string' && cfg.model.trim()
+            ? cfg.model.trim()
+            : 'gpt-4o';
+        return {
+          ...base,
+          providerModel: model,
+          entryType: 'openai_llm',
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
         };
       }
       default:

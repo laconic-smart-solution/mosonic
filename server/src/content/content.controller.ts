@@ -47,6 +47,12 @@ export class ContentController {
     return { data, meta: { total, page, limit, totalPages } };
   }
 
+  @Get('stats')
+  async stats(@Req() req: Request) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.contentService.getContentStats(auth);
+  }
+
   @Post(':contentId/save')
   @UsePipes(bodyPipe)
   async saveContent(

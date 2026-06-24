@@ -28,10 +28,15 @@ import {
   SaveWorkflowNodesRequestDto,
   SaveWorkflowNodesResponseDto,
 } from './dto/save-workflow-nodes.dto';
+import type { ApplyPipelineToWorkflowResponseDto } from './dto/apply-pipeline-to-workflow.dto';
 import {
   WorkflowPageQueryDto,
   WorkflowPageResponseDto,
 } from './dto/workflow-page-query.dto';
+import {
+  ApplyTemplateDto,
+  SaveAsTemplateDto,
+} from './dto/workflow-template.dto';
 import {
   UpdateWorkflowDto,
   UpdateWorkflowResponseDto,
@@ -93,7 +98,7 @@ export class WorkflowController {
   saveAsTemplate(
     @Req() req: Request,
     @Param('workflowId') workflowId: string,
-    @Body() body: { templateName: string },
+    @Body() body: SaveAsTemplateDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.saveAsTemplate(
@@ -107,7 +112,7 @@ export class WorkflowController {
   applyTemplate(
     @Req() req: Request,
     @Param('templateId') templateId: string,
-    @Body() body: { ruleId: string },
+    @Body() body: ApplyTemplateDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.applyTemplate(templateId, body.ruleId, auth);
@@ -143,6 +148,20 @@ export class WorkflowController {
   ): Promise<RegenerateWorkflowByRuleResponseDto> {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.workflowService.regenerateWorkflowByRuleId(ruleId, body, auth);
+  }
+
+  @Post('rule/:ruleId/apply-pipeline/:pipelineId')
+  applyPipelineToWorkflow(
+    @Req() req: Request,
+    @Param('ruleId') ruleId: string,
+    @Param('pipelineId') pipelineId: string,
+  ): Promise<ApplyPipelineToWorkflowResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.workflowService.applyPipelineToWorkflow(
+      ruleId,
+      pipelineId,
+      auth,
+    );
   }
 
   @Put('rule/:ruleId/nodes')

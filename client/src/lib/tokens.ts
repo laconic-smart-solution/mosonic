@@ -1,4 +1,4 @@
-/** NeuralTex design tokens — values follow CSS variables in styles/index.css */
+/** Mosonic design tokens — values follow CSS variables in styles/index.css */
 export const T = {
   // Sidebar (navy scale)
   sidebarBg: "var(--nt-sidebar)",

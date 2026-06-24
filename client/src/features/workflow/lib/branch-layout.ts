@@ -15,9 +15,10 @@ import { channelLabel } from "@/shared/constants/distribution-channels"
 import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 import type { WorkflowEdge, WorkflowNode } from "@/shared/types/workflow.type"
 
-const LANE_GAP = 140
-const CENTER_Y = 140
+const LANE_GAP = 180
+const CENTER_Y = 160
 const PREVIEW_EDGE_PREFIX = "preview-"
+const PREVIEW_BRANCH_ID = "preview-branch"
 
 const LANE_COLORS = [
   "#0D9488",
@@ -120,6 +121,7 @@ export type PipelineGraphInput = {
   lanes: string[]
   /** Materialized nodeId → position from workflow template at pipeline start. */
   layout?: Record<string, { x: number; y: number }>
+  channelHandles?: BranchChannelHandle[]
 }
 
 function topologicalOrder(nodeIds: string[], edges: WorkflowEdge[]): string[] {
@@ -168,27 +170,43 @@ function readLayoutPosition(
   return null
 }
 
-function hasCompletePersistedLayout(
-  snapNodes: PipelineNodeSnapshot[],
-  layout: Record<string, { x: number; y: number }>,
-): boolean {
-  if (snapNodes.length === 0) return false
-  return snapNodes.every((n) => readLayoutPosition(layout, n.nodeId) != null)
-}
-
 function buildPipelineAutoPositions(
   snapNodes: PipelineNodeSnapshot[],
   snapEdges: WorkflowEdge[],
   lanes: string[],
 ): Map<string, { x: number; y: number }> {
-  const trunk = snapNodes.filter((n) => !n.lane?.trim())
   const laneOrder =
     lanes.length > 0
       ? lanes
       : [...new Set(snapNodes.map(laneLabel).filter(Boolean) as string[])]
 
-  const trunkIds = trunk.map((n) => n.nodeId)
-  const trunkOrdered = topologicalOrder(trunkIds, snapEdges)
+  const mergeNode = snapNodes.find((n) => n.type === "merge")
+  const mergeId = mergeNode?.nodeId
+  const laneNodeIds = new Set(
+    snapNodes
+      .filter((n) => Boolean(n.lane?.trim()) || laneLabel(n))
+      .map((n) => n.nodeId),
+  )
+  const trunkNodes = snapNodes.filter(
+    (n) =>
+      !laneNodeIds.has(n.nodeId) && (mergeId ? n.nodeId !== mergeId : true),
+  )
+
+  const trunkIds = trunkNodes.map((n) => n.nodeId)
+  const trunkEdges = snapEdges.filter(
+    (e) => trunkIds.includes(e.from) && trunkIds.includes(e.to),
+  )
+  const trunkOrdered = topologicalOrder(trunkIds, trunkEdges)
+
+  const fanOutId = trunkNodes
+    .map((n) => ({
+      id: n.nodeId,
+      count: snapEdges.filter(
+        (e) => e.from === n.nodeId && laneNodeIds.has(e.to),
+      ).length,
+    }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count)[0]?.id
 
   const positionById = new Map<string, { x: number; y: number }>()
   trunkOrdered.forEach((id, i) => {
@@ -197,6 +215,11 @@ function buildPipelineAutoPositions(
       y: CENTER_Y,
     })
   })
+
+  const fanOutX = fanOutId
+    ? (positionById.get(fanOutId)?.x ?? 80)
+    : 80 + Math.max(trunkOrdered.length - 1, 0) * (NODE_W + PIPE_GAP)
+  const branchColumnX = fanOutX + NODE_W + PIPE_GAP
 
   laneOrder.forEach((lane, laneIndex) => {
     const laneNodes = snapNodes.filter(
@@ -209,18 +232,158 @@ function buildPipelineAutoPositions(
       (e) => laneIds.includes(e.from) && laneIds.includes(e.to),
     )
     const ordered = topologicalOrder(laneIds, laneEdges)
-    const y = CENTER_Y + (laneIndex - (laneOrder.length - 1) / 2) * LANE_GAP
+    const y =
+      CENTER_Y + (laneIndex - (laneOrder.length - 1) / 2) * LANE_GAP
+    const laneStartX = branchColumnX + NODE_W + PIPE_GAP
+
     ordered.forEach((id, i) => {
-      const trunkX =
-        positionById.get(trunkOrdered[trunkOrdered.length - 1] ?? "")?.x ?? 80
       positionById.set(id, {
-        x: trunkX + 80 + (i + 1) * (NODE_W + PIPE_GAP * 0.6),
+        x: laneStartX + i * (NODE_W + PIPE_GAP * 0.85),
         y,
       })
     })
   })
 
+  if (mergeId) {
+    const maxLaneX = Math.max(
+      branchColumnX + NODE_W + PIPE_GAP,
+      ...[...positionById.entries()]
+        .filter(([id]) => laneNodeIds.has(id))
+        .map(([, pos]) => pos.x + NODE_W),
+      0,
+    )
+    positionById.set(mergeId, {
+      x: maxLaneX + PIPE_GAP,
+      y: CENTER_Y,
+    })
+  }
+
   return positionById
+}
+
+function laneHandleFromNodeId(nodeId: string): string | null {
+  const sep = nodeId.lastIndexOf("__")
+  if (sep >= 0) {
+    const lane = nodeId.slice(sep + 2).trim()
+    return lane || null
+  }
+  return null
+}
+
+function laneNodeIdsFromSnapshot(
+  snapNodes: PipelineNodeSnapshot[],
+): Set<string> {
+  return new Set(
+    snapNodes
+      .filter((n) => Boolean(n.lane?.trim()) || laneLabel(n))
+      .map((n) => n.nodeId),
+  )
+}
+
+/** Infer merge node id from graph edges when it was omitted from stored pipeline nodes. */
+export function inferPipelineMergeNodeId(
+  snapNodes: PipelineNodeSnapshot[],
+  snapEdges: WorkflowEdge[],
+): string | undefined {
+  const direct = snapNodes.find((n) => n.type === "merge")
+  if (direct) return direct.nodeId
+
+  const laneNodeIds = laneNodeIdsFromSnapshot(snapNodes)
+  if (laneNodeIds.size === 0) return undefined
+
+  const inboundCount = new Map<string, number>()
+  for (const edge of snapEdges) {
+    if (!laneNodeIds.has(edge.from)) continue
+    inboundCount.set(edge.to, (inboundCount.get(edge.to) ?? 0) + 1)
+  }
+
+  let bestId: string | undefined
+  let bestCount = 1
+  for (const [targetId, count] of inboundCount) {
+    if (laneNodeIds.has(targetId)) continue
+    if (count > bestCount) {
+      bestId = targetId
+      bestCount = count
+    }
+  }
+  return bestId
+}
+
+/** Backfill merge row for legacy pipelines that stored graph edges but dropped the merge node. */
+export function ensurePipelineMergeNode(
+  snapNodes: PipelineNodeSnapshot[],
+  snapEdges: WorkflowEdge[],
+): PipelineNodeSnapshot[] {
+  if (snapNodes.some((n) => n.type === "merge")) return snapNodes
+  const mergeId = inferPipelineMergeNodeId(snapNodes, snapEdges)
+  if (!mergeId) return snapNodes
+
+  const maxOrder = snapNodes.reduce((max, node) => Math.max(max, node.order), 0)
+  return [
+    ...snapNodes,
+    {
+      nodeId: mergeId,
+      type: "merge",
+      order: maxOrder + 1,
+      isLocked: true,
+      userPrompt: "",
+      config: {},
+      lane: null,
+      status: "pending",
+      output: null,
+      retryCount: 0,
+      executedAt: null,
+    },
+  ]
+}
+
+function rewritePipelinePreviewEdges(
+  snapEdges: WorkflowEdge[],
+  fanOutId: string | null,
+  mergeId: string | undefined,
+  laneNodeIds: Set<string>,
+): WorkflowEdge[] {
+  if (!fanOutId || laneNodeIds.size === 0) return snapEdges
+
+  const rewritten: WorkflowEdge[] = []
+  let fanOutToBranch = false
+
+  for (const edge of snapEdges) {
+    const isFanOut = edge.from === fanOutId && laneNodeIds.has(edge.to)
+    if (isFanOut) {
+      if (!fanOutToBranch) {
+        rewritten.push({ from: fanOutId, to: PREVIEW_BRANCH_ID })
+        fanOutToBranch = true
+      }
+      const handle =
+        edge.sourceHandle?.trim() ||
+        laneHandleFromNodeId(edge.to) ||
+        undefined
+      rewritten.push({
+        from: PREVIEW_BRANCH_ID,
+        to: edge.to,
+        ...(handle ? { sourceHandle: handle } : {}),
+      })
+      continue
+    }
+
+    if (mergeId && edge.to === mergeId && laneNodeIds.has(edge.from)) {
+      const handle =
+        edge.targetHandle?.trim() ||
+        laneHandleFromNodeId(edge.from) ||
+        undefined
+      rewritten.push({
+        from: edge.from,
+        to: mergeId,
+        ...(handle ? { targetHandle: handle } : {}),
+      })
+      continue
+    }
+
+    rewritten.push(edge)
+  }
+
+  return rewritten
 }
 
 /**
@@ -230,44 +393,101 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
   nodes: WfRfNode[]
   edges: Edge[]
 } {
-  const { nodes: snapNodes, edges: snapEdges, lanes, layout = {} } = input
-  const usePersistedOnly = hasCompletePersistedLayout(snapNodes, layout)
-  const autoPositions = usePersistedOnly
-    ? null
-    : buildPipelineAutoPositions(snapNodes, snapEdges, lanes)
+  const {
+    nodes: rawSnapNodes,
+    edges: snapEdges,
+    lanes,
+    layout = {},
+    channelHandles = [],
+  } = input
+  const snapNodes = ensurePipelineMergeNode(rawSnapNodes, snapEdges)
+  const autoPositions = buildPipelineAutoPositions(snapNodes, snapEdges, lanes)
+
+  const mergeNode = snapNodes.find((n) => n.type === "merge")
+  const laneNodeIds = laneNodeIdsFromSnapshot(snapNodes)
+  const trunkNodes = snapNodes.filter(
+    (n) =>
+      !laneNodeIds.has(n.nodeId) &&
+      (mergeNode ? n.nodeId !== mergeNode.nodeId : true),
+  )
+  const fanOutId = trunkNodes
+    .map((n) => ({
+      id: n.nodeId,
+      count: snapEdges.filter(
+        (e) => e.from === n.nodeId && laneNodeIds.has(e.to),
+      ).length,
+    }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count)[0]?.id
+  const fanOutX = fanOutId
+    ? (autoPositions.get(fanOutId)?.x ?? 80)
+    : 80
+  const branchColumnX = fanOutX + NODE_W + PIPE_GAP
+
+  const mergeId = mergeNode?.nodeId
+  const laneOrder =
+    lanes.length > 0
+      ? lanes
+      : [...new Set(snapNodes.map(laneLabel).filter(Boolean) as string[])]
+  const showBranch =
+    Boolean(fanOutId) && laneNodeIds.size > 0 && laneOrder.length >= 2
 
   const extraLayoutNodes: WfRfNode[] = []
-  for (const [nodeId, pos] of Object.entries(layout)) {
-    if (snapNodes.some((n) => n.nodeId === nodeId)) continue
-    if (!readLayoutPosition(layout, nodeId)) continue
+  if (showBranch) {
     extraLayoutNodes.push({
-      id: nodeId,
+      id: PREVIEW_BRANCH_ID,
       type: "branchNode",
-      position: pos,
+      position: { x: branchColumnX, y: CENTER_Y },
       data: {
         label: "Branch",
         wfType: "branch",
         status: "idle",
         locked: true,
         config: { mode: "rule_channels" },
-        channelHandles: [],
+        channelHandles,
       },
       draggable: false,
     })
+  } else {
+    for (const [nodeId] of Object.entries(layout)) {
+      if (snapNodes.some((n) => n.nodeId === nodeId)) continue
+      if (!readLayoutPosition(layout, nodeId)) continue
+      extraLayoutNodes.push({
+        id: nodeId,
+        type: "branchNode",
+        position: { x: branchColumnX, y: CENTER_Y },
+        data: {
+          label: "Branch",
+          wfType: "branch",
+          status: "idle",
+          locked: true,
+          config: { mode: "rule_channels" },
+          channelHandles,
+        },
+        draggable: false,
+      })
+    }
   }
+
+  const previewEdges = showBranch
+    ? rewritePipelinePreviewEdges(
+        snapEdges,
+        fanOutId ?? null,
+        mergeId,
+        laneNodeIds,
+      )
+    : snapEdges
 
   const rfNodes: WfRfNode[] = snapNodes.map((n) => {
     const canvasType = backendTypeToCanvas(n.type)
     const meta = WF_NODE_TYPES.find((t) => t.type === canvasType) ?? WF_NODE_TYPES[0]
     const rfType = rfNodeTypeForCanvas(canvasType)
-    const saved = readLayoutPosition(layout, n.nodeId)
-    const autoPos = autoPositions?.get(n.nodeId) ?? { x: 80, y: CENTER_Y }
-    const pos = saved ?? autoPos
+    const pos = autoPositions.get(n.nodeId) ?? { x: 80, y: CENTER_Y }
     const lane = laneLabel(n)
     const displayChannel = lane ? channelLabel(lane) : null
     const branchMergeData =
       rfType === "branchNode" || rfType === "mergeNode"
-        ? { channelHandles: [] as BranchChannelHandle[] }
+        ? { channelHandles }
         : {}
     return {
       id: n.nodeId,
@@ -278,9 +498,7 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
           ? formatLaneNodeLabel(canvasType, displayChannel)
           : meta.label,
         wfType: canvasType,
-        status: (n.status === "failed"
-          ? "failed_final"
-          : n.status) as NodeStatus,
+        status: "idle" as NodeStatus,
         locked: true,
         config: n.config ?? {},
         lane,
@@ -290,7 +508,7 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
     }
   })
 
-  const rfEdges: Edge[] = snapEdges.map((e) => ({
+  const rfEdges: Edge[] = previewEdges.map((e) => ({
     id: `e-${e.from}-${e.to}-${e.sourceHandle ?? ""}-${e.targetHandle ?? ""}`,
     source: e.from,
     target: e.to,

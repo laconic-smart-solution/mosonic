@@ -1,22 +1,26 @@
 import "@xyflow/react/dist/style.css"
 
 import { Background, Controls, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react"
+import { useMemo } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useRuleFlowVisualTheme } from "@/features/rules/lib/rule-flow-theme"
 
 type SkeletonNodeData = { width: number; height: number }
 
 function SkeletonBubbleNode({ data }: NodeProps<Node<SkeletonNodeData>>) {
   return (
     <div className="pointer-events-none" style={{ width: data.width, height: data.height }}>
-      <Skeleton className="h-full w-full rounded-xl shadow-sm" />
+      <Skeleton className="h-full w-full rounded-xl shadow-sm dark:bg-muted/60" />
     </div>
   )
 }
 
 const skeletonNodeTypes = { skeletonBubble: SkeletonBubbleNode }
 
-/** Hub-and-spoke layout approximating the rule flow structure (static, non-interactive). */
-function buildSkeletonFlow(): { nodes: Node<SkeletonNodeData>[]; edges: Edge[] } {
+function buildSkeletonFlow(edgeColor: string, edgeOpacity: number): {
+  nodes: Node<SkeletonNodeData>[]
+  edges: Edge[]
+} {
   const center = { x: 0, y: 0 }
   const ring = 280
   const count = 6
@@ -45,20 +49,24 @@ function buildSkeletonFlow(): { nodes: Node<SkeletonNodeData>[]; edges: Edge[] }
       source: "sk-root",
       target: id,
       type: "smoothstep",
-      style: { stroke: "#C5CCD6", strokeWidth: 1.2, strokeOpacity: 0.7 },
+      style: { stroke: edgeColor, strokeWidth: 1.4, strokeOpacity: edgeOpacity },
       animated: false,
     })
   }
   return { nodes, edges }
 }
 
-const { nodes: skeletonNodes, edges: skeletonEdges } = buildSkeletonFlow()
-
 export function RuleFlowSkeleton() {
+  const flowTheme = useRuleFlowVisualTheme()
+  const { nodes, edges } = useMemo(
+    () => buildSkeletonFlow(flowTheme.edgeColor, flowTheme.edgeOpacity + 0.15),
+    [flowTheme.edgeColor, flowTheme.edgeOpacity],
+  )
+
   return (
     <ReactFlow
-      nodes={skeletonNodes}
-      edges={skeletonEdges}
+      nodes={nodes}
+      edges={edges}
       nodeTypes={skeletonNodeTypes}
       fitView
       fitViewOptions={{ padding: 0.2 }}
@@ -68,9 +76,9 @@ export function RuleFlowSkeleton() {
       panOnDrag
       zoomOnScroll
       edgesFocusable={false}
-      className="h-full min-h-0 w-full flex-1 bg-muted/10"
+      className="rule-flow-canvas h-full min-h-0 w-full flex-1 bg-muted/10 dark:bg-transparent"
     >
-      <Background gap={18} size={1} />
+      <Background gap={18} size={1} color={flowTheme.backgroundDotColor} />
       <Controls showInteractive={false} />
     </ReactFlow>
   )

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { workflowService } from "../services/workflow.service"
 import type { GenerateWorkflowPayload, WorkflowPageQueryPayload } from "../types/workflow.type"
 
@@ -24,18 +25,25 @@ export const useGenerateWorkflow = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
+    meta: { silent: true },
   })
 }
 
 export const useRegenerateWorkflowByRuleMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ ruleId, contentPrompt }: { ruleId: string; contentPrompt: string }) =>
-      workflowService.regenerateByRule(ruleId, { contentPrompt }),
+    mutationFn: ({
+      ruleId,
+      answers,
+    }: {
+      ruleId: string
+      answers: GenerateWorkflowPayload["answers"]
+    }) => workflowService.regenerateByRule(ruleId, { answers }),
     onSuccess: (_data, { ruleId }) => {
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
+    meta: { silent: true },
   })
 }
 
@@ -85,8 +93,8 @@ export const useSaveWorkflowNodesMutation = () => {
       if (ruleId) void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
       else void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
     },
-    onError: () => {
-      toast.error(i18n.t("workflow:toast.saveFailed"))
+    onError: (err) => {
+      toastApiError(err, "workflow:toast.saveFailed")
     },
   })
 }
@@ -111,8 +119,8 @@ export const usePatchWorkflowMutation = () => {
         void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
       }
     },
-    onError: () => {
-      toast.error(i18n.t("workflow:toast.nameUpdateFailed"))
+    onError: (err) => {
+      toastApiError(err, "workflow:toast.nameUpdateFailed")
     },
   })
 }
@@ -136,8 +144,26 @@ export const useSaveWorkflowNodesByRuleMutation = () => {
       void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
     },
-    onError: () => {
-      toast.error(i18n.t("workflow:toast.saveFailed"))
+    onError: (err) => {
+      toastApiError(err, "workflow:toast.saveFailed")
     },
+  })
+}
+
+export const useApplyPipelineToWorkflowMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      ruleId,
+      pipelineId,
+    }: {
+      ruleId: string
+      pipelineId: string
+    }) => workflowService.applyPipelineToWorkflow(ruleId, pipelineId),
+    onSuccess: (_data, { ruleId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+    },
+    meta: { toastNs: "workflow", toastKey: "usedPipelines.applyFailed", silent: true },
   })
 }

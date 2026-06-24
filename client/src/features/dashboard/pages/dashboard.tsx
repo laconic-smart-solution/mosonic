@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 
+import { PageShell } from "@/components/app/page-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -124,14 +125,14 @@ export default function DashboardPage() {
   ] as const
 
   return (
-    <div className="relative w-full min-h-0 overflow-x-hidden bg-linear-to-b from-muted/40 via-background to-background pb-8">
+    <PageShell className="relative overflow-x-hidden bg-linear-to-b from-muted/40 via-background to-background pb-8">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]"
         aria-hidden
       />
 
       <motion.div
-        className="relative mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
+        className="relative w-full space-y-8"
         variants={listVariants}
         initial="hidden"
         animate="show"
@@ -152,7 +153,7 @@ export default function DashboardPage() {
               {t("dashboard:header.subtitle")}
             </p>
           </div>
-          <Button size="lg" className="shrink-0 gap-2 shadow-sm" onClick={() => navigate("/")}>
+          <Button size="lg" className="shrink-0 gap-2 shadow-sm" onClick={() => navigate("/home")}>
             <Zap className="size-4" aria-hidden />
             {t("dashboard:header.startGeneration")}
           </Button>
@@ -297,37 +298,6 @@ export default function DashboardPage() {
                         {t("dashboard:actionQueue.review")}
                       </Button>
                     </div>
-                    <Separator />
-                    <div className="flex items-start justify-between gap-3 px-6 py-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-snug">
-                          {t("dashboard:actionQueue.ruleSuggestions", {
-                            count: actionItems?.pendingSuggestionsCount ?? 0,
-                          })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t("dashboard:actionQueue.ruleSuggestionsHint")}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate("/analytics")}>
-                        {t("dashboard:actionQueue.open")}
-                      </Button>
-                    </div>
-                    <Separator />
-                    <div className="flex items-start justify-between gap-3 px-6 py-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium leading-snug">
-                          {t("dashboard:actionQueue.failedPublishes", {
-                            count: actionItems?.failedPostsCount ?? 0,
-                          })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{t("dashboard:actionQueue.failedHint")}</p>
-                      </div>
-                      <Button size="sm" variant="ghost" className="shrink-0 gap-1" onClick={() => navigate("/upload")}>
-                        {t("dashboard:actionQueue.uploads")}
-                        <ArrowUpRight className="size-3.5" />
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
 
@@ -413,9 +383,9 @@ export default function DashboardPage() {
                       variant="outline"
                       size="sm"
                       className="mt-1 w-full sm:w-auto"
-                      onClick={() => navigate("/analytics")}
+                      onClick={() => navigate("/posts")}
                     >
-                      {t("dashboard:highlights.fullAnalytics")}
+                      {t("dashboard:highlights.viewPosts")}
                     </Button>
                   </CardContent>
                 </Card>
@@ -450,6 +420,6 @@ export default function DashboardPage() {
           </>
         ) : null}
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

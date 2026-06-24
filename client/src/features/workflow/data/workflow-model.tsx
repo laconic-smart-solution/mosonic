@@ -2,14 +2,18 @@ import type { MouseEvent, ReactNode } from "react"
 import type { Edge, Node } from "@xyflow/react"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
 import { formatLaneNodeLabel } from "@/features/workflow/lib/lane-node-label"
-import { channelLabel } from "@/shared/constants/distribution-channels"
+import { channelLabel, normalizeChannelId } from "@/shared/constants/distribution-channels"
 import i18n from "@/i18n"
+import { CHIP_COLORS, type ChipColor } from "@/lib/tokens"
 import {
   isPreviewEdgeId,
   persistedLayoutFromApiNodes,
   resolveWorkflowLayout,
 } from "@/features/workflow/lib/branch-layout"
 import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
+import {
+  effectiveVideoMode,
+} from "@/features/workflow/lib/video-generation-ui"
 import type {
   WorkflowEdge,
   WorkflowNode,
@@ -345,7 +349,12 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
     case "transcription":
       return { model, language: "auto", sourceType: "audio" }
     case "summarization":
-      return { model, summaryLength: "medium", outputFormat: "paragraph" }
+      return {
+        model,
+        summaryLength: "medium",
+        outputFormat: "paragraph",
+        sourceNodeRef: "text_generation",
+      }
     case "branch":
       return { mode: "rule_channels" }
     default:
@@ -360,7 +369,8 @@ export type GenerateMoreRuleHint = {
 }
 
 /**
- * Defaults for Generate more / re-run config UI (aligned with server content.service).
+ * Defaults for Generate more / re-run config UI — same base as workflow canvas nodes,
+ * with optional rule-aware overrides (mirrors server `defaultWorkflowNodeConfigForRule`).
  */
 export function buildGenerateMoreDefaultConfig(
   type: WorkflowNodeType,
@@ -375,84 +385,205 @@ export function buildGenerateMoreDefaultConfig(
   )
   const audienceLang = rule?.audience?.language?.trim()
 
-  switch (type) {
-    case "video_generation":
-      return {
-        ...base,
-        model: "sora-2",
-        duration: 8,
-        resolution: "720p",
-        aspectRatio: hasInstagram ? "9:16" : "16:9",
-      }
-    case "transcription":
-      return {
-        ...base,
-        model: "whisper-1",
-        sourceType: "audio",
-        language: audienceLang && audienceLang.length > 0 ? audienceLang : "auto",
-      }
-    case "summarization":
-      return {
-        ...base,
-        model: "gpt-4o",
-        summaryLength: "medium",
-        sourceNodeRef: "text_generation",
-      }
-    case "translation":
-      return { ...base, model: "gpt-4o" }
-    case "image_generation":
-      return { ...base, model: "gpt-image-1" }
-    default:
-      return base
+  if (type === "video_generation" && hasInstagram) {
+    base.aspectRatio = "9:16"
   }
+  if (
+    type === "transcription" &&
+    audienceLang &&
+    audienceLang.length > 0
+  ) {
+    base.language = audienceLang
+  }
+
+  return base
+}
+
+const CONFIG_OPTION_ALIASES: Record<string, string> = {
+  auto: "auto",
+  en: "english",
+  th: "thai",
+  ja: "japanese",
+  zh: "chinese",
+  ko: "korean",
+  es: "spanish",
+  fr: "french",
+  de: "german",
+  "720p": "resolution720p",
+  landscape: "landscape169",
+  portrait: "portrait916",
+}
+
+function configString(
+  config: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const raw = config[key]
+  if (raw == null || raw === "") return undefined
+  return String(raw)
+}
+
+function configNumber(
+  config: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const raw = config[key]
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function formatOptionLabel(
+  value: string | undefined,
+  options?: { sourceLanguage?: boolean },
+): string | undefined {
+  if (!value) return undefined
+  const keys = new Set<string>([value])
+  const alias = CONFIG_OPTION_ALIASES[value]
+  if (alias) keys.add(alias)
+  if (options?.sourceLanguage && value === "auto") keys.add("autoDetect")
+  for (const key of keys) {
+    const label = i18n.t(`workflow:fields.options.${key}`, { defaultValue: "" })
+    if (label) return label
+  }
+  return value
+}
+
+function formatDuration(config: Record<string, unknown>, key = "duration"): string | undefined {
+  const seconds = configNumber(config, key)
+  if (seconds === undefined) return undefined
+  const durationKey = `duration${seconds}s`
+  return (
+    formatOptionLabel(durationKey) ??
+    i18n.t(`workflow:fields.options.${durationKey}`, { defaultValue: `${seconds}s` })
+  )
+}
+
+function joinConfigParts(parts: Array<string | undefined>): string {
+  return parts.filter((part): part is string => Boolean(part)).join(" · ")
 }
 
 /** Short read-only hint for canvas cards (reusable “how”, not run content). */
 export function canvasConfigSummary(wfType: string, config: Record<string, unknown>): string {
-  const s = (k: string) => (typeof config[k] === "string" ? (config[k] as string) : undefined)
-  const opt = (key: string, value: string | undefined) =>
-    value ? i18n.t(`workflow:fields.options.${key}`, { defaultValue: value }) : undefined
   switch (wfType) {
-    case "text":
-      return [opt("professional", s("tone")), opt("medium", s("textLength")), opt("paragraph", s("outputFormat"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.textSettings")
-    case "image":
-      return [s("aspectRatio"), opt("natural", s("style")), opt("standard", s("quality"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.imageSettings")
-    case "video":
-      return [s("duration") ? `${s("duration")}s` : "", s("aspectRatio"), s("resolution")]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.videoSettings")
-    case "translation":
-      return s("targetLanguage")
-        ? `→ ${opt("thai", s("targetLanguage")) ?? s("targetLanguage")}`
-        : i18n.t("workflow:configSummary.translation")
     case "keywords":
-      return s("model") ?? i18n.t("workflow:configSummary.keywordPlanner")
+      return (
+        joinConfigParts([
+          configString(config, "model"),
+          configNumber(config, "temperature") !== undefined
+            ? i18n.t("workflow:configSummary.temperature", {
+                value: configNumber(config, "temperature"),
+              })
+            : undefined,
+          configNumber(config, "maxTokens") !== undefined
+            ? i18n.t("workflow:configSummary.maxTokens", {
+                value: configNumber(config, "maxTokens"),
+              })
+            : undefined,
+        ]) || i18n.t("workflow:configSummary.keywordPlanner")
+      )
+    case "text":
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "tone")),
+          formatOptionLabel(configString(config, "textLength")),
+          formatOptionLabel(configString(config, "outputFormat")),
+        ]) || i18n.t("workflow:configSummary.textSettings")
+      )
+    case "image":
+      return (
+        joinConfigParts([
+          configString(config, "aspectRatio"),
+          formatOptionLabel(configString(config, "style")),
+          formatOptionLabel(configString(config, "quality")),
+        ]) || i18n.t("workflow:configSummary.imageSettings")
+      )
+    case "video": {
+      const mode = effectiveVideoMode(config)
+      if (mode === "presenter") {
+        return (
+          joinConfigParts([
+            formatOptionLabel("presenter"),
+            formatDuration(config),
+            formatOptionLabel(configString(config, "heygenOrientation")),
+            formatOptionLabel(configString(config, "heygenExpressiveness")),
+            config.removeBackground === false
+              ? i18n.t("workflow:nodeCard.backgroundKept")
+              : undefined,
+          ]) || i18n.t("workflow:configSummary.videoSettings")
+        )
+      }
+      return (
+        joinConfigParts([
+          formatOptionLabel("cinematic"),
+          formatDuration(config),
+          configString(config, "aspectRatio"),
+          formatOptionLabel(configString(config, "resolution")),
+        ]) || i18n.t("workflow:configSummary.videoSettings")
+      )
+    }
+    case "translation": {
+      const source = formatOptionLabel(
+        configString(config, "sourceLanguage") ?? "auto",
+        { sourceLanguage: true },
+      )
+      const target = formatOptionLabel(configString(config, "targetLanguage"))
+      const route =
+        source && target
+          ? `${source} → ${target}`
+          : target
+            ? `→ ${target}`
+            : undefined
+      return (
+        joinConfigParts([
+          route,
+          formatOptionLabel(configString(config, "formalityLevel")),
+          config.preserveFormatting === false
+            ? i18n.t("workflow:nodeCard.reflowOk")
+            : undefined,
+        ]) || i18n.t("workflow:configSummary.translation")
+      )
+    }
     case "summarization":
-      return [opt("medium", s("summaryLength")), opt("paragraph", s("outputFormat"))]
-        .filter(Boolean)
-        .join(" · ") || i18n.t("workflow:configSummary.summary")
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "summaryLength")),
+          formatOptionLabel(configString(config, "outputFormat")),
+        ]) || i18n.t("workflow:configSummary.summary")
+      )
     case "transcription":
-      return [s("sourceType"), opt("auto", s("language"))].filter(Boolean).join(" · ") ||
-        i18n.t("workflow:configSummary.transcription")
-    case "branch":
-      return i18n.t("workflow:configSummary.fromCampaignRule")
+      return (
+        joinConfigParts([
+          formatOptionLabel(configString(config, "language")),
+          configString(config, "sourceType"),
+        ]) || i18n.t("workflow:configSummary.transcription")
+      )
+    case "branch": {
+      const mode = configString(config, "mode") ?? "rule_channels"
+      if (mode === "rule_channels") {
+        return i18n.t("workflow:configSummary.fromCampaignRule")
+      }
+      return formatOptionLabel(mode) ?? i18n.t("workflow:configSummary.fromCampaignRule")
+    }
     case "adapt":
-      return s("channel")
-        ? i18n.t("workflow:configSummary.channel", { channel: s("channel") })
+      return configString(config, "channel")
+        ? i18n.t("workflow:configSummary.channel", {
+            channel: configString(config, "channel"),
+          })
         : i18n.t("workflow:configSummary.channelAdapt")
     case "merge":
       return i18n.t("workflow:configSummary.fanInBarrier")
     case "intelligence": {
-      const st = s("searchType")
-      const typeLabel = st
-        ? i18n.t(`workflow:configSummary.intelligenceTypes.${st}`, { defaultValue: st })
+      const searchType = configString(config, "searchType")
+      const typeLabel = searchType
+        ? i18n.t(`workflow:configSummary.intelligenceTypes.${searchType}`, {
+            defaultValue: formatOptionLabel(searchType) ?? searchType,
+          })
         : i18n.t("workflow:configSummary.intelligenceTypes.all")
-      const model = s("model")
-      return model ? `${typeLabel} · ${model}` : typeLabel
+      return joinConfigParts([typeLabel, configString(config, "model")])
     }
     default:
       return i18n.t("workflow:configSummary.configured")
@@ -505,10 +636,27 @@ export const CONNECTIONS: { from: string; to: string }[] = [
   { from: "n2", to: "n3" },
 ]
 
+const STATUS_CHIP: Record<NodeStatus, ChipColor> = {
+  pending: "gray",
+  idle: "gray",
+  ready: "green",
+  running: "blue",
+  streaming: "blue",
+  processing: "blue",
+  retrying: "amber",
+  done: "green",
+  completed: "green",
+  failed_final: "red",
+  failed: "red",
+}
+
 export function statusStyle(status: NodeStatus) {
-  const base = STATUS_MAP[status] ?? STATUS_MAP.idle
+  const chip = CHIP_COLORS[STATUS_CHIP[status] ?? "gray"]
   return {
-    ...base,
+    bg: chip.bg,
+    text: chip.text,
+    border: chip.border,
+    dot: chip.text,
     label: i18n.t(`workflow:nodeStatus.${status}`, { defaultValue: status }),
   }
 }
@@ -625,6 +773,8 @@ export function apiNodesToRf(
     const laneFromApi =
       typeof n.lane === "string" && n.lane.trim() ? n.lane.trim() : ""
     const effectiveLaneKey = laneFromApi || laneFromConfig
+      ? normalizeChannelId(laneFromApi || laneFromConfig)
+      : ""
     const channelDisplay =
       effectiveLaneKey && channelHandles.length > 0
         ? (channelHandles.find((ch) => ch.id === effectiveLaneKey)?.label ??
@@ -729,22 +879,35 @@ function deriveNodeOrder(rfNodes: WfRfNode[], edges: Edge[]): string[] {
 
   const nodeIds = rfNodes.map((n) => n.id)
   const nodesById = new Map(rfNodes.map((node) => [node.id, node]))
-  const indegree = new Map<string, number>(nodeIds.map((id) => [id, 0]))
-  const outgoing = new Map<string, string[]>(nodeIds.map((id) => [id, []]))
+  const edgeIncidentIds = new Set<string>()
+  for (const edge of edges) {
+    if (nodesById.has(edge.source)) edgeIncidentIds.add(edge.source)
+    if (nodesById.has(edge.target)) edgeIncidentIds.add(edge.target)
+  }
+
+  const connectedIds = nodeIds.filter((id) => edgeIncidentIds.has(id))
+  const disconnectedNodes = rfNodes.filter((node) => !edgeIncidentIds.has(node.id))
+
+  const sortByPosition = (a: WfRfNode, b: WfRfNode) =>
+    a.position.x === b.position.x
+      ? a.position.y - b.position.y
+      : a.position.x - b.position.x
+
+  if (connectedIds.length === 0) {
+    return [...rfNodes].sort(sortByPosition).map((node) => node.id)
+  }
+
+  const indegree = new Map<string, number>(connectedIds.map((id) => [id, 0]))
+  const outgoing = new Map<string, string[]>(connectedIds.map((id) => [id, []]))
 
   for (const edge of edges) {
     if (!nodesById.has(edge.source) || !nodesById.has(edge.target)) continue
+    if (!indegree.has(edge.source) || !indegree.has(edge.target)) continue
     outgoing.get(edge.source)!.push(edge.target)
     indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1)
   }
 
-  const queue = nodeIds
-    .filter((id) => (indegree.get(id) ?? 0) === 0)
-    .sort((a, b) => {
-      const na = nodesById.get(a)!
-      const nb = nodesById.get(b)!
-      return na.position.x - nb.position.x || na.position.y - nb.position.y
-    })
+  const queue = connectedIds.filter((id) => (indegree.get(id) ?? 0) === 0)
 
   const ordered: string[] = []
   while (queue.length > 0) {
@@ -756,23 +919,14 @@ function deriveNodeOrder(rfNodes: WfRfNode[], edges: Edge[]): string[] {
       indegree.set(next, deg)
       if (deg === 0) {
         queue.push(next)
-        queue.sort((a, b) => {
-          const na = nodesById.get(a)!
-          const nb = nodesById.get(b)!
-          return na.position.x - nb.position.x || na.position.y - nb.position.y
-        })
       }
     }
   }
 
-  if (ordered.length === rfNodes.length) return ordered
-
-  const remainder = rfNodes
-    .filter((node) => !ordered.includes(node.id))
-    .sort((a, b) =>
-      a.position.x === b.position.x ? a.position.y - b.position.y : a.position.x - b.position.x,
-    )
+  const remainder = connectedIds.filter((id) => !ordered.includes(id))
+  const disconnected = [...disconnectedNodes]
+    .sort(sortByPosition)
     .map((node) => node.id)
 
-  return [...ordered, ...remainder]
+  return [...ordered, ...remainder, ...disconnected]
 }

@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-type BannerVariant =
+export type BannerVariant =
   | "hidden"
   | "not_connected"
   | "failed"
@@ -22,8 +22,10 @@ type UploadStatusBannerProps = {
   variant: BannerVariant
   publishedAt: string | null
   scheduledAt: string | null
-  onConnect: () => void
-  onRetry: () => void
+  onConnect?: () => void
+  onRetry?: () => void
+  /** When false, status text is shown without Connect / Retry buttons (e.g. preview dialog). */
+  showActions?: boolean
 }
 
 function formatWhen(iso: string | null): string {
@@ -46,6 +48,7 @@ export function UploadStatusBanner({
   scheduledAt,
   onConnect,
   onRetry,
+  showActions = true,
 }: UploadStatusBannerProps) {
   if (variant === "hidden") {
     return null
@@ -55,23 +58,25 @@ export function UploadStatusBanner({
     return (
       <div
         className={cn(
-          "mb-3 flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
-          "border-[#EF9F27] bg-[#FAEEDA] text-[#633806]",
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:border-amber-400/35 dark:bg-amber-500/15 dark:text-amber-100",
         )}
       >
         <AlertCircle className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
           Your {platformLabel} account is not connected.
         </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-8 shrink-0 border-[#854F0B] text-[#633806] hover:bg-[#FAC775]"
-          onClick={onConnect}
-        >
-          Connect
-        </Button>
+        {showActions ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 border-amber-600/40 bg-background/80 text-amber-950 hover:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-50 dark:hover:bg-amber-500/20"
+            onClick={() => onConnect?.()}
+          >
+            Connect
+          </Button>
+        ) : null}
       </div>
     )
   }
@@ -80,21 +85,23 @@ export function UploadStatusBanner({
     return (
       <div
         className={cn(
-          "mb-3 flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
           "border-destructive/40 bg-destructive/10 text-destructive",
         )}
       >
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">Publishing failed. Please retry.</span>
-        <Button
-          type="button"
-          size="sm"
-          variant="destructive"
-          className="h-8 shrink-0"
-          onClick={onRetry}
-        >
-          Retry
-        </Button>
+        {showActions ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            className="h-8 shrink-0"
+            onClick={() => onRetry?.()}
+          >
+            Retry
+          </Button>
+        ) : null}
       </div>
     )
   }
@@ -103,8 +110,8 @@ export function UploadStatusBanner({
     return (
       <div
         className={cn(
-          "mb-3 flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
-          "border-[#1D9E75]/50 bg-[#E1F5EE] text-[#085041]",
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-teal-500/40 bg-teal-500/10 text-teal-950 dark:border-teal-400/35 dark:bg-teal-500/15 dark:text-teal-100",
         )}
       >
         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -117,8 +124,8 @@ export function UploadStatusBanner({
     return (
       <div
         className={cn(
-          "mb-3 flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
-          "border-[#1D9E75]/50 bg-[#E1F5EE] text-[#085041]",
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-teal-500/40 bg-teal-500/10 text-teal-950 dark:border-teal-400/35 dark:bg-teal-500/15 dark:text-teal-100",
         )}
       >
         <CircleCheck className="size-4 shrink-0" aria-hidden />
@@ -134,8 +141,8 @@ export function UploadStatusBanner({
     return (
       <div
         className={cn(
-          "mb-3 flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
-          "border-[#185FA5]/50 bg-[#E6F1FB] text-[#042C53]",
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-blue-500/40 bg-blue-500/10 text-blue-950 dark:border-blue-400/35 dark:bg-blue-500/15 dark:text-blue-100",
         )}
       >
         <Clock className="size-4 shrink-0" aria-hidden />

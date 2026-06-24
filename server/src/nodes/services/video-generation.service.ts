@@ -11,6 +11,7 @@ import type {
   VideoGenerationInput,
 } from '../types/node-execution.types';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../../upload/file-service-local-mirror.util';
+import { buildFileStorageFolderPath } from '../../common/utils/file-storage-path.util';
 import { fetchUrlToBuffer } from '../../upload/fetch-url-to-buffer.util';
 import { uploadBufferToFileService } from '../../upload/file-service-upload.util';
 import type { WorkflowNodeConfig } from '../schemas/workflow-node.schema';
@@ -68,6 +69,25 @@ export function normalizeSoraDurationSeconds(
   let best: SoraVideoDuration = SORA_VIDEO_DURATIONS[0];
   let bestDiff = Math.abs(n - best);
   for (const s of SORA_VIDEO_DURATIONS) {
+    const d = Math.abs(n - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
+
+export const PRESENTER_VIDEO_DURATIONS = [10, 20, 30, 40, 60] as const;
+export type PresenterVideoDuration = (typeof PRESENTER_VIDEO_DURATIONS)[number];
+
+export function normalizePresenterDurationSeconds(
+  raw: number | undefined,
+): PresenterVideoDuration {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 20;
+  let best: PresenterVideoDuration = PRESENTER_VIDEO_DURATIONS[1];
+  let bestDiff = Math.abs(n - best);
+  for (const s of PRESENTER_VIDEO_DURATIONS) {
     const d = Math.abs(n - s);
     if (d < bestDiff) {
       best = s;
@@ -448,7 +468,7 @@ export class VideoGenerationService {
       config.heygenExpressiveness === 'high'
         ? config.heygenExpressiveness
         : 'medium';
-    const normalized = normalizeVideoConfig(config);
+    const durationSeconds = normalizePresenterDurationSeconds(config.duration);
     return {
       avatarId,
       voiceId,
@@ -457,7 +477,7 @@ export class VideoGenerationService {
       motionPrompt: config.heygenMotionPrompt?.trim() || undefined,
       removeBackground: config.removeBackground !== false,
       backgroundAssetId: config.heygenBackgroundAssetId?.trim() || undefined,
-      durationSeconds: normalized.duration,
+      durationSeconds,
     };
   }
 
@@ -546,7 +566,7 @@ export class VideoGenerationService {
       buffer: new Uint8Array(buffer),
       originalName: fileName,
       mimeType: 'video/mp4',
-      folderPath: `neural-tex/videos/${input.pipelineId}`,
+      folderPath: buildFileStorageFolderPath('videos', input.pipelineId),
     });
     const storage = await this.maybeMirrorVideoUploadToPublicUploads(
       {
@@ -688,7 +708,7 @@ export class VideoGenerationService {
     const storage = await this.uploadVideoBuffer({
       videoBuffer,
       fileName,
-      folderPath: `neural-tex/videos/${input.pipelineId}`,
+      folderPath: buildFileStorageFolderPath('videos', input.pipelineId),
     });
 
     return {
@@ -772,7 +792,7 @@ export class VideoGenerationService {
         video: storage,
         videoCost: {
           model: 'heygen-presenter',
-          videoSeconds: config.duration ?? 8,
+          videoSeconds: normalizePresenterDurationSeconds(config.duration),
           videoResolution: presenterResolutionLabel(config),
         },
       };

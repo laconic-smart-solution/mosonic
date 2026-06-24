@@ -1,4 +1,4 @@
-import type { User } from '../users/schemas/user.schema';
+import type { UserRecord } from '../domain/users/user.types';
 
 export type AuthRole = 'ADMIN' | 'CUSTOMER';
 
@@ -19,5 +19,7 @@ export interface SsoTokenClaims {
 export interface RequestAuthContext {
   claims: SsoTokenClaims;
   authServerUserId: string;
-  localUser?: User;
+  /** Raw Bearer token when verified via JwtAuthGuard (for SSO proxy calls). */
+  accessToken?: string;
+  localUser?: UserRecord;
 }

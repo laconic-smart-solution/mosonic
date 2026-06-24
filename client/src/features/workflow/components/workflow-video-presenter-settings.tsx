@@ -1,11 +1,14 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { T } from "@/lib/tokens"
 import { mergeHeygenVideoConfig } from "@/features/workflow/lib/workflow-node-validation"
+import { VIDEO_CINEMATIC_UI_ENABLED } from "@/features/workflow/lib/video-generation-ui"
 import { HeygenVoicePicker } from "@/features/workflow/components/heygen-voice-picker"
 import {
   heygenService,
@@ -14,6 +17,38 @@ import {
 
 const ACCEPT = "image/png,image/jpeg,image/jpg"
 const MAX_BYTES = 32 * 1024 * 1024
+const HEYGEN_AVATARS_QUERY_KEY = ["heygen", "avatars"] as const
+
+function removeAvatarFromCache(queryClient: QueryClient, lookId: string) {
+  queryClient.setQueryData<HeygenAvatarLook[]>(HEYGEN_AVATARS_QUERY_KEY, (old) =>
+    (old ?? []).filter((avatar) => avatar.lookId !== lookId),
+  )
+}
+
+function upsertAvatarInCache(queryClient: QueryClient, look: HeygenAvatarLook) {
+  queryClient.setQueryData<HeygenAvatarLook[]>(HEYGEN_AVATARS_QUERY_KEY, (old) => {
+    const list = old ?? []
+    const index = list.findIndex((avatar) => avatar.lookId === look.lookId)
+    if (index === -1) return [look, ...list]
+    const next = [...list]
+    next[index] = { ...next[index], ...look }
+    return next
+  })
+}
+
+function uploadResultToAvatarLook(
+  result: { heygenAvatarId: string; previewUrl: string },
+  fileName: string,
+): HeygenAvatarLook {
+  const baseName = fileName.replace(/\.[^.]+$/, "").trim()
+  return {
+    lookId: result.heygenAvatarId,
+    name: baseName || "Uploaded avatar",
+    avatarType: "photo_avatar",
+    previewImageUrl: result.previewUrl,
+    deletable: true,
+  }
+}
 
 type WorkflowVideoPresenterSettingsProps = {
   workflowId: string | undefined
@@ -21,6 +56,8 @@ type WorkflowVideoPresenterSettingsProps = {
   config: Record<string, unknown>
   onPatch: (patch: Record<string, unknown>) => void
   compact?: boolean
+  /** When false, skip workflow-node API calls (Generate more before node is saved). */
+  persistToServer?: boolean
 }
 
 function isAvatarSelectable(look: HeygenAvatarLook): boolean {
@@ -34,6 +71,7 @@ export function WorkflowVideoPresenterSettings({
   config,
   onPatch,
   compact = false,
+  persistToServer = true,
 }: WorkflowVideoPresenterSettingsProps) {
   const { t } = useTranslation("workflow")
   const queryClient = useQueryClient()
@@ -41,28 +79,47 @@ export function WorkflowVideoPresenterSettings({
   const bgInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<"avatar" | "background" | null>(null)
   const [deletingLookId, setDeletingLookId] = useState<string | null>(null)
+  const [removedLookIds, setRemovedLookIds] = useState<string[]>([])
+  const [pendingUploadedAvatars, setPendingUploadedAvatars] = useState<
+    HeygenAvatarLook[]
+  >([])
   const [uploadError, setUploadError] = useState<string | null>(null)
   const avatarsQuery = useQuery({
-    queryKey: ["heygen", "avatars"],
+    queryKey: HEYGEN_AVATARS_QUERY_KEY,
     queryFn: () => heygenService.listAvatars(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   })
 
-  const canUpload = Boolean(workflowId?.trim())
+  const visibleAvatars = useMemo(() => {
+    const removed = new Set(removedLookIds)
+    const fromQuery = (avatarsQuery.data ?? []).filter(
+      (avatar) => !removed.has(avatar.lookId),
+    )
+    const queryIds = new Set(fromQuery.map((avatar) => avatar.lookId))
+    const pending = pendingUploadedAvatars.filter(
+      (avatar) => !removed.has(avatar.lookId) && !queryIds.has(avatar.lookId),
+    )
+    return [...pending, ...fromQuery]
+  }, [avatarsQuery.data, removedLookIds, pendingUploadedAvatars])
+
+  const canSyncToServer =
+    persistToServer && Boolean(workflowId?.trim()) && Boolean(nodeId?.trim())
+  const canUploadAssets = true
   const selectedAvatarId = String(config.heygenAvatarId ?? "")
+  const motionPrompt = String(config.heygenMotionPrompt ?? "")
 
   const persistPatch = useCallback(
     async (patch: Record<string, unknown>) => {
       const merged = mergeHeygenVideoConfig(config, patch)
       onPatch(merged)
-      if (!workflowId?.trim()) return
+      if (!canSyncToServer) return
       try {
-        await heygenService.patchPresenterConfig(workflowId, nodeId, patch)
+        await heygenService.patchPresenterConfig(workflowId!, nodeId, patch)
       } catch {
         setUploadError(t("presenter.saveFailed"))
       }
     },
-    [config, workflowId, nodeId, onPatch, t],
+    [canSyncToServer, config, workflowId, nodeId, onPatch, t],
   )
 
   const handleSelectAvatar = useCallback(
@@ -87,18 +144,13 @@ export function WorkflowVideoPresenterSettings({
         heygenAvatarId: "",
         heygenAvatarPhotoUrl: "",
         heygenAvatarAssetId: "",
-        mode: "cinematic",
+        mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
       }),
     )
   }, [config, onPatch])
 
   const handleDeleteAvatar = useCallback(
     async (look: HeygenAvatarLook) => {
-      const confirmed = window.confirm(
-        t("presenter.deleteConfirm", { name: look.name }),
-      )
-      if (!confirmed) return
-
       setUploadError(null)
       setDeletingLookId(look.lookId)
       try {
@@ -109,15 +161,25 @@ export function WorkflowVideoPresenterSettings({
               heygenAvatarId: "",
               heygenAvatarPhotoUrl: "",
               heygenAvatarAssetId: "",
-              mode: "cinematic",
+              mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
             }),
           )
         }
-        await queryClient.invalidateQueries({ queryKey: ["heygen", "avatars"] })
-      } catch (e) {
-        setUploadError(
-          e instanceof Error ? e.message : t("presenter.deleteFailed"),
+        setRemovedLookIds((prev) =>
+          prev.includes(look.lookId) ? prev : [...prev, look.lookId],
         )
+        setPendingUploadedAvatars((prev) =>
+          prev.filter((avatar) => avatar.lookId !== look.lookId),
+        )
+        removeAvatarFromCache(queryClient, look.lookId)
+        await queryClient.refetchQueries({ queryKey: HEYGEN_AVATARS_QUERY_KEY })
+        removeAvatarFromCache(queryClient, look.lookId)
+        toast.success(t("presenter.deleteSuccess", { name: look.name }))
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : t("presenter.deleteFailed")
+        setUploadError(message)
+        toast.error(message)
       } finally {
         setDeletingLookId(null)
       }
@@ -127,7 +189,7 @@ export function WorkflowVideoPresenterSettings({
 
   const handleFile = useCallback(
     async (kind: "avatar" | "background", file: File | undefined) => {
-      if (!file || !workflowId) return
+      if (!file || !canUploadAssets) return
       if (file.size > MAX_BYTES) {
         setUploadError(t("presenter.fileTooLarge"))
         return
@@ -136,36 +198,72 @@ export function WorkflowVideoPresenterSettings({
       setUploading(kind)
       try {
         if (kind === "avatar") {
-          const result = await heygenService.uploadAvatar(workflowId, nodeId, file)
-          onPatch({
-            mode: "presenter",
-            heygenAvatarId: result.heygenAvatarId,
-            heygenAvatarAssetId: result.heygenAvatarAssetId,
-            heygenAvatarPhotoUrl: result.previewUrl,
-          })
-          await queryClient.invalidateQueries({ queryKey: ["heygen", "avatars"] })
-        } else {
-          const result = await heygenService.uploadBackground(
-            workflowId,
-            nodeId,
-            file,
+          const result =
+            canSyncToServer && workflowId
+              ? await heygenService.uploadAvatar(workflowId, nodeId, file)
+              : await heygenService.uploadAvatarDraft(file)
+          const optimisticLook = uploadResultToAvatarLook(result, file.name)
+          upsertAvatarInCache(queryClient, optimisticLook)
+          setPendingUploadedAvatars((prev) => [
+            optimisticLook,
+            ...prev.filter((avatar) => avatar.lookId !== optimisticLook.lookId),
+          ])
+          onPatch(
+            mergeHeygenVideoConfig(config, {
+              mode: "presenter",
+              heygenAvatarId: result.heygenAvatarId,
+              heygenAvatarAssetId: result.heygenAvatarAssetId,
+              heygenAvatarPhotoUrl: result.previewUrl,
+            }),
           )
+          await queryClient.refetchQueries({ queryKey: HEYGEN_AVATARS_QUERY_KEY })
+          upsertAvatarInCache(queryClient, optimisticLook)
+          const freshAvatars =
+            queryClient.getQueryData<HeygenAvatarLook[]>(
+              HEYGEN_AVATARS_QUERY_KEY,
+            ) ?? []
+          if (freshAvatars.some((avatar) => avatar.lookId === optimisticLook.lookId)) {
+            setPendingUploadedAvatars((prev) =>
+              prev.filter((avatar) => avatar.lookId !== optimisticLook.lookId),
+            )
+          }
+          toast.success(t("presenter.uploadSuccess", { name: optimisticLook.name }))
+        } else {
+          const result =
+            canSyncToServer && workflowId
+              ? await heygenService.uploadBackground(workflowId, nodeId, file)
+              : await heygenService.uploadBackgroundDraft(file)
           onPatch({
             heygenBackgroundAssetId: result.heygenBackgroundAssetId,
             heygenBackgroundUrl: result.previewUrl,
             removeBackground: true,
           })
+          toast.success(t("presenter.backgroundUploadSuccess"))
         }
       } catch (e) {
-        setUploadError(
-          e instanceof Error ? e.message : t("presenter.uploadFailed"),
-        )
+        const message =
+          e instanceof Error ? e.message : t("presenter.uploadFailed")
+        setUploadError(message)
+        toast.error(message)
       } finally {
         setUploading(null)
       }
     },
-    [workflowId, nodeId, onPatch, queryClient, t],
+    [
+      canUploadAssets,
+      canSyncToServer,
+      config,
+      workflowId,
+      nodeId,
+      onPatch,
+      queryClient,
+      t,
+    ],
   )
+
+  const handleMotionPromptBlur = useCallback(() => {
+    void persistPatch({ heygenMotionPrompt: motionPrompt })
+  }, [motionPrompt, persistPatch])
 
   const labelClass = cn(
     "mb-1.5 block font-bold",
@@ -178,12 +276,6 @@ export function WorkflowVideoPresenterSettings({
 
   return (
     <div className="flex flex-col gap-3">
-      {!canUpload ? (
-        <p className="text-[11px] text-amber-700">
-          {t("presenter.saveWorkflowFirst")}
-        </p>
-      ) : null}
-
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <p className={labelClass} style={{ color: T.textPrimary, marginBottom: 0 }}>
@@ -193,7 +285,7 @@ export function WorkflowVideoPresenterSettings({
             <button
               type="button"
               onClick={handleClearAvatar}
-              className="text-[10px] text-gray-500 underline hover:text-gray-700"
+              className="text-[10px] text-muted-foreground underline hover:text-foreground"
             >
               {t("presenter.clearSelection")}
             </button>
@@ -201,7 +293,7 @@ export function WorkflowVideoPresenterSettings({
         </div>
 
         {avatarsQuery.isLoading ? (
-          <div className="flex items-center gap-2 py-2 text-[11px] text-gray-500">
+          <div className="flex items-center gap-2 py-2 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
             {t("presenter.loadingAvatars")}
           </div>
@@ -209,13 +301,13 @@ export function WorkflowVideoPresenterSettings({
           <p className="text-[11px] text-red-600">
             {t("presenter.loadAvatarsFailed")}
           </p>
-        ) : (avatarsQuery.data ?? []).length === 0 ? (
-          <p className="text-[11px] text-gray-500">
+        ) : visibleAvatars.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">
             {t("presenter.noAvatars")}
           </p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            {(avatarsQuery.data ?? []).map((look) => {
+            {visibleAvatars.map((look) => {
               const selected = selectedAvatarId === look.lookId
               const selectable = isAvatarSelectable(look)
               const busy = deletingLookId === look.lookId
@@ -224,11 +316,10 @@ export function WorkflowVideoPresenterSettings({
                 <div
                   key={look.lookId}
                   className={cn(
-                    "group relative overflow-hidden rounded-lg border bg-[#FDFCFA]",
+                    "group relative overflow-hidden rounded-lg border border-border bg-muted/30",
                     selected && "ring-2 ring-teal-500",
                     !selectable && "opacity-60",
                   )}
-                  style={{ borderColor: T.surfaceBorder }}
                 >
                   <button
                     type="button"
@@ -243,15 +334,15 @@ export function WorkflowVideoPresenterSettings({
                         className="aspect-square w-full rounded object-cover"
                       />
                     ) : (
-                      <div className="flex aspect-square w-full items-center justify-center rounded bg-gray-100 text-[10px] text-gray-400">
+                      <div className="flex aspect-square w-full items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">
                         No preview
                       </div>
                     )}
-                    <span className="line-clamp-2 w-full text-center text-[10px] font-medium text-gray-700">
+                    <span className="line-clamp-2 w-full text-center text-[10px] font-medium text-foreground">
                       {look.name}
                     </span>
                     {look.status && look.status !== "completed" ? (
-                      <span className="text-[9px] capitalize text-amber-700">
+                      <span className="text-[9px] capitalize text-amber-700 dark:text-amber-400">
                         {look.status}
                       </span>
                     ) : null}
@@ -288,7 +379,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={avatarUrl && !selectedAvatarId ? avatarUrl : ""}
-        disabled={!canUpload || uploading !== null}
+        disabled={!canUploadAssets || uploading !== null}
         busy={uploading === "avatar"}
         inputRef={avatarInputRef}
         onPick={() => avatarInputRef.current?.click()}
@@ -301,7 +392,7 @@ export function WorkflowVideoPresenterSettings({
         uploadLabel={t("presenter.clickOrDrag")}
         uploadingLabel={t("presenter.uploading")}
         previewUrl={bgUrl}
-        disabled={!canUpload || uploading !== null}
+        disabled={!canUploadAssets || uploading !== null}
         busy={uploading === "background"}
         inputRef={bgInputRef}
         onPick={() => bgInputRef.current?.click()}
@@ -314,7 +405,7 @@ export function WorkflowVideoPresenterSettings({
         </label>
         <p
           className={cn(
-            "mb-2 text-gray-500",
+            "mb-2 text-muted-foreground",
             compact ? "text-[9px]" : "text-[10px]",
           )}
         >
@@ -322,7 +413,7 @@ export function WorkflowVideoPresenterSettings({
         </p>
         <HeygenVoicePicker
           value={voiceId}
-          selectionDisabled={!canUpload}
+          selectionDisabled={false}
           compact={compact}
           onChange={(nextVoice) => {
             const patch: Record<string, unknown> = { heygenVoiceId: nextVoice }
@@ -331,14 +422,34 @@ export function WorkflowVideoPresenterSettings({
             }
             const merged = mergeHeygenVideoConfig(config, patch)
             onPatch(merged)
-            if (workflowId?.trim() && nextVoice) {
+            if (canSyncToServer && nextVoice) {
               void heygenService
-                .patchPresenterConfig(workflowId, nodeId, patch)
+                .patchPresenterConfig(workflowId!, nodeId, patch)
                 .catch(() => {
                   setUploadError(t("presenter.voiceSaveFailed"))
                 })
             }
           }}
+        />
+      </div>
+
+      <div>
+        <label className={labelClass} style={{ color: T.textPrimary }}>
+          {t("fields.video.heygenMotionPrompt.label")}
+        </label>
+        <Textarea
+          value={motionPrompt}
+          onChange={(e) => onPatch({ heygenMotionPrompt: e.target.value })}
+          onBlur={handleMotionPromptBlur}
+          rows={2}
+          maxLength={500}
+          className={cn(
+            "mt-1 min-h-[56px] resize-y bg-background leading-relaxed",
+            compact ? "text-xs" : "text-sm",
+          )}
+          placeholder={t("fields.video.heygenMotionPrompt.placeholder", {
+            defaultValue: "",
+          })}
         />
       </div>
 
@@ -401,16 +512,16 @@ function UploadSlot({
           onFile(file)
         }}
         className={cn(
-          "flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-3 py-4 text-center transition-colors",
-          dragOver && "border-teal-400 bg-teal-50/50",
+          "flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-3 py-4 text-center transition-colors",
+          dragOver &&
+            "border-teal-400 bg-teal-50/50 dark:border-teal-500 dark:bg-teal-950/30",
           disabled && "cursor-not-allowed opacity-60",
         )}
-        style={{ borderColor: dragOver ? undefined : T.surfaceBorder }}
       >
         {busy ? (
           <>
             <Spinner className="size-4" />
-            <span className="text-[11px] text-gray-500">{uploadingLabel}</span>
+            <span className="text-[11px] text-muted-foreground">{uploadingLabel}</span>
           </>
         ) : previewUrl ? (
           <img
@@ -419,9 +530,9 @@ function UploadSlot({
             className="max-h-20 max-w-full rounded object-contain"
           />
         ) : (
-          <span className="text-[11px] text-gray-500">{uploadLabel}</span>
+          <span className="text-[11px] text-muted-foreground">{uploadLabel}</span>
         )}
-        <span className="text-[10px] text-gray-400">{hint}</span>
+        <span className="text-[10px] text-muted-foreground/70">{hint}</span>
       </div>
       <input
         ref={inputRef}

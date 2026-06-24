@@ -14,18 +14,18 @@ export const ContentPage      = PageLoader(lazy(() => import("@/features/content
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
 export const PostsPage        = PageLoader(lazy(() => import("@/features/posts/pages/posts-page")))
+export const PostDetailPage   = PageLoader(lazy(() => import("@/features/posts/pages/post-detail-page")))
 export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
 )
-export const AnalyticsPage    = PageLoader(lazy(() => import("@/features/analytics/pages/analytics")))
-export const AnalyticsDetailPage = PageLoader(
-  lazy(() => import("@/features/analytics/pages/analytics-detail")),
-)
-export const CostDashboardPage = PageLoader(lazy(() => import("@/features/cost/pages/cost-dashboard")))
-export const CostBudgetPage = PageLoader(lazy(() => import("@/features/cost/pages/cost-budget")))
+export const UsagePage = PageLoader(lazy(() => import("@/features/usage/pages/usage")))
 export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
 export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
 export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
+
+export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
+export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
+export const AboutPage = PageLoader(lazy(() => import("@/features/marketing/pages/about")))
 
 export const LoginPage = PageLoader(lazy(() => import("@/features/auth/pages/login")))
 export const SignupPage = PageLoader(lazy(() => import("@/features/auth/pages/signup")))
@@ -40,7 +40,22 @@ export const AdminDashboardPage = PageLoader(lazy(() => import("@/features/admin
 export const AdminUsersPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-users")))
 export const AdminUserDetailPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-user-detail")))
 export const AdminCostPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-cost")))
+export const AdminCreditConfigPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-credit-config")),
+)
+export const AdminNodeCreditsPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-node-credits")),
+)
+export const AdminPlansPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-plans")))
+export const AdminUsagePage = PageLoader(lazy(() => import("@/features/admin/pages/admin-usage")))
+export const AdminApiUsagePage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-api-usage")),
+)
 export const AdminContentPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-content")))
 export const AdminContentDetailPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-content-detail")),
+)
+export const AdminFaqPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-faq-page")))
+export const AdminFaqDocumentDetailPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-faq-document-detail")),
 )

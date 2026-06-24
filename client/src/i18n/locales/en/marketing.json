@@ -1,0 +1,176 @@
+{
+  "nav": {
+    "ariaLabel": "Main navigation",
+    "landing": "Home",
+    "create": "Create",
+    "pricing": "Pricing",
+    "about": "About"
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "Built in Thailand, for Thai growth",
+      "title": "Plant one idea. Grow content everywhere.",
+      "subtitle": "Strategy in. Content and publishing out.",
+      "ctaPrimary": "Start free",
+      "ctaSecondary": "See how it works"
+    },
+    "problem": {
+      "eyebrow": "The problem we solve",
+      "title": "Most content tools are standalone. Your campaigns aren't.",
+      "paragraph1": "Digital marketing now demands a constant supply of content — for feeds, marketplaces, and inboxes at once. Doing it by hand doesn't scale, and the AI writers and image generators bolted onto every other tool only solve one piece.",
+      "paragraph2": "What's missing is the system around the content: a strategy that's defined once, a process that turns it into channel-ready output automatically, and a record of what actually performed. Mosonic is that system, built around how Thai SMEs and the agencies serving them actually work."
+    },
+    "features": {
+      "eyebrow": "Features",
+      "title": "Everything between a strategy and a published post.",
+      "link": "See the full feature breakdown →",
+      "items": {
+        "plan": {
+          "eyebrow": "Plan",
+          "title": "Set the strategy",
+          "description": "Brand tone, audience, goals, and channels — defined once, inherited by every run."
+        },
+        "create": {
+          "eyebrow": "Create",
+          "title": "Generate everything",
+          "description": "Text, images, video, and translation, chained from one prompt per batch."
+        },
+        "publish": {
+          "eyebrow": "Publish",
+          "title": "Ship to every channel",
+          "description": "Captions and media auto-packaged per platform, posted together on schedule."
+        },
+        "measure": {
+          "eyebrow": "Measure",
+          "title": "See what worked",
+          "description": "Performance synced on demand, rolled up by strategy or by post."
+        }
+      }
+    },
+    "howItWorks": {
+      "eyebrow": "How it works",
+      "title": "One strategy. Seven stages. Every stage is automatic after the first.",
+      "subtitle": "Like a bamboo culm, Mosonic grows in fixed stages — each one building directly on the last, with nothing skipped and nothing left to chance.",
+      "stages": {
+        "strategy": {
+          "label": "Stage 01",
+          "title": "Set the strategy",
+          "description": "Define brand tone, target audience, goals, and channels once. Everything downstream inherits it."
+        },
+        "template": {
+          "label": "Stage 02",
+          "title": "Build the template",
+          "description": "Choose which steps a piece of content goes through — write, illustrate, translate, animate — and reuse it for every future run."
+        },
+        "run": {
+          "label": "Stage 03",
+          "title": "Run it",
+          "description": "Give Mosonic a prompt for this batch. It executes the template against your strategy in the background."
+        },
+        "generate": {
+          "label": "Stage 04",
+          "title": "Generate content",
+          "description": "Copy, images, video, and translations come back versioned, so you can compare and pick a winner before anything goes out."
+        },
+        "package": {
+          "label": "Stage 05",
+          "title": "Package for each channel",
+          "description": "Captions and media are reformatted per platform automatically — no manual resizing or rewriting for each feed."
+        },
+        "publish": {
+          "label": "Stage 06",
+          "title": "Publish",
+          "description": "One action posts to every channel you've selected, on schedule, with no double handling."
+        },
+        "track": {
+          "label": "Stage 07",
+          "title": "Track results",
+          "description": "Performance flows back per post and per channel, so the next run starts smarter than the last."
+        }
+      }
+    },
+    "cta": {
+      "eyebrow": "Pricing",
+      "title": "Plans that grow with your business.",
+      "subtitle": "From solo founders to agencies — start free, then scale when your content pipeline does.",
+      "button": "View pricing"
+    }
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "Pick the plan that fits your pipeline",
+    "subtitle": "Start free with monthly credits. Scale up when your campaigns need more volume.",
+    "perMonth": "/ mo",
+    "creditsPerMonth": "{{count}} credits / month",
+    "free": "Free",
+    "getStarted": "Get started",
+    "startFree": "Get started",
+    "mostPopular": "Popular",
+    "includesPrevious": "Everything in {{plan}}, PLUS:",
+    "contactSales": "Contact sales",
+    "upgradeTo": "Upgrade to {{plan}}",
+    "checkoutNote": "New accounts start on the Free plan. Paid upgrades are assigned after signup — self-serve checkout is coming soon.",
+    "loadError": "Could not load plans. Please refresh and try again.",
+    "loading": "Loading plans…",
+    "empty": "No plans available right now.",
+    "comparison": {
+      "eyebrow": "Features",
+      "title": "Everything you need to plan, create, and publish",
+      "subtitle": "Compare generation, workflow, publishing, and analytics across every plan.",
+      "unavailable": "Feature comparison is unavailable right now.",
+      "limited": "Limited",
+      "creditsValue": "{{count}} / mo",
+      "categories": {
+        "generation": {
+          "title": "Content generation",
+          "rows": {
+            "monthlyCredits": "Monthly credits",
+            "textGeneration": "Text generation",
+            "imageGeneration": "Image generation",
+            "videoGeneration": "Video generation",
+            "translation": "Translation",
+            "versionHistory": "Version history"
+          }
+        },
+        "workflow": {
+          "title": "Workflow & orchestration",
+          "rows": {
+            "workflowTemplates": "Workflow templates",
+            "multiNodePipelines": "Multi-node pipelines",
+            "nodeRerun": "Single-node re-run",
+            "liveGenerationLogs": "Live generation logs"
+          }
+        },
+        "publishing": {
+          "title": "Publishing",
+          "rows": {
+            "socialChannels": "Social channels",
+            "scheduledPublishing": "Scheduled publishing",
+            "channelPreviews": "Channel previews",
+            "multiChannelUpload": "Multi-channel upload"
+          }
+        },
+        "analytics": {
+          "title": "Analytics & support",
+          "rows": {
+            "usageDashboard": "Usage dashboard",
+            "campaignAnalytics": "Campaign analytics",
+            "ruleFeedback": "Rule improvement feedback",
+            "prioritySupport": "Priority support"
+          }
+        }
+      }
+    }
+  },
+  "footer": {
+    "tagline": "AI content and publishing built for Thai SMEs and the agencies that grow them.",
+    "product": "Product",
+    "company": "Company",
+    "getStarted": "Get started",
+    "features": "Features",
+    "contact": "Contact",
+    "startFree": "Start free",
+    "copyright": "© 2026 Mosonic. Made in Thailand.",
+    "legal": "Privacy · Terms"
+  }
+}

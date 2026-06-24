@@ -1,37 +1,17 @@
-import { Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { Check, ChevronRight, Clock, X } from "lucide-react"
+import { Check, Clock, X } from "lucide-react"
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { cn } from "@/lib/utils"
 import type { ContentDetail } from "@/shared/types/content.type"
+
 type Props = {
   workflowTitle: string
   data: ContentDetail
-  /** Defaults to Content library */
-  breadcrumbParentHref?: string
-  breadcrumbParentLabel?: string
 }
 
-export function ContentDetailReviewHeader({
-  workflowTitle,
-  data,
-  breadcrumbParentHref = "/content",
-  breadcrumbParentLabel = "Content",
-}: Props) {
+export function ContentDetailReviewHeader({ workflowTitle, data }: Props) {
   return (
     <>
-      <motion.div
-        className="mb-4 flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground"
-        initial={{ opacity: 0, x: -6 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.25 }}
-      >
-        <Link to={breadcrumbParentHref} className="hover:text-foreground">
-          {breadcrumbParentLabel}
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-50" />
-        <span className="font-medium text-foreground">Review</span>
-      </motion.div>
-
       <motion.div
         className="mb-6 flex flex-col gap-3"
         initial={{ opacity: 0, y: 8 }}
@@ -46,9 +26,9 @@ export function ContentDetailReviewHeader({
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase",
               data.status === "draft" &&
-                "border-amber-200/80 bg-[#FEF6E4] text-[#7C4F07]",
+                "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
               data.status === "approved" &&
-                "border-[rgba(0,201,167,0.25)] bg-[#E0FAF5] text-[#005C4D]",
+                "border-primary/25 bg-primary/10 text-primary",
               data.status === "rejected" &&
                 "border-red-200 bg-red-50 text-red-700"
             )}
@@ -62,13 +42,20 @@ export function ContentDetailReviewHeader({
             )}
             {data.status}
           </span>
-          <span className="text-xs text-[#A89D8E]">
+          <span className="text-xs text-muted-foreground">
             Last edited{" "}
             {new Date(data.updatedAt).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
             })}
           </span>
+          {(data.creditUsage?.totalCredits ?? 0) > 0 ? (
+            <CreditUsageBadge
+              credits={data.creditUsage?.totalCredits ?? 0}
+              size="md"
+              showLabel
+            />
+          ) : null}
         </div>
       </motion.div>
     </>

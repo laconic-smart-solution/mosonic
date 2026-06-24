@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
-  ArrowLeft,
   Clock,
   Globe,
   Hash,
@@ -33,7 +32,8 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { KeywordTagInput } from "@/features/rules/components/news-trigger/keyword-tag-input"
 import { cn } from "@/lib/utils"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { getApiErrorMessage } from "@/shared/lib/api-error"
 import {
   useLatestNewsRunQuery,
   useNewsTriggerSettingsQuery,
@@ -285,11 +285,11 @@ export function NewsTriggerSettingsPanel({ ruleId, ruleName }: Props) {
         runningSinceRef.current = Date.now()
       },
       onError: (err) => {
-        const msg = getApiErrorMessage(err)
+        const msg = getApiErrorMessage(err, "")
         if (msg.toLowerCase().includes("already in progress")) {
           toast.error(t("newsTrigger.runInProgress"))
         } else {
-          toast.error(msg)
+          toastApiError(err, "rules:toast.newsRunFailed")
         }
       },
     })
@@ -304,15 +304,7 @@ export function NewsTriggerSettingsPanel({ ruleId, ruleName }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-      <Link
-        to="/rules"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        {t("newsTrigger.backToRules")}
-      </Link>
-
+    <div className="w-full">
       <div
         className={cn(
           "overflow-hidden rounded-2xl border border-border/70 bg-linear-to-b from-card/95 to-card/50 shadow-sm ring-1 ring-black/3 dark:ring-white/6",
@@ -732,6 +724,30 @@ function runStatusLabel(
   if (run.status === "running") return t("newsTrigger.runStatusRunning")
   if (run.status === "failed") return t("newsTrigger.runStatusFailed")
   if (run.outcome === "triggered") return t("newsTrigger.runStatusStarted")
+
+  const reason = run.skipReason?.toLowerCase() ?? ""
+  if (reason.includes("keyword pre-filter")) {
+    return t("newsTrigger.runStatusKeywordSkip")
+  }
+  if (reason.includes("below threshold") || reason.includes("score")) {
+    return t("newsTrigger.runStatusRelevanceSkip")
+  }
+  if (reason.includes("max posts per day")) {
+    return t("newsTrigger.runStatusDailyLimit")
+  }
+  if (reason.includes("max concurrent")) {
+    return t("newsTrigger.runStatusConcurrentLimit")
+  }
+  if (reason.includes("no ready workflow")) {
+    return t("newsTrigger.runStatusNoWorkflow")
+  }
+  if (
+    reason.includes("no articles") ||
+    (run.articlesFetched ?? 0) === 0
+  ) {
+    return t("newsTrigger.runStatusNoArticles")
+  }
+
   return t("newsTrigger.runStatusNoMatch")
 }
 

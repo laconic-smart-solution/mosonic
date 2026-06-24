@@ -16,9 +16,7 @@ export type HomeRecentContentSlot = {
   updated: string
 }
 
-export type HomeRecentEmptySlot = { kind: "empty" }
-
-export type HomeRecentSlot = HomeRecentContentSlot | HomeRecentEmptySlot
+export type HomeRecentSlot = HomeRecentContentSlot
 
 function pickPublicLabel(item: ContentPageItem): string {
   const o = item.outputs
@@ -43,10 +41,10 @@ function initialForLabel(label: string): string {
   return ch && /\S/u.test(ch) ? ch.toUpperCase() : "•"
 }
 
-/** Up to three API rows, padded with empty slots so the rail always shows three rows. */
+/** Up to three most recent content rows from the API. */
 export function buildHomeRecentSlots(items: ContentPageItem[]): HomeRecentSlot[] {
   const colors = HOME_RECENT_RAIL_COLORS
-  const slots: HomeRecentSlot[] = items.slice(0, 3).map((item, i) => {
+  return items.slice(0, 3).map((item, i) => {
     const label = pickPublicLabel(item)
     return {
       kind: "content",
@@ -58,6 +56,4 @@ export function buildHomeRecentSlots(items: ContentPageItem[]): HomeRecentSlot[]
       updated: formatRelativeTime(item.updatedAt),
     }
   })
-  while (slots.length < 3) slots.push({ kind: "empty" })
-  return slots
 }

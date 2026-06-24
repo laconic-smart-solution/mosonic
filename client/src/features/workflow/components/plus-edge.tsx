@@ -11,6 +11,8 @@ import {
 export type PlusEdgeData = {
   onInsert?: (event: React.MouseEvent, labelX: number, labelY: number) => void
   readOnly?: boolean
+  paletteDropHighlight?: boolean
+  paletteDropActive?: boolean
 }
 
 export function PlusEdge({
@@ -37,7 +39,11 @@ export function PlusEdge({
     targetPosition,
   })
 
-  const showButton = !edgeData?.readOnly && Boolean(edgeData?.onInsert)
+  const showButton =
+    !edgeData?.readOnly &&
+    (Boolean(edgeData?.onInsert) || Boolean(edgeData?.paletteDropHighlight))
+  const forceVisible = Boolean(edgeData?.paletteDropHighlight)
+  const isActive = Boolean(edgeData?.paletteDropActive)
 
   return (
     <>
@@ -63,9 +69,13 @@ export function PlusEdge({
           >
             <button
               type="button"
-              className={`flex size-6 items-center justify-center rounded-full border-2 border-white bg-[#00A589] text-white shadow-md transition-opacity duration-150 hover:bg-[#008f77] ${
-                hovered ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
+              className={`flex size-6 items-center justify-center rounded-full border-2 border-card bg-[#00A589] text-white shadow-md transition-all duration-150 hover:bg-[#008f77] dark:border-[#252D3B] ${
+                hovered || forceVisible ? "opacity-100" : "pointer-events-none opacity-0"
+              } ${forceVisible && !hovered ? "pointer-events-none" : ""} ${
+                forceVisible ? "ring-4 ring-[#00A589]/30" : ""
+              } ${
+                isActive ? "scale-110 shadow-[0_0_0_4px_rgba(0,165,137,0.35)]" : ""
+              } ${forceVisible && !isActive ? "animate-pulse" : ""}`}
               onMouseEnter={() => setHovered(true)}
               onMouseLeave={() => setHovered(false)}
               onClick={(event) => {

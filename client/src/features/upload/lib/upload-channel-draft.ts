@@ -24,6 +24,10 @@ import {
   normalizeChannelKey,
   type MediaTabMode,
 } from "./upload-platform-media"
+import {
+  isTikTokPhotoMedia,
+  tiktokPhotoCaptionErrorI18n,
+} from "./tiktok-publish"
 
 export type { WorkflowNodeLayersSnapshot } from "@/features/upload/lib/upload-lane-media"
 
@@ -276,6 +280,56 @@ export function getChannelMediaValidationError(
   }
 
   return null
+}
+
+export function getTikTokPhotoCaptionValidationError(
+  channelKey: string,
+  caption: string,
+  draft: ChannelDraft,
+  row: UploadChannelRow,
+  resolved: UploadResolvedOutputs,
+  layers: WorkflowNodeLayersSnapshot | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | null {
+  if (normalizeChannelKey(channelKey) !== "tiktok") return null
+  const urls = effectiveMediaUrlsForPublish(
+    draft,
+    row,
+    resolved,
+    channelKey,
+    layers,
+  )
+  if (!isTikTokPhotoMedia(urls)) return null
+  return tiktokPhotoCaptionErrorI18n(caption, t)
+}
+
+export function getChannelPublishValidationError(
+  channelKey: string,
+  caption: string,
+  draft: ChannelDraft,
+  row: UploadChannelRow,
+  resolved: UploadResolvedOutputs,
+  layers: WorkflowNodeLayersSnapshot | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | null {
+  return (
+    getChannelMediaValidationError(
+      channelKey,
+      draft,
+      row,
+      resolved,
+      layers,
+    ) ??
+    getTikTokPhotoCaptionValidationError(
+      channelKey,
+      caption,
+      draft,
+      row,
+      resolved,
+      layers,
+      t,
+    )
+  )
 }
 
 export function draftToMediaStorage(

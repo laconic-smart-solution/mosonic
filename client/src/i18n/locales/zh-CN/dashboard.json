@@ -7,7 +7,7 @@
   },
   "header": {
     "overview": "概览",
-    "subtitle": "活动健康度、互动情况以及需要关注的事项——随内容在 NeuralTex 中流转而更新。",
+    "subtitle": "活动健康度、互动情况以及需要关注的事项——随内容在 Mosonic 中流转而更新。",
     "startGeneration": "开始新的生成"
   },
   "stats": {
@@ -69,10 +69,10 @@
     "clicks": "点击",
     "bestChannel": "最佳渠道：",
     "bestPost": "最佳帖子：",
-    "fullAnalytics": "完整分析"
+    "viewPosts": "查看帖子"
   },
   "quickStart": {
-    "title": "欢迎使用 NeuralTex",
+    "title": "欢迎使用 Mosonic",
     "desc": "三步完成首次发布",
     "step1": "创建规则",
     "step2": "生成首条内容",

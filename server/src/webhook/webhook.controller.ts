@@ -50,14 +50,9 @@ export class WebhookController {
 
   @Post('heygen')
   @HttpCode(200)
-  async handleHeygen(@Body() body: Record<string, unknown>): Promise<{ ok: boolean }> {
-    try {
-      return await this.heygenWebhook.handlePayload(body ?? {});
-    } catch (err) {
-      this.logger.error(
-        err instanceof Error ? (err.stack ?? err.message) : String(err),
-      );
-      return { ok: false };
-    }
+  async handleHeygen(
+    @Body() body: Record<string, unknown>,
+  ): Promise<{ ok: boolean }> {
+    return this.heygenWebhook.handlePayload(body ?? {});
   }
 }

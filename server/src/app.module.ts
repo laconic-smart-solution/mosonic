@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
+import { DatabaseModule } from './database/database.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PreprocessingModule } from './preprocessing/preprocessing.module';
@@ -24,6 +25,9 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { CostModule } from './cost/cost.module';
+import { CreditModule } from './credit/credit.module';
+import { PlanModule } from './plan/plan.module';
+import { UsageModule } from './usage/usage.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -35,6 +39,7 @@ import {
 
 @Module({
   imports: [
+    DatabaseModule,
     ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
@@ -42,6 +47,9 @@ import {
     LlmModule,
     PreprocessingModule,
     CostModule,
+    CreditModule,
+    PlanModule,
+    UsageModule,
     EventsModule,
     NodesModule,
     LoggingModule,
@@ -53,7 +61,6 @@ import {
     UploadModule,
     PostModule,
     WebhookModule,
-    AnalyticsModule,
     CampaignModule,
     NewsTriggerModule,
     IntegrationsModule,
@@ -81,19 +88,14 @@ import {
       }),
       inject: [ConfigService],
     }),
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const uri = configService.get<string>('MONGODB_URI');
-        if (!uri) {
-          throw new Error('MONGODB_URI is not set');
-        }
-        return { uri };
-      },
-      inject: [ConfigService],
-    }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalHttpExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}

@@ -2,6 +2,18 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 
+import { PageShell } from "@/components/app/page-shell"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,9 +24,71 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 
-import { AdminLayout } from "../components/admin-layout"
+import {
+  AdminUserActionsMenu,
+  type AdminUserActionTarget,
+} from "../components/admin-user-actions-menu"
+import {
+  AdminUserTopupDialog,
+  type AdminUserTopupTarget,
+} from "../components/admin-user-topup-dialog"
 import { useAdminUserActions, useAdminUsers } from "../hooks/use-admin-users"
+
+type AdminUserRow = {
+  _id: string
+  email?: string
+  displayName?: string
+  createdAt: string
+  lastActiveAt?: string | null
+  pipelinesThisMonth: number
+  costThisMonthUsd: number
+  isSuspended: boolean
+  role: string
+  creditsRemaining: number | null
+  creditsPerMonth: number | null
+}
+
+type ConfirmAction = {
+  userId: string
+  email: string
+  action: "suspend" | "reactivate"
+}
+
+const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
+
+function roleLabel(t: (key: string) => string, role: string) {
+  if (role === "ADMIN") return t("users.roleAdmin")
+  if (role === "CUSTOMER") return t("users.roleCustomer")
+  return role
+}
+
+function formatCredits(user: AdminUserRow) {
+  if (user.creditsRemaining == null && user.creditsPerMonth == null) return "—"
+  const remaining = user.creditsRemaining ?? 0
+  return `${remaining.toLocaleString()}`
+}
+
+function toActionTarget(user: AdminUserRow): AdminUserActionTarget {
+  return {
+    userId: user._id,
+    email: user.email ?? user.displayName ?? user._id,
+    role: user.role,
+    isSuspended: user.isSuspended,
+    creditsRemaining: user.creditsRemaining,
+    creditsPerMonth: user.creditsPerMonth,
+  }
+}
+
+function toTopupTarget(user: AdminUserRow): AdminUserTopupTarget {
+  return {
+    userId: user._id,
+    email: user.email ?? user.displayName ?? user._id,
+    creditsRemaining: user.creditsRemaining,
+    creditsPerMonth: user.creditsPerMonth,
+  }
+}
 
 export default function AdminUsersPage() {
   const { t } = useTranslation("admin")
@@ -23,13 +97,33 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<string | undefined>()
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [topupTarget, setTopupTarget] = useState<AdminUserTopupTarget | null>(null)
   const { data, isLoading } = useAdminUsers({ page, limit: 20, search, status })
   const { suspend, reactivate } = useAdminUserActions()
 
+  const actionPending = suspend.isPending || reactivate.isPending
+
+  const handleConfirm = () => {
+    if (!confirmAction) return
+    const onSuccess = () => setConfirmAction(null)
+    if (confirmAction.action === "suspend") {
+      suspend.mutate(confirmAction.userId, { onSuccess })
+    } else {
+      reactivate.mutate(confirmAction.userId, { onSuccess })
+    }
+  }
+
+  const users = (data?.users ?? []) as AdminUserRow[]
+
   return (
-    <AdminLayout>
-      <div className="space-y-6 p-6 md:p-8">
-        <h1 className="text-2xl font-bold tracking-tight">{t("users.title")}</h1>
+    <PageShell>
+      <div className="w-full space-y-6">
+        <div>
+          <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
+            {t("users.title")}
+          </h1>
+        </div>
 
         <div className="flex flex-wrap gap-3">
           <Input
@@ -55,116 +149,122 @@ export default function AdminUsersPage() {
           </select>
         </div>
 
-        <div className="rounded-lg border">
-          <Table>
+        <section className={panelClass}>
+          <Table className="table-fixed min-w-[920px]">
             <TableHeader>
-              <TableRow>
-                <TableHead>{t("users.tableUser")}</TableHead>
-                <TableHead>{t("users.tableJoined")}</TableHead>
-                <TableHead>{t("users.tableLastActive")}</TableHead>
-                <TableHead className="text-right">{t("users.tablePipelinesMtd")}</TableHead>
-                <TableHead className="text-right">{t("users.tableCostMtd")}</TableHead>
-                <TableHead className="text-center">{t("users.tableStatus")}</TableHead>
-                <TableHead className="w-[100px]" />
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[22%] whitespace-normal">{t("users.tableUser")}</TableHead>
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableRole")}</TableHead>
+                <TableHead className="w-[11%] whitespace-normal text-right">
+                  {t("users.tableCredits")}
+                </TableHead>
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableJoined")}</TableHead>
+                <TableHead className="w-[9%] whitespace-normal">{t("users.tableLastActive")}</TableHead>
+                <TableHead className="w-[8%] text-right">{t("users.tablePipelinesMtd")}</TableHead>
+                <TableHead className="w-[9%] text-right">{t("users.tableCostMtd")}</TableHead>
+                <TableHead className="w-[8%] text-center">{t("users.tableStatus")}</TableHead>
+                <TableHead className="w-[115px] text-right">{t("users.tableActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="whitespace-normal py-10 text-center text-muted-foreground">
                     {t("users.loading")}
                   </TableCell>
                 </TableRow>
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="whitespace-normal py-10 text-center text-muted-foreground">
+                    {t("users.empty")}
+                  </TableCell>
+                </TableRow>
               ) : (
-                data?.users.map((user: {
-                  _id: string
-                  email?: string
-                  displayName?: string
-                  createdAt: string
-                  lastActiveAt?: string | null
-                  pipelinesThisMonth: number
-                  costThisMonthUsd: number
-                  isSuspended: boolean
-                  role: string
-                }) => (
+                users.map((user) => (
                   <TableRow
                     key={user._id}
                     className="cursor-pointer"
                     onClick={() => navigate(`/admin/users/${user._id}`)}
                   >
-                    <TableCell>
-                      <div className="font-medium">{user.email}</div>
+                    <TableCell className="whitespace-normal align-top">
+                      <div className="truncate font-medium">{user.email ?? "—"}</div>
                       {user.displayName ? (
-                        <div className="text-muted-foreground text-xs">{user.displayName}</div>
+                        <div className="truncate text-xs text-muted-foreground">{user.displayName}</div>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="whitespace-normal align-top">
+                      <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
+                        {roleLabel(t, user.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-normal align-top text-right font-mono text-sm tabular-nums">
+                      {formatCredits(user)}
+                    </TableCell>
+                    <TableCell className="whitespace-normal align-top text-muted-foreground">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="whitespace-normal align-top text-muted-foreground">
                       {user.lastActiveAt
                         ? new Date(user.lastActiveAt).toLocaleDateString()
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{user.pipelinesThisMonth}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-right tabular-nums align-top">
+                      {user.pipelinesThisMonth}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums align-top">
                       ${Number(user.costThisMonthUsd).toFixed(4)}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center align-top">
                       <span
-                        className={
+                        className={cn(
+                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
                           user.isSuspended
-                            ? "bg-destructive/15 text-destructive rounded-full px-2 py-0.5 text-xs font-medium"
-                            : "rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
-                        }
+                            ? "bg-destructive/15 text-destructive"
+                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                        )}
                       >
                         {user.isSuspended ? t("users.suspended") : t("users.active")}
                       </span>
                     </TableCell>
                     <TableCell
-                      className="text-right"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                      }}
+                      className="align-top text-right"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {user.role !== "ADMIN" ? (
-                        user.isSuspended ? (
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0"
-                            disabled={reactivate.isPending}
-                            onClick={() => reactivate.mutate(user._id)}
-                          >
-                            {t("users.reactivate")}
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="sm"
-                            className="text-destructive h-auto p-0"
-                            disabled={suspend.isPending}
-                            onClick={() => suspend.mutate(user._id)}
-                          >
-                            {t("users.suspend")}
-                          </Button>
-                        )
-                      ) : null}
+                      <div className="flex justify-end">
+                        <AdminUserActionsMenu
+                          user={toActionTarget(user)}
+                          disabled={actionPending}
+                          onViewDetail={() => navigate(`/admin/users/${user._id}`)}
+                          onDisable={() =>
+                            setConfirmAction({
+                              userId: user._id,
+                              email: user.email ?? user.displayName ?? user._id,
+                              action: "suspend",
+                            })
+                          }
+                          onEnable={() =>
+                            setConfirmAction({
+                              userId: user._id,
+                              email: user.email ?? user.displayName ?? user._id,
+                              action: "reactivate",
+                            })
+                          }
+                          onTopUp={() => setTopupTarget(toTopupTarget(user))}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
-        </div>
+        </section>
 
         {data ? (
-          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>
               {t("users.showing", {
-                start: (page - 1) * 20 + 1,
+                start: users.length ? (page - 1) * 20 + 1 : 0,
                 end: Math.min(page * 20, data.total),
                 total: data.total,
               })}
@@ -177,7 +277,7 @@ export default function AdminUsersPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                {tc("actions.previous")}
+                {tc("pagination.previous")}
               </Button>
               <Button
                 type="button"
@@ -186,12 +286,61 @@ export default function AdminUsersPage() {
                 disabled={page >= (data.totalPages ?? 1)}
                 onClick={() => setPage((p) => p + 1)}
               >
-                {tc("actions.next")}
+                {tc("pagination.next")}
               </Button>
             </div>
           </div>
         ) : null}
       </div>
-    </AdminLayout>
+
+      <AdminUserTopupDialog
+        target={topupTarget}
+        open={topupTarget != null}
+        onOpenChange={(open) => {
+          if (!open) setTopupTarget(null)
+        }}
+      />
+
+      <AlertDialog
+        open={confirmAction != null}
+        onOpenChange={(open) => {
+          if (!open && !actionPending) setConfirmAction(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction?.action === "suspend"
+                ? t("users.suspendConfirmTitle")
+                : t("users.reactivateConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.action === "suspend"
+                ? t("users.suspendConfirmDescription", { email: confirmAction.email })
+                : t("users.reactivateConfirmDescription", { email: confirmAction?.email ?? "" })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionPending}>{tc("actions.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={actionPending}
+              className={
+                confirmAction?.action === "suspend"
+                  ? "bg-destructive text-white hover:bg-destructive/90"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirm()
+              }}
+            >
+              {confirmAction?.action === "suspend"
+                ? t("users.disableAccount")
+                : t("users.enableAccount")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageShell>
   )
 }

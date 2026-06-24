@@ -4,16 +4,21 @@ import {
   Processor,
   WorkerHost,
 } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import {
   getVideoGenerationMode,
   VideoGenerationService,
 } from '../../nodes/services/video-generation.service';
-import { PipelineRepository } from '../../pipeline/pipeline.repository';
+import type { IPipelineRepository } from '../../pipeline/pipeline.repository';
+import { PIPELINE_REPOSITORY } from '../../pipeline/pipeline.repository';
 import { PipelineNodeExecutionStatus } from '../../pipeline/schemas/pipeline.schema';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
-import { POLL_CONFIG, QUEUES, videoCheckJobId } from '../types/queue.constants';
+import {
+  computeVideoInitialDelayMs,
+  QUEUES,
+  videoCheckJobId,
+} from '../types/queue.constants';
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 import type { NodeJobPayload } from '../types/node-job.payload';
 
@@ -24,7 +29,8 @@ export class VideoGenerateProcessor extends WorkerHost {
   private readonly logger = new Logger(VideoGenerateProcessor.name);
 
   constructor(
-    private readonly pipelineRepo: PipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelineRepo: IPipelineRepository,
     private readonly videoService: VideoGenerationService,
     private readonly completion: MediaNodeCompletionService,
     @InjectQueue(QUEUES.VIDEO_CHECK)
@@ -81,10 +87,9 @@ export class VideoGenerateProcessor extends WorkerHost {
         externalJobId,
       );
 
-      const delayMs = Math.max(
-        10_000,
-        Math.round((estimatedSeconds ?? 60) * 1000 * 0.8),
-        POLL_CONFIG.video.initialDelayMs,
+      const delayMs = computeVideoInitialDelayMs(
+        videoProvider,
+        estimatedSeconds,
       );
 
       const checkPayload: MediaCheckJobPayload = {
@@ -99,7 +104,7 @@ export class VideoGenerateProcessor extends WorkerHost {
       await this.videoCheckQueue.add('video_check', checkPayload, {
         jobId: videoCheckJobId(pipelineId, nodeId, 0),
         delay: delayMs,
-        attempts: 1,
+        attempts: 2,
       });
 
       await this.videoService.emitProcessing(

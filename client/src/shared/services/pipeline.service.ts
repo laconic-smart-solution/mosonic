@@ -1,6 +1,8 @@
 import apiClient from "../api/api-client"
 import type {
   GetPipelineResponse,
+  PipelineEstimatePayload,
+  PipelineEstimateResponse,
   PipelinePageQueryPayload,
   PipelinePageResponse,
   PipelineStatsResponse,
@@ -10,6 +12,8 @@ import type {
   SkipNodeResponse,
   StartPipelinePayload,
   StartPipelineResponse,
+  UpdatePipelineNamePayload,
+  UpdatePipelineNameResponse,
 } from "../types/pipeline.type"
 
 export const pipelineService = {
@@ -17,6 +21,13 @@ export const pipelineService = {
     payload: StartPipelinePayload,
   ): Promise<StartPipelineResponse> => {
     const response = await apiClient.post("/pipeline/start", payload)
+    return response.data
+  },
+
+  estimate: async (
+    payload: PipelineEstimatePayload,
+  ): Promise<PipelineEstimateResponse> => {
+    const response = await apiClient.post("/pipeline/estimate", payload)
     return response.data
   },
 
@@ -65,6 +76,14 @@ export const pipelineService = {
 
   cancel: async (pipelineId: string): Promise<{ success: boolean }> => {
     const response = await apiClient.post(`/pipeline/${pipelineId}/cancel`)
+    return response.data
+  },
+
+  updateName: async (
+    pipelineId: string,
+    payload: UpdatePipelineNamePayload,
+  ): Promise<UpdatePipelineNameResponse> => {
+    const response = await apiClient.patch(`/pipeline/${pipelineId}`, payload)
     return response.data
   },
 

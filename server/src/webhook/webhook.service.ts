@@ -1,43 +1,45 @@
 import {
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
-  Post,
   PlatformPostStatus,
   PostStatus,
-  type PostDocument,
   type PlatformResult,
 } from '../post/schemas/post.schema';
+import type { IPostRepository } from '../repositories/interfaces/post.repository.interface';
+import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
+import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
+import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
+import type { IWebhookEventRepository } from '../repositories/interfaces/webhook-event.repository.interface';
 import {
-  Upload,
+  POST_REPOSITORY,
+  UPLOAD_REPOSITORY,
+  WEBHOOK_EVENT_REPOSITORY,
+} from '../repositories/tokens';
+import {
   UploadChannelStatus,
   UploadJobStatus,
   type UploadChannelEntry,
-  type UploadDocument,
 } from '../upload/schemas/upload.schema';
+import {
+  postPlatformResults,
+  uploadChannels,
+  withPostPlatformResults,
+  withUploadChannels,
+} from '../upload/upload-record.util';
 import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
 } from '../upload/upload-status.util';
 import { UsersService } from '../users/users.service';
-import { WebhookEvent, type WebhookEventDocument } from './webhook-event.schema';
-
-function isDuplicateKeyError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const code = (err as { code?: number }).code;
-  if (code === 11000) return true;
-  const name = (err as { name?: string }).name;
-  if (name === 'MongoServerError' && code === 11000) return true;
-  return false;
-}
 
 /** Strip optional `sha256=` prefix; Zernio may send raw hex digest. */
 function signatureHeaderToBuffer(signature: string): Buffer {
@@ -87,14 +89,15 @@ export class WebhookService {
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(WebhookEvent.name)
-    private readonly webhookEventModel: Model<WebhookEventDocument>,
-    @InjectModel(Upload.name)
-    private readonly uploadModel: Model<UploadDocument>,
-    @InjectModel(Post.name)
-    private readonly postModel: Model<PostDocument>,
+    @Inject(WEBHOOK_EVENT_REPOSITORY)
+    private readonly webhookEvents: IWebhookEventRepository,
+    @Inject(UPLOAD_REPOSITORY)
+    private readonly uploads: IUploadRepository,
+    @Inject(POST_REPOSITORY)
+    private readonly posts: IPostRepository,
     private readonly events: EventsService,
     private readonly usersService: UsersService,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
   /**
@@ -137,16 +140,12 @@ export class WebhookService {
       return;
     }
 
-    try {
-      await this.webhookEventModel.create({
-        eventId,
-        event: eventName,
-        processedAt: new Date(),
-      });
-    } catch (err: unknown) {
-      if (isDuplicateKeyError(err)) return;
-      throw err;
-    }
+    const recorded = await this.webhookEvents.tryRecord(
+      eventId,
+      eventName,
+      new Date(),
+    );
+    if (recorded === 'duplicate') return;
 
     switch (eventName) {
       case 'post.published':
@@ -183,31 +182,39 @@ export class WebhookService {
     this.events.emitToRoom(`upload_${uploadId}`, event, body);
   }
 
-  private remainingScheduledHint(doc: UploadDocument): string | null {
-    const remaining = doc.channels.find(
+  private remainingScheduledHint(upload: UploadRecord): string | null {
+    const remaining = uploadChannels(upload).find(
       (c) => c.status === UploadChannelStatus.Scheduled && c.scheduledAt,
     );
-    return remaining?.scheduledAt ? remaining.scheduledAt.toISOString() : null;
+    if (!remaining?.scheduledAt) return null;
+    const at =
+      remaining.scheduledAt instanceof Date
+        ? remaining.scheduledAt
+        : new Date(remaining.scheduledAt as string);
+    return at.toISOString();
   }
 
   private async saveUploadEmitAll(
-    doc: UploadDocument,
+    upload: UploadRecord,
     options: { publishNowHint?: boolean; scheduledAtHint?: string | null },
   ): Promise<void> {
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+    const channels = uploadChannels(upload);
+    const saved = await this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
-    const status = doc.status;
+    const status = saved.status;
     if (status === UploadJobStatus.Completed || status === UploadJobStatus.Partial) {
-      const channelsPublished = doc.channels
+      const channelsPublished = uploadChannels(saved)
         .filter((c) => c.status === UploadChannelStatus.Published)
         .map((c) => c.channel.toLowerCase());
-      this.emitUpload(doc.uploadId, 'upload:all_completed', {
-        uploadId: doc.uploadId,
+      this.emitUpload(saved.uploadId, 'upload:all_completed', {
+        uploadId: saved.uploadId,
         publishNow: options.publishNowHint ?? true,
         scheduledAt: options.scheduledAtHint ?? null,
         channelsPublished,
-        summary: buildUploadStatusSummary(doc.channels),
+        summary: buildUploadStatusSummary(uploadChannels(saved)),
       });
     }
   }
@@ -216,9 +223,9 @@ export class WebhookService {
     return ch.channel.trim().toLowerCase();
   }
 
-  private platformKeySet(postDoc: PostDocument): Set<string> {
+  private platformKeySet(post: PostRecord): Set<string> {
     return new Set(
-      (postDoc.channels ?? []).map((c) => String(c).trim().toLowerCase()),
+      (post.channels ?? []).map((c) => String(c).trim().toLowerCase()),
     );
   }
 
@@ -258,20 +265,14 @@ export class WebhookService {
     const postPayload = payload.post as Record<string, unknown> | undefined;
     const zernioPostId = extractPostId(postPayload);
     if (!zernioPostId) return;
-    const postDoc = await this.postModel
-      .findOne({ zernioPostId })
-      .exec();
-    if (!postDoc) return;
+    const post = await this.posts.findByZernioPostId(zernioPostId);
+    if (!post) return;
 
     const at = parseDate(payload.timestamp);
     const rows = parsePlatformRows(postPayload);
-    const keys = this.platformKeySet(postDoc);
+    const keys = this.platformKeySet(post);
 
-    postDoc.status = PostStatus.Published;
-    postDoc.publishedAt = at;
-    postDoc.scheduledAt = null;
-    postDoc.failureReason = null;
-    postDoc.platformResults =
+    const platformResults: PlatformResult[] =
       rows.length > 0
         ? this.publishedPlatformResults([...keys], at, rows)
         : [...keys].map((platform) => ({
@@ -281,82 +282,96 @@ export class WebhookService {
             publishedAt: at,
             failureReason: null,
           }));
-    await postDoc.save();
 
-    const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
-    if (!doc) return;
+    const savedPost = await this.posts.save({
+      ...withPostPlatformResults(post, platformResults),
+      status: PostStatus.Published,
+      publishedAt: at,
+      scheduledAt: null,
+      failureReason: null,
+    });
+    await this.postAnalyticsService.ensureForPost(savedPost);
 
-    for (const ch of doc.channels) {
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
+
+    let channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
       ch.status = UploadChannelStatus.Published;
       ch.publishedAt = at;
       ch.scheduledAt = null;
       ch.failureReason = null;
-      this.emitUpload(doc.uploadId, 'upload:completed', {
-        uploadId: doc.uploadId,
+      this.emitUpload(upload.uploadId, 'upload:completed', {
+        uploadId: upload.uploadId,
         channel: this.rowKey(ch),
         postId: zernioPostId,
       });
     }
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {
+    await this.saveUploadEmitAll(withUploadChannels(upload, channels), {
       publishNowHint: true,
-      scheduledAtHint: this.remainingScheduledHint(doc),
+      scheduledAtHint: this.remainingScheduledHint(
+        withUploadChannels(upload, channels),
+      ),
     });
   }
 
   private async handlePostFailed(payload: Record<string, unknown>): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
-    const postDoc = await this.postModel.findOne({ zernioPostId }).exec();
-    if (!postDoc) return;
+    const post = await this.posts.findByZernioPostId(zernioPostId);
+    if (!post) return;
 
     const msg =
       typeof payload.error === 'string' && payload.error.trim()
         ? payload.error.trim()
         : 'Publishing failed on platform.';
 
-    postDoc.status = PostStatus.Failed;
-    postDoc.failureReason = msg;
-    const keys = this.platformKeySet(postDoc);
-    postDoc.platformResults = [...keys].map((platform) => ({
+    const keys = this.platformKeySet(post);
+    const platformResults: PlatformResult[] = [...keys].map((platform) => ({
       platform,
       status: PlatformPostStatus.Failed,
       platformUrl: null,
       publishedAt: null,
       failureReason: msg,
     }));
-    await postDoc.save();
 
-    const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
-    if (!doc) return;
+    await this.posts.save(
+      withPostPlatformResults(
+        { ...post, status: PostStatus.Failed, failureReason: msg },
+        platformResults,
+      ),
+    );
 
-    for (const ch of doc.channels) {
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
+
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
       ch.status = UploadChannelStatus.Failed;
       ch.failureReason = msg;
-      this.emitUpload(doc.uploadId, 'upload:failed', {
-        uploadId: doc.uploadId,
+      this.emitUpload(upload.uploadId, 'upload:failed', {
+        uploadId: upload.uploadId,
         channel: this.rowKey(ch),
         message: 'Publishing failed. Please retry.',
       });
     }
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {});
+    await this.saveUploadEmitAll(withUploadChannels(upload, channels), {});
   }
 
   private async handlePostPartial(payload: Record<string, unknown>): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
-    const postDoc = await this.postModel.findOne({ zernioPostId }).exec();
-    if (!postDoc) return;
+    const post = await this.posts.findByZernioPostId(zernioPostId);
+    if (!post) return;
 
     const postPayload = payload.post as Record<string, unknown> | undefined;
     const platforms = parsePlatformRows(postPayload);
     const at = parseDate(payload.timestamp);
-    const keys = this.platformKeySet(postDoc);
+    const keys = this.platformKeySet(post);
 
     const platformResults: PlatformResult[] = [...keys].map((platform) => {
       const row = platforms.find(
@@ -412,13 +427,18 @@ export class WebhookService {
       };
     });
 
-    postDoc.status = PostStatus.Partial;
-    postDoc.platformResults = platformResults;
-    await postDoc.save();
+    const savedPost = await this.posts.save(
+      withPostPlatformResults(
+        { ...post, status: PostStatus.Partial },
+        platformResults,
+      ),
+    );
+    await this.postAnalyticsService.ensureForPost(savedPost);
 
-    const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
-    if (!doc) return;
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
 
+    const channels = uploadChannels(upload);
     for (const row of platforms) {
       const platform = String(row.platform ?? '')
         .trim()
@@ -428,7 +448,7 @@ export class WebhookService {
         String(row.status ?? '')
           .trim()
           .toLowerCase() === 'published';
-      const ch = doc.channels.find((c) => this.rowKey(c) === platform);
+      const ch = channels.find((c) => this.rowKey(c) === platform);
       if (!ch || ch.status === UploadChannelStatus.Skipped) continue;
 
       if (isPublished) {
@@ -436,8 +456,8 @@ export class WebhookService {
         ch.publishedAt = at;
         ch.scheduledAt = null;
         ch.failureReason = null;
-        this.emitUpload(doc.uploadId, 'upload:completed', {
-          uploadId: doc.uploadId,
+        this.emitUpload(upload.uploadId, 'upload:completed', {
+          uploadId: upload.uploadId,
           channel: platform,
           postId: zernioPostId,
         });
@@ -448,15 +468,14 @@ export class WebhookService {
             ? row.error.trim()
             : 'Publishing failed on platform.';
         ch.failureReason = err;
-        this.emitUpload(doc.uploadId, 'upload:failed', {
-          uploadId: doc.uploadId,
+        this.emitUpload(upload.uploadId, 'upload:failed', {
+          uploadId: upload.uploadId,
           channel: platform,
           message: 'Publishing failed. Please retry.',
         });
       }
     }
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {});
+    await this.saveUploadEmitAll(withUploadChannels(upload, channels), {});
   }
 
   private async handlePostScheduled(
@@ -464,8 +483,8 @@ export class WebhookService {
   ): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
-    const postDoc = await this.postModel.findOne({ zernioPostId }).exec();
-    if (!postDoc) return;
+    const post = await this.posts.findByZernioPostId(zernioPostId);
+    if (!post) return;
 
     const postPayload = payload.post as Record<string, unknown> | undefined;
     const scheduledRaw = postPayload?.scheduledFor;
@@ -474,43 +493,52 @@ export class WebhookService {
         ? parseDate(scheduledRaw)
         : null;
 
-    const keys = this.platformKeySet(postDoc);
-    postDoc.status = PostStatus.Scheduled;
-    postDoc.scheduledAt = scheduledAt;
-    postDoc.publishedAt = null;
-    postDoc.failureReason = null;
-    postDoc.platformResults = [...keys].map((platform) => ({
+    const keys = this.platformKeySet(post);
+    const platformResults: PlatformResult[] = [...keys].map((platform) => ({
       platform,
       status: PlatformPostStatus.Scheduled,
       platformUrl: null,
       publishedAt: null,
       failureReason: null,
     }));
-    await postDoc.save();
 
-    const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
-    if (!doc) return;
+    await this.posts.save(
+      withPostPlatformResults(
+        {
+          ...post,
+          status: PostStatus.Scheduled,
+          scheduledAt,
+          publishedAt: null,
+          failureReason: null,
+        },
+        platformResults,
+      ),
+    );
 
-    for (const ch of doc.channels) {
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
+
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
       ch.status = UploadChannelStatus.Scheduled;
       ch.scheduledAt = scheduledAt;
       ch.publishedAt = null;
       ch.failureReason = null;
-      this.emitUpload(doc.uploadId, 'upload:scheduled', {
-        uploadId: doc.uploadId,
+      this.emitUpload(upload.uploadId, 'upload:scheduled', {
+        uploadId: upload.uploadId,
         channel: this.rowKey(ch),
         scheduledAt: scheduledAt ? scheduledAt.toISOString() : '',
         postId: zernioPostId,
       });
     }
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {
+    const updatedUpload = withUploadChannels(upload, channels);
+    await this.saveUploadEmitAll(updatedUpload, {
       publishNowHint: false,
       scheduledAtHint: scheduledAt
         ? scheduledAt.toISOString()
-        : this.remainingScheduledHint(doc),
+        : this.remainingScheduledHint(updatedUpload),
     });
   }
 
@@ -519,26 +547,31 @@ export class WebhookService {
   ): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
-    const postDoc = await this.postModel.findOne({ zernioPostId }).exec();
-    if (!postDoc) return;
+    const post = await this.posts.findByZernioPostId(zernioPostId);
+    if (!post) return;
 
     const msg = 'Post was cancelled.';
-    const keys = this.platformKeySet(postDoc);
-    postDoc.status = PostStatus.Cancelled;
-    postDoc.failureReason = msg;
-    postDoc.platformResults = [...keys].map((platform) => ({
+    const keys = this.platformKeySet(post);
+    const platformResults: PlatformResult[] = [...keys].map((platform) => ({
       platform,
       status: PlatformPostStatus.Cancelled,
       platformUrl: null,
       publishedAt: null,
       failureReason: msg,
     }));
-    await postDoc.save();
 
-    const doc = await this.uploadModel.findOne({ uploadId: postDoc.uploadRef }).exec();
-    if (!doc) return;
+    await this.posts.save(
+      withPostPlatformResults(
+        { ...post, status: PostStatus.Cancelled, failureReason: msg },
+        platformResults,
+      ),
+    );
 
-    for (const ch of doc.channels) {
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
+
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
       if (
         ch.status === UploadChannelStatus.Skipped ||
@@ -548,14 +581,13 @@ export class WebhookService {
       }
       ch.status = UploadChannelStatus.Failed;
       ch.failureReason = msg;
-      this.emitUpload(doc.uploadId, 'upload:failed', {
-        uploadId: doc.uploadId,
+      this.emitUpload(upload.uploadId, 'upload:failed', {
+        uploadId: upload.uploadId,
         channel: this.rowKey(ch),
         message: msg,
       });
     }
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {});
+    await this.saveUploadEmitAll(withUploadChannels(upload, channels), {});
   }
 
   private async handleAccountConnected(

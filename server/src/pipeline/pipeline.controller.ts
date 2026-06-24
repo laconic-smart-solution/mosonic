@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -18,10 +19,16 @@ import {
   PipelinePageQueryDto,
   PipelinePageResponseDto,
 } from './dto/pipeline-page-query.dto';
+import { EstimatePipelineDto } from './dto/estimate-pipeline.dto';
+import { ReplanPipelineDto } from './dto/replan-pipeline.dto';
 import { PipelineStatsQueryDto } from './dto/pipeline-stats-query.dto';
 import { RetryNodeDto } from './dto/retry-node.dto';
 import { SkipNodeDto } from './dto/skip-node.dto';
 import { StartPipelineDto } from './dto/start-pipeline.dto';
+import {
+  UpdatePipelineDto,
+  UpdatePipelineResponseDto,
+} from './dto/update-pipeline.dto';
 import { PipelineService } from './pipeline.service';
 
 @UseGuards(JwtAuthGuard)
@@ -70,6 +77,19 @@ export class PipelineController {
     };
   }
 
+  @Post('estimate')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  estimatePipeline(@Req() req: Request, @Body() dto: EstimatePipelineDto) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.estimatePipeline(dto, auth);
+  }
+
   @Post('start')
   startPipeline(@Req() req: Request, @Body() dto: StartPipelineDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
@@ -96,7 +116,7 @@ export class PipelineController {
   replan(
     @Req() req: Request,
     @Param('id') pipelineId: string,
-    @Body() body: { operations: unknown[] },
+    @Body() body: ReplanPipelineDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.replanPipeline(
@@ -167,5 +187,22 @@ export class PipelineController {
   getPipeline(@Req() req: Request, @Param('id') pipelineId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.getPipeline(pipelineId, auth);
+  }
+
+  @Patch(':id')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  updatePipeline(
+    @Req() req: Request,
+    @Param('id') pipelineId: string,
+    @Body() body: UpdatePipelineDto,
+  ): Promise<UpdatePipelineResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.updateName(pipelineId, body, auth);
   }
 }

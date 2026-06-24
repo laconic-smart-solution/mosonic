@@ -16,13 +16,24 @@
   },
   "preview": {
     "title": "Preview",
+    "dialogTitle": "{{platform}} preview",
+    "dialogDescription": "See how this post will look when published.",
+    "openDialog": "Preview",
     "save": "Save",
     "noMedia": "No media",
+    "previousMedia": "Previous media",
+    "nextMedia": "Next media",
+    "mediaCounter": "{{current}} / {{total}}",
     "tiktokVerticalHint": "TikTok uses vertical 9:16 video in preview."
+  },
+  "mediaDetail": {
+    "title": "Media preview",
+    "description": "Full-size view of the selected media.",
+    "openHint": "View full size"
   },
   "scheduledEdit": {
     "title": "Edit scheduled post",
-    "hint": "Changes apply to this channel only. Media and platform cannot be changed after scheduling.",
+    "hint": "Changes apply to this channel only.",
     "caption": "Caption",
     "captionPlaceholder": "Update caption for this channel",
     "youtubeTitle": "YouTube title",
@@ -30,8 +41,10 @@
     "rescheduleTo": "Reschedule to",
     "cancel": "Cancel",
     "updating": "Updating...",
-    "confirm": "Confirm changes",
-    "scheduledHint": "This post is scheduled. Use Edit scheduled post to update the caption, schedule time, or YouTube title for this channel only. Media changes are not supported by Zernio."
+    "confirm": "Confirm changes"
+  },
+  "editor": {
+    "scheduledHint": "This post is scheduled. Edit caption, media, schedule time, or YouTube title below, then click Save to sync changes to Zernio."
   },
   "fields": {
     "media": "Media",
@@ -42,6 +55,10 @@
     "single": "Single image",
     "multiple": "Multiple images",
     "video": "Video"
+  },
+  "tiktok": {
+    "slideshowTitleHint": "TikTok photo posts use this text as the slideshow title (90 characters max).",
+    "slideshowTitleTooLong": "TikTok photo posts use your caption as the slideshow title ({{max}} characters max). Shorten by {{over}} character(s). Current length: {{count}}."
   },
   "publish": {
     "publishNow": "Publish now",
@@ -55,7 +72,7 @@
     "cancel": "Cancel",
     "confirmSchedule": "Confirm schedule",
     "publishedNoAction": "Published — no further action needed",
-    "scheduledEditable": "Scheduled — caption, schedule time, and YouTube title can still be edited",
+    "scheduledEditable": "Scheduled — edit content below and click Save to update",
     "publishingInProgress": "Publishing in progress…",
     "editScheduled": "Edit scheduled post",
     "whenToPublish": "When to publish",
@@ -102,7 +119,8 @@
     "copied": "Copied to clipboard",
     "copyFailed": "Copy failed",
     "mediaUploadFailed": "Media upload failed.",
-    "noMediaSlot": "No media slot for upload."
+    "noMediaSlot": "No media slot for upload.",
+    "publishFailed": "Publish failed. Please try again."
   },
   "review": {
     "defaultTitle": "Content review",

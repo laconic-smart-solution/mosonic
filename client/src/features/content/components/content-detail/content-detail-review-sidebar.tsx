@@ -69,11 +69,11 @@ export function ContentDetailReviewSidebar({
       )}
     >
       <div className="border-b border-border px-5 py-4">
-        <p className="mb-3 text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
+        <p className="mb-3 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
           {t("sidebar.reviewDecision")}
         </p>
-        <div className="mb-3 rounded-xl border border-border bg-[color:var(--nt-canvas)] px-4 py-3">
-          <p className="text-[11px] text-[#A89D8E]">{t("sidebar.currentStatus")}</p>
+        <div className="mb-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+          <p className="text-[11px] text-muted-foreground">{t("sidebar.currentStatus")}</p>
           <p className="text-sm font-semibold text-foreground">
             {data.status === "draft"
               ? t("sidebar.statusDraft")
@@ -86,7 +86,7 @@ export function ContentDetailReviewSidebar({
         </div>
         {(data.approval?.steps?.length ?? 0) > 0 ? (
           <div className="mb-3 space-y-2 rounded-xl border border-border bg-card px-3 py-3">
-            <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
+            <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
               {t("sidebar.approvalSteps")}
             </p>
             {data.approval!.steps.map((step, index) => {
@@ -107,10 +107,10 @@ export function ContentDetailReviewSidebar({
                   <span
                     className={
                       done
-                        ? "font-medium text-emerald-700"
+                        ? "font-medium text-emerald-600 dark:text-emerald-400"
                         : isNext
-                          ? "font-medium text-amber-700"
-                          : "text-[#A89D8E]"
+                          ? "font-medium text-amber-600 dark:text-amber-400"
+                          : "text-muted-foreground"
                     }
                   >
                     {done
@@ -126,13 +126,13 @@ export function ContentDetailReviewSidebar({
         ) : null}
         {data.status === "approved" ? (
           hideContinueToUpload ? (
-            <p className="mb-2 rounded-lg border border-border bg-[color:var(--nt-canvas)] px-3 py-2 text-xs leading-snug text-muted-foreground">
+            <p className="mb-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-snug text-muted-foreground">
               {t("sidebar.approvedHint")}
             </p>
           ) : (
             <Button
               type="button"
-              className="mb-2 h-10 w-full rounded-[10px] bg-[#00C9A7] text-sm font-semibold text-white hover:bg-[#00A589]"
+              className="mb-2 h-10 w-full rounded-[10px]"
               disabled={uploadNavLoading}
               onClick={() => void onContinueToUpload()}
             >
@@ -148,7 +148,7 @@ export function ContentDetailReviewSidebar({
                     <span className="mb-2 inline-flex w-full">
                       <Button
                         type="button"
-                        className="pointer-events-none h-10 w-full rounded-[10px] bg-[#00C9A7] text-sm font-semibold text-white opacity-50"
+                        className="pointer-events-none h-10 w-full rounded-[10px] opacity-50"
                         disabled
                       >
                         {approveLoading
@@ -165,7 +165,7 @@ export function ContentDetailReviewSidebar({
             ) : (
               <Button
                 type="button"
-                className="mb-2 h-10 w-full rounded-[10px] bg-[#00C9A7] text-sm font-semibold text-white hover:bg-[#00A589]"
+                className="mb-2 h-10 w-full rounded-[10px]"
                 disabled={approveLoading}
                 onClick={onApproveClick}
               >
@@ -175,7 +175,7 @@ export function ContentDetailReviewSidebar({
             <Button
               type="button"
               variant="outline"
-              className="relative mb-3 h-[38px] w-full rounded-[10px] border border-red-200/80 bg-transparent text-sm text-red-600 hover:bg-red-50"
+              className="relative mb-3 h-[38px] w-full rounded-[10px] border border-destructive/30 bg-transparent text-sm text-destructive hover:bg-destructive/10"
               onClick={onRejectClick}
             >
               {t("sidebar.rejectDraft")}
@@ -203,16 +203,16 @@ export function ContentDetailReviewSidebar({
 
       {omitContentInfo ? null : (
         <div className="border-b border-border px-5 py-4">
-          <p className="mb-3 text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
+          <p className="mb-3 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
             {t("sidebar.contentInfo")}
           </p>
           <div className="space-y-2.5 text-[13px]">
             <div>
-              <p className="mb-0.5 text-[11px] text-[#A89D8E]">{t("sidebar.workflow")}</p>
+              <p className="mb-0.5 text-[11px] text-muted-foreground">{t("sidebar.workflow")}</p>
               <p className="text-muted-foreground">{wfLabel}</p>
             </div>
             <div>
-              <p className="mb-0.5 text-[11px] text-[#A89D8E]">{t("sidebar.updated")}</p>
+              <p className="mb-0.5 text-[11px] text-muted-foreground">{t("sidebar.updated")}</p>
               <p className="text-[12px] text-muted-foreground">
                 {new Date(data.updatedAt).toLocaleString(undefined, {
                   dateStyle: "medium",

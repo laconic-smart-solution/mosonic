@@ -1,4 +1,4 @@
-import { getSharedSocket } from "./socket-client"
+import { getSharedSocket, joinSocketRoom, leaveSocketRoom } from "./socket-client"
 
 export type ContentNodeStartedEvent = {
   contentId: string
@@ -43,14 +43,11 @@ export type ContentNodeRerunCompletedEvent = {
 }
 
 export function joinContentRoom(contentId: string) {
-  const socket = getSharedSocket()
-  socket.emit("join", { room: `content_${contentId}` })
-  return socket
+  return joinSocketRoom(`content_${contentId}`)
 }
 
 export function leaveContentRoom(contentId: string) {
-  const socket = getSharedSocket()
-  socket.emit("leave", { room: `content_${contentId}` })
+  leaveSocketRoom(`content_${contentId}`)
 }
 
 export function onContentNodeStarted(

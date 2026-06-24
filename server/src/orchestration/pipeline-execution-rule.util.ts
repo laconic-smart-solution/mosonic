@@ -1,18 +1,16 @@
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import type { PipelineRuleOverlay } from '../pipeline/schemas/pipeline.schema';
 import { mergeRuleWithOverlay } from '../rule/rule-overlay.util';
+import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 import type { Rule } from '../rule/schemas/rule.schema';
-import type { RuleDocument } from '../rule/schemas/rule.schema';
-import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
 
 /** Rule used for node execution (base + ephemeral overlay). */
 export function resolveExecutionRule(
-  pipeline: PipelineDocument,
-  rule: Rule | RuleDocument,
+  pipeline: PipelineRecord,
+  rule: Rule | RuleRecord,
 ): Rule {
-  const base =
-    typeof (rule as RuleDocument).toObject === 'function'
-      ? ((rule as RuleDocument).toObject() as Rule)
-      : (rule as Rule);
-  const overlay = pipeline.ruleOverlay;
+  const base = rule as unknown as Rule;
+  const overlay = pipeline.ruleOverlay as PipelineRuleOverlay | null | undefined;
   if (!overlay?.patches?.length) {
     return base;
   }

@@ -1,17 +1,14 @@
 import {
   BadGatewayException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { UserRole, UserStatus } from '../../domain/users/user.types';
 import { SsoClientService } from '../../auth/sso-client.service';
-import {
-  User,
-  type UserDocument,
-  UserRole,
-  UserStatus,
-} from '../../users/schemas/user.schema';
+import { PlanService } from '../../plan/plan.service';
+import type { IUserRepository } from '../../repositories/interfaces/user.repository.interface';
+import { USER_REPOSITORY } from '../../repositories/tokens';
 
 function tryGet(obj: unknown, path: string[]): unknown {
   let cur: unknown = obj;
@@ -26,8 +23,9 @@ function tryGet(obj: unknown, path: string[]): unknown {
 @Injectable()
 export class AdminUserProvisioningService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
     private readonly sso: SsoClientService,
+    private readonly planService: PlanService,
   ) {}
 
   async createUserViaSso(args: {
@@ -58,7 +56,7 @@ export class AdminUserProvisioningService {
     }
 
     try {
-      const user = await this.userModel.create({
+      const user = await this.users.create({
         authServerUserId,
         email: args.email,
         username: args.username,
@@ -67,6 +65,7 @@ export class AdminUserProvisioningService {
         role: args.role,
         status: UserStatus.ACTIVE,
       });
+      await this.planService.assignDefaultPlan(user.userId);
       return { user, sso: ssoResp };
     } catch (e) {
       try {
@@ -79,23 +78,20 @@ export class AdminUserProvisioningService {
   }
 
   async updateRole(userId: string, role: UserRole) {
-    const user = await this.userModel.findOne({ userId }).exec();
+    const user = await this.users.update(userId, { role });
     if (!user) throw new NotFoundException('User not found');
-    user.role = role;
-    return await user.save();
+    return user;
   }
 
   async updateStatus(userId: string, status: UserStatus) {
-    const user = await this.userModel.findOne({ userId }).exec();
+    const user = await this.users.update(userId, { status });
     if (!user) throw new NotFoundException('User not found');
-    user.status = status;
-    return await user.save();
+    return user;
   }
 
   async deleteUser(userId: string) {
-    const user = await this.userModel.findOne({ userId }).exec();
-    if (!user) throw new NotFoundException('User not found');
-    await user.deleteOne();
+    const deleted = await this.users.deleteByUserId(userId);
+    if (!deleted) throw new NotFoundException('User not found');
     return { success: true };
   }
 }

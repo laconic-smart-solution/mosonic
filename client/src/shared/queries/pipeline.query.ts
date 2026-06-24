@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import i18n from "@/i18n"
 import { pipelineService } from "../services/pipeline.service"
 import type {
+  GetPipelineResponse,
   PipelinePageQueryPayload,
   PipelineStatsResponse,
   RetryNodePayload,
@@ -25,6 +26,26 @@ function assertPipelineStatsPayload(data: unknown): PipelineStatsResponse {
 export const useStartPipelineMutation = () => {
   return useMutation({
     mutationFn: (payload: StartPipelinePayload) => pipelineService.startPipeline(payload),
+    meta: { toastNs: "pipeline", toastKey: "errors.startFailed", silent: true },
+  })
+}
+
+export const usePipelineEstimateQuery = (
+  workflowId: string | undefined,
+  ruleId: string | undefined,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["pipeline", "estimate", workflowId ?? "", ruleId ?? ""],
+    queryFn: () =>
+      pipelineService.estimate({
+        workflowId: workflowId!,
+        ...(ruleId ? { ruleId } : {}),
+      }),
+    enabled: enabled && !!workflowId,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
   })
 }
 
@@ -37,6 +58,7 @@ export const useRetryNodeMutation = () => {
       pipelineId: string
       payload: RetryNodePayload
     }) => pipelineService.retryNode(pipelineId, payload),
+    meta: { toastNs: "workflow", toastKey: "toasts.retryFailed", silent: true },
   })
 }
 
@@ -49,11 +71,16 @@ export const useSkipNodeMutation = () => {
       pipelineId: string
       payload: SkipNodePayload
     }) => pipelineService.skipNode(pipelineId, payload),
+    meta: { toastNs: "workflow", toastKey: "toasts.skipFailed", silent: true },
   })
 }
 
 export type UseGetPipelineQueryOptions = {
-  refetchInterval?: number | false
+  refetchInterval?:
+    | number
+    | false
+    | ((query: { state: { data?: GetPipelineResponse } }) => number | false)
+  refetchIntervalInBackground?: boolean
 }
 
 export const useGetPipelineQuery = (
@@ -66,6 +93,7 @@ export const useGetPipelineQuery = (
     enabled: !!pipelineId,
     retry: false,
     refetchInterval: options?.refetchInterval,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground,
   })
 }
 
@@ -103,11 +131,29 @@ export const useReplanPipelineMutation = () => {
       pipelineId: string
       operations: Parameters<typeof pipelineService.replan>[1]
     }) => pipelineService.replan(pipelineId, operations),
+    meta: { toastNs: "workflow", toastKey: "toasts.replanFailed", silent: true },
   })
 }
 
 export const useCancelPipelineMutation = () => {
   return useMutation({
     mutationFn: (pipelineId: string) => pipelineService.cancel(pipelineId),
+    meta: { toastNs: "pipeline", toastKey: "errors.startFailed", silent: true },
+  })
+}
+
+export const useUpdatePipelineNameMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      pipelineId,
+      name,
+    }: {
+      pipelineId: string
+      name: string
+    }) => pipelineService.updateName(pipelineId, { name }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["pipeline"] })
+    },
   })
 }

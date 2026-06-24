@@ -5,6 +5,7 @@ import type {
   WfRfNode,
 } from "@/features/workflow/data/workflow-model"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
 import { createRfNode } from "@/features/workflow/lib/workflow-canvas-mutations"
 import {
   adaptNodesByLane,
@@ -12,6 +13,7 @@ import {
   findBranchNode,
   findMergeNode,
   laneAdaptPosition,
+  laneKeyFromRfNode,
   mergeNodePosition,
 } from "@/features/workflow/lib/workflow-lane-layout"
 
@@ -30,6 +32,26 @@ function workflowNodeData(node: WfRfNode): WfNodeData | null {
 function laneWfPriority(wfType: string): number {
   const idx = LANE_WF_ORDER.indexOf(wfType as (typeof LANE_WF_ORDER)[number])
   return idx === -1 ? 99 : idx
+}
+
+function collectSubgraphNodeIds(
+  branchId: string,
+  mergeId: string,
+  edges: Edge[],
+): Set<string> {
+  const subgraph = new Set<string>()
+  const queue = edges.filter((e) => e.source === branchId).map((e) => e.target)
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (current === mergeId || subgraph.has(current)) continue
+    subgraph.add(current)
+    for (const edge of edges) {
+      if (edge.source === current && edge.target !== mergeId) {
+        queue.push(edge.target)
+      }
+    }
+  }
+  return subgraph
 }
 
 function collectDownstreamChain(
@@ -93,9 +115,87 @@ function cloneLaneNode(
   } as WfRfNode
 }
 
+function findAdaptForChannel(
+  byLane: Map<string, WfRfNode>,
+  channelId: string,
+): WfRfNode | undefined {
+  const normalized = normalizeLaneId(channelId)
+  return (
+    byLane.get(normalized) ??
+    byLane.get(channelId) ??
+    [...byLane.entries()].find(
+      ([lane]) => normalizeLaneId(lane) === normalized,
+    )?.[1]
+  )
+}
+
+function expandSharedChainPerLane(
+  nodes: WfRfNode[],
+  edges: Edge[],
+  branch: WfRfNode,
+  merge: WfRfNode,
+  branchChannels: BranchChannelHandle[],
+  byLane: Map<string, WfRfNode>,
+  sharedChainTemplates: WfRfNode[],
+): { nodes: WfRfNode[]; edges: Edge[] } {
+  const sortedTemplates = [...sharedChainTemplates].sort((a, b) => {
+    const aType = workflowNodeData(a)?.wfType ?? ""
+    const bType = workflowNodeData(b)?.wfType ?? ""
+    return laneWfPriority(aType) - laneWfPriority(bType)
+  })
+  const removeIds = new Set(sortedTemplates.map((n) => n.id))
+  const created: WfRfNode[] = []
+  const newEdges: Edge[] = []
+
+  branchChannels.forEach((ch, channelIndex) => {
+    const adapt = findAdaptForChannel(byLane, ch.id)
+    if (!adapt) return
+
+    let prevId = adapt.id
+    let prevNode = adapt
+
+    sortedTemplates.forEach((template, chainIndex) => {
+      const laneNode = cloneLaneNode(
+        template,
+        ch,
+        {
+          x:
+            adapt.position.x +
+            (chainIndex + 1) * (240 + 48),
+          y:
+            laneAdaptPosition(
+              branch.position,
+              channelIndex,
+              branchChannels.length,
+            ).y,
+        },
+        branchChannels,
+      )
+      created.push(laneNode)
+      newEdges.push(buildLaneEdge(prevId, laneNode.id))
+      prevId = laneNode.id
+      prevNode = laneNode
+    })
+
+    newEdges.push(
+      buildLaneEdge(prevNode.id, merge.id, { targetHandle: ch.id }),
+    )
+  })
+
+  return {
+    nodes: [...nodes.filter((n) => !removeIds.has(n.id)), ...created],
+    edges: [
+      ...edges.filter(
+        (e) => !removeIds.has(e.source) && !removeIds.has(e.target),
+      ),
+      ...newEdges,
+    ],
+  }
+}
+
 /**
- * Expands a legacy single shared adapt (no lane) into one adapt per channel for the editor.
- * Reconnects downstream lane nodes (image, video, etc.) per channel.
+ * Expands incomplete lane subgraphs: shared adapt and/or shared downstream nodes
+ * (image, video, translation, etc.) into one node per channel for the editor.
  */
 export function expandLegacySingleAdapt(
   nodes: WfRfNode[],
@@ -107,49 +207,92 @@ export function expandLegacySingleAdapt(
   const branch = findBranchNode(nodes)
   if (!branch) return { nodes, edges }
 
-  const legacyAdapts = nodes.filter((n) => {
-    const d = workflowNodeData(n)
-    return d?.wfType === "adapt" && !d.lane?.trim()
-  })
-  if (legacyAdapts.length !== 1) return { nodes, edges }
-
-  const byLane = adaptNodesByLane(nodes)
-  if (byLane.size > 0) return { nodes, edges }
-
-  const legacy = legacyAdapts[0]!
   let merge = findMergeNode(nodes)
-  const nodesById = new Map(
+  const nodesById = new Map<string, WfRfNode>(
     nodes
       .filter((n) => n.type !== "plus_placeholder")
       .map((n) => [n.id, n]),
   )
-  const mergeId = merge?.id ?? ""
-  const downstreamChain = mergeId
-    ? collectDownstreamChain(legacy.id, mergeId, edges, nodesById)
-    : []
-
-  const created: WfRfNode[] = []
-  const newEdges: Edge[] = []
 
   if (!merge) {
     merge = createRfNode("merge", mergeNodePosition(branch.position), {
       branchChannels,
     })
-    created.push(merge)
+    nodes = [...nodes, merge]
+    nodesById.set(merge.id, merge)
   }
 
-  const sharedChainIds = new Set(
-    downstreamChain
-      .filter((n) => !workflowNodeData(n)?.lane?.trim())
-      .map((n) => n.id),
+  const mergeId = merge.id
+  const subgraphIds = collectSubgraphNodeIds(branch.id, mergeId, edges)
+  const subgraphNodes = nodes.filter((n) => subgraphIds.has(n.id))
+  const sharedSubgraphNodes = subgraphNodes.filter((n) => !laneKeyFromRfNode(n))
+  const byLane = adaptNodesByLane(nodes)
+
+  const needsAdaptExpansion = byLane.size < branchChannels.length
+  const needsSharedChainExpansion = sharedSubgraphNodes.some(
+    (n) => workflowNodeData(n)?.wfType !== "adapt",
   )
-  const removeIds = new Set([legacy.id, ...sharedChainIds])
+
+  if (!needsAdaptExpansion && !needsSharedChainExpansion) {
+    return { nodes, edges }
+  }
+
+  if (!needsAdaptExpansion && needsSharedChainExpansion) {
+    const sharedChainTemplates = sharedSubgraphNodes.filter(
+      (n) => workflowNodeData(n)?.wfType !== "adapt",
+    )
+    return expandSharedChainPerLane(
+      nodes,
+      edges,
+      branch,
+      merge,
+      branchChannels,
+      byLane,
+      sharedChainTemplates,
+    )
+  }
+
+  const legacyAdapts = nodes.filter((n) => {
+    const d = workflowNodeData(n)
+    return d?.wfType === "adapt" && !laneKeyFromRfNode(n)
+  })
+
+  const templateAdapt =
+    legacyAdapts.length === 1
+      ? legacyAdapts[0]!
+      : byLane.size === 1
+        ? [...byLane.values()][0]!
+        : legacyAdapts[0] ?? null
+  if (!templateAdapt) return { nodes, edges }
+
+  const downstreamChain = collectDownstreamChain(
+    templateAdapt.id,
+    mergeId,
+    edges,
+    nodesById,
+  )
+
+  const created: WfRfNode[] = []
+  const newEdges: Edge[] = []
+
+  const adaptIdsToRemove = new Set([
+    templateAdapt.id,
+    ...[...byLane.values()].map((n) => n.id),
+  ])
+  const sharedChainIds = new Set(
+    [
+      ...sharedSubgraphNodes,
+      ...downstreamChain.filter((n) => !laneKeyFromRfNode(n)),
+    ].map((n) => n.id),
+  )
+  const removeIds = new Set([...adaptIdsToRemove, ...sharedChainIds])
 
   branchChannels.forEach((ch, channelIndex) => {
-    const adapt = createRfNode(
-      "adapt",
+    const adapt = cloneLaneNode(
+      templateAdapt,
+      ch,
       laneAdaptPosition(branch.position, channelIndex, branchChannels.length),
-      { branchChannels, lane: ch },
+      branchChannels,
     )
     created.push(adapt)
     newEdges.push(buildLaneEdge(branch.id, adapt.id, { sourceHandle: ch.id }))
@@ -157,14 +300,19 @@ export function expandLegacySingleAdapt(
     let prevId = adapt.id
     let prevNode = adapt
 
-    downstreamChain.forEach((template, chainIndex) => {
+    const chainTemplates =
+      downstreamChain.length > 0
+        ? downstreamChain
+        : sharedSubgraphNodes.filter(
+            (n) => workflowNodeData(n)?.wfType !== "adapt",
+          )
+
+    chainTemplates.forEach((template, chainIndex) => {
       const laneNode = cloneLaneNode(
         template,
         ch,
         {
-          x:
-            adapt.position.x +
-            (chainIndex + 1) * (240 + 48),
+          x: adapt.position.x + (chainIndex + 1) * (240 + 48),
           y: adapt.position.y,
         },
         branchChannels,

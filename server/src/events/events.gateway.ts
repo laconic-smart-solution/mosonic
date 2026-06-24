@@ -75,6 +75,11 @@ export class EventsGateway
       if (!userId || room !== userRoom(userId)) {
         return { ok: false as const, error: 'cannot join another user room' };
       }
+    } else if (!client.data.userId) {
+      return {
+        ok: false as const,
+        error: 'Authentication required to join this room',
+      };
     }
 
     void client.join(room);
@@ -96,6 +101,11 @@ export class EventsGateway
       if (!userId || room !== userRoom(userId)) {
         return { ok: false as const, error: 'cannot leave another user room' };
       }
+    } else if (!client.data.userId) {
+      return {
+        ok: false as const,
+        error: 'Authentication required to leave this room',
+      };
     }
 
     void client.leave(room);

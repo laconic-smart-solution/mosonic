@@ -1,15 +1,24 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CreditCalculationService } from '../credit/credit-calculation.service';
+import { CreditService } from '../credit/credit.service';
+import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
+import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import {
   type ConnectedAccountRecord,
   UsersService,
 } from '../users/users.service';
-import { ZernioClient } from './zernio/zernio.client';
+import {
+  buildZernioProfileNameForUser,
+  ZernioClient,
+  ZernioClientError,
+} from './zernio/zernio.client';
 import { ZernioMcpClient } from './zernio/zernio.mcp';
 import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
@@ -25,6 +34,9 @@ export class McpService {
     private readonly usersService: UsersService,
     private readonly oauthState: ZernioOauthStateService,
     private readonly config: ConfigService,
+    private readonly creditService: CreditService,
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly creditCalculation: CreditCalculationService,
   ) {}
 
   /** Lazy-create Zernio REST profile and persist on the user. */
@@ -35,7 +47,84 @@ export class McpService {
     return { zernioProfileId: id };
   }
 
+  /** Charge unlock credits and persist the channel slot (no OAuth redirect). */
+  async unlockChannel(
+    platform: string,
+    userId: string,
+  ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
+    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    if (this.isChannelConnected(accounts, platform)) {
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is already connected`,
+      );
+    }
+
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+    const config = await this.creditCalculation.getConfig();
+    const channel = platform.trim().toLowerCase();
+    const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
+      userId,
+      channel,
+      credits: creditsEach,
+      creditPriceUsd: config.creditPriceUsd,
+    });
+
+    return { unlocked: true, alreadyUnlocked };
+  }
+
+  /** OAuth redirect URL for an already-unlocked publishing channel. */
+  async connectChannel(
+    platform: string,
+    userId: string,
+  ): Promise<{ connectUrl: string }> {
+    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
+    if (this.isChannelConnected(accounts, platform)) {
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is already connected`,
+      );
+    }
+
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+    if (creditsEach > 0) {
+      const unlocked = await this.creditService.hasSocialChannelUnlock(
+        userId,
+        platform,
+      );
+      if (!unlocked) {
+        throw new ForbiddenException(
+          `Unlock "${platform}" before connecting your account`,
+        );
+      }
+    }
+
+    const connectUrl = await this.buildConnectUrl(platform, userId);
+    return { connectUrl };
+  }
+
+  /** @deprecated Use `unlockChannel` then `connectChannel`. */
+  async unlockChannelForConnect(
+    platform: string,
+    userId: string,
+  ): Promise<{ connectUrl: string }> {
+    await this.unlockChannel(platform, userId);
+    return await this.connectChannel(platform, userId);
+  }
+
+  /** OAuth redirect URL only (no credit charge). Prefer `unlockChannelForConnect`. */
   async getConnectUrl(platform: string, userId: string): Promise<string> {
+    return await this.buildConnectUrl(platform, userId);
+  }
+
+  private async buildConnectUrl(
+    platform: string,
+    userId: string,
+  ): Promise<string> {
     const profileId = await this.ensureZernioProfileId(userId);
     const state = await this.oauthState.signState(userId);
     const base = this.config.get<string>('ZERNIO_CALLBACK_URL')?.trim();
@@ -64,11 +153,13 @@ export class McpService {
         'Missing platform or accountId from Zernio',
       );
     }
+
     await this.usersService.setZernioConnectedAccount(
       userId,
       platform,
       accountId,
     );
+
     try {
       await this.syncAccounts(userId);
     } catch (err: unknown) {
@@ -87,16 +178,39 @@ export class McpService {
   }> {
     const profileId = await this.ensureZernioProfileId(userId);
     const raw = await this.zernio.listAccounts(profileId);
-    const accounts = this.parseConnectedAccounts(raw);
+    const accounts = this.parseConnectedAccounts(raw, userId);
     await this.usersService.syncZernioConnectedAccounts(userId, accounts);
     return { accounts };
   }
 
   async getConnectedAccounts(userId: string): Promise<{
     accounts: ConnectedAccountRecord[];
+    unlockedChannels: string[];
   }> {
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    return { accounts };
+    const unlockedChannels =
+      await this.creditService.listUnlockedSocialChannels(userId);
+    this.logger.log(
+      `getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`,
+    );
+    return { accounts, unlockedChannels };
+  }
+
+  async getConnectionCreditQuote(userId: string): Promise<{
+    nodeType: typeof SOCIAL_ACCOUNT_CONNECT_NODE_TYPE;
+    creditsEach: number;
+    creditsRemaining: number;
+  }> {
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(
+        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      )) ?? 0;
+    const creditsRemaining = await this.creditService.getCreditsRemaining(userId);
+    return {
+      nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+      creditsEach,
+      creditsRemaining,
+    };
   }
 
   async disconnectAccount(userId: string, channel: string): Promise<void> {
@@ -115,6 +229,13 @@ export class McpService {
   }
 
   /** Resolve stored row when UI uses `twitter` vs Zernio storing `x` (or vice versa). */
+  private isChannelConnected(
+    accounts: ConnectedAccountRecord[],
+    platform: string,
+  ): boolean {
+    return Boolean(this.findConnectedAccountForDisconnect(accounts, platform));
+  }
+
   private findConnectedAccountForDisconnect(
     accounts: ConnectedAccountRecord[],
     requestChannel: string,
@@ -157,6 +278,7 @@ export class McpService {
     scheduledFor?: string | null;
     title?: string;
     publishNow?: boolean;
+    mediaUrls?: string[] | null;
   }): Promise<{ success: boolean }> {
     return await this.zernioRest.updatePost(payload);
   }
@@ -241,19 +363,54 @@ export class McpService {
     }
     const existing = user.zernioProfileId?.trim();
     if (existing) {
-      return existing;
+      const otherOwner =
+        await this.usersService.findOtherUserByZernioProfileId(
+          existing,
+          userId,
+        );
+      if (!otherOwner) {
+        return existing;
+      }
+      this.logger.warn(
+        `User ${userId} had shared Zernio profile ${existing} (also assigned to ${otherOwner.userId}); provisioning a dedicated profile`,
+      );
     }
-    const name =
-      user.email?.trim() ||
-      user.username?.trim() ||
-      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
-      user.userId;
-    const profile = await this.zernio.createProfile(name);
-    await this.usersService.setZernioProfileId(userId, profile._id);
-    return profile._id;
+
+    try {
+      const profile = await this.createDedicatedZernioProfile(userId);
+      await this.usersService.setZernioProfileId(userId, profile._id);
+      this.logger.log(
+        `Created dedicated Zernio profile ${profile._id} for user ${userId}`,
+      );
+      return profile._id;
+    } catch (err: unknown) {
+      if (err instanceof ZernioClientError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
-  private parseConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {
+  private async createDedicatedZernioProfile(userId: string) {
+    const baseName = buildZernioProfileNameForUser(userId);
+    try {
+      return await this.zernio.createProfile(baseName);
+    } catch (err: unknown) {
+      if (!(err instanceof ZernioClientError)) {
+        throw err;
+      }
+      const fallbackName = `${baseName}:${Date.now()}`;
+      this.logger.warn(
+        `Zernio createProfile failed for ${baseName}; retrying as ${fallbackName}`,
+      );
+      return await this.zernio.createProfile(fallbackName);
+    }
+  }
+
+  private parseConnectedAccounts(
+    raw: unknown,
+    userId: string,
+  ): ConnectedAccountRecord[] {
     if (!Array.isArray(raw)) return [];
     const byChannel = new Map<string, ConnectedAccountRecord>();
     for (const item of raw) {
@@ -276,6 +433,7 @@ export class McpService {
       ])?.trim();
       if (!channel || !accountId) continue;
       byChannel.set(channel, {
+        userId,
         channel,
         accountId,
         connectedAt: new Date(),

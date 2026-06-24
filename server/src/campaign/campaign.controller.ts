@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -12,7 +13,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
 import { CampaignScheduleService } from './campaign-schedule.service';
-import { ContentPromptStrategy } from './schemas/campaign-schedule.schema';
+import { UpsertCampaignScheduleDto } from './dto/upsert-campaign-schedule.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('campaign')
@@ -35,15 +36,7 @@ export class CampaignController {
   upsert(
     @Req() req: Request,
     @Param('ruleId') ruleId: string,
-    @Body()
-    body: {
-      enabled?: boolean;
-      workflowTemplateId?: string | null;
-      workflowRef?: string | null;
-      contentPromptStrategy?: ContentPromptStrategy;
-      contentPrompts?: string[];
-      timezone?: string;
-    },
+    @Body() body: UpsertCampaignScheduleDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.schedules.upsertForRule(ruleId, body, auth);

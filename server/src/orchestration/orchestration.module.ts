@@ -1,25 +1,17 @@
 import { BullModule } from '@nestjs/bullmq';
 import { forwardRef, Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
 import { ContentModule } from '../content/content.module';
-import { Content, ContentSchema } from '../content/schemas/content.schema';
-import { AnalyticsModule } from '../analytics/analytics.module';
+import { PostModule } from '../post/post.module';
 import { CampaignModule } from '../campaign/campaign.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { CostModule } from '../cost/cost.module';
+import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
-import { PipelineRepository } from '../pipeline/pipeline.repository';
-import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
+import { RepositoriesModule } from '../repositories/repositories.module';
 import { UploadModule } from '../upload/upload.module';
-import {
-  WorkflowNode,
-  WorkflowNodeSchema,
-} from '../nodes/schemas/workflow-node.schema';
-import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
-import { Workflow, WorkflowSchema } from '../workflow/schemas/workflow.schema';
 import { DependencyResolverService } from './dependency-resolver.service';
 import { GraphMaterializationService } from './graph-materialization.service';
 import { GraphReplanService } from './graph-replan.service';
@@ -41,12 +33,13 @@ import {
 
 const runWorkersInApi = process.env.RUN_WORKERS_IN_API !== 'false';
 
-function isLocalMongoUri(uri: string): boolean {
-  const u = uri.trim().toLowerCase();
+function isLocalDatabaseUrl(url: string): boolean {
+  const u = url.trim().toLowerCase();
   return (
     u.includes('127.0.0.1') ||
     u.includes('localhost') ||
-    u.startsWith('mongodb://mongo:')
+    u.includes('@postgres:') ||
+    u.includes('@db:')
   );
 }
 
@@ -62,7 +55,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit(): void {
-    const mongoUri = this.config.get<string>('MONGODB_URI') ?? '';
+    const databaseUrl = this.config.get<string>('DATABASE_URL') ?? '';
     const redisHost = (this.config.get<string>('REDIS_HOST') ?? '127.0.0.1').trim();
     const redisUrl = this.config.get<string>('REDIS_URL')?.trim();
     const queueMode =
@@ -75,7 +68,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     this.logger.log(
       `pipeline queue="${PIPELINE_NODES_QUEUE}" workersInApi=${runWorkersInApi} ` +
         `queueMode=${queueMode} tenantIsolation=${tenantIsolation} ` +
-        `redis=${redisUrl ? 'REDIS_URL' : redisHost} mongo=${mongoUri ? 'set' : 'unset'}`,
+        `redis=${redisUrl ? 'REDIS_URL' : redisHost} postgres=${databaseUrl ? 'set' : 'unset'}`,
     );
 
     if (!runWorkersInApi) {
@@ -84,15 +77,15 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
       );
     }
 
-    const mongoLocal = mongoUri ? isLocalMongoUri(mongoUri) : false;
+    const dbLocal = databaseUrl ? isLocalDatabaseUrl(databaseUrl) : false;
     const redisLocal = redisUrl
       ? /localhost|127\.0\.0\.1/i.test(redisUrl)
       : isLocalRedisHost(redisHost);
-    if (mongoLocal && !redisLocal) {
+    if (dbLocal && !redisLocal) {
       this.logger.warn(
-        'MONGODB_URI is local but Redis is remote — a shared Redis worker can mark BullMQ jobs ' +
+        'DATABASE_URL is local but Redis is remote — a shared Redis worker can mark BullMQ jobs ' +
           'completed without updating your local database. Use REDIS_HOST=127.0.0.1 for local dev, ' +
-          'or point MONGODB_URI at the same database as the worker.',
+          'or point DATABASE_URL at the same database as the worker.',
       );
     }
 
@@ -107,15 +100,17 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
 @Module({
   imports: [
     ConfigModule,
-    forwardRef(() => AnalyticsModule),
+    forwardRef(() => PostModule),
     forwardRef(() => CampaignModule),
     forwardRef(() => IntegrationsModule),
     CostModule,
+    CreditModule,
     NodesModule,
     LoggingModule,
     EventsModule,
     forwardRef(() => UploadModule),
     forwardRef(() => ContentModule),
+    RepositoriesModule,
     BullModule.registerQueueAsync({
       name: PIPELINE_NODES_QUEUE,
       imports: [ConfigModule],
@@ -173,22 +168,14 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
       imports: [ConfigModule],
       useFactory: () => ({
         defaultJobOptions: {
-          attempts: 1,
+          attempts: 2,
           removeOnComplete: true,
         },
       }),
     }),
-    MongooseModule.forFeature([
-      { name: Pipeline.name, schema: PipelineSchema },
-      { name: Workflow.name, schema: WorkflowSchema },
-      { name: WorkflowNode.name, schema: WorkflowNodeSchema },
-      { name: Rule.name, schema: RuleSchema },
-      { name: Content.name, schema: ContentSchema },
-    ]),
   ],
   providers: [
     OrchestrationModuleBootstrap,
-    PipelineRepository,
     GraphMaterializationService,
     GraphReplanService,
     RuleOverlayBuilderService,
@@ -205,7 +192,6 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
   exports: [
     NodeExecutor,
     OrchestrationService,
-    PipelineRepository,
     MediaNodeCompletionService,
     HeygenWebhookService,
     BullModule,

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import type { WfRfNode } from "@/features/workflow/data/workflow-model"
-import { layoutTemplateGraphToRf } from "./branch-layout"
+import {
+  ensurePipelineMergeNode,
+  inferPipelineMergeNodeId,
+  layoutTemplateGraphToRf,
+  pipelineGraphToRf,
+} from "./branch-layout"
 
 function wfNode(
   id: string,
@@ -117,5 +122,76 @@ describe("layoutTemplateGraphToRf", () => {
     const { nodes: laidOut } = layoutTemplateGraphToRf(nodes, edges)
     expect(laidOut[1]!.position.x).toBeGreaterThan(laidOut[0]!.position.x)
     expect(laidOut[0]!.position.y).toBe(laidOut[1]!.position.y)
+  })
+})
+
+describe("pipelineGraphToRf", () => {
+  it("synthesizes merge node when omitted from stored pipeline nodes", () => {
+    const snapNodes = [
+      {
+        nodeId: "text-1",
+        type: "text_generation" as const,
+        order: 1,
+        isLocked: true,
+        userPrompt: "",
+        config: {},
+        status: "completed" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+      {
+        nodeId: "adapt-1__instagram",
+        type: "adapt" as const,
+        order: 2,
+        isLocked: false,
+        userPrompt: "",
+        config: { channel: "instagram" },
+        lane: "instagram",
+        status: "completed" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+      {
+        nodeId: "adapt-1__facebook",
+        type: "adapt" as const,
+        order: 3,
+        isLocked: false,
+        userPrompt: "",
+        config: { channel: "facebook" },
+        lane: "facebook",
+        status: "completed" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+    ]
+    const snapEdges = [
+      { from: "text-1", to: "adapt-1__instagram" },
+      { from: "text-1", to: "adapt-1__facebook" },
+      { from: "adapt-1__instagram", to: "merge-1" },
+      { from: "adapt-1__facebook", to: "merge-1" },
+    ]
+
+    expect(inferPipelineMergeNodeId(snapNodes, snapEdges)).toBe("merge-1")
+    expect(ensurePipelineMergeNode(snapNodes, snapEdges).some((n) => n.type === "merge")).toBe(
+      true,
+    )
+
+    const { nodes, edges } = pipelineGraphToRf({
+      nodes: snapNodes,
+      edges: snapEdges,
+      lanes: ["instagram", "facebook"],
+      channelHandles: [
+        { id: "instagram", label: "Instagram" },
+        { id: "facebook", label: "Facebook" },
+      ],
+    })
+
+    const merge = nodes.find((n) => n.data.wfType === "merge")
+    expect(merge).toBeDefined()
+    expect(merge?.id).toBe("merge-1")
+    expect(edges.some((e) => e.target === "merge-1")).toBe(true)
   })
 })

@@ -1,69 +1,33 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
-import { randomUUID } from 'node:crypto';
+import { CampaignAutonomyMode as PrismaCampaignAutonomyMode } from '@prisma/client';
 
-export enum AutonomyMode {
-  Off = 'off',
-  ReviewOptional = 'review_optional',
-  FullAuto = 'full_auto',
-}
+export const AutonomyMode = {
+  ...PrismaCampaignAutonomyMode,
+  Off: PrismaCampaignAutonomyMode.off,
+  ReviewOptional: PrismaCampaignAutonomyMode.review_optional,
+  FullAuto: PrismaCampaignAutonomyMode.full_auto,
+} as const;
 
-@Schema({ _id: false })
-export class QuietHours {
-  @Prop({ type: String, required: true })
+export type AutonomyMode =
+  (typeof AutonomyMode)[keyof typeof AutonomyMode];
+
+export interface QuietHours {
   start: string;
-
-  @Prop({ type: String, required: true })
   end: string;
-
-  @Prop({ type: String, default: 'UTC' })
   timezone: string;
 }
-export const QuietHoursSchema = SchemaFactory.createForClass(QuietHours);
 
-@Schema({ collection: 'campaign_autonomy_policies', timestamps: true })
-export class CampaignAutonomyPolicy {
-  @Prop({
-    type: String,
-    required: true,
-    unique: true,
-    default: () => randomUUID(),
-  })
+export interface CampaignAutonomyPolicy {
   policyId: string;
-
-  @Prop({ type: String, required: true, index: true })
   ruleRef: string;
-
-  @Prop({ type: String, required: true, index: true })
   userId: string;
-
-  @Prop({ type: Boolean, default: false })
   enabled: boolean;
-
-  @Prop({
-    type: String,
-    enum: Object.values(AutonomyMode),
-    default: AutonomyMode.Off,
-  })
   mode: AutonomyMode;
-
-  @Prop({ type: [String], default: [] })
   allowedChannels: string[];
-
-  @Prop({ type: Number, default: 5 })
   maxPostsPerDay: number;
-
-  @Prop({ type: QuietHoursSchema, default: null })
   quietHours: QuietHours | null;
-
-  @Prop({ type: Boolean, default: true })
   blockIfPendingSuggestions: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-export const CampaignAutonomyPolicySchema = SchemaFactory.createForClass(
-  CampaignAutonomyPolicy,
-);
-export type CampaignAutonomyPolicyDocument =
-  HydratedDocument<CampaignAutonomyPolicy>;
-
-CampaignAutonomyPolicySchema.index({ ruleRef: 1 }, { unique: true });
+export type CampaignAutonomyPolicyDocument = CampaignAutonomyPolicy;

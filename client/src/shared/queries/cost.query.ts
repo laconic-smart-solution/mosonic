@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { costService } from "@/shared/services/cost.service"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
 
 export const costQueryKeys = {
@@ -65,6 +66,9 @@ export function useCostBudgetUpdateMutation() {
     mutationFn: costService.updateBudget,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["cost"] })
+    },
+    onError: (err) => {
+      toastApiError(err, "cost:budget.saveFailed")
     },
   })
 }

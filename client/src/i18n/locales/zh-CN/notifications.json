@@ -12,7 +12,7 @@
     "sectorNews": "新闻"
   },
   "browser": {
-    "iosBrowser": "在 iPhone 和 iPad 上，请将 NeuralTex 添加到主屏幕以接收后台提醒。在此之前请使用铃铛和应用内提示。",
+    "iosBrowser": "在 iPhone 和 iPad 上，请将 Mosonic 添加到主屏幕以接收后台提醒。在此之前请使用铃铛和应用内提示。",
     "unsupported": "此浏览器不支持后台提醒。您仍会看到应用内通知。",
     "grantedPwa": "主屏幕提醒已开启。",
     "grantedDesktop": "标签页在后台时浏览器提醒已开启。",
@@ -24,6 +24,6 @@
     "iosPwaEnabled": "主屏幕提醒已启用",
     "browserEnabled": "浏览器提醒已启用",
     "notEnabledTitle": "提醒未启用",
-    "notEnabledDesc": "您仍可使用 NeuralTex 的通知铃铛和应用内提示。"
+    "notEnabledDesc": "您仍可使用 Mosonic 的通知铃铛和应用内提示。"
   }
 }

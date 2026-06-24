@@ -1,11 +1,26 @@
 import { BadRequestException } from '@nestjs/common';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { resolveDistributionChannelId } from './distribution-channels.util';
 
 export interface WorkflowGraphEdge {
   from: string;
   to: string;
   sourceHandle?: string;
   targetHandle?: string;
+}
+
+/** Parse workflow template edges stored as Prisma JSON. */
+export function parseWorkflowEdges(json: unknown): WorkflowGraphEdge[] {
+  if (!Array.isArray(json)) return [];
+  return json
+    .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+    .map((e) => ({
+      from: String(e.from ?? ''),
+      to: String(e.to ?? ''),
+      ...(typeof e.sourceHandle === 'string' ? { sourceHandle: e.sourceHandle } : {}),
+      ...(typeof e.targetHandle === 'string' ? { targetHandle: e.targetHandle } : {}),
+    }))
+    .filter((e) => e.from && e.to);
 }
 
 export function buildLinearEdgesFromOrder(
@@ -77,6 +92,63 @@ export function getAncestors(
     }
   }
   return ancestors;
+}
+
+/** Drop nodes that do not participate in any edge when the graph is non-trivial. */
+export function stripDisconnectedNodes<
+  T extends { nodeId: string },
+>(nodes: T[], edges: WorkflowGraphEdge[]): T[] {
+  if (edges.length === 0 || nodes.length <= 1) {
+    return nodes;
+  }
+
+  const incident = new Set<string>();
+  for (const edge of edges) {
+    incident.add(edge.from);
+    incident.add(edge.to);
+  }
+
+  const connected = nodes.filter((node) => incident.has(node.nodeId));
+  return connected.length > 0 ? connected : nodes;
+}
+
+/** Reassign `order` from a topological sort when the workflow has explicit edges. */
+export function assignOrderFromGraph<
+  T extends { nodeId: string; order: number },
+>(nodes: T[], edges: WorkflowGraphEdge[]): T[] {
+  if (edges.length === 0 || nodes.length <= 1) {
+    return nodes;
+  }
+
+  const edgeIncidentIds = new Set<string>();
+  for (const edge of edges) {
+    edgeIncidentIds.add(edge.from);
+    edgeIncidentIds.add(edge.to);
+  }
+
+  const connectedIds = nodes
+    .filter((node) => edgeIncidentIds.has(node.nodeId))
+    .map((node) => node.nodeId);
+  const disconnected = nodes.filter(
+    (node) => !edgeIncidentIds.has(node.nodeId),
+  );
+
+  const sortedConnected =
+    connectedIds.length > 0 ? topologicalSort(connectedIds, edges) : [];
+  const sortedDisconnected = [...disconnected].sort(
+    (a, b) => a.order - b.order,
+  );
+
+  const orderedIds = [
+    ...sortedConnected,
+    ...sortedDisconnected.map((node) => node.nodeId),
+  ];
+  const orderById = new Map(orderedIds.map((id, index) => [id, index + 1]));
+
+  return nodes.map((node) => ({
+    ...node,
+    order: orderById.get(node.nodeId) ?? node.order,
+  }));
 }
 
 export function topologicalSort(
@@ -291,6 +363,45 @@ export function validateWorkflowGraph(
   }
 
   assertIntelligenceBeforeText(nodes, effectiveEdges);
+  assertDownstreamContentFollowsText(nodes, effectiveEdges);
+}
+
+const TYPES_REQUIRING_TEXT_ANCESTOR = new Set<WorkflowNodeType>([
+  WorkflowNodeType.ImageGeneration,
+  WorkflowNodeType.VideoGeneration,
+  WorkflowNodeType.Translation,
+  WorkflowNodeType.Branch,
+  WorkflowNodeType.Merge,
+  WorkflowNodeType.Adapt,
+]);
+
+function assertDownstreamContentFollowsText(
+  nodes: NodeForValidation[],
+  edges: WorkflowGraphEdge[],
+): void {
+  const textNodes = nodes.filter(
+    (n) => n.type === WorkflowNodeType.TextGeneration,
+  );
+  if (textNodes.length === 0) {
+    return;
+  }
+
+  const nodesById = new Map(nodes.map((n) => [n.nodeId, n]));
+  for (const node of nodes) {
+    if (!TYPES_REQUIRING_TEXT_ANCESTOR.has(node.type)) {
+      continue;
+    }
+    const ancestors = getAncestors(edges, node.nodeId);
+    const hasTextAncestor = [...ancestors].some(
+      (ancestorId) =>
+        nodesById.get(ancestorId)?.type === WorkflowNodeType.TextGeneration,
+    );
+    if (!hasTextAncestor) {
+      throw new BadRequestException(
+        `${node.type} must run after text_generation`,
+      );
+    }
+  }
 }
 
 function assertIntelligenceBeforeText(
@@ -336,7 +447,7 @@ export function areAllDependenciesMet(
 }
 
 export function normalizeLaneId(channel: string): string {
-  return channel.trim().toLowerCase();
+  return resolveDistributionChannelId(channel);
 }
 
 export type PipelineNodeLaneLike = {
@@ -352,11 +463,13 @@ export function getAncestorsForLane(
   nodesById: Map<string, PipelineNodeLaneLike>,
 ): Set<string> {
   const all = getAncestors(edges, nodeId);
-  const lane = nodeLane?.trim() || null;
+  const lane = nodeLane?.trim() ? normalizeLaneId(nodeLane) : null;
   const filtered = new Set<string>();
   for (const ancestorId of all) {
     const ancestor = nodesById.get(ancestorId);
-    const ancestorLane = ancestor?.lane?.trim() || null;
+    const ancestorLane = ancestor?.lane?.trim()
+      ? normalizeLaneId(ancestor.lane)
+      : null;
     if (ancestorLane === null || ancestorLane === lane) {
       filtered.add(ancestorId);
     }

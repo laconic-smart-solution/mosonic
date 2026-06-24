@@ -19,7 +19,7 @@ import {
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/shared/stores/auth.store"
-import { useAnalyticsPendingSummary } from "@/shared/queries/analytics.query"
+import { BrandLogo } from "@/assets/icon/brand-logo"
 
 type NavItem = {
   id: string
@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
   {
     id: "home",
     labelKey: "nav.home",
-    path: "/",
+    path: "/home",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
@@ -180,25 +180,9 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    id: "analytics",
-    labelKey: "nav.analytics",
-    path: "/analytics",
-    icon: (active) => (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path
-          d="M2 12l3-4 3 2 3-5 3 3"
-          stroke={active ? "#fff" : "currentColor"}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: "cost",
-    labelKey: "nav.cost",
-    path: "/cost",
+    id: "usage",
+    labelKey: "nav.usage",
+    path: "/usage",
     icon: (active) => (
       <Wallet
         className="size-4 shrink-0"
@@ -268,8 +252,8 @@ function navItemActive(item: NavItem, pathname: string): boolean {
   if (item.id === "posts") {
     return pathname === "/posts" || pathname.startsWith("/posts/")
   }
-  if (item.id === "cost") {
-    return pathname === "/cost" || pathname.startsWith("/cost/")
+  if (item.id === "usage") {
+    return pathname === "/usage" || pathname.startsWith("/usage/")
   }
   if (item.id === "admin") {
     return pathname.startsWith("/admin")
@@ -289,7 +273,6 @@ export function SidebarPanel() {
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
   const role = useAuthStore((s) => s.role)
-  const { data: analyticsPending = 0 } = useAnalyticsPendingSummary()
 
   const navItems = useMemo(
     () => (role === "ADMIN" ? NAV : NAV.filter((item) => item.id !== "admin")),
@@ -301,7 +284,7 @@ export function SidebarPanel() {
   }
 
   const handleHome = () => {
-    navigate("/")
+    navigate("/home")
     closeMobileIfNeeded()
   }
 
@@ -316,32 +299,8 @@ export function SidebarPanel() {
             "group-data-[collapsible=icon]:justify-center"
           )}
         >
-          <div className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#00A589] to-[#254C94] shadow-[0_0_12px_#00A58950]">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden
-            >
-              <circle cx="8" cy="8" r="3" fill="white" opacity="0.9" />
-              <circle
-                cx="8"
-                cy="8"
-                r="6"
-                stroke="white"
-                strokeWidth="1.2"
-                opacity="0.4"
-              />
-              <circle
-                cx="8"
-                cy="8"
-                r="7.5"
-                stroke="white"
-                strokeWidth="0.6"
-                opacity="0.2"
-              />
-            </svg>
+          <div className="bg-primary-foreground/90 rounded-sm px-1">
+            <BrandLogo size="nav" className="size-[30px] shrink-0" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-white">
@@ -363,10 +322,7 @@ export function SidebarPanel() {
             <SidebarMenu>
               {navItems.map((item) => {
                 const active = navItemActive(item, location.pathname)
-                const displayBadge =
-                  item.id === "analytics" && analyticsPending > 0
-                    ? String(analyticsPending > 99 ? "99+" : analyticsPending)
-                    : (item.badge ?? null)
+                const displayBadge = item.badge ?? null
                 return (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
@@ -404,10 +360,7 @@ export function SidebarPanel() {
                       <SidebarMenuBadge
                         className="rounded-[10px] px-[5px] py-px text-[9px] font-bold text-white"
                         style={{
-                          background:
-                            item.id === "analytics"
-                              ? T.accent
-                              : (item.badgeColor ?? T.accent),
+                          background: item.badgeColor ?? T.accent,
                         }}
                       >
                         {displayBadge}

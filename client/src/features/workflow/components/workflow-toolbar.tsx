@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,15 +10,15 @@ type WorkflowToolbarProps = {
   onWfNameCommit?: () => void
   ruleName?: string
   onRuleClick?: () => void
-  onToggleStructurePrompt?: () => void
-  structurePromptOpen?: boolean
-  onRebuildWorkflow?: () => void
   onRun: () => void
+  onGenerateWorkflow?: () => void
   runLabel?: string
   onSave?: () => void
   isSaving?: boolean
   readOnly?: boolean
   generationDisabled?: boolean
+  generateWorkflowDisabled?: boolean
+  workflowGenerationCredits?: number
   showCancel?: boolean
   onCancel?: () => void
 }
@@ -28,19 +29,24 @@ export function WorkflowToolbar({
   onWfNameCommit,
   ruleName,
   onRuleClick,
-  onToggleStructurePrompt,
-  structurePromptOpen,
-  onRebuildWorkflow,
   onRun,
+  onGenerateWorkflow,
   runLabel,
   onSave,
   isSaving,
   readOnly,
   generationDisabled = false,
+  generateWorkflowDisabled = false,
+  workflowGenerationCredits,
   showCancel,
   onCancel,
 }: WorkflowToolbarProps) {
   const { t } = useTranslation("workflow")
+  const { t: tCredit } = useTranslation("credit")
+  const workflowGenLabel =
+    workflowGenerationCredits != null && workflowGenerationCredits > 0
+      ? tCredit("generationCost", { count: workflowGenerationCredits })
+      : null
 
   return (
     <div
@@ -103,28 +109,6 @@ export function WorkflowToolbar({
       </div>
 
       <div className="flex gap-2">
-        {onRebuildWorkflow && !readOnly ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRebuildWorkflow}
-            disabled={generationDisabled}
-          >
-            {t("toolbar.rebuildNodes")}
-          </Button>
-        ) : null}
-        {onToggleStructurePrompt && !readOnly ? (
-          <Button
-            type="button"
-            variant={structurePromptOpen ? "default" : "outline"}
-            size="sm"
-            onClick={onToggleStructurePrompt}
-            disabled={generationDisabled}
-          >
-            {t("toolbar.describeWorkflow")}
-          </Button>
-        ) : null}
         {onSave && !readOnly ? (
           <Button
             type="button"
@@ -134,6 +118,24 @@ export function WorkflowToolbar({
             disabled={isSaving}
           >
             {isSaving ? t("toolbar.saving") : t("toolbar.saveChanges")}
+          </Button>
+        ) : null}
+        {!readOnly && onGenerateWorkflow ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onGenerateWorkflow}
+            disabled={generateWorkflowDisabled}
+            className="gap-1.5"
+          >
+            <Sparkles className="size-3.5 shrink-0" aria-hidden />
+            {t("toolbar.generateWorkflow")}
+            {workflowGenLabel ? (
+              <span className="text-[10px] font-normal opacity-80">
+                · {workflowGenLabel}
+              </span>
+            ) : null}
           </Button>
         ) : null}
         {!readOnly ? (

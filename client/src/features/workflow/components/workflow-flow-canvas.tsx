@@ -7,10 +7,13 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
 import type { MouseEvent, ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -25,6 +28,7 @@ import {
   type Edge,
   type NodeChange,
   type OnSelectionChangeParams,
+  type OnMoveEnd,
   type ReactFlowInstance,
 } from "@xyflow/react"
 
@@ -50,19 +54,27 @@ import {
 } from "@/features/workflow/lib/workflow-canvas-mutations"
 import {
   WORKFLOW_CANVAS_DROP_ID,
+  afterSourceIdFromTarget,
+  listPaletteDropHints,
   parsePaletteDragId,
   resolvePaletteDropTarget,
+  type PaletteDropTarget,
 } from "@/features/workflow/lib/workflow-palette-dnd"
 import {
   isPreviewEdgeId,
   persistedLayoutFromApiNodes,
   resolveWorkflowLayout,
 } from "@/features/workflow/lib/branch-layout"
+import { useWorkflowFlowVisualTheme } from "@/features/workflow/lib/workflow-flow-theme"
 import { workflowConfigsEqual } from "@/features/workflow/lib/config-equality"
 import { normalizeImageCanvasConfig } from "@/features/workflow/lib/openai-image-size"
 import { expandLegacySingleAdapt } from "@/features/workflow/lib/workflow-lane-expand"
 import {
-  branchHasAllLaneAdapts,
+  applyWorkflowCanvasViewport,
+  defaultWorkflowCanvasViewport,
+  writeWorkflowCanvasViewport,
+} from "@/features/workflow/lib/workflow-canvas-viewport"
+import {
   getAllowedInitialTypes,
   getAllowedInsertTypes,
   getAllowedNextTypes,
@@ -79,19 +91,18 @@ import { toast } from "sonner"
 import { NodeSelectPopover } from "./node-select-popover"
 import { PlusEdge } from "./plus-edge"
 import { PlusPlaceholderNode } from "./plus-placeholder-node"
-import { WorkflowBranchNode } from "./workflow-branch-node"
-import { WorkflowMergeNode } from "./workflow-merge-node"
 import { WorkflowPropertiesPanel } from "./workflow-properties-panel"
 import {
   WorkflowNodePalette,
   WorkflowPaletteDragPreview,
 } from "./workflow-node-palette"
+import { WorkflowPaletteDropHints } from "./workflow-palette-drop-hints"
 import { WorkflowRfNode } from "./workflow-rf-node"
 
 const nodeTypes = {
   wfNode: WorkflowRfNode,
-  branchNode: WorkflowBranchNode,
-  mergeNode: WorkflowMergeNode,
+  branchNode: WorkflowRfNode,
+  mergeNode: WorkflowRfNode,
   plus_placeholder: PlusPlaceholderNode,
 }
 
@@ -99,8 +110,8 @@ const edgeTypes = {
   plus_edge: PlusEdge,
 }
 
-function flowPositionFromDragEnd(
-  event: DragEndEvent,
+function flowPositionFromDragEvent(
+  event: DragEndEvent | DragMoveEvent,
   screenToFlow: (pos: { x: number; y: number }) => { x: number; y: number },
 ): { x: number; y: number } | null {
   const activator = event.activatorEvent
@@ -215,6 +226,10 @@ export type WorkflowFlowCanvasHandle = {
   getRfEdges: () => Edge[]
   /** Removes unassigned Adapt nodes and spawns one per channel from Branch. */
   repairOrphanLaneAdapts: () => boolean
+  /** Drops nodes that are not connected to any edge in the graph. */
+  removeNodesByIds: (nodeIds: string[]) => boolean
+  /** Applies open properties-panel draft to canvas nodes. Returns false if validation blocks apply. */
+  applyOpenPropertiesPanel: () => boolean
   /** Closes the properties panel and clears unapplied config drafts. */
   dismissPropertiesPanel: () => void
 }
@@ -236,6 +251,8 @@ type WorkflowFlowCanvasProps = {
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
   workflowId?: string
+  /** Portal target so the properties panel stacks above the bottom prompt bar. */
+  overlayRoot?: HTMLElement | null
 }
 
 export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowFlowCanvasProps>(
@@ -256,12 +273,15 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onCanvasEdited,
       onConfigDraftChange,
       workflowId,
+      overlayRoot,
     },
     ref,
   ) {
     const { t } = useTranslation("workflow")
+    const flowTheme = useWorkflowFlowVisualTheme()
     const initialNodes = useMemo(() => [] as WfRfNode[], [])
     const initialEdges = useMemo(() => [] as Edge[], [])
+    const defaultViewport = useMemo(() => defaultWorkflowCanvasViewport(), [])
 
     const [nodes, setNodes, onNodesChange] = useNodesState<WfRfNode>(initialNodes)
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -271,6 +291,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const [popover, setPopover] = useState<PopoverState | null>(null)
     const [paletteDragType, setPaletteDragType] =
       useState<PlusPopoverType | null>(null)
+    const [activeDropTarget, setActiveDropTarget] =
+      useState<PaletteDropTarget | null>(null)
 
     const paletteSensors = useSensors(
       useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -337,7 +359,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         setPropConfig({})
         setPopover(null)
         endApiGraphSync()
-        queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
+        queueMicrotask(() => {
+          if (rf.current) applyWorkflowCanvasViewport(rf.current)
+        })
         return
       }
       if (!apiNodes || apiNodes.length === 0) return
@@ -360,7 +384,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       setPropConfig({})
       setPopover(null)
       endApiGraphSync()
-      queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
+      queueMicrotask(() => {
+        if (rf.current) applyWorkflowCanvasViewport(rf.current)
+      })
     }, [
       apiNodes,
       apiEdges,
@@ -462,28 +488,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       [nodes, setNodes],
     )
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        getRfNodes: () => nodesRef.current,
-        getRfEdges: () =>
-          edgesRef.current.filter((edge) => !isPreviewEdgeId(edge.id)),
-        repairOrphanLaneAdapts: () => {
-          const result = repairOrphanLaneAdapts(
-            nodesRef.current,
-            edgesRef.current,
-            branchChannels,
-          )
-          if (!result.repaired) return false
-          setNodes(result.nodes)
-          setEdges(result.edges)
-          return true
-        },
-        dismissPropertiesPanel: closePanel,
-      }),
-      [branchChannels, closePanel, setEdges, setNodes],
-    )
-
     const closePopover = useCallback(() => setPopover(null), [])
 
     const notifyCanvasEdited = useCallback(() => {
@@ -510,12 +514,46 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const handlePaletteDragStart = useCallback((event: DragStartEvent) => {
       const wfType = parsePaletteDragId(event.active.id)
-      if (wfType) setPaletteDragType(wfType)
+      if (wfType) {
+        setPaletteDragType(wfType)
+        setActiveDropTarget(null)
+      }
+    }, [])
+
+    const handlePaletteDragMove = useCallback(
+      (event: DragMoveEvent) => {
+        const wfType = parsePaletteDragId(event.active.id)
+        if (!wfType) return
+        const inst = rf.current
+        if (!inst) return
+        const flowPosition = flowPositionFromDragEvent(event, (pos) =>
+          inst.screenToFlowPosition(pos),
+        )
+        if (!flowPosition) {
+          setActiveDropTarget(null)
+          return
+        }
+        const target = resolvePaletteDropTarget(
+          flowPosition,
+          wfType,
+          nodesRef.current,
+          edgesRef.current,
+          channelCount,
+        )
+        setActiveDropTarget(target)
+      },
+      [channelCount],
+    )
+
+    const handlePaletteDragCancel = useCallback((_event: DragCancelEvent) => {
+      setPaletteDragType(null)
+      setActiveDropTarget(null)
     }, [])
 
     const handlePaletteDragEnd = useCallback(
       (event: DragEndEvent) => {
         setPaletteDragType(null)
+        setActiveDropTarget(null)
         if (readOnly || isMaterializedView) return
         const { active, over } = event
         if (!over || over.id !== WORKFLOW_CANVAS_DROP_ID) return
@@ -526,7 +564,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         const inst = rf.current
         if (!inst) return
 
-        const flowPosition = flowPositionFromDragEnd(event, (pos) =>
+        const flowPosition = flowPositionFromDragEvent(event, (pos) =>
           inst.screenToFlowPosition(pos),
         )
         if (!flowPosition) return
@@ -612,14 +650,56 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       [branchChannels, notifyCanvasEdited, popover, setEdges, setNodes],
     )
 
+    const dropHints = useMemo(() => {
+      if (!paletteDragType) return []
+      return listPaletteDropHints(
+        paletteDragType,
+        nodes,
+        edges,
+        channelCount,
+      )
+    }, [channelCount, edges, nodes, paletteDragType])
+
+    const afterSourceIds = useMemo(
+      () =>
+        new Set(
+          dropHints
+            .filter((h) => h.mode === "after")
+            .map((h) => h.sourceId),
+        ),
+      [dropHints],
+    )
+
+    const betweenEdgeIds = useMemo(
+      () =>
+        new Set(
+          dropHints
+            .filter((h) => h.mode === "between")
+            .map((h) => h.edgeId),
+        ),
+      [dropHints],
+    )
+
+    const showInitialDropHint = dropHints.some((h) => h.mode === "initial")
+    const activeAfterSourceId = afterSourceIdFromTarget(activeDropTarget)
+    const activeBetweenEdgeId =
+      activeDropTarget?.mode === "between" ? activeDropTarget.edgeId : null
+
     const edgesWithHandlers = useMemo(
       () =>
         edges.map((edge) => ({
           ...edge,
           type: edge.type ?? "plus_edge",
+          style: {
+            strokeWidth: 2,
+            ...edge.style,
+            stroke: flowTheme.edgeColor,
+          },
           data: {
             ...edge.data,
             readOnly,
+            paletteDropHighlight: betweenEdgeIds.has(edge.id),
+            paletteDropActive: activeBetweenEdgeId === edge.id,
             onInsert: readOnly
               ? undefined
               : (event: MouseEvent, labelX: number, labelY: number) => {
@@ -627,7 +707,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
                 },
           },
         })),
-      [edges, openBetweenPopover, readOnly],
+      [
+        activeBetweenEdgeId,
+        betweenEdgeIds,
+        edges,
+        flowTheme.edgeColor,
+        openBetweenPopover,
+        readOnly,
+      ],
     )
 
     const displayEdges = edgesWithHandlers
@@ -710,6 +797,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       [readOnly],
     )
 
+    const persistedNodeIds = useMemo(
+      () => new Set((apiNodes ?? []).map((node) => node.nodeId)),
+      [apiNodes],
+    )
+
     const selNode = useMemo(() => {
       const n = nodes.find((x) => x.id === settingsNodeId)
       if (
@@ -721,6 +813,60 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       }
       return rfNodeToWfNode(n)
     }, [nodes, settingsNodeId])
+
+    const syncVideoConfigToCanvas = useCallback(
+      (config: Record<string, unknown>) => {
+        if (readOnly || !settingsNodeId) return
+        const selected = nodesRef.current.find((n) => n.id === settingsNodeId)
+        if (selected?.type !== "wfNode" || selected.data.wfType !== "video") {
+          return
+        }
+        const configToApply = mergeHeygenVideoConfig({}, config)
+        const nextNodes = nodesRef.current.map((n) => {
+          if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              config: configToApply,
+            },
+          } as WfRfNode
+        })
+        nodesRef.current = nextNodes
+        setNodes(nextNodes)
+        setPropConfig(configToApply)
+        onConfigDraftChange?.(false)
+        if (
+          workflowId?.trim() &&
+          persistedNodeIds.has(settingsNodeId)
+        ) {
+          void heygenService
+            .patchPresenterConfig(workflowId, settingsNodeId, configToApply)
+            .catch(() => {
+              toast.error(t("canvas.videoSettingsSaveFailed"))
+            })
+        }
+      },
+      [
+        onConfigDraftChange,
+        persistedNodeIds,
+        readOnly,
+        settingsNodeId,
+        setNodes,
+        t,
+        workflowId,
+      ],
+    )
+
+    const handlePropConfigChange = useCallback(
+      (next: Record<string, unknown>) => {
+        setPropConfig(next)
+        if (selNode?.type === "video") {
+          syncVideoConfigToCanvas(next)
+        }
+      },
+      [selNode?.type, syncVideoConfigToCanvas],
+    )
 
     useEffect(() => {
       if (!selNode || readOnly) {
@@ -734,8 +880,15 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const onInit = useCallback((inst: ReactFlowInstance<WfRfNode>) => {
       rf.current = inst
-      queueMicrotask(() => void inst.fitView({ padding: 0.15 }))
+      queueMicrotask(() => applyWorkflowCanvasViewport(inst))
     }, [])
+
+    const onMoveEnd = useCallback<OnMoveEnd>(
+      (_event, viewport) => {
+        writeWorkflowCanvasViewport(viewport)
+      },
+      [],
+    )
 
     const deleteNode = useCallback(
       (nodeId: string) => {
@@ -807,6 +960,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             ...node,
             data: {
               onOpenPopover: readOnly ? undefined : openInitialPopover,
+              paletteDropHighlight: showInitialDropHint,
             },
           }
         }
@@ -816,7 +970,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
         if (!readOnly && wfType !== "merge") {
           if (node.type === "branchNode") {
-            showAddButton = !branchHasAllLaneAdapts(channelCount, validationNodes)
+            showAddButton = false
           } else if (
             wfType === "keywords" ||
             wfType === "intelligence" ||
@@ -865,10 +1019,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             onOpenAddPopover: showAddButton
               ? (event: MouseEvent) => openAfterPopover(event, node.id)
               : undefined,
+            paletteDropAfterHighlight: afterSourceIds.has(node.id),
+            paletteDropAfterActive: activeAfterSourceId === node.id,
           },
         }
       })
     }, [
+      activeAfterSourceId,
+      afterSourceIds,
       channelCount,
       deleteNode,
       edges,
@@ -882,13 +1040,15 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       readOnly,
       runtimeById,
       settingsNodeId,
+      showInitialDropHint,
     ])
 
-    const applyChanges = useCallback(() => {
-      if (readOnly) return
-      if (!settingsNodeId) return
-      const selected = nodes.find((n) => n.id === settingsNodeId)
-      if (selected?.type === "plus_placeholder") return
+    const applyChanges = useCallback((): boolean => {
+      if (readOnly) return true
+      if (!settingsNodeId) return true
+      const currentNodes = nodesRef.current
+      const selected = currentNodes.find((n) => n.id === settingsNodeId)
+      if (selected?.type === "plus_placeholder") return true
       let configToApply: Record<string, unknown> = propConfig
       if (selected?.data.wfType === "branch") {
         configToApply = { mode: "rule_channels" }
@@ -901,10 +1061,17 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           toast.info(t("canvas.imageSizeAdjusted"))
         }
       }
-      let nextNodes = nodes
+      if (selected?.type === "wfNode" && selected.data.wfType === "video") {
+        configToApply = mergeHeygenVideoConfig({}, propConfig)
+      }
+      let nextNodes = currentNodes
       let nextEdges = edgesRef.current
       if (selected?.data.wfType === "branch") {
-        const synced = syncBranchLanesToChannels(nodes, nextEdges, branchChannels)
+        const synced = syncBranchLanesToChannels(
+          currentNodes,
+          nextEdges,
+          branchChannels,
+        )
         nextNodes = synced.nodes.map((n) => {
           if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
           return {
@@ -923,9 +1090,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             }),
           )
         }
+        edgesRef.current = nextEdges
         setEdges(nextEdges)
       } else {
-        nextNodes = nodes.map((n) => {
+        nextNodes = currentNodes.map((n) => {
           if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
           return {
             ...n,
@@ -936,25 +1104,25 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           } as WfRfNode
         })
       }
+      nodesRef.current = nextNodes
       setNodes(nextNodes)
       setPropConfig(configToApply)
       onConfigDraftChange?.(false)
       if (
         workflowId?.trim() &&
+        persistedNodeIds.has(settingsNodeId) &&
         selected?.type === "wfNode" &&
         selected.data.wfType === "video"
       ) {
-        const heygenSafeConfig = mergeHeygenVideoConfig({}, configToApply)
         void heygenService
-          .patchPresenterConfig(workflowId, settingsNodeId, heygenSafeConfig)
+          .patchPresenterConfig(workflowId, settingsNodeId, configToApply)
           .catch(() => {
             toast.error(t("canvas.videoSettingsSaveFailed"))
           })
       }
+      return true
     }, [
       branchChannels,
-      edges,
-      nodes,
       onConfigDraftChange,
       propConfig,
       readOnly,
@@ -964,7 +1132,71 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       setPropConfig,
       t,
       workflowId,
+      persistedNodeIds,
     ])
+
+    const applyOpenPropertiesPanel = useCallback((): boolean => {
+      if (readOnly || !settingsNodeId) return true
+      const selected = nodesRef.current.find((n) => n.id === settingsNodeId)
+      if (
+        !selected ||
+        selected.type === "plus_placeholder" ||
+        (selected.type !== "wfNode" &&
+          selected.type !== "branchNode" &&
+          selected.type !== "mergeNode")
+      ) {
+        return true
+      }
+      const currentConfig = selected.data.config ?? {}
+      if (workflowConfigsEqual(propConfig, currentConfig)) return true
+      return applyChanges()
+    }, [applyChanges, propConfig, readOnly, settingsNodeId])
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        getRfNodes: () => nodesRef.current,
+        getRfEdges: () =>
+          edgesRef.current.filter((edge) => !isPreviewEdgeId(edge.id)),
+        repairOrphanLaneAdapts: () => {
+          const result = repairOrphanLaneAdapts(
+            nodesRef.current,
+            edgesRef.current,
+            branchChannels,
+          )
+          if (!result.repaired) return false
+          nodesRef.current = result.nodes
+          edgesRef.current = result.edges
+          setNodes(result.nodes)
+          setEdges(result.edges)
+          return true
+        },
+        removeNodesByIds: (nodeIds: string[]) => {
+          if (nodeIds.length === 0) return false
+          const idSet = new Set(nodeIds)
+          const nextNodes = nodesRef.current.filter((node) => !idSet.has(node.id))
+          if (nextNodes.length === nodesRef.current.length) return false
+          const nextEdges = edgesRef.current.filter(
+            (edge) => !idSet.has(edge.source) && !idSet.has(edge.target),
+          )
+          nodesRef.current = nextNodes
+          edgesRef.current = nextEdges
+          setNodes(nextNodes)
+          setEdges(nextEdges)
+          if (settingsNodeId && idSet.has(settingsNodeId)) {
+            setSettingsNodeId(null)
+            setPropConfig({})
+          }
+          if (selectedId && idSet.has(selectedId)) {
+            setSelectedId(null)
+          }
+          return true
+        },
+        applyOpenPropertiesPanel,
+        dismissPropertiesPanel: closePanel,
+      }),
+      [applyOpenPropertiesPanel, branchChannels, closePanel, selectedId, settingsNodeId, setEdges, setNodes],
+    )
 
     const showPalette = !readOnly && !isMaterializedView
 
@@ -972,6 +1204,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       <DndContext
         sensors={paletteSensors}
         onDragStart={showPalette ? handlePaletteDragStart : undefined}
+        onDragMove={showPalette ? handlePaletteDragMove : undefined}
+        onDragCancel={showPalette ? handlePaletteDragCancel : undefined}
         onDragEnd={showPalette ? handlePaletteDragEnd : undefined}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
@@ -987,6 +1221,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             onNodeClick={onNodeClick}
             onPaneClick={() => closePanel()}
             onInit={onInit}
+            onMoveEnd={onMoveEnd}
             nodesFocusable={false}
             selectNodesOnDrag={false}
             nodeTypes={nodeTypes}
@@ -994,38 +1229,76 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             isValidConnection={isValidConnection}
             minZoom={0.35}
             maxZoom={1.5}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-            className="h-full min-h-0 w-full flex-1 bg-transparent!"
+            defaultViewport={defaultViewport}
+            className="workflow-flow-canvas h-full min-h-0 w-full flex-1 bg-muted/10! dark:bg-transparent!"
             style={{ width: "100%", height: "100%" }}
           >
-            <Background gap={24} size={1} />
+            <Background
+              gap={24}
+              size={1}
+              color={flowTheme.backgroundDotColor}
+            />
             <Controls
               className="border-(--nt-border)! shadow-md!"
               showInteractive={false}
             />
             <MiniMap
               className="rounded-lg! border! border-(--nt-border)! bg-card! shadow-md!"
-              maskColor="rgba(247, 244, 239, 0.72)"
+              maskColor={flowTheme.minimapMaskColor}
               nodeStrokeWidth={2}
               zoomable
               pannable
             />
+            {paletteDragType ? (
+              <WorkflowPaletteDropHints
+                hints={dropHints}
+                activeTarget={activeDropTarget}
+                nodes={nodes}
+              />
+            ) : null}
           </ReactFlow>
           </WorkflowCanvasDropZone>
 
           {selNode && !readOnly ? (
-            <WorkflowPropertiesPanel
-              selNode={selNode}
-              propConfig={propConfig}
-              setPropConfig={setPropConfig}
-              resolvedChannels={resolvedChannels}
-              workflowId={workflowId}
-              onClose={closePanel}
-              onApply={applyChanges}
-              onReset={() => {
-                setPropConfig(selNode.config ?? {})
-              }}
-            />
+            <>
+              <div className="w-1/2 shrink-0" aria-hidden />
+              {overlayRoot
+                ? createPortal(
+                    <div className="absolute inset-y-0 right-0 z-50 flex w-1/2 min-w-0 flex-col">
+                      <WorkflowPropertiesPanel
+                        selNode={selNode}
+                        propConfig={propConfig}
+                        setPropConfig={handlePropConfigChange}
+                        nodePersisted={persistedNodeIds.has(selNode.id)}
+                        resolvedChannels={resolvedChannels}
+                        workflowId={workflowId}
+                        onClose={closePanel}
+                        onApply={applyChanges}
+                        onReset={() => {
+                          setPropConfig(selNode.config ?? {})
+                        }}
+                      />
+                    </div>,
+                    overlayRoot,
+                  )
+                : (
+                    <div className="flex w-1/2 shrink-0 min-w-0 flex-col">
+                      <WorkflowPropertiesPanel
+                        selNode={selNode}
+                        propConfig={propConfig}
+                        setPropConfig={handlePropConfigChange}
+                        nodePersisted={persistedNodeIds.has(selNode.id)}
+                        resolvedChannels={resolvedChannels}
+                        workflowId={workflowId}
+                        onClose={closePanel}
+                        onApply={applyChanges}
+                        onReset={() => {
+                          setPropConfig(selNode.config ?? {})
+                        }}
+                      />
+                    </div>
+                  )}
+            </>
           ) : null}
 
           <NodeSelectPopover

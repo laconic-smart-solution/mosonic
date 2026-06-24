@@ -1,5 +1,10 @@
 import type { TFunction } from "i18next"
 import type { Edge, Node } from "@xyflow/react"
+import {
+  DISTRIBUTION_CHANNELS,
+  channelLabel,
+  resolveDistributionChannelId,
+} from "@/shared/constants/distribution-channels"
 import type { ChipColor } from "@/lib/tokens"
 import { randomUuid } from "@/lib/random-uuid"
 
@@ -97,6 +102,58 @@ export const STATUS_COLOR: Record<RuleStatus, ChipColor> = {
 
 export const CHANNELS_ALL = ["facebook", "instagram", "x", "line", "linkedin", "youtube"] as const
 
+export const RULE_DISTRIBUTION_CHANNEL_IDS = DISTRIBUTION_CHANNELS.map((c) => c.id)
+
+export function isRuleChannelFieldPath(fieldPath: string | undefined): boolean {
+  return Boolean(fieldPath?.match(/^channels\[\d+\]\.channel$/))
+}
+
+export function ruleChannelIds(rule: RuleEntity): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const row of rule.channels) {
+    const id = resolveDistributionChannelId(row.channel)
+    if (!id || seen.has(id)) continue
+    if (!RULE_DISTRIBUTION_CHANNEL_IDS.includes(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+export function setRuleChannels(
+  rule: RuleEntity,
+  selectedIds: string[],
+): RuleEntity {
+  const unique: string[] = []
+  const seen = new Set<string>()
+  for (const raw of selectedIds) {
+    const id = resolveDistributionChannelId(raw)
+    if (!id || seen.has(id)) continue
+    if (!RULE_DISTRIBUTION_CHANNEL_IDS.includes(id)) continue
+    seen.add(id)
+    unique.push(id)
+  }
+  if (unique.length === 0) return rule
+
+  const byId = new Map<string, RuleEntity["channels"][number]>()
+  for (const row of rule.channels) {
+    byId.set(resolveDistributionChannelId(row.channel), row)
+  }
+
+  const channels = unique.map((id) => {
+    const existing = byId.get(id)
+    if (existing) return { ...existing, channel: id }
+    return {
+      channel: id,
+      priority: "medium" as const,
+      contentStyle: "custom style",
+    }
+  })
+
+  return { ...rule, channels }
+}
+
 const NOW = "2026-05-05T14:00:00.000Z"
 
 export const RULES_MOCK: RuleEntity[] = [
@@ -104,7 +161,7 @@ export const RULES_MOCK: RuleEntity[] = [
     ruleId: "b0872dad-ec95-4f9e-a1e4-0b39bd14d112",
     name: "Black Friday Campaign 2024",
     brand: {
-      brandName: "NeuralTex",
+      brandName: "Mosonic",
       industry: "SaaS / Technology",
       brandDescription: "AI-powered content orchestration platform for marketing teams.",
       brandTone: ["casual", "inspirational"],
@@ -431,9 +488,9 @@ export function buildRuleFlow(
           type: "bubbleNode",
           position: polarPoint(ring4, itemAngle),
           data: {
-            label: item,
+            label: section.key === "channels" ? channelLabel(item) : item,
             level: 3,
-            editable: true,
+            editable: section.key !== "channels",
             fieldPath:
               section.key === "channels"
                 ? `channels[${itemIndex}].channel`

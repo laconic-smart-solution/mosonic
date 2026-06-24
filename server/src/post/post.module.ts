@@ -1,23 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
 import { McpModule } from '../mcp/mcp.module';
-import { Upload, UploadSchema } from '../upload/schemas/upload.schema';
+import { RepositoriesModule } from '../repositories/repositories.module';
 import { UsersModule } from '../users/users.module';
+import { PostAnalyticsService } from './post-analytics.service';
 import { PostController } from './post.controller';
 import { PostService } from './post.service';
-import { Post, PostSchema } from './schemas/post.schema';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: Post.name, schema: PostSchema },
-      { name: Upload.name, schema: UploadSchema },
-    ]),
-    UsersModule,
-    McpModule,
-  ],
+  imports: [ConfigModule, RepositoriesModule, UsersModule, McpModule],
   controllers: [PostController],
-  providers: [PostService],
-  exports: [PostService, MongooseModule],
+  providers: [PostService, PostAnalyticsService],
+  exports: [PostService, PostAnalyticsService],
 })
 export class PostModule {}

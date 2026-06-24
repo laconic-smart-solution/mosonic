@@ -112,6 +112,8 @@ export class ContentPageItemDto {
   laneOutputs?: Record<string, Record<string, unknown>>;
   /** Present when an upload sidecar exists for this content. */
   uploadId?: string;
+  /** Net credits charged for this content (pipeline + reruns). */
+  creditsUsed?: number;
 }
 
 export class ContentPageResponseDto {

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { FormSection, FullRow } from "./rule-form-helpers"
-import { RuleFormCommaList } from "./rule-form-comma-list"
+import { RuleFormTagList } from "./rule-form-tag-list"
 import { RuleFormInput } from "./rule-form-input"
 import { RuleFormSelect } from "./rule-form-select"
 import { RuleFormTextarea } from "./rule-form-textarea"
@@ -35,15 +35,15 @@ export function AudienceSectionForm() {
       />
       <RuleFormInput name="audience.language" label={t("form.audience.primaryLanguage")} />
       <FullRow>
-        <RuleFormCommaList name="audience.location" label={t("form.audience.locations")} className="min-h-16" />
+        <RuleFormTagList name="audience.location" label={t("form.audience.locations")} />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList name="audience.interests" label={t("form.audience.interests")} className="min-h-16" />
+        <RuleFormTagList name="audience.interests" label={t("form.audience.interests")} />
       </FullRow>
       <FullRow>
-        <RuleFormCommaList name="audience.painPoints" label={t("form.audience.painPoints")} className="min-h-16" />
+        <RuleFormTagList name="audience.painPoints" label={t("form.audience.painPoints")} />
       </FullRow>
-      <RuleFormCommaList name="audience.targetLanguages" label={t("form.audience.targetLanguages")} rows={1} />
+      <RuleFormTagList name="audience.targetLanguages" label={t("form.audience.targetLanguages")} />
     </FormSection>
   )
 }

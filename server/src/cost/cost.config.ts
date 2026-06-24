@@ -73,3 +73,7 @@ export const ZERNIO_ACCOUNT_MONTHLY_USD = 6.0;
 
 /** OpenAI Whisper — USD per minute (approximate public pricing). */
 export const OPENAI_WHISPER_USD_PER_MINUTE = 0.006;
+
+/** Credit display rounding — minimum 1 credit per operation. */
+export const displayCredits = (precise: number): number =>
+  Math.max(1, Math.round(precise));

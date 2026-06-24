@@ -1,4 +1,4 @@
-import { getSharedSocket } from "./socket-client"
+import { getSharedSocket, joinSocketRoom, leaveSocketRoom } from "./socket-client"
 
 export type UploadStartedEvent = { uploadId: string; channel: string }
 export type UploadCompletedEvent = {
@@ -43,14 +43,11 @@ export type UploadUpdatedEvent = {
 }
 
 export function joinUploadRoom(uploadId: string) {
-  const socket = getSharedSocket()
-  socket.emit("join", { room: `upload_${uploadId}` })
-  return socket
+  return joinSocketRoom(`upload_${uploadId}`)
 }
 
 export function leaveUploadRoom(uploadId: string) {
-  const socket = getSharedSocket()
-  socket.emit("leave", { room: `upload_${uploadId}` })
+  leaveSocketRoom(`upload_${uploadId}`)
 }
 
 export function onUploadStarted(

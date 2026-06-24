@@ -1,5 +1,6 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { buildFileStorageFolderPath } from '../common/utils/file-storage-path.util';
 
 const logger = new Logger('FileServiceUpload');
 
@@ -103,7 +104,7 @@ export function normalizeMediaUploadMeta(
       fileName,
       mimeType: mimeTypeResolved,
       mediaKind: 'video',
-      folderPath: 'neural-tex/videos',
+      folderPath: buildFileStorageFolderPath('videos'),
     };
   }
 
@@ -112,7 +113,7 @@ export function normalizeMediaUploadMeta(
       fileName: base,
       mimeType: mime || 'image/png',
       mediaKind: 'image',
-      folderPath: 'neural-tex/images',
+      folderPath: buildFileStorageFolderPath('images'),
     };
   }
 

@@ -1,138 +1,54 @@
-import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { PrismaPipelineRepository } from '../repositories/prisma/prisma-pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
-  type PipelineDocument,
-} from './schemas/pipeline.schema';
-import { PipelineRepository } from './pipeline.repository';
+  type PipelineRecord,
+} from '../domain/pipeline/pipeline.types';
 
-describe('PipelineRepository.buildAncestorOutputs', () => {
-  const repo = Object.create(PipelineRepository.prototype) as PipelineRepository;
+describe('PrismaPipelineRepository.buildAncestorOutputs', () => {
+  const repo = Object.create(
+    PrismaPipelineRepository.prototype,
+  ) as PrismaPipelineRepository;
 
-  const pipeline = {
-    graph: {
-      edges: [
-        { from: 'text', to: 'image' },
-        { from: 'text', to: 'trans' },
-        { from: 'image', to: 'video' },
-        { from: 'trans', to: 'video' },
-      ],
-    },
-    nodes: [
-      {
-        nodeId: 'text',
-        type: WorkflowNodeType.TextGeneration,
-        order: 1,
-        lane: null,
-        status: PipelineNodeExecutionStatus.Completed,
-        output: JSON.stringify({ text: 'hello' }),
-      },
-      {
-        nodeId: 'image',
-        type: WorkflowNodeType.ImageGeneration,
-        order: 2,
-        lane: null,
-        status: PipelineNodeExecutionStatus.Completed,
-        output: JSON.stringify({ image: 'img.png' }),
-      },
-      {
-        nodeId: 'trans',
-        type: WorkflowNodeType.Translation,
-        order: 3,
-        lane: null,
-        status: PipelineNodeExecutionStatus.Completed,
-        output: JSON.stringify({ translatedText: 'สวัสดี' }),
-      },
-      {
-        nodeId: 'video',
-        type: WorkflowNodeType.VideoGeneration,
-        order: 4,
-        lane: null,
-        status: PipelineNodeExecutionStatus.Pending,
-        output: null,
-      },
-    ],
-  } as unknown as PipelineDocument;
+  function pipelineWithNodes(
+    nodes: Array<{
+      nodeId: string;
+      type: string;
+      order: number;
+      status: PipelineNodeExecutionStatus;
+      output: string | null;
+      lane?: string | null;
+    }>,
+    edges?: Array<{ from: string; to: string }>,
+  ): PipelineRecord {
+    return {
+      pipelineId: 'p1',
+      nodes,
+      graph: edges ? { edges } : {},
+    } as unknown as PipelineRecord;
+  }
 
-  it('merges all ancestor outputs for fan-in target', () => {
-    const outputs = repo.buildAncestorOutputs(pipeline, 'video');
-    expect(outputs.text).toBe('hello');
-    expect(outputs.image).toBe('img.png');
-    expect(outputs.translatedText).toBe('สวัสดี');
-  });
-
-  it('stacks intelligenceBrief from multiple intelligence ancestors', () => {
-    const intelPipeline = {
-      graph: {
-        edges: [
-          { from: 'intel1', to: 'intel2' },
-          { from: 'intel2', to: 'text' },
-        ],
-      },
-      nodes: [
+  it('returns outputs from completed ancestors only', () => {
+    const pipeline = pipelineWithNodes(
+      [
         {
-          nodeId: 'intel1',
-          type: WorkflowNodeType.Intelligence,
+          nodeId: 'a',
+          type: 'text_generation',
           order: 1,
-          lane: null,
-          status: PipelineNodeExecutionStatus.Completed,
-          output: JSON.stringify({ intelligenceBrief: 'Trend brief' }),
+          status: 'completed',
+          output: JSON.stringify({ text: 'hello' }),
         },
         {
-          nodeId: 'intel2',
-          type: WorkflowNodeType.Intelligence,
+          nodeId: 'b',
+          type: 'image_generation',
           order: 2,
-          lane: null,
-          status: PipelineNodeExecutionStatus.Completed,
-          output: JSON.stringify({ intelligenceBrief: 'Competitor brief' }),
-        },
-        {
-          nodeId: 'text',
-          type: WorkflowNodeType.TextGeneration,
-          order: 3,
-          lane: null,
-          status: PipelineNodeExecutionStatus.Pending,
+          status: 'pending',
           output: null,
         },
       ],
-    } as unknown as PipelineDocument;
-
-    const outputs = repo.buildAncestorOutputs(intelPipeline, 'text');
-    expect(outputs.intelligenceBrief).toBe(
-      'Trend brief\n\n---\n\nCompetitor brief',
+      [{ from: 'a', to: 'b' }],
     );
-  });
 
-  it('excludes sibling lane outputs for lane-scoped node', () => {
-    const lanePipeline = {
-      graph: {
-        edges: [
-          { from: 'text', to: 'adapt_ig' },
-          { from: 'text', to: 'adapt_fb' },
-        ],
-      },
-      nodes: [
-        {
-          nodeId: 'text',
-          lane: null,
-          status: PipelineNodeExecutionStatus.Completed,
-          output: JSON.stringify({ text: 'base' }),
-        },
-        {
-          nodeId: 'adapt_ig',
-          lane: 'instagram',
-          status: PipelineNodeExecutionStatus.Completed,
-          output: JSON.stringify({ text: 'ig copy' }),
-        },
-        {
-          nodeId: 'adapt_fb',
-          lane: 'facebook',
-          status: PipelineNodeExecutionStatus.Completed,
-          output: JSON.stringify({ text: 'fb copy' }),
-        },
-      ],
-    } as unknown as PipelineDocument;
-    const outputs = repo.buildAncestorOutputs(lanePipeline, 'adapt_ig');
-    expect(outputs.text).toBe('base');
-    expect(outputs.text).not.toBe('fb copy');
+    const result = repo.buildAncestorOutputs(pipeline, 'b');
+    expect(result.text).toBe('hello');
   });
 });

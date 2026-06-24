@@ -123,7 +123,7 @@ export function PreviewImageWithOverlay({
   const media = useFileObjectUrl(url)
   if (media.status !== "ready" || !media.src) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-[10px] border border-border bg-[color:var(--nt-canvas)]">
+      <div className="flex min-h-[120px] w-full items-center justify-center rounded-[10px] border border-border bg-muted/30">
         <MediaLoadPlaceholder
           className="w-full py-6"
           progress={media.progress}
@@ -134,13 +134,17 @@ export function PreviewImageWithOverlay({
     )
   }
   return (
-    <div className="group relative aspect-video overflow-hidden rounded-[10px] border border-border bg-[color:var(--nt-canvas)]">
+    <div className="group relative w-full overflow-hidden rounded-[10px] border border-border bg-muted/30">
       <button
         type="button"
-        className="block h-full w-full overflow-hidden border-0 p-0"
+        className="block w-full border-0 p-0"
         onClick={onOpen}
       >
-        <img src={media.src} alt={title} className="h-full w-full object-cover" />
+        <img
+          src={media.src}
+          alt={title}
+          className="max-h-[min(420px,60vh)] w-full object-contain"
+        />
       </button>
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
@@ -208,7 +212,7 @@ export function MediaVideoBlock({ url }: { url: string }) {
   const media = useFileObjectUrl(url)
   if (media.status !== "ready" || !media.src) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-lg bg-muted">
+      <div className="flex min-h-[160px] w-full items-center justify-center rounded-lg bg-muted/30">
         <MediaLoadPlaceholder
           className="w-full py-8"
           progress={media.progress}
@@ -222,7 +226,7 @@ export function MediaVideoBlock({ url }: { url: string }) {
     <video
       src={media.src}
       controls
-      className="aspect-video w-full rounded-lg bg-black"
+      className="max-h-[min(420px,60vh)] w-full rounded-lg bg-black object-contain"
       autoPlay
       muted
       playsInline

@@ -1,34 +1,31 @@
 import "@xyflow/react/dist/style.css"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { isAxiosError } from "axios"
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
+  applyNodeChanges,
   Background,
   Controls,
   MarkerType,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
   type Edge,
   type Node,
+  type NodeChange,
 } from "@xyflow/react"
-import type { Attachment } from "@/components/core/prompt-area"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/app/page-shell"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ruleFlowNodeTypes,
-  type BubbleNodeData,
 } from "@/features/rules/components/bubble-node"
 import { CreateRuleDialog } from "@/features/rules/components/create-rule-dialog"
 import { RuleDetailForm } from "@/features/rules/components/rule-detail-form"
@@ -40,56 +37,27 @@ import {
   ruleFlowEdgeTypes,
 } from "@/features/rules/components/rule-flow-edge"
 import { RulesListDrawer } from "@/features/rules/components/rules-list-drawer"
+import { useRuleFlowVisualTheme } from "@/features/rules/lib/rule-flow-theme"
 import {
-  type RuleFlowNodeData,
-  addListItemFromNode,
   buildRuleFlow,
   createRuleFromPrompt,
-  removeListItemFromNode,
-  updateRuleFromNode,
   type RuleEntity,
 } from "@/features/rules/data/rules-mock"
+import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
+import { toastApiError } from "@/shared/lib/toast-error"
 import {
-  useExtractRuleMutation,
   usePutRuleMutation,
   useRuleByIdQuery,
   useRulesPageQuery,
 } from "@/shared/queries/rule.query"
 import type { RuleReplacePayload } from "@/shared/services/rule.service"
 import type { RuleListItem } from "@/shared/services/rule.service"
-import {
-  formatMaxFileSizeMb,
-  RULE_EXTRACT_MAX_FILE_BYTES,
-} from "@/lib/rule-extract-limits"
-import { buildRuleExtractFormData } from "@/lib/strategy-input"
-import {
-  joinRuleRoom,
-  leaveRuleRoom,
-  onRuleCompleted,
-  onRuleFailed,
-  onRuleInputProcessed,
-  onRuleReadingInput,
-  onRuleStarted,
-  onRuleStreaming,
-} from "@/shared/socket/rule-events"
 
-type RuleViewMode = "tree" | "detail"
+type RuleViewMode = "tree" | "manage"
 const RULES_DRAWER_PAGE_LIMIT = 8
 
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const data = error.response?.data as unknown
-    if (typeof data === "string" && data.trim()) return data
-    if (data && typeof data === "object") {
-      const msg = (data as Record<string, unknown>).message
-      if (typeof msg === "string" && msg.trim()) return msg
-      if (Array.isArray(msg) && typeof msg[0] === "string")
-        return msg.join(", ")
-    }
-    if (error.message) return error.message
-  }
-  if (error instanceof Error && error.message) return error.message
-  return fallback
+function isVisibleRuleListItem(rule: { status: string }): boolean {
+  return rule.status !== "failed"
 }
 
 function toReplacePayload(rule: RuleEntity): RuleReplacePayload {
@@ -101,19 +69,6 @@ function toReplacePayload(rule: RuleEntity): RuleReplacePayload {
     channels: rule.channels,
     contentGuidelines: rule.contentGuidelines,
   }
-}
-
-function mergeFlowNodePositions<T extends Node>(next: T[], prev: T[]): T[] {
-  const prevById = new Map(prev.map((n) => [n.id, n]))
-  return next.map((n) => {
-    const p = prevById.get(n.id)
-    if (!p) return n
-    return {
-      ...n,
-      position: p.position,
-      ...(p.selected !== undefined ? { selected: p.selected } : {}),
-    }
-  })
 }
 
 export default function RulesPage() {
@@ -159,25 +114,65 @@ export default function RulesPage() {
     routeState.sourcePrompt ?? ""
   )
   const [createDialogKey, setCreateDialogKey] = useState(0)
-  const [processingRuleId, setProcessingRuleId] = useState<string | null>(null)
-  const [progressStep, setProgressStep] = useState<
-    | "idle"
-    | "started"
-    | "reading_input"
-    | "input_processed"
-    | "streaming"
-    | "completed"
-    | "failed"
-  >("idle")
-  const [streamedContent, setStreamedContent] = useState("")
-  const [failureMessage, setFailureMessage] = useState("")
   const [viewMode, setViewMode] = useState<RuleViewMode>("tree")
-  const [treeDraft, setTreeDraft] = useState<RuleEntity | null>(null)
 
-  const extractRuleMutation = useExtractRuleMutation()
   const putRuleMutation = usePutRuleMutation()
+  const flowTheme = useRuleFlowVisualTheme()
 
-  const pageList = rulesPageQuery.data?.data
+  const pageList = useMemo(
+    () => (rulesPageQuery.data?.data ?? []).filter(isVisibleRuleListItem),
+    [rulesPageQuery.data?.data],
+  )
+
+  const handleExtractStarted = useCallback(
+    (ruleId: string, previewLabel: string) => {
+      const nextRule = {
+        ...createRuleFromPrompt(previewLabel),
+        ruleId,
+        name: t("page.processingRuleName"),
+        status: "processing" as const,
+      }
+      queryClient.setQueryData<RuleEntity>(["rule", ruleId], nextRule)
+      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+      setSelectedRuleId(ruleId)
+      setCreateDialogOpen(false)
+      setCreatePrompt("")
+    },
+    [queryClient, t],
+  )
+
+  const handleExtractCompleted = useCallback(
+    async (ruleId: string) => {
+      setSelectedRuleId(ruleId)
+      await queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+      await queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
+    },
+    [queryClient],
+  )
+
+  const {
+    processingRuleId,
+    progressStep,
+    failureMessage,
+    streamedContent,
+    showOverlay: showExtractionOverlay,
+    runExtract: runRuleExtract,
+    dismissFailure,
+    isPending: isExtracting,
+  } = useRuleExtraction({
+    onExtractStarted: handleExtractStarted,
+    onCompleted: handleExtractCompleted,
+  })
+
+  const dismissExtractionFailure = useCallback(() => {
+    dismissFailure()
+    setSelectedRuleId((prev) => {
+      if (!pageList.length) return undefined
+      if (prev && pageList.some((r) => r.ruleId === prev)) return prev
+      return pageList[0]?.ruleId
+    })
+  }, [dismissFailure, pageList])
+
   const drawerRulesPageQuery = useRulesPageQuery(
     {
       page: drawerPage,
@@ -196,7 +191,9 @@ export default function RulesPage() {
 
   useEffect(() => {
     if (!rulesDrawerOpen) return
-    const pageData = drawerRulesPageQuery.data?.data ?? []
+    const pageData = (drawerRulesPageQuery.data?.data ?? []).filter(
+      isVisibleRuleListItem,
+    )
     if (!pageData.length && drawerPage !== 1) return
     setDrawerSummaries((prev) => {
       const base = drawerPage === 1 ? [] : prev
@@ -221,7 +218,11 @@ export default function RulesPage() {
   }, [drawerPage, drawerRulesPageQuery.data?.data, rulesDrawerOpen, t])
 
   useEffect(() => {
-    if (!pageList?.length) return
+    if (processingRuleId) return
+    if (!pageList.length) {
+      setSelectedRuleId(undefined)
+      return
+    }
     const ids = pageList.map((r) => r.ruleId)
     setSelectedRuleId((prev) => {
       if (prev && ids.includes(prev)) return prev
@@ -233,11 +234,16 @@ export default function RulesPage() {
       }
       return ids[0]
     })
-  }, [pageList, routeState.selectedRuleId])
+  }, [pageList, processingRuleId, routeState.selectedRuleId])
+
+  const handleExtractionTryAgain = useCallback(() => {
+    dismissExtractionFailure()
+    setCreateDialogOpen(true)
+  }, [dismissExtractionFailure])
 
   const summaries = useMemo(
     () =>
-      (pageList ?? []).map((rule: RuleListItem) => ({
+      pageList.map((rule: RuleListItem) => ({
         ruleId: rule.ruleId,
         name: rule.name,
         tones: rule.tones,
@@ -266,35 +272,30 @@ export default function RulesPage() {
     Boolean(selectedRuleId)
   )
   const selectedRule = ruleDetailQuery.data
+
+  useSetBreadcrumbLabel(selectedRule?.name)
+
   const showRuleSkeleton =
     Boolean(selectedRuleId) &&
     !ruleDetailQuery.isError &&
     ruleDetailQuery.isLoading
 
-  useEffect(() => {
-    if (!selectedRule) return
-    setTreeDraft((prev) => {
-      if (!prev || prev.ruleId !== selectedRule.ruleId) {
-        return selectedRule
-      }
-      // While extracting we cache a placeholder rule (`processing`). After completion the
-      // query refetches the real rule — we must replace the draft or we keep stale status and
-      // every list field looks "edited" vs server (false "N pending" / save bar).
-      if (prev.status === "processing" && selectedRule.status !== "processing") {
-        return selectedRule
-      }
-      return prev
-    })
-  }, [selectedRule])
-
-  const treeWorkingRule = treeDraft?.ruleId === selectedRule?.ruleId ? treeDraft : selectedRule
-
   const flow = useMemo(() => {
-    if (!treeWorkingRule) return { nodes: [] as Node[], edges: [] as Edge[] }
-    return buildRuleFlow(treeWorkingRule, t)
-  }, [treeWorkingRule, t])
+    if (!selectedRule) return { nodes: [] as Node[], edges: [] as Edge[] }
+    return buildRuleFlow(selectedRule, t)
+  }, [selectedRule, t])
 
-  const handleDetailSave = useCallback(
+  const [flowNodes, setFlowNodes] = useState<Node[]>([])
+
+  useEffect(() => {
+    setFlowNodes(flow.nodes)
+  }, [flow])
+
+  const onFlowNodesChange = useCallback((changes: NodeChange[]) => {
+    setFlowNodes((nodes) => applyNodeChanges(changes, nodes))
+  }, [])
+
+  const handleManageSave = useCallback(
     async (values: RuleEntity) => {
       if (!selectedRuleId) return values
       if (values.status === "processing") return values
@@ -306,120 +307,12 @@ export default function RulesPage() {
         toast.success(t("toast.ruleSaved"), { id: "rule-detail-save" })
         return data
       } catch (err) {
-        toast.error(apiErrorMessage(err, t("toast.couldNotSaveRule")))
+        toastApiError(err, "rules:toast.couldNotSaveRule", { id: "rule-detail-save" })
         return values
       }
     },
     [putRuleMutation, selectedRuleId, t]
   )
-
-  const onSaveNode = useCallback(
-    (fieldPath: string, nextValue: string) => {
-      setTreeDraft((prev) => {
-        if (!prev || prev.status === "processing") return prev
-        return updateRuleFromNode(prev, fieldPath, nextValue)
-      })
-    },
-    []
-  )
-
-  const onAddNodeItem = useCallback((fieldPath: string) => {
-    setTreeDraft((prev) => {
-      if (!prev || prev.status === "processing") return prev
-      return addListItemFromNode(prev, fieldPath)
-    })
-  }, [])
-
-  const onRemoveNodeItem = useCallback((fieldPath: string) => {
-    setTreeDraft((prev) => {
-      if (!prev || prev.status === "processing") return prev
-      return removeListItemFromNode(prev, fieldPath)
-    })
-  }, [])
-
-  const onSaveNodeRef = useRef(onSaveNode)
-  onSaveNodeRef.current = onSaveNode
-  const onAddNodeItemRef = useRef(onAddNodeItem)
-  onAddNodeItemRef.current = onAddNodeItem
-  const onRemoveNodeItemRef = useRef(onRemoveNodeItem)
-  onRemoveNodeItemRef.current = onRemoveNodeItem
-
-  const enhancedNodes = useMemo(() => {
-    return flow.nodes.map((node) => {
-      const base = node.data as RuleFlowNodeData
-      return {
-        ...node,
-        data: {
-          ...base,
-          onSaveNode: (fp: string, nextValue: string) =>
-            onSaveNodeRef.current(fp, nextValue),
-          onAddNodeItem: (fp: string) => onAddNodeItemRef.current(fp),
-          onRemoveNodeItem: (fp: string) => onRemoveNodeItemRef.current(fp),
-        },
-      }
-    }) as Node<BubbleNodeData>[]
-  }, [flow.nodes])
-
-  const treeDraftDirty = useMemo(() => {
-    if (!selectedRule || !treeWorkingRule) return false
-    return (
-      JSON.stringify(toReplacePayload(treeWorkingRule)) !==
-      JSON.stringify(toReplacePayload(selectedRule))
-    )
-  }, [selectedRule, treeWorkingRule])
-
-  const treeListChangeCount = useMemo(() => {
-    if (!selectedRule || !treeWorkingRule) return 0
-
-    const countListDiff = (a: string[], b: string[]) => {
-      const length = Math.max(a.length, b.length)
-      let changed = 0
-      for (let i = 0; i < length; i += 1) {
-        if ((a[i] ?? "") !== (b[i] ?? "")) changed += 1
-      }
-      return changed
-    }
-
-    return (
-      countListDiff(selectedRule.brand.brandTone, treeWorkingRule.brand.brandTone) +
-      countListDiff(selectedRule.audience.location, treeWorkingRule.audience.location) +
-      countListDiff(selectedRule.audience.interests, treeWorkingRule.audience.interests) +
-      countListDiff(selectedRule.campaign.goals, treeWorkingRule.campaign.goals) +
-      countListDiff(selectedRule.campaign.keywords, treeWorkingRule.campaign.keywords) +
-      countListDiff(selectedRule.campaign.contentFormats, treeWorkingRule.campaign.contentFormats) +
-      countListDiff(
-        selectedRule.contentGuidelines.dos,
-        treeWorkingRule.contentGuidelines.dos
-      ) +
-      countListDiff(
-        selectedRule.contentGuidelines.donts,
-        treeWorkingRule.contentGuidelines.donts
-      ) +
-      countListDiff(
-        selectedRule.channels.map((c) => c.channel),
-        treeWorkingRule.channels.map((c) => c.channel)
-      )
-    )
-  }, [selectedRule, treeWorkingRule])
-
-  const handleDiscardTreeDraft = useCallback(() => {
-    if (selectedRule) setTreeDraft(selectedRule)
-  }, [selectedRule])
-
-  const handleSaveTreeDraft = useCallback(async () => {
-    if (!selectedRuleId || !treeWorkingRule || !treeDraftDirty) return
-    if (treeWorkingRule.status === "processing") return
-    try {
-      const data = await putRuleMutation.mutateAsync({
-        ruleId: selectedRuleId,
-        body: toReplacePayload(treeWorkingRule),
-      })
-      setTreeDraft(data)
-      toast.success(t("toast.treeChangesSaved"))
-    } catch (err) {
-      toast.error(apiErrorMessage(err, t("toast.couldNotSaveTree")))
-    }
-  }, [putRuleMutation, selectedRuleId, treeWorkingRule, treeDraftDirty, t])
 
   const enhancedEdges = useMemo(() => {
     return flow.edges.map((edge) => ({
@@ -429,158 +322,27 @@ export default function RulesPage() {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: "#8A96A8",
+        color: flowTheme.edgeColor,
       },
       animated: true,
       style: {
-        stroke: "#8A96A8",
-        strokeOpacity: 0.55,
-        strokeWidth: 1.5,
+        stroke: flowTheme.edgeColor,
+        strokeOpacity: flowTheme.edgeOpacity,
+        strokeWidth: flowTheme.edgeWidth,
         ...edge.style,
       },
     })) as Edge[]
-  }, [flow.edges])
-
-  const [canvasNodes, setCanvasNodes, onNodesChange] = useNodesState<
-    Node<BubbleNodeData>
-  >([])
-  const [canvasEdges, setCanvasEdges, onEdgesChange] = useEdgesState<Edge>([])
-
-  useLayoutEffect(() => {
-    setCanvasNodes((prev) => mergeFlowNodePositions(enhancedNodes, prev))
-  }, [enhancedNodes, setCanvasNodes])
-
-  useLayoutEffect(() => {
-    setCanvasEdges(enhancedEdges)
-  }, [enhancedEdges, setCanvasEdges])
-
-  const hydrateCompletedRule = useCallback(
-    async (ruleId: string) => {
-      setProgressStep("completed")
-      setSelectedRuleId(ruleId)
-      await queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      await queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
-      setProcessingRuleId(null)
-      leaveRuleRoom(ruleId)
-    },
-    [queryClient]
-  )
-
-  useEffect(() => {
-    if (!processingRuleId) return
-
-    const cleanupStarted = onRuleStarted(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("started")
-    })
-
-    const cleanupReadingInput = onRuleReadingInput(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("reading_input")
-    })
-
-    const cleanupInputProcessed = onRuleInputProcessed(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("input_processed")
-    })
-
-    const cleanupStreaming = onRuleStreaming(({ ruleId, chunk }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("streaming")
-      setStreamedContent((prev) => `${prev}${prev ? " " : ""}${chunk}`)
-    })
-
-    const cleanupCompleted = onRuleCompleted(({ ruleId }) => {
-      if (ruleId !== processingRuleId) return
-      void hydrateCompletedRule(ruleId)
-    })
-
-    const cleanupFailed = onRuleFailed(({ ruleId, message }) => {
-      if (ruleId !== processingRuleId) return
-      setProgressStep("failed")
-      setFailureMessage(message ?? t("toast.generationFailed"))
-      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      void queryClient.invalidateQueries({ queryKey: ["rule", ruleId] })
-      setProcessingRuleId(null)
-      leaveRuleRoom(ruleId)
-    })
-
-    return () => {
-      cleanupStarted()
-      cleanupReadingInput()
-      cleanupInputProcessed()
-      cleanupStreaming()
-      cleanupCompleted()
-      cleanupFailed()
-    }
-  }, [hydrateCompletedRule, processingRuleId, queryClient, t])
-
-  async function runRuleExtract(text: string, attachments: Attachment[]) {
-    const trimmed = text.trim()
-    const hasFile = attachments.some(
-      (a) => a.type === "file" && a.data instanceof File
-    )
-    const hasUrl = attachments.some((a) => a.type === "url")
-    if (!trimmed && !hasFile && !hasUrl) return
-
-    for (const a of attachments) {
-      if (a.type === "file" && a.data instanceof File) {
-        if (a.data.size > RULE_EXTRACT_MAX_FILE_BYTES) {
-          const msg = t("toast.fileTooLarge", {
-            name: a.label,
-            maxMb: formatMaxFileSizeMb(RULE_EXTRACT_MAX_FILE_BYTES),
-          })
-          toast.error(msg)
-          setProgressStep("failed")
-          setFailureMessage(msg)
-          return
-        }
-      }
-    }
-
-    try {
-      const formData = buildRuleExtractFormData(text, attachments)
-      const { ruleId } = await extractRuleMutation.mutateAsync(formData)
-      const previewLabel =
-        trimmed ||
-        attachments
-          .map((a) => a.label)
-          .filter(Boolean)
-          .join(", ") ||
-        t("page.attachmentsFallback")
-      const nextRule = {
-        ...createRuleFromPrompt(previewLabel),
-        ruleId,
-        name: t("page.processingRuleName"),
-        status: "processing" as const,
-      }
-
-      queryClient.setQueryData<RuleEntity>(["rule", ruleId], nextRule)
-      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
-      setSelectedRuleId(ruleId)
-      setCreateDialogOpen(false)
-      setCreatePrompt("")
-      setProcessingRuleId(ruleId)
-      setProgressStep("idle")
-      setFailureMessage("")
-      setStreamedContent("")
-      joinRuleRoom(ruleId)
-      toast.success(t("toast.extractionStarted"))
-    } catch (err) {
-      const message = apiErrorMessage(err, t("toast.couldNotStartExtraction"))
-      setProgressStep("failed")
-      setFailureMessage(message)
-      toast.error(message)
-    }
-  }
+  }, [flow.edges, flowTheme])
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-4">
+    <PageShell variant="canvas">
+      <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">{t("page.title")}</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("drawer.description")}</p>
           {rulesPageQuery.isError ? (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-red-600 dark:text-red-400">
               {t("page.loadError")}
             </p>
           ) : null}
@@ -629,8 +391,8 @@ export default function RulesPage() {
         </div>
       </div>
 
-      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background">
-        <div className="pointer-events-auto absolute top-3 right-3 z-20 rounded-full border border-border/80 bg-background/95 p-0.5 shadow-md backdrop-blur-sm">
+      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background dark:bg-[#0D1118]">
+        <div className="pointer-events-auto absolute top-3 right-3 z-20 rounded-full border border-border/80 bg-background/95 p-0.5 shadow-md backdrop-blur-sm dark:border-border dark:bg-card/95">
           <Tabs
             orientation="horizontal"
             value={viewMode}
@@ -647,21 +409,23 @@ export default function RulesPage() {
                 {t("page.viewTree")}
               </TabsTrigger>
               <TabsTrigger
-                value="detail"
+                value="manage"
                 className="rounded-full px-3 py-1 text-xs"
               >
-                {t("page.viewDetail")}
+                {t("page.viewManage")}
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {processingRuleId ? (
+        {showExtractionOverlay ? (
           <RuleExtractionProgress
-            ruleId={processingRuleId}
+            ruleId={processingRuleId ?? ""}
             progressStep={progressStep}
             failureMessage={failureMessage}
             streamedContent={streamedContent}
+            onDismiss={failureMessage ? dismissExtractionFailure : undefined}
+            onTryAgain={failureMessage ? handleExtractionTryAgain : undefined}
           />
         ) : null}
 
@@ -684,66 +448,54 @@ export default function RulesPage() {
             </div>
           ) : showRuleSkeleton && viewMode === "tree" ? (
             <RuleFlowSkeleton />
-          ) : showRuleSkeleton && viewMode === "detail" ? (
+          ) : showRuleSkeleton && viewMode === "manage" ? (
             <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-4 pt-1 pb-4">
               <RuleDetailViewSkeleton />
+            </div>
+          ) : selectedRule?.status === "failed" ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <p className="text-sm font-medium text-destructive">
+                {t("extraction.titleFailed")}
+              </p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {t("extraction.failedHint")}
+              </p>
+              <Button type="button" onClick={handleExtractionTryAgain}>
+                {t("extraction.tryAgain")}
+              </Button>
             </div>
           ) : selectedRule && viewMode === "tree" ? (
             <div className="relative min-h-0 flex-1">
               <ReactFlow
-                nodes={canvasNodes}
-                edges={canvasEdges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
+                nodes={flowNodes}
+                edges={enhancedEdges}
                 nodeTypes={ruleFlowNodeTypes}
                 edgeTypes={ruleFlowEdgeTypes}
                 connectionLineComponent={FloatingConnectionLine}
+                onNodesChange={onFlowNodesChange}
                 fitView
                 nodesConnectable={false}
                 nodesDraggable
+                nodesFocusable={false}
                 edgesFocusable={false}
-                elementsSelectable
+                elementsSelectable={false}
                 panOnDrag
                 zoomOnScroll
-                className="h-full min-h-0 w-full flex-1"
+                className="rule-flow-canvas h-full min-h-0 w-full flex-1"
               >
-                <Background gap={18} size={1} />
+                <Background
+                  gap={18}
+                  size={1}
+                  color={flowTheme.backgroundDotColor}
+                />
                 <Controls showInteractive={false} />
               </ReactFlow>
-              {treeDraftDirty ? (
-                <div className="pointer-events-none absolute right-4 bottom-4 z-20 flex justify-end">
-                  <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/80 bg-background/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-                    <span className="px-2 text-xs text-muted-foreground">
-                      {t("page.pendingChanges", { count: treeListChangeCount })}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full px-4"
-                      onClick={handleDiscardTreeDraft}
-                      disabled={putRuleMutation.isPending}
-                    >
-                      {t("page.discardAll")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="rounded-full px-4"
-                      onClick={() => void handleSaveTreeDraft()}
-                      disabled={putRuleMutation.isPending || !treeDraftDirty}
-                    >
-                      {t("page.saveChanges")}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </div>
-          ) : selectedRule && viewMode === "detail" ? (
+          ) : selectedRule && viewMode === "manage" ? (
             <RuleDetailForm
               rule={selectedRule}
               isSaving={putRuleMutation.isPending}
-              onSubmit={handleDetailSave}
+              onSubmit={handleManageSave}
             />
           ) : null}
         </div>
@@ -761,7 +513,9 @@ export default function RulesPage() {
         onPromptChange={setCreatePrompt}
         promptAreaKey={createDialogKey}
         onExtract={runRuleExtract}
+        isExtracting={isExtracting}
       />
-    </div>
+      </div>
+    </PageShell>
   )
 }

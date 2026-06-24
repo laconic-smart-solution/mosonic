@@ -9,7 +9,7 @@
     "selectOrCreate": "选择或创建规则",
     "loadRuleError": "无法加载此规则。",
     "viewTree": "树状图",
-    "viewDetail": "详情",
+    "viewManage": "管理",
     "pendingChanges": "{{count}} 项待保存",
     "discardAll": "全部放弃",
     "saveChanges": "保存更改",
@@ -49,7 +49,10 @@
     "titleFailed": "规则生成失败",
     "titleGenerating": "正在生成您的规则",
     "subtitle": "规则提取",
-    "waitMessage": "请稍候，我们正在处理您的提示…"
+    "waitMessage": "请稍候，我们正在处理您的提示…",
+    "failedHint": "无法从您的输入中提取规则。请提供更多细节或尝试其他来源后重试。",
+    "dismiss": "关闭",
+    "tryAgain": "重试"
   },
   "createDialog": {
     "title": "通过提示创建规则",
@@ -64,13 +67,12 @@
     "scrollToLoadMore": "滚动以加载更多"
   },
   "bubbleNode": {
-    "editTitle": "编辑节点内容",
     "detailsTitle": "节点详情",
-    "editDescription": "更新此节点值并保存。",
-    "structureDescription": "此节点为结构标签。",
-    "saveNode": "保存节点",
-    "addItem": "添加项",
-    "removeItem": "移除项"
+    "viewOnlyDescription": "只读预览。切换到「管理」以编辑此规则。",
+    "structureDescription": "此节点为结构标签。"
+  },
+  "channelsDialog": {
+    "atLeastOne": "请至少选择一个渠道。"
   },
   "detail": {
     "campaignRule": "活动规则",
@@ -90,7 +92,10 @@
     "cancel": "取消"
   },
   "form": {
-    "commaListHint": "以逗号分隔的值",
+    "tagListHint": "输入内容后点击 + 添加。",
+    "tagListPlaceholder": "添加一项…",
+    "tagListAdd": "添加",
+    "tagListRemoveAria": "移除 {{value}}",
     "brand": {
       "title": "品牌",
       "subtitle": "语调、定位及品牌在内容中的呈现方式。",
@@ -133,9 +138,9 @@
     },
     "channels": {
       "title": "渠道",
-      "subtitle": "此规则适用的渠道。以逗号分隔渠道名称。",
+      "subtitle": "此规则适用的渠道，请选择一个或多个分发平台。",
       "distribution": "分发",
-      "distributionHint": "以逗号分隔的渠道名称"
+      "distributionHint": "勾选此活动应发布的平台。"
     },
     "guidelines": {
       "title": "指南",
@@ -246,6 +251,12 @@
     "runStatusFailed": "失败",
     "runStatusStarted": "已开始",
     "runStatusNoMatch": "无匹配",
+    "runStatusKeywordSkip": "关键词过滤",
+    "runStatusRelevanceSkip": "相关性不足",
+    "runStatusDailyLimit": "已达日限额",
+    "runStatusNoArticles": "无文章",
+    "runStatusNoWorkflow": "无工作流",
+    "runStatusConcurrentLimit": "系统繁忙",
     "runQueued": "新闻检查已排队…",
     "runInProgress": "此活动已有运行在进行中。",
     "runTimeoutMessage": "新闻运行超时。请确认 API 工作进程正在运行（RUN_WORKERS_IN_API）且 Redis 可用。",

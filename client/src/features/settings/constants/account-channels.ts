@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { Bird, Building2, Camera, Music2, PlayCircle, Share2 } from "lucide-react"
+import { Building2, Camera, Music2, PlayCircle, Share2 } from "lucide-react"
 
 export type AccountChannelDef = {
   /** Stable id for React keys */
@@ -15,7 +15,7 @@ export type AccountChannelDef = {
   iconTileClass: string
 }
 
-/** Display order: Facebook, Twitter, Instagram, YouTube, LinkedIn, TikTok */
+/** Display order: Facebook, Instagram, YouTube, LinkedIn, TikTok */
 export const ACCOUNT_CHANNELS: readonly AccountChannelDef[] = [
   {
     id: "facebook",
@@ -25,15 +25,6 @@ export const ACCOUNT_CHANNELS: readonly AccountChannelDef[] = [
     description: "Pages and profiles for Meta publishing.",
     icon: Share2,
     iconTileClass: "bg-[#1877F2]/15 text-[#1877F2]",
-  },
-  {
-    id: "twitter",
-    apiKey: "x",
-    matchKeys: ["x", "twitter"],
-    label: "Twitter",
-    description: "Short-form posts via X.",
-    icon: Bird,
-    iconTileClass: "bg-foreground/10 text-foreground",
   },
   {
     id: "instagram",

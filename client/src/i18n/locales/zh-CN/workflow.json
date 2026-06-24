@@ -32,7 +32,12 @@
     "video_generation": "视频",
     "translation": "翻译",
     "transcription": "转录",
-    "summarization": "摘要"
+    "summarization": "摘要",
+    "adapt": "适配",
+    "intelligence": "情报",
+    "social_account_connect": "社交账户解锁",
+    "rule_generation": "规则生成",
+    "workflow_generation": "工作流生成"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"
@@ -181,9 +186,13 @@
       "resolution720p": "720p (Sora 2)",
       "duration4s": "4秒",
       "duration8s": "8秒",
+      "duration10s": "10秒",
       "duration12s": "12秒",
       "duration16s": "16秒",
       "duration20s": "20秒",
+      "duration30s": "30秒",
+      "duration40s": "40秒",
+      "duration60s": "60秒",
       "low": "低",
       "high": "高",
       "autoDetect": "自动检测",
@@ -217,6 +226,8 @@
     "channel": "渠道：{{channel}}",
     "fanInBarrier": "汇聚屏障",
     "configured": "已配置",
+    "temperature": "温度 {{value}}",
+    "maxTokens": "{{value}} tokens",
     "intelligenceTypes": {
       "all": "全部",
       "trend": "趋势",
@@ -252,7 +263,9 @@
     "saveChanges": "保存更改",
     "runPipeline": "运行流水线",
     "stopPipeline": "停止流水线",
-    "generateContent": "生成内容"
+    "generateContent": "生成内容",
+    "generateWorkflow": "生成工作流",
+    "generateWorkflowAndContent": "生成工作流和内容"
   },
   "palette": {
     "title": "节点",
@@ -292,11 +305,15 @@
   },
   "presenter": {
     "saveWorkflowFirst": "上传形象前请先保存工作流。",
+    "saveWorkflowToSync": "保存工作流后可上传新形象或将数字人设置同步到服务器。您仍可在本地选择形象和语音。",
     "saveFailed": "无法保存数字人设置。请保存工作流后重试。",
     "deleteConfirm": "从您的 HeyGen 账户删除「{{name}}」？此操作无法撤销。",
+    "deleteSuccess": "已删除形象「{{name}}」。",
     "deleteFailed": "无法删除形象。请重试。",
     "fileTooLarge": "图像必须小于 32MB。",
     "uploadFailed": "上传失败。请重试。",
+    "uploadSuccess": "已上传形象「{{name}}」。",
+    "backgroundUploadSuccess": "背景图已上传。",
     "avatar": "形象",
     "clearSelection": "清除选择",
     "loadingAvatars": "加载形象中…",
@@ -338,10 +355,19 @@
     "removedLanes": "已移除分支：{{lanes}}",
     "videoSettingsSaveFailed": "无法将视频设置保存到服务器。运行前请先保存工作流。"
   },
+  "toast": {
+    "saved": "工作流已保存",
+    "saveFailed": "无法保存工作流，请重试。",
+    "nameUpdated": "工作流名称已更新",
+    "nameUpdateFailed": "无法更新工作流名称，请重试。"
+  },
   "toasts": {
     "replacedAdaptNodes": "已用 Branch 的每个渠道一个 Adapt 替换未分配分支的 Adapt 节点。",
     "branchNeedsChannels": "Branch 需要在活动规则中至少两个分发渠道。",
     "addNodeBeforeSave": "保存前请至少添加一个节点。",
+    "disconnectedNode": "“{{label}}”节点未连接到工作流，请连接或删除该节点。",
+    "removedDisconnectedNode": "已从工作流中移除未连接的“{{label}}”节点。",
+    "removedDisconnectedNodes": "已从工作流中移除 {{count}} 个未连接的节点。",
     "pipelineStartFailed": "无法启动流水线。请重试。",
     "enterPostTopic": "请输入您要发布的内容主题。",
     "addNodeBeforeRun": "运行前请至少添加一个节点。",
@@ -373,7 +399,16 @@
     "postPlaceholder": "例如：圣诞促销 — 12 月 25 日前全场五折…",
     "exitPreviewHint": "清除或再次点击所选流水线以退出预览并生成。",
     "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
-    "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}"
+    "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}",
+    "emptyWorkflowHint": "通过问答向导配置工作流，然后在每次运行时生成内容。",
+    "modeUseCurrentWorkflow": "使用当前工作流",
+    "modeGenerateWorkflow": "自动生成工作流",
+    "modeTabCurrent": "当前",
+    "modeTabAuto": "自动",
+    "generateWorkflowPlaceholder": "例如：Instagram + Facebook 文案、泰语翻译、主图…",
+    "autoWorkflowHint": "AI 将根据您的帖子和活动规则构建工作流，然后生成内容。",
+    "hidePrompt": "隐藏提示词区域",
+    "showPrompt": "显示提示词区域"
   },
   "nodesLabel_one": "节点",
   "nodesLabel_other": "节点",
@@ -419,8 +454,13 @@
   "usedPipelines": {
     "aria": "已用流水线",
     "title": "已用流水线",
-    "previewing": "预览运行中 · 再次点击或清除以编辑工作流",
-    "clear": "清除",
+    "previewing": "正在预览此运行。应用可将结构复制到工作流编辑器。",
+    "apply": "应用到工作流",
+    "applying": "应用中…",
+    "clear": "清除预览",
+    "rename": "重命名流水线",
+    "applySuccess": "已将流水线结构应用到工作流，可在就绪后保存。",
+    "applyFailed": "无法将流水线应用到工作流。",
     "noPrompt": "无提示词",
     "nodes_one": "节点",
     "nodes_other": "节点",
@@ -479,10 +519,88 @@
     "defaultVideoSettings": "默认视频设置",
     "defaultSummarySettings": "默认摘要设置",
     "reflowOk": "可重排格式",
+    "backgroundKept": "保留背景",
     "presenter": "数字人",
     "cinematic": "电影感"
   },
   "rebuildTooltip": "根据当前规则和渠道设置刷新工作流节点。",
+  "qaWizard": {
+    "title": "生成工作流",
+    "yes": "是",
+    "no": "否",
+    "back": "上一步",
+    "next": "下一步",
+    "generate": "生成工作流",
+    "generating": "生成中…",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "validation": {
+      "selectAtLeastOneChannel": "请至少选择一个渠道。",
+      "selectAtLeastOneLanguage": "请至少选择一种目标语言。"
+    },
+    "languages": {
+      "thai": "泰语",
+      "english": "英语",
+      "japanese": "日语",
+      "chinese": "中文",
+      "korean": "韩语",
+      "spanish": "西班牙语",
+      "french": "法语",
+      "german": "德语"
+    },
+    "steps": {
+      "webSearch": {
+        "title": "是否为此内容使用网络搜索？",
+        "description": "在文本生成前添加情报步骤以收集趋势和市场信息。"
+      },
+      "keywordPlanner": {
+        "title": "是否规划目标关键词？",
+        "description": "根据活动规则，在文本生成前添加关键词规划步骤。"
+      },
+      "summary": {
+        "title": "是否生成摘要？",
+        "description": "下一步将选择活动规则中的哪些渠道需要摘要。"
+      },
+      "summaryChannels": {
+        "title": "哪些渠道需要摘要？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "image": {
+        "title": "是否生成图片？",
+        "description": "下一步将选择活动规则中的哪些渠道需要图片。"
+      },
+      "imageChannels": {
+        "title": "哪些渠道需要图片？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "video": {
+        "title": "是否生成视频？",
+        "description": "下一步将选择活动规则中的哪些渠道需要视频。"
+      },
+      "videoChannels": {
+        "title": "哪些渠道需要视频？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "translate": {
+        "title": "是否翻译内容？",
+        "description": "下一步将选择活动规则中的哪些渠道需要翻译。"
+      },
+      "translationChannels": {
+        "title": "哪些渠道需要翻译？",
+        "description": "仅显示活动规则中的渠道。"
+      },
+      "targetLanguages": {
+        "title": "目标语言",
+        "description": "每种语言将添加一个翻译步骤。"
+      },
+      "additionalMessage": {
+        "title": "还有其他要求吗？",
+        "description": "本次生成的可选说明（语气、主题、行动号召等）。",
+        "placeholder": "例如：紧急宣布黑色星期五五折优惠…"
+      }
+    }
+  },
   "aria": {
     "openNodeSettings": "打开节点设置",
     "addNode": "添加节点",

@@ -5,7 +5,17 @@
   },
   "page": {
     "title": "ตั้งค่าบัญชี",
-    "subtitle": "เชื่อมช่องทางที่คุณเผยแพร่ การเชื่อมต่อใช้ร่วมกับการอัปโหลดและการกำหนดเวลา จึงยืนยันตัวตนเพียงครั้งเดียว"
+    "subtitle": "จัดการโปรไฟล์ ภาษา และช่องทางเผยแพร่ที่เชื่อมต่อ"
+  },
+  "profile": {
+    "email": "อีเมล",
+    "phone": "โทรศัพท์",
+    "address": "ที่อยู่",
+    "unnamed": "บัญชี",
+    "roles": {
+      "admin": "ผู้ดูแลระบบ",
+      "member": "สมาชิก"
+    }
   },
   "toolbar": {
     "createProfile": "สร้างโปรไฟล์ Zernio",
@@ -22,18 +32,28 @@
     "profileReady": "โปรไฟล์ Zernio พร้อมแล้ว",
     "profileFailed": "สร้างโปรไฟล์ไม่ได้",
     "connectUrlFailed": "รับ URL เชื่อมต่อไม่ได้",
+    "unlockFailed": "ปลดล็อกช่องทางนี้ไม่ได้ กรุณาลองอีกครั้ง",
+    "unlockedToast": "ปลดล็อกช่องทางแล้ว คุณสามารถเชื่อมบัญชีได้เมื่อพร้อม",
+    "unlockRequired": "กรุณาปลดล็อกช่องทางนี้ก่อนเชื่อมต่อ",
+    "insufficientCredits": "เครดิตไม่เพียงพอสำหรับปลดล็อกช่องทางนี้",
     "disconnected": "ยกเลิกการเชื่อมช่องทางแล้ว",
     "disconnectFailed": "ยกเลิกการเชื่อมบัญชีไม่ได้"
   },
   "channels": {
     "sectionTitle": "ช่องทางเผยแพร่",
-    "sectionDesc": "Facebook, X (Twitter), Instagram, YouTube, LinkedIn และ TikTok เชื่อมเฉพาะเครือข่ายที่ใช้ ใช้ร่วมกับการอัปโหลดและการกำหนดเวลา",
+    "sectionDesc": "Facebook, Instagram, YouTube, LinkedIn และ TikTok ปลดล็อกเฉพาะเครือข่ายที่ใช้ ใช้ร่วมกับการอัปโหลดและการกำหนดเวลา",
     "connected": "เชื่อมแล้ว",
+    "unlocked": "ปลดล็อกแล้ว",
     "notConnected": "ยังไม่เชื่อม",
     "accountId": "รหัสบัญชี",
     "disconnect": "ยกเลิกการเชื่อม",
-    "connect": "เชื่อม",
+    "connect": "เชื่อมต่อ",
     "connectAria": "เชื่อม {{channel}}",
+    "unlock": "ปลดล็อก",
+    "unlockWithCredits": "ปลดล็อก · {{count}}",
+    "unlockCost": "ใช้ {{count}} เครดิตเพื่อปลดล็อก",
+    "unlockAria": "ปลดล็อก {{channel}}",
+    "unlockAriaWithCost": "ปลดล็อก {{channel}} ใช้ {{count}} เครดิต",
     "facebook": {
       "label": "Facebook",
       "description": "เพจและโปรไฟล์สำหรับการเผยแพร่บน Meta"
@@ -58,5 +78,26 @@
       "label": "TikTok",
       "description": "วิดีโอแนวตั้งและรูปแบบเฉพาะ TikTok"
     }
+  },
+  "unlockConfirm": {
+    "title": "ปลดล็อก {{channel}}",
+    "description": "การปลดล็อกจะเปิดช่องเครือข่ายนี้ให้บัญชีของคุณ เครดิตจะถูกหักเมื่อคุณยืนยันด้านล่าง จากนั้นใช้ปุ่มเชื่อมต่อเพื่อลงชื่อเข้าใช้กับเครือข่าย",
+    "loading": "กำลังโหลดค่าใช้จ่ายการปลดล็อก…",
+    "estimatedCost": "ค่าใช้จ่ายการปลดล็อก",
+    "currentBalance": "ยอดคงเหลือ",
+    "credits": "เครดิต",
+    "balanceAfter": "ยอดหลังปลดล็อก",
+    "balanceAfterAria": "ยอดหลังปลดล็อก: {{count}} เครดิต",
+    "costSummaryAria": "ค่าใช้จ่ายการปลดล็อกและยอดคงเหลือ",
+    "noCharge": "การปลดล็อกช่องทางนี้ไม่หักเครดิต",
+    "chargeNotice": "เครดิตจะถูกหักทันทีเมื่อคุณยืนยัน ช่องจะยังปลดล็อกอยู่แม้ยกเลิกการเชื่อมภายหลัง—ใช้ปุ่มเชื่อมต่อเมื่อพร้อมอนุญาต",
+    "insufficientTitle": "เครดิตไม่เพียงพอ",
+    "insufficientDescription": "การปลดล็อกต้องใช้ {{required}} เครดิต แต่คุณมีเหลือ {{remaining}} เครดิต",
+    "refill": "เติมเครดิต",
+    "cancel": "ไว้ก่อน",
+    "confirm": "ใช่ ยืนยัน",
+    "confirmAria": "ยืนยันปลดล็อก {{channel}}",
+    "confirmAriaWithCost": "ยืนยันปลดล็อก {{channel}} ใช้ {{count}} เครดิต",
+    "unlocking": "กำลังปลดล็อก…"
   }
 }

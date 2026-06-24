@@ -111,3 +111,35 @@ export function flattenNodeOutputsFromPipeline(
   }
   return out;
 }
+
+/** Fallback when pipeline template is missing — last-wins scan of all node layers. */
+export function flattenNodeOutputsBestEffort(
+  nodeOutputs: NodeOutputMap,
+  nodeUserEdits: NodeUserEditMap = {},
+): ContentOutputs {
+  const out: ContentOutputs = {};
+  for (const nodeId of Object.keys(nodeOutputs)) {
+    const layer = mergeNodeLayers(nodeOutputs[nodeId], nodeUserEdits[nodeId]);
+    if (typeof layer.keywords === 'string' && layer.keywords.trim()) {
+      out.keywords = layer.keywords;
+    }
+    const text = adaptTextFromLayer(layer);
+    if (text) out.text = text;
+    if (typeof layer.image === 'string' && layer.image.trim()) {
+      out.image = layer.image;
+    }
+    if (typeof layer.translatedText === 'string' && layer.translatedText.trim()) {
+      out.translatedText = layer.translatedText;
+    }
+    if (typeof layer.video === 'string' && layer.video.trim()) {
+      out.video = layer.video;
+    }
+    if (typeof layer.transcription === 'string' && layer.transcription.trim()) {
+      out.transcription = layer.transcription;
+    }
+    if (typeof layer.summary === 'string' && layer.summary.trim()) {
+      out.summary = layer.summary;
+    }
+  }
+  return out;
+}

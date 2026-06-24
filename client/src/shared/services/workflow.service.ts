@@ -1,5 +1,6 @@
 import apiClient from "../api/api-client"
 import type {
+  ApplyPipelineToWorkflowResponse,
   GenerateWorkflowPayload,
   GenerateWorkflowResponse,
   GetWorkflowResponse,
@@ -25,7 +26,7 @@ export const workflowService = {
 
   regenerateByRule: async (
     ruleId: string,
-    payload: Pick<GenerateWorkflowPayload, "contentPrompt">,
+    payload: Pick<GenerateWorkflowPayload, "answers">,
   ): Promise<GenerateWorkflowResponse> => {
     const response = await apiClient.post(`/workflow/rule/${ruleId}/regenerate`, payload)
     return response.data
@@ -62,6 +63,16 @@ export const workflowService = {
     payload: UpdateWorkflowPayload,
   ): Promise<UpdateWorkflowResponse> => {
     const response = await apiClient.patch(`/workflow/${workflowId}`, payload)
+    return response.data
+  },
+
+  applyPipelineToWorkflow: async (
+    ruleId: string,
+    pipelineId: string,
+  ): Promise<ApplyPipelineToWorkflowResponse> => {
+    const response = await apiClient.post(
+      `/workflow/rule/${ruleId}/apply-pipeline/${pipelineId}`,
+    )
     return response.data
   },
 }

@@ -1,18 +1,13 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { QueryClientProvider } from "@tanstack/react-query"
 import { RouterProvider } from "react-router-dom"
 
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { createAppQueryClient } from "@/shared/lib/query-client"
 
 import { router } from "./app/routes/router"
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-    },
-  },
-})
+const queryClient = createAppQueryClient()
 
 export function App() {
   return (

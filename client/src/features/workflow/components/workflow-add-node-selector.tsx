@@ -16,7 +16,6 @@ const ADDABLE_NODE_TYPES: WorkflowNodeType[] = [
   "image_generation",
   "video_generation",
   "translation",
-  "transcription",
   "summarization",
 ]
 

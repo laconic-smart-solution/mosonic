@@ -81,15 +81,38 @@ export function parseMcpToolJson(result: unknown): unknown | null {
   }
 }
 
+import { isAxiosError } from 'axios';
+
+/** Pull user-facing `error` text from Zernio REST 4xx bodies. */
+export function extractZernioApiErrorMessage(err: unknown): string | null {
+  if (!isAxiosError(err)) {
+    if (err instanceof Error && err.message.trim()) return err.message.trim();
+    return null;
+  }
+  const data = err.response?.data;
+  if (typeof data === 'object' && data !== null) {
+    const rec = data as Record<string, unknown>;
+    if (typeof rec.error === 'string' && rec.error.trim()) return rec.error.trim();
+    if (typeof rec.message === 'string' && rec.message.trim()) {
+      return rec.message.trim();
+    }
+  }
+  if (typeof data === 'string' && data.trim()) return data.trim();
+  return null;
+}
+
 /** User-facing errors for publish failures (Zernio / network). */
 export function getFriendlyZernioPublishError(err: unknown): string {
-  const msg =
-    err instanceof Error
-      ? err.message.toLowerCase()
-      : typeof err === 'string'
-        ? err.toLowerCase()
-        : '';
+  const apiMsg = extractZernioApiErrorMessage(err);
+  const raw = apiMsg ?? (err instanceof Error ? err.message : typeof err === 'string' ? err : '');
+  const msg = raw.toLowerCase();
 
+  if (
+    msg.includes('tiktok') &&
+    (msg.includes('slideshow title') || msg.includes('90 character'))
+  ) {
+    return 'TikTok photo posts use your caption as the slideshow title (90 characters max). Shorten the caption and try again.';
+  }
   if (msg.includes('rate limit'))
     return 'Service is busy. Please retry in a moment.';
   if (msg.includes('unauthorized') || msg.includes('auth'))
@@ -97,5 +120,8 @@ export function getFriendlyZernioPublishError(err: unknown): string {
   if (msg.includes('not connected') || msg.includes('no account'))
     return 'Social account is not connected. Please connect in Settings.';
   if (msg.includes('timeout')) return 'Request timed out. Please retry.';
+
+  if (apiMsg && apiMsg.length <= 240) return apiMsg;
+
   return 'Publishing failed. Please retry.';
 }

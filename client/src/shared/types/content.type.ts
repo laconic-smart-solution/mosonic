@@ -50,6 +50,8 @@ export type ContentPageItem = {
   /** Per-channel adapt outputs (multi-lane runs). */
   laneOutputs?: Record<string, Record<string, unknown>>
   uploadId?: string
+  /** Net credits charged for this content (pipeline + reruns). */
+  creditsUsed?: number
 }
 
 export type ContentPageResponse = {
@@ -60,6 +62,11 @@ export type ContentPageResponse = {
     limit: number
     totalPages: number
   }
+}
+
+export type ContentStatsResponse = {
+  total: number
+  byStatus: Partial<Record<ContentStatus, number>>
 }
 
 export type ContentOutputs = {
@@ -95,6 +102,10 @@ export type ContentDetail = {
     relevanceScore: number
     suggestedAngle: string
   } | null
+  creditUsage?: {
+    totalCredits: number
+    byNodeId: Record<string, number>
+  }
 }
 
 export type AvailableNodeTypesResponse = {
@@ -103,6 +114,7 @@ export type AvailableNodeTypesResponse = {
 
 export type GenerateNodeBody = {
   type: WorkflowNodeType
+  nodeId?: string
   config?: Record<string, unknown>
   /** @deprecated Use `config` instead. */
   userPrompt?: string

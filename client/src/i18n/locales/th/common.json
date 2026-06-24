@@ -1,13 +1,21 @@
 {
-  "appName": "NeuralTex",
+  "appName": "Mosonic",
   "appTagline": "แพลตฟอร์ม AI",
   "platform": "แพลตฟอร์ม",
   "account": "บัญชี",
   "accountMenu": "เมนูบัญชี",
   "logOut": "ออกจากระบบ",
+  "credits": {
+    "remaining": "เหลือ {{count}} เครดิต",
+    "loading": "กำลังโหลดเครดิต",
+    "unavailable": "ไม่สามารถโหลดเครดิตได้",
+    "viewUsage": "ดูรายละเอียดการใช้งาน"
+  },
   "pendingSuggestions": "คำแนะนำ AI ที่รอดำเนินการ",
   "language": "ภาษา",
   "languageDescription": "เลือกภาษาสำหรับส่วนติดต่อของแอปพลิเคชัน",
+  "showPassword": "แสดงรหัสผ่าน",
+  "hidePassword": "ซ่อนรหัสผ่าน",
   "languages": {
     "en": "English",
     "th": "ไทย",
@@ -16,9 +24,9 @@
   "systemMessagesEnglish": "ข้อความจากเซิร์ฟเวอร์อาจแสดงเป็นภาษาอังกฤษ",
   "searchPlaceholder": "ค้นหาหน้า…",
   "search": {
-    "ariaLabel": "ค้นหาคอนเทนต์และหน้า",
-    "placeholder": "ค้นหาคอนเทนต์และหน้า…",
-    "noMatches": "ไม่พบหน้าหรือคอนเทนต์ที่ตรงกัน",
+    "ariaLabel": "ค้นหาหน้าและเส้นทาง",
+    "placeholder": "ค้นหาหน้าและเส้นทาง…",
+    "noMatches": "ไม่พบหน้าหรือเส้นทางที่ตรงกัน",
     "goTo": "ไปที่",
     "content": "คอนเทนต์",
     "searching": "กำลังค้นหา…",
@@ -70,8 +78,14 @@
     "posts": "โพสต์",
     "analytics": "การวิเคราะห์",
     "cost": "ค่าใช้จ่าย",
+    "usage": "การใช้งาน",
     "settingsAccounts": "ตั้งค่าบัญชี",
     "admin": "ผู้ดูแล"
+  },
+  "breadcrumb": {
+    "detail": "รายละเอียด",
+    "review": "ตรวจสอบ",
+    "newsTrigger": "ทริกเกอร์ข่าว"
   },
   "routes": {
     "dashboard": "แดชบอร์ด",
@@ -86,6 +100,7 @@
     "components": "คอมโพเนนต์",
     "pipelines": "ไปป์ไลน์",
     "cost": "ค่าใช้จ่าย",
+    "usage": "การใช้งาน",
     "settings": "ตั้งค่า",
     "admin": "ผู้ดูแล"
   },
@@ -115,10 +130,10 @@
       "subtitle": "บัญชีที่เชื่อมต่อ",
       "keywords": "ตั้งค่า บัญชี โปรไฟล์ settings account"
     },
-    "analytics": {
-      "title": "การวิเคราะห์",
-      "subtitle": "เมตริกและรายงาน",
-      "keywords": "การวิเคราะห์ เมตริก analytics metrics"
+    "posts": {
+      "title": "โพสต์",
+      "subtitle": "โพสต์ที่เผยแพร่และกำหนดเวลา",
+      "keywords": "โพสต์ เผยแพร่ โซเชียล posts publish"
     }
   },
   "status": {
@@ -140,7 +155,10 @@
     "network": "ข้อผิดพลาดเครือข่าย ตรวจสอบการเชื่อมต่อแล้วลองใหม่",
     "unauthorized": "คุณยังไม่ได้เข้าสู่ระบบ",
     "forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
-    "notFound": "ไม่พบ"
+    "notFound": "ไม่พบ",
+    "validation": "กรุณาตรวจสอบข้อมูลและลองอีกครั้ง",
+    "payloadTooLarge": "ไฟล์มีขนาดใหญ่เกินไป",
+    "serviceUnavailable": "บริการไม่พร้อมใช้งานชั่วคราว กรุณาลองอีกครั้ง"
   },
   "pagination": {
     "page": "หน้า {{page}}",
@@ -153,5 +171,15 @@
   "empty": "ยังไม่มีรายการ",
   "noData": "ไม่มีข้อมูล",
   "optional": "ไม่บังคับ",
-  "required": "จำเป็น"
+  "required": "จำเป็น",
+  "toast": {
+    "eyebrow": {
+      "success": "บันทึกแล้ว",
+      "error": "ล้มเหลว",
+      "warning": "แจ้งเตือน",
+      "info": "หมายเหตุ",
+      "loading": "กำลังดำเนินการ",
+      "default": "หมายเหตุ"
+    }
+  }
 }

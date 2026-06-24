@@ -1,7 +1,8 @@
 {
   "prompt": {
     "focusedPlaceholder": "描述您今天想创作的内容…",
-    "generatingWorkflow": "正在生成工作流…"
+    "generatingWorkflow": "正在生成工作流…",
+    "extractingSubtitle": "规则准备好后，我们将打开几个简短问题。"
   },
   "promptSuggestions": {
     "songkran": "为 Facebook 和 Instagram 撰写宋干节促销文案",
@@ -34,13 +35,31 @@
     "loadingMore": "加载中…"
   },
   "footer": {
-    "copyright": "© 2026 NeuralTex Co., Ltd. — 泰国曼谷"
+    "copyright": "© 2026 Mosonic Co., Ltd. — 泰国曼谷"
+  },
+  "toast": {
+    "extractionFailed": "无法根据您的提示创建活动规则，请重试。",
+    "noChannelsAfterExtract": "提取的规则没有渠道。请在规则页面添加渠道后重试。",
+    "generationFailed": "规则生成失败",
+    "couldNotStartExtraction": "无法开始规则提取",
+    "fileTooLarge": "文件 \"{{name}}\" 超过最大大小（{{maxMb}} MB）。"
+  },
+  "extraction": {
+    "titleGenerating": "正在创建您的活动规则…",
+    "titleFailed": "无法创建规则",
+    "subtitle": "正在分析您的提示并准备活动规则。",
+    "waitMessage": "正在分析您的提示…",
+    "dismiss": "关闭",
+    "tryAgain": "重试"
   },
   "userStrip": {
     "loading": "加载中…",
+    "logIn": "登录",
+    "signUp": "注册",
     "admin": "管理员",
     "member": "成员",
     "account": "账户",
-    "dashboard": "仪表盘"
+    "dashboard": "仪表盘",
+    "usage": "用量与积分"
   }
 }

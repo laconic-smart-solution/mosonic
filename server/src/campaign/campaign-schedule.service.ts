@@ -1,27 +1,34 @@
 import {
-  BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
-import { Rule, type RuleDocument } from '../rule/schemas/rule.schema';
-import { computeNextRunAt } from './campaign-schedule.util';
+import type {
+  CampaignScheduleRecord,
+  ICampaignScheduleRepository,
+} from '../repositories/interfaces/campaign-schedule.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
 import {
-  CampaignSchedule,
-  ContentPromptStrategy,
-  type CampaignScheduleDocument,
-} from './schemas/campaign-schedule.schema';
+  CAMPAIGN_SCHEDULE_REPOSITORY,
+  RULE_REPOSITORY,
+} from '../repositories/tokens';
+import { PostingFrequency } from '../rule/schemas/rule.schema';
+import { computeNextRunAt } from './campaign-schedule.util';
+import { ContentPromptStrategy } from './schemas/campaign-schedule.schema';
+
+type RuleCampaign = {
+  postingFrequency: PostingFrequency;
+  customSchedule?: string | string[];
+};
 
 @Injectable()
 export class CampaignScheduleService {
   constructor(
-    @InjectModel(CampaignSchedule.name)
-    private readonly scheduleModel: Model<CampaignScheduleDocument>,
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
+    @Inject(CAMPAIGN_SCHEDULE_REPOSITORY)
+    private readonly schedules: ICampaignScheduleRepository,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
   ) {}
 
   async upsertForRule(
@@ -36,21 +43,18 @@ export class CampaignScheduleService {
     },
     auth: TenancyAuth,
   ) {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+    const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
 
+    const campaign = rule.campaign as RuleCampaign;
     const nextRunAt = computeNextRunAt(
-      rule.campaign.postingFrequency,
-      rule.campaign.customSchedule,
+      campaign.postingFrequency,
+      campaign.customSchedule,
     );
 
-    const existing = await this.scheduleModel
-      .findOne({ ruleRef: ruleId, userId: auth.userId })
-      .exec();
+    const existing = await this.schedules.findByRule(ruleId, auth);
 
     if (existing) {
       if (body.enabled !== undefined) existing.enabled = body.enabled;
@@ -69,11 +73,10 @@ export class CampaignScheduleService {
       if (body.timezone) {
         existing.timezone = body.timezone;
       }
-      await existing.save();
-      return existing.toObject();
+      return this.schedules.save(existing);
     }
 
-    const created = await this.scheduleModel.create({
+    return this.schedules.create({
       userId: auth.userId,
       ruleRef: ruleId,
       enabled: body.enabled ?? true,
@@ -85,24 +88,13 @@ export class CampaignScheduleService {
       timezone: body.timezone ?? 'UTC',
       nextRunAt,
     });
-    return created.toObject();
   }
 
   async getForRule(ruleId: string, auth: TenancyAuth) {
-    return this.scheduleModel
-      .findOne(mergeUserIdFilter({ ruleRef: ruleId }, auth))
-      .lean()
-      .exec();
+    return this.schedules.findByRule(ruleId, auth);
   }
 
   async listUpcoming(auth: TenancyAuth, limit = 10) {
-    return this.scheduleModel
-      .find(
-        mergeUserIdFilter({ enabled: true, nextRunAt: { $gte: new Date() } }, auth),
-      )
-      .sort({ nextRunAt: 1 })
-      .limit(limit)
-      .lean()
-      .exec();
+    return this.schedules.listUpcoming(auth, limit);
   }
 }

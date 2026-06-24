@@ -4,25 +4,35 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AccountChannelRow } from "@/features/settings/components/account-channel-row"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
-import { buildAccountChannelMap, findConnectedForChannel } from "@/features/settings/lib/account-channel-lookup"
+import { buildAccountChannelMap, findConnectedForChannel, isChannelUnlocked } from "@/features/settings/lib/account-channel-lookup"
 import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 
 type AccountChannelsSectionProps = {
   accounts: ZernioConnectedAccount[] | undefined
+  unlockedChannels: string[] | undefined
   loading: boolean
+  onUnlock: (apiKey: string) => void
   onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
+  unlockPending: boolean
   connectPending: boolean
   disconnectPending: boolean
+  hideHeader?: boolean
+  creditsEach?: number
 }
 
 export function AccountChannelsSection({
   accounts,
+  unlockedChannels,
   loading,
+  onUnlock,
   onConnect,
   onDisconnect,
+  unlockPending,
   connectPending,
   disconnectPending,
+  hideHeader = false,
+  creditsEach = 0,
 }: AccountChannelsSectionProps) {
   const { t } = useTranslation("settings")
 
@@ -53,22 +63,28 @@ export function AccountChannelsSection({
 
   return (
     <Card className="overflow-hidden shadow-none ring-1 ring-foreground/8">
-      <CardHeader className="border-b border-foreground/8 pb-4">
-        <CardTitle className="text-base font-semibold">{t("channels.sectionTitle")}</CardTitle>
-        <CardDescription className="text-[13px] leading-relaxed">
-          {t("channels.sectionDesc")}
-        </CardDescription>
-      </CardHeader>
+      {hideHeader ? null : (
+        <CardHeader className="border-b border-foreground/8 pb-4">
+          <CardTitle className="text-base font-semibold">{t("channels.sectionTitle")}</CardTitle>
+          <CardDescription className="text-[13px] leading-relaxed">
+            {t("channels.sectionDesc")}
+          </CardDescription>
+        </CardHeader>
+      )}
       <CardContent className="divide-y divide-border p-0">
         {ACCOUNT_CHANNELS.map((def) => (
           <AccountChannelRow
             key={def.id}
             def={def}
             connected={findConnectedForChannel(def, byChannel)}
+            unlocked={isChannelUnlocked(def, unlockedChannels)}
+            onUnlock={onUnlock}
             onConnect={onConnect}
             onDisconnect={onDisconnect}
+            unlockPending={unlockPending}
             connectPending={connectPending}
             disconnectPending={disconnectPending}
+            creditsEach={creditsEach}
           />
         ))}
       </CardContent>

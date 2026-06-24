@@ -5,7 +5,9 @@ import {
   getAllowedInsertTypes,
   getAllowedNextTypes,
   getBranchSubgraphLaneErrors,
+  getVideoPresenterConfigErrors,
   inferGraphContext,
+  mergeHeygenVideoConfig,
   wouldCreateCycle,
   type ValidationContext,
 } from "./workflow-node-validation"
@@ -26,12 +28,11 @@ function ctx(
 }
 
 describe("workflow-node-validation", () => {
-  it("empty canvas offers four starter nodes", () => {
+  it("empty canvas offers three starter nodes", () => {
     expect(getAllowedInitialTypes(ctx([], []))).toEqual([
       "keywords",
       "intelligence",
       "text",
-      "transcription",
     ])
   })
 
@@ -84,7 +85,7 @@ describe("workflow-node-validation", () => {
     expect(getAllowedNextTypes(c, "t")).not.toContain("branch")
   })
 
-  it("branch only allows adapt", () => {
+  it("branch does not offer manual adapt insertion", () => {
     const c = ctx(
       [
         { id: "t", wfType: "text" },
@@ -92,7 +93,7 @@ describe("workflow-node-validation", () => {
       ],
       [{ from: "t", to: "b" }],
     )
-    expect(getAllowedNextTypes(c, "b")).toEqual(["adapt"])
+    expect(getAllowedNextTypes(c, "b")).toEqual([])
   })
 
   it("lane adapt allows flex types but not trunk-only nodes", () => {
@@ -118,7 +119,7 @@ describe("workflow-node-validation", () => {
     expect(next).not.toContain("merge")
   })
 
-  it("linear image offers merge when no branch", () => {
+  it("linear image does not offer manual merge insertion", () => {
     const c = ctx(
       [
         { id: "t", wfType: "text" },
@@ -126,7 +127,7 @@ describe("workflow-node-validation", () => {
       ],
       [{ from: "t", to: "i" }],
     )
-    expect(getAllowedNextTypes(c, "i")).toContain("merge")
+    expect(getAllowedNextTypes(c, "i")).not.toContain("merge")
   })
 
   it("linear image can chain another image for multi-image carousels", () => {
@@ -373,5 +374,80 @@ describe("getBranchSubgraphLaneErrors", () => {
       { id: "e3", source: "a", target: "m" },
     ]
     expect(getBranchSubgraphLaneErrors(rfNodes, edges, 3)).toEqual([])
+  })
+})
+
+describe("mergeHeygenVideoConfig", () => {
+  it("allows presenter mode before avatar is chosen", () => {
+    expect(
+      mergeHeygenVideoConfig({}, { mode: "presenter", heygenVoiceId: "voice-1" }),
+    ).toEqual({
+      mode: "presenter",
+      heygenVoiceId: "voice-1",
+    })
+  })
+
+  it("coerces to cinematic when clearing avatar in presenter mode", () => {
+    expect(
+      mergeHeygenVideoConfig(
+        { mode: "presenter", heygenAvatarId: "avatar-1" },
+        { heygenAvatarId: "" },
+      ),
+    ).toEqual({
+      mode: "cinematic",
+      heygenAvatarId: "",
+    })
+  })
+
+  it("allows presenter mode in draft while editing other fields before avatar is chosen", () => {
+    expect(
+      mergeHeygenVideoConfig(
+        { mode: "presenter", heygenVoiceId: "voice-1" },
+        { heygenMotionPrompt: "gentle nodding" },
+      ),
+    ).toEqual({
+      mode: "presenter",
+      heygenVoiceId: "voice-1",
+      heygenMotionPrompt: "gentle nodding",
+    })
+  })
+
+  it("keeps presenter mode when avatar is present in patch", () => {
+    expect(
+      mergeHeygenVideoConfig(
+        {},
+        {
+          mode: "presenter",
+          heygenAvatarId: "avatar-1",
+          heygenVoiceId: "voice-1",
+        },
+      ),
+    ).toEqual({
+      mode: "presenter",
+      heygenAvatarId: "avatar-1",
+      heygenVoiceId: "voice-1",
+    })
+  })
+
+  it("preserves motion prompt and other presenter fields", () => {
+    expect(
+      mergeHeygenVideoConfig(
+        { mode: "presenter", heygenAvatarId: "avatar-1" },
+        { heygenMotionPrompt: "gentle nodding" },
+      ),
+    ).toEqual({
+      mode: "presenter",
+      heygenAvatarId: "avatar-1",
+      heygenMotionPrompt: "gentle nodding",
+    })
+  })
+})
+
+describe("getVideoPresenterConfigErrors", () => {
+  it("requires avatar and voice in presenter mode", () => {
+    const errors = getVideoPresenterConfigErrors({ mode: "presenter" })
+    expect(errors).toHaveLength(2)
+    expect(errors.some((e) => e.toLowerCase().includes("avatar"))).toBe(true)
+    expect(errors.some((e) => e.toLowerCase().includes("voice"))).toBe(true)
   })
 })

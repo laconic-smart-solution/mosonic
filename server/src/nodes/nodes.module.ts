@@ -1,11 +1,6 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
-import {
-  WorkflowNode,
-  WorkflowNodeSchema,
-} from './schemas/workflow-node.schema';
 import { ImageGenerationService } from './services/image-generation.service';
 import { KeywordPlannerService } from './services/keyword-planner.service';
 import { SummarizationService } from './services/summarization.service';
@@ -35,14 +30,8 @@ const NODE_SERVICES = [
 ];
 
 @Module({
-  imports: [
-    LlmModule,
-    EventsModule,
-    MongooseModule.forFeature([
-      { name: WorkflowNode.name, schema: WorkflowNodeSchema },
-    ]),
-  ],
+  imports: [LlmModule, EventsModule],
   providers: NODE_SERVICES,
-  exports: [MongooseModule, ...NODE_SERVICES],
+  exports: [...NODE_SERVICES],
 })
 export class NodesModule {}

@@ -1,33 +1,39 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { EventsService } from '../events/events.service';
 import { McpService } from '../mcp/mcp.service';
+import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
   PlatformPostStatus,
-  Post,
   PostStatus,
-  type PostDocument,
 } from '../post/schemas/post.schema';
+import type { IPostRepository } from '../repositories/interfaces/post.repository.interface';
+import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
+import type { ISyncLockRepository } from '../repositories/interfaces/sync-lock.repository.interface';
+import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
+import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
 import {
-  SyncLock,
-  SyncLockDocument,
-  ZERNIO_SCHEDULED_SYNC_LOCK_ID,
-} from './sync-lock.schema';
+  POST_REPOSITORY,
+  SYNC_LOCK_REPOSITORY,
+  UPLOAD_REPOSITORY,
+} from '../repositories/tokens';
 import {
-  Upload,
   UploadChannelStatus,
   UploadJobStatus,
   type UploadChannelEntry,
-  type UploadDocument,
 } from './schemas/upload.schema';
+import { ZERNIO_SCHEDULED_SYNC_LOCK_ID } from './sync-lock.schema';
 import {
   interpretZernioPostForSync,
   mapWithConcurrencyLimit,
   type SyncPostDecision,
 } from './upload-scheduled-sync.helpers';
+import {
+  uploadChannels,
+  withPostPlatformResults,
+  withUploadChannels,
+} from './upload-record.util';
 import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
@@ -39,20 +45,21 @@ export class UploadScheduledSyncService {
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(Upload.name)
-    private readonly uploadModel: Model<UploadDocument>,
-    @InjectModel(Post.name)
-    private readonly postModel: Model<PostDocument>,
-    @InjectModel(SyncLock.name)
-    private readonly syncLockModel: Model<SyncLockDocument>,
+    @Inject(UPLOAD_REPOSITORY)
+    private readonly uploads: IUploadRepository,
+    @Inject(POST_REPOSITORY)
+    private readonly posts: IPostRepository,
+    @Inject(SYNC_LOCK_REPOSITORY)
+    private readonly syncLocks: ISyncLockRepository,
     private readonly mcpService: McpService,
     private readonly events: EventsService,
+    private readonly postAnalyticsService: PostAnalyticsService,
   ) {}
 
   /**
    * Reconciles scheduled `posts` rows against Zernio (webhook may be missed).
    *
-   * **Multi-instance:** With `ZERNIO_SYNC_INSTANCE_ID` set, we take a short Mongo lease in
+   * **Multi-instance:** With `ZERNIO_SYNC_INSTANCE_ID` set, we take a short lease in
    * `sync_locks` so only one replica runs per window. With it unset, every API replica runs
    * the job—fine for single-node dev; in production prefer a dedicated worker or set the id.
    */
@@ -78,14 +85,7 @@ export class UploadScheduledSyncService {
     const postIdsWithZernio: string[] = [];
 
     try {
-      const docs = await this.postModel
-        .find({
-          status: PostStatus.Scheduled,
-          zernioPostId: { $exists: true, $nin: [null, ''] },
-        })
-        .select({ zernioPostId: 1 })
-        .lean()
-        .exec();
+      const docs = await this.posts.findScheduledWithZernioId();
 
       for (const p of docs) {
         const id = typeof p.zernioPostId === 'string' ? p.zernioPostId.trim() : '';
@@ -115,8 +115,8 @@ export class UploadScheduledSyncService {
       const decision = interpretZernioPostForSync(parsed);
 
       try {
-        const posts = await this.postModel.find({ zernioPostId: zPid }).exec();
-        for (const post of posts) {
+        const postRows = await this.posts.findAllByZernioPostId(zPid);
+        for (const post of postRows) {
           await this.applyDecisionForPost(post, zPid, decision);
         }
       } catch (err: unknown) {
@@ -132,31 +132,31 @@ export class UploadScheduledSyncService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + leaseMs);
 
-    const upserted = await this.syncLockModel
-      .updateOne(
-        { _id: ZERNIO_SCHEDULED_SYNC_LOCK_ID },
-        { $setOnInsert: { owner: instanceId, expiresAt } },
-        { upsert: true },
+    if (
+      await this.syncLocks.tryAcquire(
+        ZERNIO_SCHEDULED_SYNC_LOCK_ID,
+        instanceId,
+        expiresAt,
       )
-      .exec();
-    if (upserted.upsertedCount > 0) return true;
+    ) {
+      return true;
+    }
 
-    const stolen = await this.syncLockModel
-      .updateOne(
-        { _id: ZERNIO_SCHEDULED_SYNC_LOCK_ID, expiresAt: { $lte: now } },
-        { $set: { owner: instanceId, expiresAt } },
-      )
-      .exec();
-    return stolen.modifiedCount > 0;
+    return this.syncLocks.stealExpired(
+      ZERNIO_SCHEDULED_SYNC_LOCK_ID,
+      instanceId,
+      expiresAt,
+      now,
+    );
   }
 
   private rowKey(ch: UploadChannelEntry): string {
     return ch.channel.trim().toLowerCase();
   }
 
-  private platformKeys(postDoc: PostDocument): Set<string> {
+  private platformKeys(post: PostRecord): Set<string> {
     return new Set(
-      (postDoc.channels ?? []).map((c) => String(c).trim().toLowerCase()),
+      (post.channels ?? []).map((c) => String(c).trim().toLowerCase()),
     );
   }
 
@@ -168,37 +168,45 @@ export class UploadScheduledSyncService {
     this.events.emitToRoom(`upload_${uploadId}`, event, body);
   }
 
-  private remainingScheduledHint(doc: UploadDocument): string | null {
-    const remaining = doc.channels.find(
+  private remainingScheduledHint(upload: UploadRecord): string | null {
+    const remaining = uploadChannels(upload).find(
       (c) => c.status === UploadChannelStatus.Scheduled && c.scheduledAt,
     );
-    return remaining?.scheduledAt ? remaining.scheduledAt.toISOString() : null;
+    if (!remaining?.scheduledAt) return null;
+    const at =
+      remaining.scheduledAt instanceof Date
+        ? remaining.scheduledAt
+        : new Date(remaining.scheduledAt as string);
+    return at.toISOString();
   }
 
   private async saveUploadEmitAll(
-    doc: UploadDocument,
+    upload: UploadRecord,
     options: { publishNowHint?: boolean; scheduledAtHint?: string | null },
   ): Promise<void> {
-    doc.status = recomputeUploadJobStatus(doc.channels);
-    await doc.save();
+    const channels = uploadChannels(upload);
+    const saved = await this.uploads.save({
+      ...withUploadChannels(upload, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
 
-    const status = doc.status;
+    const status = saved.status;
     if (status === UploadJobStatus.Completed || status === UploadJobStatus.Partial) {
-      const channelsPublished = doc.channels
+      const channelsPublished = uploadChannels(saved)
         .filter((c) => c.status === UploadChannelStatus.Published)
         .map((c) => c.channel.toLowerCase());
-      this.emitUpload(doc.uploadId, 'upload:all_completed', {
-        uploadId: doc.uploadId,
+      this.emitUpload(saved.uploadId, 'upload:all_completed', {
+        uploadId: saved.uploadId,
         publishNow: options.publishNowHint ?? true,
         scheduledAt: options.scheduledAtHint ?? null,
         channelsPublished,
-        summary: buildUploadStatusSummary(doc.channels),
+        summary: buildUploadStatusSummary(uploadChannels(saved)),
       });
     }
   }
 
   private async applyDecisionForPost(
-    post: PostDocument,
+    post: PostRecord,
     zPid: string,
     decision: SyncPostDecision,
   ): Promise<void> {
@@ -212,43 +220,62 @@ export class UploadScheduledSyncService {
     let uploadTouched = false;
 
     const keys = this.platformKeys(post);
+    let nextPost = post;
 
     if (decision.kind === 'not_found') {
-      post.status = PostStatus.Cancelled;
-      post.failureReason = 'Post not found in Zernio.';
+      nextPost = {
+        ...post,
+        status: PostStatus.Cancelled,
+        failureReason: 'Post not found in Zernio.',
+      };
       publishNowHint = false;
     } else if (decision.kind === 'mark_published') {
-      post.status = PostStatus.Published;
-      post.publishedAt = decision.at;
-      post.scheduledAt = null;
-      post.failureReason = null;
-      post.publishedNow = false;
-      post.platformResults = [...keys].map((platform) => ({
-        platform,
-        status: PlatformPostStatus.Published,
-        platformUrl: null,
+      nextPost = {
+        ...withPostPlatformResults(
+          post,
+          [...keys].map((platform) => ({
+            platform,
+            status: PlatformPostStatus.Published,
+            platformUrl: null,
+            publishedAt: decision.at,
+            failureReason: null,
+          })),
+        ),
+        status: PostStatus.Published,
         publishedAt: decision.at,
+        scheduledAt: null,
         failureReason: null,
-      }));
+        publishedNow: false,
+      };
     } else if (decision.kind === 'mark_failed') {
-      post.status = PostStatus.Failed;
-      post.failureReason = decision.message;
-      publishNowHint = false;
-      post.platformResults = [...keys].map((platform) => ({
-        platform,
-        status: PlatformPostStatus.Failed,
-        platformUrl: null,
-        publishedAt: null,
+      nextPost = {
+        ...withPostPlatformResults(
+          post,
+          [...keys].map((platform) => ({
+            platform,
+            status: PlatformPostStatus.Failed,
+            platformUrl: null,
+            publishedAt: null,
+            failureReason: decision.message,
+          })),
+        ),
+        status: PostStatus.Failed,
         failureReason: decision.message,
-      }));
+      };
+      publishNowHint = false;
     }
 
-    await post.save();
+    const savedPost = await this.posts.save(nextPost);
 
-    const doc = await this.uploadModel.findOne({ uploadId: post.uploadRef }).exec();
-    if (!doc) return;
+    if (savedPost.status === PostStatus.Published) {
+      await this.postAnalyticsService.ensureForPost(savedPost);
+    }
 
-    for (const ch of doc.channels) {
+    const upload = await this.uploads.findByUploadId(post.uploadRef);
+    if (!upload) return;
+
+    const channels = uploadChannels(upload);
+    for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
 
       uploadTouched = true;
@@ -257,8 +284,8 @@ export class UploadScheduledSyncService {
         ch.status = UploadChannelStatus.Failed;
         ch.failureReason = 'Post not found in Zernio.';
         ch.scheduledAt = null;
-        this.emitUpload(doc.uploadId, 'upload:failed', {
-          uploadId: doc.uploadId,
+        this.emitUpload(upload.uploadId, 'upload:failed', {
+          uploadId: upload.uploadId,
           channel: this.rowKey(ch),
           message: 'Publishing failed. Please retry.',
         });
@@ -267,16 +294,16 @@ export class UploadScheduledSyncService {
         ch.publishedAt = decision.at;
         ch.scheduledAt = null;
         ch.failureReason = null;
-        this.emitUpload(doc.uploadId, 'upload:completed', {
-          uploadId: doc.uploadId,
+        this.emitUpload(upload.uploadId, 'upload:completed', {
+          uploadId: upload.uploadId,
           channel: this.rowKey(ch),
           postId: zPid,
         });
       } else if (decision.kind === 'mark_failed') {
         ch.status = UploadChannelStatus.Failed;
         ch.failureReason = decision.message;
-        this.emitUpload(doc.uploadId, 'upload:failed', {
-          uploadId: doc.uploadId,
+        this.emitUpload(upload.uploadId, 'upload:failed', {
+          uploadId: upload.uploadId,
           channel: this.rowKey(ch),
           message: decision.message,
         });
@@ -285,10 +312,9 @@ export class UploadScheduledSyncService {
 
     if (!uploadTouched) return;
 
-    scheduledAtHint = this.remainingScheduledHint(doc);
+    scheduledAtHint = this.remainingScheduledHint(withUploadChannels(upload, channels));
 
-    doc.markModified('channels');
-    await this.saveUploadEmitAll(doc, {
+    await this.saveUploadEmitAll(withUploadChannels(upload, channels), {
       publishNowHint,
       scheduledAtHint,
     });

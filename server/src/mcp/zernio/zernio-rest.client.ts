@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, isAxiosError } from 'axios';
 
 import { getFriendlyZernioPublishError } from './zernio-mcp-publish.util';
+import { assertTikTokPhotoCaptionForPublish } from './tiktok-publish.util';
 import {
   assertPdfNotUsedForPresign,
   isLikelyZernioAccessibleMediaUrl,
@@ -121,6 +122,13 @@ export class ZernioRestClient {
 
     const platforms = await Promise.all(
       payload.platforms.map(async (p) => {
+        assertTikTokPhotoCaptionForPublish(
+          p.platform,
+          p.content,
+          p.mediaUrl,
+          p.mediaUrls,
+        );
+
         const singleMedia = (p.mediaUrl ?? '').trim();
         const multiMedia =
           p.mediaUrls?.map((u) => u.trim()).filter(Boolean) ?? [];
@@ -424,6 +432,7 @@ export class ZernioRestClient {
     scheduledFor?: string | null;
     title?: string;
     publishNow?: boolean;
+    mediaUrls?: string[] | null;
   }): Promise<{ success: boolean }> {
     const postId = payload.postId.trim();
     if (!postId) {
@@ -442,6 +451,17 @@ export class ZernioRestClient {
       }
     }
     if (payload.title !== undefined) body.title = payload.title;
+
+    if (payload.mediaUrls !== undefined) {
+      const rawUrls = (payload.mediaUrls ?? [])
+        .map((u) => u.trim())
+        .filter(Boolean);
+      const mediaCache = new Map<string, ZernioCustomMediaItem>();
+      body.mediaItems = await this.buildZernioMediaItemsFromUrls(
+        rawUrls,
+        mediaCache,
+      );
+    }
 
     this.logger.log(`[REST] PUT body: ${JSON.stringify(body)}`);
 

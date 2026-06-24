@@ -1,6 +1,4 @@
 import {
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -9,12 +7,13 @@ import {
 } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { AxiosError } from "axios"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { LayoutGrid } from "lucide-react"
 
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -33,7 +32,6 @@ import {
   SORT_OPTIONS,
   VALID_CHANNELS,
 } from "@/features/posts/lib/posts-filter-config"
-import { getApiErrorMessage } from "@/features/upload/lib/upload-publish.helpers"
 import { cn } from "@/lib/utils"
 import {
   navigateSearchParams,
@@ -54,12 +52,6 @@ import {
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import type { PostListSort, PostStatus } from "@/shared/types/post.type"
 
-const PostDetailDrawer = lazy(() =>
-  import("@/features/posts/components/post-detail-drawer").then((m) => ({
-    default: m.PostDetailDrawer,
-  }))
-)
-
 const POST_LIST_DEFAULTS: ListPaginationDefaults = {
   defaultPage: 1,
   defaultLimit: 20,
@@ -67,12 +59,10 @@ const POST_LIST_DEFAULTS: ListPaginationDefaults = {
 }
 
 const STATUSES_ALL: PostStatus[] = [
-  "pending",
   "scheduled",
   "published",
   "failed",
   "cancelled",
-  "partial",
 ]
 
 const STAT_TILES: {
@@ -82,10 +72,11 @@ const STAT_TILES: {
   { key: "all" },
   { key: "published", status: "published" },
   { key: "scheduled", status: "scheduled" },
-  { key: "pending", status: "pending" },
-  { key: "partial", status: "partial" },
   { key: "failed", status: "failed" },
 ]
+
+const POSTS_GRID_CLASS =
+  "grid gap-4 py-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr))] justify-items-center sm:gap-5"
 
 function parsePostFilters(search: string): {
   status: PostStatus | "all"
@@ -243,9 +234,6 @@ export default function PostsPage() {
     setSelectedIds(new Set())
   }, [filterKey])
 
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [activePostId, setActivePostId] = useState<string | null>(null)
-
   const listParams = useMemo(
     () => ({
       page,
@@ -302,9 +290,8 @@ export default function PostsPage() {
     })
   }
 
-  function openDrawer(pid: string) {
-    setActivePostId(pid)
-    setDrawerOpen(true)
+  function openPostDetail(pid: string) {
+    navigate(`/posts/${encodeURIComponent(pid)}`)
   }
 
   function scheduleSearchNavigate(raw: string) {
@@ -347,7 +334,7 @@ export default function PostsPage() {
       })
       setBulkScheduleLocal("")
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.scheduleFailed")
     }
   }
 
@@ -363,7 +350,7 @@ export default function PostsPage() {
         }),
       })
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.publishFailed")
     }
   }
 
@@ -375,7 +362,7 @@ export default function PostsPage() {
       toastBulkDeleteResult(res)
       setSelectedIds(new Set())
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.deleteFailed")
     }
   }
 
@@ -390,7 +377,7 @@ export default function PostsPage() {
           : undefined,
       })
     } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e as AxiosError))
+      toastApiError(e, "posts:bulk.retryFailed")
     }
   }
 
@@ -408,10 +395,7 @@ export default function PostsPage() {
     queryReady && !listQuery.isError && !listLoading && listTotal > 0
 
   return (
-    <div
-      className="min-h-full w-full bg-[color:var(--nt-canvas)] px-4 py-5 sm:px-5"
-      style={{ minHeight: "100%" }}
-    >
+    <PageShell>
       <motion.div className="flex w-full flex-col gap-5">
         <header className="space-y-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
@@ -422,7 +406,7 @@ export default function PostsPage() {
           </p>
         </header>
 
-        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
           {STAT_TILES.map((tile) => {
             const active =
               tile.key === "all"
@@ -549,11 +533,11 @@ export default function PostsPage() {
         </AnimatePresence>
 
         {!queryReady ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className={POSTS_GRID_CLASS}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="flex max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-canvas-200"
+                className="flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-canvas-200"
               >
                 <Skeleton className="h-40 w-full rounded-none" />
                 <div className="space-y-2 p-3">
@@ -607,7 +591,7 @@ export default function PostsPage() {
 
             <motion.div
               key={filterKey}
-              className="grid grid-cols-1 gap-4 py-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+              className={POSTS_GRID_CLASS}
               variants={gridVariants}
               initial="hidden"
               animate="show"
@@ -631,13 +615,13 @@ export default function PostsPage() {
                       key={post.postId}
                       variants={cardVariants}
                       transition={{ duration: 0.22 }}
-                      className="w-full max-w-[22rem] justify-self-start"
+                      className="w-full max-w-[22rem]"
                     >
                       <PostListCard
                         post={post}
                         selected={selectedIds.has(post.postId)}
                         onToggleSelect={toggleSelect}
-                        onOpen={openDrawer}
+                        onOpen={openPostDetail}
                         onRetry={(pid) => void handleRetryOne(pid)}
                         retryBusy={
                           retryMu.isPending && retryMu.variables === post.postId
@@ -707,18 +691,7 @@ export default function PostsPage() {
             ) : null}
           </motion.div>
         ) : null}
-
-        <Suspense fallback={null}>
-          <PostDetailDrawer
-            open={drawerOpen}
-            onOpenChange={(o) => {
-              setDrawerOpen(o)
-              if (!o) setActivePostId(null)
-            }}
-            postId={activePostId}
-          />
-        </Suspense>
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

@@ -10,6 +10,8 @@ type HomePromptBarProps = {
   onFocus: () => void
   onBlur: () => void
   onSubmit: (text: string, attachments: Attachment[]) => void
+  disabled?: boolean
+  submitDisabled?: boolean
 }
 
 export function HomePromptBar({
@@ -19,6 +21,8 @@ export function HomePromptBar({
   onFocus,
   onBlur,
   onSubmit,
+  disabled = false,
+  submitDisabled = false,
 }: HomePromptBarProps) {
   return (
     <div className="w-full max-w-[600px]">
@@ -29,6 +33,8 @@ export function HomePromptBar({
         onBlur={onBlur}
         placeholder={placeholder}
         onSubmit={onSubmit}
+        disabled={disabled}
+        submitDisabled={submitDisabled}
         className="shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
       />
     </div>

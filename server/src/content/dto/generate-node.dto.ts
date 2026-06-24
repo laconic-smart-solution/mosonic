@@ -6,6 +6,10 @@ export class GenerateNodeDto {
   type!: WorkflowNodeType;
 
   @IsOptional()
+  @IsString()
+  nodeId?: string;
+
+  @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
 

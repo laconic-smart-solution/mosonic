@@ -1,17 +1,19 @@
 import {
   BadRequestException,
-  forwardRef,
   HttpException,
   Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import type { Prisma } from '@prisma/client';
+import type { TenancyAuth } from '../auth/tenancy.types';
+import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
 import { randomUUID } from 'node:crypto';
-import { AnalyticsService } from '../analytics/analytics.service';
 import { EventsService } from '../events/events.service';
+import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
+import type { IRuleRepository, RuleRecord } from '../repositories/interfaces/rule.repository.interface';
+import { RULE_REPOSITORY } from '../repositories/tokens';
 import type { ExtractRuleResponseDto } from './dto/extract-rule.dto';
 import type { RuleExtractRequest } from './extract-request.types';
 import type { ReplaceRuleDto } from './dto/replace-rule.dto';
@@ -23,6 +25,7 @@ import type {
   NewsTriggerSettingsResponseDto,
   UpdateNewsTriggerSettingsDto,
 } from './dto/news-trigger-settings.dto';
+import type { RuleDocument } from './schemas/rule.schema';
 import {
   GenderOption,
   NewsTriggerCategory,
@@ -30,17 +33,15 @@ import {
   NewsTriggerSchedule,
   OriginalInputType,
   PostingFrequency,
-  Rule,
-  type RuleDocument,
   RuleStatus,
   VersionChangedBy,
 } from './schemas/rule.schema';
-import type { TenancyAuth } from '../auth/tenancy.types';
-import { mergeUserIdFilter } from '../auth/tenancy.util';
 import { ContentReaderService } from '../preprocessing/content-reader.service';
 import { PreprocessingService } from '../preprocessing/preprocessing.service';
 import { RuleExtractionService } from './rule-extraction.service';
-import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
+import { CreditService } from '../credit/credit.service';
+import { currentBillingPeriod } from '../credit/lib/billing-period.util';
+import { RULE_GENERATION_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -73,19 +74,23 @@ export class RuleService {
   private static readonly DEFAULT_AWAIT_TIMEOUT_MS = 120_000;
 
   constructor(
-    @InjectModel(Rule.name) private readonly ruleModel: Model<RuleDocument>,
+    @Inject(RULE_REPOSITORY) private readonly rules: IRuleRepository,
     private readonly ruleExtraction: RuleExtractionService,
     private readonly preprocessing: PreprocessingService,
     private readonly contentReader: ContentReaderService,
     private readonly events: EventsService,
-    @Inject(forwardRef(() => AnalyticsService))
-    private readonly analyticsService: AnalyticsService,
+    private readonly creditService: CreditService,
   ) {}
 
   async requestExtraction(
     args: RuleExtractRequest,
     auth: TenancyAuth,
   ): Promise<ExtractRuleResponseDto> {
+    await this.creditService.assertCreditsForNodeType(
+      auth.userId,
+      RULE_GENERATION_NODE_TYPE,
+    );
+
     const now = new Date();
     const originalType =
       args.files.length > 0
@@ -96,7 +101,7 @@ export class RuleService {
 
     const ruleId = randomUUID();
 
-    await this.ruleModel.create({
+    await this.rules.create({
       ruleId,
       userId: auth.userId,
       name: 'Processing rule',
@@ -152,15 +157,6 @@ export class RuleService {
       versions: [],
     });
 
-    try {
-      await this.analyticsService.ensureForRule(ruleId);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Failed to seed analytics doc for rule ${ruleId}: ${msg}`,
-      );
-    }
-
     void this.runExtraction(ruleId, args, auth);
     return { ruleId };
   }
@@ -197,10 +193,7 @@ export class RuleService {
     const startedAt = Date.now();
     const intervalMs = 500;
     for (;;) {
-      const rule = await this.ruleModel
-        .findOne(mergeUserIdFilter({ ruleId }, auth))
-        .lean()
-        .exec();
+      const rule = await this.rules.findById(ruleId, auth);
       if (!rule) {
         throw new NotFoundException(`Rule ${ruleId} not found`);
       }
@@ -217,10 +210,8 @@ export class RuleService {
     }
   }
 
-  async getRuleById(ruleId: string, auth: TenancyAuth): Promise<RuleDocument> {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+  async getRuleById(ruleId: string, auth: TenancyAuth): Promise<RuleRecord> {
+    const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -248,19 +239,13 @@ export class RuleService {
     fieldPath: string,
     suggestedValue: unknown,
     auth: TenancyAuth,
-  ): Promise<RuleDocument> {
-    const existing = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+  ): Promise<RuleRecord> {
+    const existing = await this.rules.findById(ruleId, auth);
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
     const dto = buildSuggestionUpdateDto(
-      {
-        brand: existing.brand,
-        campaign: existing.campaign,
-        channels: existing.channels,
-      },
+      existing as unknown as Pick<RuleDocument, 'brand' | 'campaign' | 'channels'>,
       fieldPath,
       suggestedValue,
     );
@@ -271,87 +256,81 @@ export class RuleService {
     ruleId: string,
     dto: UpdateRuleDto,
     auth: TenancyAuth,
-  ): Promise<RuleDocument> {
-    const existing = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+  ): Promise<RuleRecord> {
+    const existing = await this.rules.findById(ruleId, auth);
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
 
-    const $set: Record<string, unknown> = {};
+    const data: Prisma.RuleUpdateInput = {};
+    const brand = existing.brand as Record<string, unknown>;
+    const audience = existing.audience as Record<string, unknown> & {
+      ageRange?: Record<string, unknown>;
+    };
+    const campaign = existing.campaign as Record<string, unknown> & {
+      duration?: { startDate?: Date; endDate?: Date };
+    };
+    const contentGuidelines = existing.contentGuidelines as Record<
+      string,
+      unknown
+    > & { seoGuidelines?: Record<string, unknown> };
 
-    if (dto.name !== undefined) {
-      $set.name = dto.name;
-    }
-
+    if (dto.name !== undefined) data.name = dto.name;
     if (dto.brand !== undefined) {
-      $set.brand = { ...existing.brand, ...dto.brand };
+      data.brand = { ...brand, ...dto.brand } as Prisma.InputJsonValue;
     }
-
     if (dto.audience !== undefined) {
-      $set.audience = {
-        ...existing.audience,
+      data.audience = {
+        ...audience,
         ...dto.audience,
         ageRange:
           dto.audience.ageRange !== undefined
-            ? {
-                ...existing.audience.ageRange,
-                ...dto.audience.ageRange,
-              }
-            : existing.audience.ageRange,
-      };
+            ? { ...audience.ageRange, ...dto.audience.ageRange }
+            : audience.ageRange,
+      } as Prisma.InputJsonValue;
     }
-
     if (dto.campaign !== undefined) {
-      const ex = existing.campaign;
       const mergedCampaign = {
-        ...ex,
+        ...campaign,
         ...dto.campaign,
         duration:
           dto.campaign.duration !== undefined
             ? {
                 startDate:
-                  dto.campaign.duration.startDate ?? ex.duration.startDate,
-                endDate: dto.campaign.duration.endDate ?? ex.duration.endDate,
+                  dto.campaign.duration.startDate ?? campaign.duration?.startDate,
+                endDate:
+                  dto.campaign.duration.endDate ?? campaign.duration?.endDate,
               }
-            : ex.duration,
+            : campaign.duration,
       };
-      $set.campaign = this.campaignFromDto(mergedCampaign as CampaignDto);
+      data.campaign = this.campaignFromDto(
+        mergedCampaign as CampaignDto,
+      ) as Prisma.InputJsonValue;
     }
-
     if (dto.channels !== undefined) {
-      $set.channels = dto.channels;
+      data.channels = dto.channels as unknown as Prisma.InputJsonValue;
     }
-
     if (dto.contentGuidelines !== undefined) {
-      const ex = existing.contentGuidelines;
-      $set.contentGuidelines = {
-        ...ex,
+      data.contentGuidelines = {
+        ...contentGuidelines,
         ...dto.contentGuidelines,
         seoGuidelines:
           dto.contentGuidelines.seoGuidelines !== undefined
             ? {
-                ...ex.seoGuidelines,
+                ...contentGuidelines.seoGuidelines,
                 ...dto.contentGuidelines.seoGuidelines,
               }
-            : ex.seoGuidelines,
-      };
+            : contentGuidelines.seoGuidelines,
+      } as Prisma.InputJsonValue;
     }
 
-    if (Object.keys($set).length === 0) {
+    if (Object.keys(data).length === 0) {
       throw new BadRequestException(
         'No updatable fields in body (send at least one of: name, brand, audience, campaign, channels, contentGuidelines)',
       );
     }
 
-    const updated = await this.ruleModel
-      .findOneAndUpdate(
-        mergeUserIdFilter({ ruleId }, auth),
-        { $set },
-        { new: true, runValidators: true },
-      )
-      .exec();
+    const updated = await this.rules.updateById(ruleId, data, auth);
     if (!updated) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -362,23 +341,19 @@ export class RuleService {
     ruleId: string,
     dto: ReplaceRuleDto,
     auth: TenancyAuth,
-  ): Promise<RuleDocument> {
-    const $set = {
-      name: dto.name,
-      brand: dto.brand,
-      audience: dto.audience,
-      campaign: this.campaignFromDto(dto.campaign),
-      channels: dto.channels,
-      contentGuidelines: dto.contentGuidelines,
-    };
-
-    const updated = await this.ruleModel
-      .findOneAndUpdate(
-        mergeUserIdFilter({ ruleId }, auth),
-        { $set },
-        { new: true, runValidators: true },
-      )
-      .exec();
+  ): Promise<RuleRecord> {
+    const updated = await this.rules.updateById(
+      ruleId,
+      {
+        name: dto.name,
+        brand: dto.brand as unknown as Prisma.InputJsonValue,
+        audience: dto.audience as unknown as Prisma.InputJsonValue,
+        campaign: this.campaignFromDto(dto.campaign) as unknown as Prisma.InputJsonValue,
+        channels: dto.channels as unknown as Prisma.InputJsonValue,
+        contentGuidelines: dto.contentGuidelines as unknown as Prisma.InputJsonValue,
+      },
+      auth,
+    );
     if (!updated) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -398,39 +373,24 @@ export class RuleService {
     const sortOrder = dto.sortOrder ?? 'desc';
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = mergeUserIdFilter({}, auth);
+    const filter: Prisma.RuleWhereInput = mergeTenancyWhere({}, auth);
     const nameFilter = dto.filter?.name?.trim();
     if (nameFilter) {
-      filter.name = {
-        $regex: escapeRegex(nameFilter),
-        $options: 'i',
-      };
+      filter.name = { contains: nameFilter, mode: 'insensitive' };
     }
     if (dto.filter?.status !== undefined) {
-      filter.status = dto.filter.status;
+      filter.status = dto.filter.status as Prisma.EnumRuleStatusFilter['equals'];
+    } else {
+      filter.status = { not: 'failed' };
     }
 
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    const sort: Record<string, 1 | -1> = { [sortBy]: sortDir };
-
-    const [data, total] = await Promise.all([
-      this.ruleModel
-        .find(filter)
-        .select({
-          ruleId: 1,
-          name: 1,
-          status: 1,
-          'brand.brandTone': 1,
-          'channels.channel': 1,
-          updatedAt: 1,
-        })
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.ruleModel.countDocuments(filter).exec(),
-    ]);
+    const { rows: data, total } = await this.rules.findPage(
+      filter,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
 
     const mapped: RulePageItemDto[] = (data as unknown as RulePageRaw[]).map(
       (row) => {
@@ -503,48 +463,60 @@ export class RuleService {
         message: 'Analyzing your strategy...',
       });
 
-      const extracted = await this.ruleExtraction.extractRuleFromInput(summary);
+      const { draft: extracted } =
+        await this.ruleExtraction.extractRuleFromInput(summary);
+
+      await this.creditService.deductCredits({
+        userId: auth.userId,
+        pipelineRef: `rule:${ruleId}`,
+        campaignRef: ruleId,
+        nodeId: 'rule-extraction',
+        nodeType: RULE_GENERATION_NODE_TYPE,
+        provider: 'system',
+        model: 'system',
+        rawCostUsd: 0,
+        billingPeriod: currentBillingPeriod(),
+      });
+
       const streamSource = JSON.stringify(extracted);
       for (const chunk of streamSource.split(/\s+/).filter(Boolean)) {
         this.events.emitToRule(ruleId, 'rule:streaming', { ruleId, chunk });
       }
 
-      await this.ruleModel.updateOne(
-        mergeUserIdFilter({ ruleId }, auth),
+      await this.rules.appendVersion(
+        ruleId,
         {
-          $set: {
-            name: extracted.name,
-            brand: extracted.brand,
-            audience: extracted.audience,
-            campaign: {
-              ...extracted.campaign,
-              duration: {
-                startDate: new Date(extracted.campaign.duration.startDate),
-                endDate: new Date(extracted.campaign.duration.endDate),
-              },
+          name: extracted.name,
+          brand: extracted.brand as Prisma.InputJsonValue,
+          audience: extracted.audience as Prisma.InputJsonValue,
+          campaign: {
+            ...extracted.campaign,
+            duration: {
+              startDate: new Date(extracted.campaign.duration.startDate),
+              endDate: new Date(extracted.campaign.duration.endDate),
             },
-            channels: extracted.channels,
-            contentGuidelines: extracted.contentGuidelines,
-            status: RuleStatus.Active,
-          },
-          $push: {
-            versions: {
-              versionNumber: 1,
-              changedFields: ['*'],
-              changedBy: VersionChangedBy.SystemSuggestion,
-              snapshot: extracted,
-              createdAt: new Date(),
-            },
-          },
+          } as Prisma.InputJsonValue,
+          channels: extracted.channels as Prisma.InputJsonValue,
+          contentGuidelines: extracted.contentGuidelines as Prisma.InputJsonValue,
+          status: 'active',
         },
+        {
+          versionNumber: 1,
+          changedFields: ['*'],
+          changedBy: VersionChangedBy.SystemSuggestion,
+          snapshot: extracted,
+          createdAt: new Date(),
+        },
+        auth,
       );
 
       this.events.emitToRule(ruleId, 'rule:completed', { ruleId });
     } catch (error) {
       this.logger.error(`Rule extraction failed for ${ruleId}`, error as Error);
-      await this.ruleModel.updateOne(
-        mergeUserIdFilter({ ruleId }, auth),
-        { $set: { status: RuleStatus.Failed } },
+      await this.rules.updateById(
+        ruleId,
+        { status: 'failed' },
+        auth,
       );
       const message =
         error instanceof BadRequestException
@@ -598,13 +570,13 @@ export class RuleService {
     ruleId: string,
     auth: TenancyAuth,
   ): Promise<NewsTriggerSettingsResponseDto> {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+    const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
-    return this.toNewsTriggerResponse(rule.newsTrigger);
+    return this.toNewsTriggerResponse(
+      rule.newsTrigger as unknown as NewsTriggerConfig | undefined,
+    );
   }
 
   async updateNewsTriggerSettings(
@@ -612,9 +584,7 @@ export class RuleService {
     body: UpdateNewsTriggerSettingsDto,
     auth: TenancyAuth,
   ): Promise<NewsTriggerSettingsResponseDto> {
-    const rule = await this.ruleModel
-      .findOne(mergeUserIdFilter({ ruleId }, auth))
-      .exec();
+    const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
@@ -646,9 +616,11 @@ export class RuleService {
     }
     if (body.autoApprove !== undefined) current.autoApprove = body.autoApprove;
 
-    rule.newsTrigger = current;
-    await rule.save();
-
-    return this.toNewsTriggerResponse(rule.newsTrigger);
+    await this.rules.updateNewsTrigger(
+      ruleId,
+      current as unknown as Prisma.InputJsonValue,
+      auth,
+    );
+    return this.toNewsTriggerResponse(current);
   }
 }

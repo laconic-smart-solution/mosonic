@@ -56,11 +56,15 @@ async function refreshTokensAndPersist(): Promise<string | null> {
 }
 
 function forceLogoutToLogin() {
+  const { accessToken, refreshToken } = useAuthStore.getState()
+  const hadSession = Boolean(accessToken || refreshToken)
   useUserStore.getState().clearUser()
   useAuthStore.getState().clearSession()
-  const path = `${window.location.pathname}${window.location.search}`
+  if (!hadSession) {
+    return
+  }
   if (!window.location.pathname.startsWith("/login")) {
-    window.location.href = `/login?next=${encodeURIComponent(path)}`
+    window.location.href = "/login"
   }
 }
 

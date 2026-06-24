@@ -1,16 +1,17 @@
-import type { PipelineDocument } from '../pipeline/schemas/pipeline.schema';
+import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
+import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
 
 /** Whether a pending node should be withheld while a lane is paused. */
 export function isNodeBlockedByLanePause(
-  pipeline: PipelineDocument,
+  pipeline: PipelineRecord,
   nodeId: string,
   laneScopedPause: boolean,
 ): boolean {
   if (!laneScopedPause || !pipeline.pausedLaneId) {
     return false;
   }
-  const node = (pipeline.nodes ?? []).find((n) => n.nodeId === nodeId);
+  const node = parsePipelineNodes(pipeline.nodes).find((n) => n.nodeId === nodeId);
   if (!node) {
     return false;
   }
@@ -20,20 +21,22 @@ export function isNodeBlockedByLanePause(
 }
 
 export function isSharedTrunkFailure(
-  pipeline: PipelineDocument,
+  pipeline: PipelineRecord,
   failedNodeId: string,
 ): boolean {
-  const node = (pipeline.nodes ?? []).find((n) => n.nodeId === failedNodeId);
+  const node = parsePipelineNodes(pipeline.nodes).find(
+    (n) => n.nodeId === failedNodeId,
+  );
   return !node?.lane?.trim();
 }
 
 export function countNodesByLane(
-  pipeline: PipelineDocument,
+  pipeline: PipelineRecord,
 ): Record<string, { completed: number; total: number }> {
   const byLane: Record<string, { completed: number; total: number }> = {
     _shared: { completed: 0, total: 0 },
   };
-  for (const node of pipeline.nodes ?? []) {
+  for (const node of parsePipelineNodes(pipeline.nodes)) {
     const key = node.lane?.trim() || '_shared';
     if (!byLane[key]) {
       byLane[key] = { completed: 0, total: 0 };

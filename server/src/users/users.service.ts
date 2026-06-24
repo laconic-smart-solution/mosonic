@@ -1,19 +1,23 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { ModuleRef } from '@nestjs/core';
 import { type SsoTokenClaims } from '../auth/auth.types';
 import {
-  User,
-  type UserDocument,
   UserRole,
   UserStatus,
-} from './schemas/user.schema';
+  type UserRecord,
+} from '../domain/users/user.types';
+import { PlanService } from '../plan/plan.service';
+import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
+import { isUniqueViolation } from '../repositories/prisma/prisma.util';
+import { USER_REPOSITORY } from '../repositories/tokens';
 
 export type ConnectedAccountRecord = {
+  userId: string;
   channel: string;
   accountId: string;
   connectedAt: Date;
@@ -22,13 +26,23 @@ export type ConnectedAccountRecord = {
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private async assignDefaultPlanForUser(userId: string): Promise<void> {
+    try {
+      const planService = this.moduleRef.get(PlanService, { strict: false });
+      await planService.assignDefaultPlan(userId);
+    } catch {
+      // PlanModule may not be initialized during early bootstrap
+    }
+  }
 
   async upsertFromSsoClaims(args: {
     authServerUserId: string;
     claims: SsoTokenClaims;
-  }): Promise<User> {
+  }): Promise<UserRecord> {
     const { authServerUserId, claims } = args;
 
     const email = typeof claims.email === 'string' ? claims.email : undefined;
@@ -43,31 +57,58 @@ export class UsersService {
 
     const now = new Date();
 
-    const existing = await this.userModel.findOne({ authServerUserId }).exec();
-    if (existing) {
-      // Do not overwrite role/status from SSO.
-      existing.email = email ?? existing.email;
-      existing.username = username ?? existing.username;
-      existing.firstName = firstName ?? existing.firstName;
-      existing.lastName = lastName ?? existing.lastName;
-      existing.lastLoginAt = now;
-      return await existing.save();
+    let existing = await this.users.findByAuthServerUserId(authServerUserId);
+
+    if (!existing) {
+      existing = await this.users.findByEmailOrUsernameInsensitive(
+        email,
+        username,
+      );
     }
 
-    return await this.userModel.create({
-      authServerUserId,
-      email,
-      username,
-      firstName,
-      lastName,
-      role: UserRole.CUSTOMER,
-      status: UserStatus.ACTIVE,
-      lastLoginAt: now,
-    });
+    if (existing) {
+      const updated = await this.users.update(existing.userId, {
+        authServerUserId,
+        email: email ?? existing.email,
+        username: username ?? existing.username,
+        firstName: firstName ?? existing.firstName,
+        lastName: lastName ?? existing.lastName,
+        lastLoginAt: now,
+      });
+      if (updated) return updated;
+
+      const winner = await this.users.findByAuthServerUserId(authServerUserId);
+      if (winner) return winner;
+
+      throw new Error(
+        `Failed to update user ${existing.userId} during SSO upsert`,
+      );
+    }
+
+    try {
+      const user = await this.users.create({
+        authServerUserId,
+        email,
+        username,
+        firstName,
+        lastName,
+        role: UserRole.CUSTOMER,
+        status: UserStatus.ACTIVE,
+        lastLoginAt: now,
+      });
+      await this.assignDefaultPlanForUser(user.userId);
+      return user;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.users.findByAuthServerUserId(authServerUserId);
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
-  async findByUserId(userId: string): Promise<User | null> {
-    return this.userModel.findOne({ userId }).exec();
+  async findByUserId(userId: string): Promise<UserRecord | null> {
+    return this.users.findByUserId(userId);
   }
 
   /**
@@ -76,18 +117,15 @@ export class UsersService {
   async listUserIdsWithZernioConnectedAccounts(): Promise<
     Array<{ userId: string; accountCount: number }>
   > {
-    const users = await this.userModel
-      .find({})
-      .select({ userId: 1, zernioConnectedAccounts: 1 })
-      .lean()
-      .exec();
+    const rows = await this.users.listWithZernioAccounts();
 
     const out: Array<{ userId: string; accountCount: number }> = [];
-    for (const row of users) {
+    for (const row of rows) {
       const userId = typeof row.userId === 'string' ? row.userId : '';
       if (!userId) continue;
       const count = this.normalizeConnectedAccounts(
         row.zernioConnectedAccounts,
+        userId,
       ).length;
       if (count > 0) {
         out.push({ userId, accountCount: count });
@@ -96,23 +134,45 @@ export class UsersService {
     return out;
   }
 
-  async findByZernioProfileId(profileId: string): Promise<User | null> {
-    const id = profileId.trim();
-    if (!id) {
-      return null;
-    }
-    return this.userModel.findOne({ zernioProfileId: id }).exec();
+  async findByZernioProfileId(profileId: string): Promise<UserRecord | null> {
+    return this.users.findByZernioProfileId(profileId);
   }
 
-  async findByAuthServerUserId(authServerUserId: string): Promise<User | null> {
-    return this.userModel.findOne({ authServerUserId }).exec();
+  async findOtherUserByZernioProfileId(
+    profileId: string,
+    excludeUserId: string,
+  ): Promise<UserRecord | null> {
+    return this.users.findOtherUserByZernioProfileId(profileId, excludeUserId);
+  }
+
+  async listDuplicateZernioProfileGroups(): Promise<
+    Array<{
+      profileId: string;
+      users: Array<{
+        userId: string;
+        createdAt: Date;
+        email: string | null;
+      }>;
+    }>
+  > {
+    return this.users.listDuplicateZernioProfileGroups();
+  }
+
+  async clearZernioConnectedAccounts(userId: string): Promise<void> {
+    await this.replaceZernioConnectedAccounts(userId, []);
+  }
+
+  async findByAuthServerUserId(
+    authServerUserId: string,
+  ): Promise<UserRecord | null> {
+    return this.users.findByAuthServerUserId(authServerUserId);
   }
 
   async setZernioProfileId(userId: string, profileId: string): Promise<void> {
-    const result = await this.userModel
-      .updateOne({ userId }, { $set: { zernioProfileId: profileId } })
-      .exec();
-    if (result.matchedCount === 0) {
+    const updated = await this.users.update(userId, {
+      zernioProfileId: profileId,
+    });
+    if (!updated) {
       throw new NotFoundException(`User ${userId} not found`);
     }
   }
@@ -138,9 +198,11 @@ export class UsersService {
     const now = new Date();
     const accounts = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     );
     const next = accounts.filter((acc) => acc.channel !== key);
     next.push({
+      userId,
       channel: key,
       accountId: normalizedAccountId,
       connectedAt: now,
@@ -161,7 +223,10 @@ export class UsersService {
       throw new NotFoundException(`User ${userId} not found`);
     }
     const byChannel = new Map<string, ConnectedAccountRecord>();
-    for (const item of this.normalizeConnectedAccounts(user.zernioConnectedAccounts)) {
+    for (const item of this.normalizeConnectedAccounts(
+      user.zernioConnectedAccounts,
+      userId,
+    )) {
       byChannel.set(item.channel, item);
     }
     for (const item of accounts) {
@@ -169,6 +234,7 @@ export class UsersService {
       const accountId = item.accountId?.trim();
       if (!channel || !accountId) continue;
       byChannel.set(channel, {
+        userId,
         channel,
         accountId,
         connectedAt: item.connectedAt ?? new Date(),
@@ -187,7 +253,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts);
+    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts, userId);
   }
 
   async disconnectZernioConnectedAccount(
@@ -204,6 +270,7 @@ export class UsersService {
     }
     const next = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     ).filter((acc) => acc.channel !== key);
     await this.replaceZernioConnectedAccounts(userId, next);
   }
@@ -224,6 +291,7 @@ export class UsersService {
     }
     const normalized = this.normalizeConnectedAccounts(
       user.zernioConnectedAccounts,
+      userId,
     );
     const accounts = normalized.reduce<Record<string, string>>((acc, item) => {
       acc[item.channel] = item.accountId;
@@ -240,27 +308,30 @@ export class UsersService {
     userId: string,
     accounts: ConnectedAccountRecord[],
   ): Promise<void> {
-    const result = await this.userModel
-      .updateOne(
-        { userId },
-        {
-          $set: {
-            zernioConnectedAccounts: accounts,
-          },
-        },
-      )
-      .exec();
-    if (result.matchedCount === 0) {
+    const updated = await this.users.update(userId, {
+      zernioConnectedAccounts: accounts.map(
+        ({ channel, accountId, connectedAt }) => ({
+          channel,
+          accountId,
+          connectedAt,
+        }),
+      ),
+    });
+    if (!updated) {
       throw new NotFoundException(`User ${userId} not found`);
     }
   }
 
-  private normalizeConnectedAccounts(raw: unknown): ConnectedAccountRecord[] {
+  private normalizeConnectedAccounts(
+    raw: unknown,
+    userId: string,
+  ): ConnectedAccountRecord[] {
     if (Array.isArray(raw)) {
       const normalized: ConnectedAccountRecord[] = [];
       for (const item of raw) {
         if (!item || typeof item !== 'object') continue;
         const rec = item as {
+          userId?: string;
           channel?: string;
           accountId?: string;
           connectedAt?: Date | string;
@@ -269,6 +340,7 @@ export class UsersService {
         const accountId = rec.accountId?.trim();
         if (!channel || !accountId) continue;
         normalized.push({
+          userId: rec.userId?.trim() || userId,
           channel,
           accountId,
           connectedAt: this.toDate(rec.connectedAt),
@@ -280,6 +352,7 @@ export class UsersService {
     if (raw && typeof raw === 'object') {
       return Object.entries(raw as Record<string, unknown>)
         .map(([channel, accountId]) => ({
+          userId,
           channel: this.normalizeChannel(channel),
           accountId:
             typeof accountId === 'string' ? accountId.trim() : '',
@@ -304,3 +377,4 @@ export class UsersService {
     return new Date();
   }
 }
+

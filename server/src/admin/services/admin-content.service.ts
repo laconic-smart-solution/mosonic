@@ -1,33 +1,67 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Content, type ContentDocument } from '../../content/schemas/content.schema';
-import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
-import { Pipeline, type PipelineDocument } from '../../pipeline/schemas/pipeline.schema';
-import { Rule, type RuleDocument } from '../../rule/schemas/rule.schema';
-import { User, type UserDocument } from '../../users/schemas/user.schema';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { ContentStatus, Prisma } from '@prisma/client';
+import type { IContentRepository } from '../../repositories/interfaces/content.repository.interface';
+import type { ICostEntryRepository } from '../../repositories/interfaces/cost-entry.repository.interface';
+import type { IPipelineRepository } from '../../repositories/interfaces/pipeline.repository.interface';
+import type { IRuleRepository } from '../../repositories/interfaces/rule.repository.interface';
+import type { IUserRepository } from '../../repositories/interfaces/user.repository.interface';
+import {
+  CONTENT_REPOSITORY,
+  COST_ENTRY_REPOSITORY,
+  PIPELINE_REPOSITORY,
+  RULE_REPOSITORY,
+  USER_REPOSITORY,
+} from '../../repositories/tokens';
 
 function displayName(u: {
-  firstName?: string;
-  lastName?: string;
-  username?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
 }): string {
   const parts = [u.firstName, u.lastName].filter(Boolean) as string[];
   if (parts.length) return parts.join(' ');
   return u.username ?? '';
 }
 
+function contentPreview(content: {
+  userEdits?: unknown;
+  outputs?: unknown;
+}): string | undefined {
+  const userEdits = content.userEdits as
+    | { text?: string; translatedText?: string }
+    | null
+    | undefined;
+  const outputs = content.outputs as
+    | { text?: string; translatedText?: string }
+    | null
+    | undefined;
+  const text =
+    userEdits?.text ??
+    outputs?.text ??
+    userEdits?.translatedText ??
+    outputs?.translatedText;
+  if (typeof text !== 'string') return undefined;
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length > 160 ? `${trimmed.slice(0, 160)}…` : trimmed;
+}
+
+function ruleChannelNames(rule: { channels: unknown }): string[] {
+  if (!Array.isArray(rule.channels)) return [];
+  return (rule.channels as Array<{ channel?: string }>)
+    .map((x) => x.channel)
+    .filter((c): c is string => Boolean(c));
+}
+
 @Injectable()
 export class AdminContentService {
   constructor(
-    @InjectModel(Content.name)
-    private readonly contentModel: Model<ContentDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<PipelineDocument>,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(CostEntry.name)
-    private readonly costModel: Model<CostEntryDocument>,
-    @InjectModel(Rule.name) private readonly ruleModel: Model<RuleDocument>,
+    @Inject(CONTENT_REPOSITORY) private readonly content: IContentRepository,
+    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(COST_ENTRY_REPOSITORY)
+    private readonly costEntries: ICostEntryRepository,
+    @Inject(RULE_REPOSITORY) private readonly rules: IRuleRepository,
   ) {}
 
   async listContent(query: {
@@ -40,62 +74,49 @@ export class AdminContentService {
   }) {
     const { page, limit } = query;
 
-    const filter: Record<string, unknown> = {};
-    if (query.status) filter.status = query.status;
+    const filter: Prisma.ContentWhereInput = {};
+    if (query.status) filter.status = query.status as ContentStatus;
     if (query.userId) filter.userId = query.userId;
     if (query.from || query.to) {
-      filter.createdAt = {} as Record<string, Date>;
-      if (query.from) (filter.createdAt as Record<string, Date>).$gte = query.from;
-      if (query.to) (filter.createdAt as Record<string, Date>).$lte = query.to;
+      filter.createdAt = {};
+      if (query.from) filter.createdAt.gte = query.from;
+      if (query.to) filter.createdAt.lte = query.to;
     }
 
-    const [contents, total] = await Promise.all([
-      this.contentModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      this.contentModel.countDocuments(filter),
-    ]);
+    const { rows: contents, total } = await this.content.findPageAdmin(
+      filter,
+      page,
+      limit,
+    );
 
-    const userIds = [...new Set(contents.map((c) => c.userId).filter(Boolean))] as string[];
+    const userIds = [
+      ...new Set(contents.map((c) => c.userId).filter(Boolean)),
+    ] as string[];
     const pipelineIds = contents
       .map((c) => c.pipelineRef)
       .filter(Boolean) as string[];
 
     const ruleRefs = [...new Set(contents.map((c) => c.ruleRef))];
 
-    const [users, costs, rules] = await Promise.all([
-      this.userModel
-        .find(
-          { userId: { $in: userIds } },
-          { userId: 1, email: 1, firstName: 1, lastName: 1, username: 1 },
-        )
-        .lean(),
+    const [users, costMap, rules] = await Promise.all([
+      this.users.findManyByUserIds(userIds, {
+        userId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+      }),
       pipelineIds.length
-        ? this.costModel.aggregate([
-            { $match: { pipelineRef: { $in: pipelineIds } } },
-            { $group: { _id: '$pipelineRef', total: { $sum: '$costUsd' } } },
-          ])
-        : Promise.resolve([] as { _id: string; total: number }[]),
-      ruleRefs.length
-        ? this.ruleModel
-            .find({ ruleId: { $in: ruleRefs } }, { ruleId: 1, channels: 1 })
-            .lean()
-        : Promise.resolve([]),
+        ? this.costEntries.sumForPipelines(pipelineIds)
+        : Promise.resolve(new Map<string, number>()),
+      ruleRefs.length ? this.rules.findByIds(ruleRefs) : Promise.resolve([]),
     ]);
 
     const userMap = Object.fromEntries(users.map((u) => [u.userId, u]));
-    const costMap = Object.fromEntries(costs.map((c) => [c._id, c.total]));
     const ruleChannelMap = Object.fromEntries(
-      rules.map((r) => {
-        const chs = (r.channels ?? [])
-          .map((x) => x.channel)
-          .filter(Boolean) as string[];
-        return [r.ruleId, chs];
-      }),
+      rules.map((r) => [r.ruleId, ruleChannelNames(r)]),
     );
+    const ruleNameMap = Object.fromEntries(rules.map((r) => [r.ruleId, r.name]));
 
     return {
       contents: contents.map((c) => {
@@ -103,12 +124,12 @@ export class AdminContentService {
         return {
           contentId: c.contentId,
           status: c.status,
-          userId: c.userId,
           userEmail: u?.email ?? 'unknown',
           displayName: u ? displayName(u) : '',
-          pipelineRef: c.pipelineRef,
-          costUsd: costMap[c.pipelineRef] ?? 0,
-          createdAt: (c as { createdAt?: Date }).createdAt,
+          ruleName: ruleNameMap[c.ruleRef] ?? '',
+          preview: contentPreview(c),
+          costUsd: costMap.get(c.pipelineRef) ?? 0,
+          createdAt: c.createdAt,
           channels: ruleChannelMap[c.ruleRef] ?? [],
         };
       }),
@@ -120,30 +141,41 @@ export class AdminContentService {
   }
 
   async getContentDetail(contentId: string) {
-    const content = await this.contentModel.findOne({ contentId }).lean();
+    const content = await this.content.findByContentId(contentId);
     if (!content) throw new NotFoundException('Content not found');
 
-    const [user, pipeline, costs] = await Promise.all([
+    const [user, pipeline, costs, rule] = await Promise.all([
       content.userId
-        ? this.userModel
-            .findOne(
-              { userId: content.userId },
-              { email: 1, firstName: 1, lastName: 1, username: 1, userId: 1 },
-            )
-            .lean()
+        ? this.users.findByUserId(content.userId)
         : Promise.resolve(null),
-      this.pipelineModel.findOne({ pipelineId: content.pipelineRef }).lean(),
-      this.costModel.find({ pipelineRef: content.pipelineRef }).lean(),
+      this.pipelines.findById(content.pipelineRef),
+      this.costEntries.findByPipeline(content.pipelineRef),
+      this.rules.findById(content.ruleRef),
     ]);
 
     const totalCost = costs.reduce((sum, row) => sum + row.costUsd, 0);
 
     return {
-      content,
+      status: content.status,
+      createdAt: content.createdAt,
+      updatedAt: content.updatedAt,
+      preview: contentPreview(content),
+      ruleName: rule?.name ?? '',
       user: user
-        ? { ...user, displayName: displayName(user) }
+        ? {
+            userId: user.userId,
+            email: user.email,
+            displayName: displayName(user),
+          }
         : null,
-      pipeline,
+      pipeline: pipeline
+        ? {
+            status: pipeline.status,
+            contentPrompt: pipeline.contentPrompt,
+            startedAt: pipeline.startedAt,
+            completedAt: pipeline.completedAt,
+          }
+        : null,
       costUsd: totalCost,
       costBreakdown: costs.map((row) => ({
         nodeType: row.nodeType,

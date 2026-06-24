@@ -5,7 +5,6 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { Pause, Play } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
-import { T } from "@/lib/tokens"
 import {
   HEYGEN_VOICE_PAGE_SIZE,
   heygenService,
@@ -174,7 +173,7 @@ export function HeygenVoicePicker({
 
   const textSize = compact ? "text-[10px]" : "text-[11px]"
   const inputClass = cn(
-    "w-full rounded-md border bg-[#FDFCFA] px-2 py-1.5",
+    "w-full rounded-md border border-border bg-background px-2 py-1.5 text-foreground",
     textSize,
   )
   const hasMore = Boolean(voicesQuery.hasNextPage)
@@ -193,8 +192,8 @@ export function HeygenVoicePicker({
               "rounded-md border px-2 py-0.5 font-medium capitalize transition-colors",
               textSize,
               genderFilter === filter
-                ? "border-teal-500 bg-teal-50 text-teal-800"
-                : "border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200",
+                ? "border-teal-500 bg-teal-50 text-teal-800 dark:border-teal-400 dark:bg-teal-950/60 dark:text-teal-300"
+                : "border-transparent bg-muted text-muted-foreground hover:bg-muted/80",
             )}
           >
             {filter === "all"
@@ -208,14 +207,13 @@ export function HeygenVoicePicker({
 
       <div className="flex gap-2">
         <label className="min-w-0 flex-1">
-          <span className={cn("mb-1 block text-gray-500", textSize)}>
+          <span className={cn("mb-1 block text-muted-foreground", textSize)}>
             {t("voicePicker.language")}
           </span>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             className={inputClass}
-            style={{ borderColor: T.surfaceBorder }}
           >
             {VOICE_LANGUAGES.map((lang) => (
               <option key={lang} value={lang}>
@@ -225,7 +223,7 @@ export function HeygenVoicePicker({
           </select>
         </label>
         <label className="min-w-0 flex-1">
-          <span className={cn("mb-1 block text-gray-500", textSize)}>
+          <span className={cn("mb-1 block text-muted-foreground", textSize)}>
             {t("voicePicker.search")}
           </span>
           <input
@@ -234,7 +232,6 @@ export function HeygenVoicePicker({
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("voicePicker.searchPlaceholder")}
             className={inputClass}
-            style={{ borderColor: T.surfaceBorder }}
           />
         </label>
       </div>
@@ -242,10 +239,9 @@ export function HeygenVoicePicker({
       {selected ? (
         <div
           className={cn(
-            "flex items-center gap-2 rounded-md border bg-[#FDFCFA] px-2 py-1.5",
+            "flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5",
             textSize,
           )}
-          style={{ borderColor: T.surfaceBorder }}
         >
           <VoicePreviewButton
             voice={selected}
@@ -254,7 +250,7 @@ export function HeygenVoicePicker({
             onClick={(e) => void playPreview(selected, e)}
             size={compact ? "sm" : "md"}
           />
-          <span className="min-w-0 flex-1 truncate font-medium text-gray-800">
+          <span className="min-w-0 flex-1 truncate font-medium text-foreground">
             {selectedVoiceQuery.isLoading && needsSelectedFetch
               ? t("voicePicker.loadingSelection")
               : voiceLabel(selected, t)}
@@ -264,19 +260,18 @@ export function HeygenVoicePicker({
           ) : null}
         </div>
       ) : (
-        <p className={cn("text-gray-500", textSize)}>
+        <p className={cn("text-muted-foreground", textSize)}>
           {t("voicePicker.noVoiceSelected")}
         </p>
       )}
 
       <div
-        className="max-h-44 overflow-y-auto rounded-md border"
-        style={{ borderColor: T.surfaceBorder }}
+        className="max-h-44 overflow-y-auto rounded-md border border-border bg-background"
         role="listbox"
         aria-label={t("voicePicker.voicesAria")}
       >
         {isLoading ? (
-          <div className="flex items-center gap-2 px-2 py-3 text-gray-500">
+          <div className="flex items-center gap-2 px-2 py-3 text-muted-foreground">
             <Spinner className="size-3" />
             <span className={textSize}>{t("voicePicker.loadingVoices")}</span>
           </div>
@@ -285,7 +280,7 @@ export function HeygenVoicePicker({
             {t("voicePicker.loadVoicesFailed")}
           </p>
         ) : filteredVoices.length === 0 ? (
-          <p className={cn("px-2 py-3 text-gray-500", textSize)}>
+          <p className={cn("px-2 py-3 text-muted-foreground", textSize)}>
             {search.trim()
               ? t("voicePicker.noSearchResults")
               : t("voicePicker.noFilterResults")}
@@ -307,12 +302,13 @@ export function HeygenVoicePicker({
                   onChange(voice.voiceId)
                 }}
                 className={cn(
-                  "flex w-full items-center gap-2 border-b px-2 py-1.5 text-left last:border-b-0",
+                  "flex w-full items-center gap-2 border-b border-border px-2 py-1.5 text-left last:border-b-0",
                   textSize,
-                  isSelected ? "bg-teal-50" : "bg-[#FDFCFA] hover:bg-gray-50",
+                  isSelected
+                    ? "bg-teal-50 dark:bg-teal-950/40"
+                    : "bg-background hover:bg-muted/50",
                   selectionDisabled && "cursor-default",
                 )}
-                style={{ borderColor: T.surfaceBorder }}
               >
                 <VoicePreviewButton
                   voice={voice}
@@ -322,10 +318,10 @@ export function HeygenVoicePicker({
                   size={compact ? "sm" : "md"}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-gray-800">
+                  <span className="block truncate font-medium text-foreground">
                     {voice.name}
                   </span>
-                  <span className="block truncate text-gray-500">
+                  <span className="block truncate text-muted-foreground">
                     {voice.language || t("voicePicker.unknownLanguage")}
                   </span>
                 </span>
@@ -338,13 +334,13 @@ export function HeygenVoicePicker({
         )}
 
         {hasMore && !search.trim() ? (
-          <div className="border-t px-2 py-2" style={{ borderColor: T.surfaceBorder }}>
+          <div className="border-t border-border px-2 py-2">
             <button
               type="button"
               disabled={isFetchingMore}
               onClick={() => void voicesQuery.fetchNextPage()}
               className={cn(
-                "w-full rounded-md border border-teal-200 bg-teal-50 py-1.5 font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60",
+                "w-full rounded-md border border-teal-200 bg-teal-50 py-1.5 font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-500/40 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-950/60",
                 textSize,
               )}
             >
@@ -362,7 +358,7 @@ export function HeygenVoicePicker({
       </div>
 
       {!isLoading && !search.trim() ? (
-        <p className={cn("text-gray-400", compact ? "text-[9px]" : "text-[10px]")}>
+        <p className={cn("text-muted-foreground/70", compact ? "text-[9px]" : "text-[10px]")}>
           Showing {loadedVoices.length} voice{loadedVoices.length === 1 ? "" : "s"}
           {hasMore ? " — load more for additional options" : ""}.
         </p>
@@ -372,7 +368,7 @@ export function HeygenVoicePicker({
         <p className={cn("text-red-600", textSize)}>{previewError}</p>
       ) : null}
       {selectionDisabled ? (
-        <p className={cn("text-amber-700", textSize)}>
+        <p className={cn("text-amber-700 dark:text-amber-400", textSize)}>
           Save the workflow to select a voice. You can still preview loaded voices.
         </p>
       ) : null}
@@ -396,7 +392,9 @@ function GenderBadge({
       className={cn(
         "shrink-0 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide",
         compact ? "text-[8px]" : "text-[9px]",
-        isMale ? "bg-sky-100 text-sky-800" : "bg-rose-100 text-rose-800",
+        isMale
+          ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300"
+          : "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
       )}
     >
       {label}
@@ -436,9 +434,9 @@ function VoicePreviewButton({
         "nodrag nopan flex shrink-0 items-center justify-center rounded-full border transition-colors",
         dim,
         canPlay && !loading
-          ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-          : "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300",
-        playing && "bg-teal-600 text-white hover:bg-teal-700",
+          ? "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-500/40 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-950/60"
+          : "cursor-not-allowed border-border bg-muted text-muted-foreground/50",
+        playing && "border-teal-600 bg-teal-600 text-white hover:bg-teal-700 dark:border-teal-500 dark:bg-teal-500",
       )}
     >
       {loading ? (

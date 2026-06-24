@@ -18,8 +18,10 @@ type WorkflowPropertiesPanelProps = {
   setPropConfig: (next: Record<string, unknown>) => void
   resolvedChannels?: BranchChannelHandle[]
   workflowId?: string
+  /** True when this node exists in the saved workflow API payload. */
+  nodePersisted?: boolean
   onClose: () => void
-  onApply: () => void
+  onApply: () => boolean
   onReset: () => void
 }
 
@@ -29,6 +31,7 @@ export function WorkflowPropertiesPanel({
   setPropConfig,
   resolvedChannels = [],
   workflowId,
+  nodePersisted = false,
   onClose,
   onApply,
   onReset,
@@ -48,7 +51,7 @@ export function WorkflowPropertiesPanel({
 
   return (
     <div
-      className="z-50 flex w-[300px] min-w-[300px] flex-col overflow-hidden border-l bg-card"
+      className="flex h-full w-full flex-col overflow-hidden border-l bg-card shadow-lg"
       style={{ borderColor: T.surfaceBorder }}
     >
       <div
@@ -97,21 +100,20 @@ export function WorkflowPropertiesPanel({
         <WorkflowNodeGuideSection canvasType={selNode.type} />
 
         {hasConfigFields ? (
-          <p
-            className="text-[10px] font-bold tracking-wide uppercase"
-            style={{ color: T.textSecondary }}
-          >
-            {t("properties.configuration")}
-          </p>
+          <div className="rounded-xl border border-border/60 bg-muted/15 p-3.5">
+            <p className="mb-3 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+              {t("properties.configuration")}
+            </p>
+            <WorkflowNodeConfigFields
+              canvasType={selNode.type}
+              config={propConfig}
+              onChange={setPropConfig}
+              workflowId={workflowId}
+              nodeId={selNode.id}
+              persistPresenterToServer={nodePersisted}
+            />
+          </div>
         ) : null}
-
-        <WorkflowNodeConfigFields
-          canvasType={selNode.type}
-          config={propConfig}
-          onChange={setPropConfig}
-          workflowId={workflowId}
-          nodeId={selNode.id}
-        />
 
         {selNode.type === "branch" ? (
           resolvedChannels.length > 0 ? (
@@ -145,8 +147,7 @@ export function WorkflowPropertiesPanel({
           )}
           size="sm"
           onClick={() => {
-            onApply()
-            onClose()
+            if (onApply()) onClose()
           }}
         >
           {hasUnappliedChanges

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import { WF_NODE_TYPES } from "@/features/workflow/data/workflow-model"
 import {
   getNodePopoverDescription,
+  PLUS_POPOVER_TYPES,
   type PlusPopoverType,
 } from "@/features/workflow/lib/workflow-node-validation"
 import {
@@ -15,19 +16,7 @@ import {
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
-const PALETTE_TYPES: PlusPopoverType[] = [
-  "keywords",
-  "intelligence",
-  "text",
-  "transcription",
-  "branch",
-  "adapt",
-  "image",
-  "video",
-  "summarization",
-  "translation",
-  "merge",
-]
+const PALETTE_TYPES: PlusPopoverType[] = [...PLUS_POPOVER_TYPES]
 
 type PaletteRowProps = {
   wfType: PlusPopoverType
@@ -64,7 +53,7 @@ function PaletteRow({ wfType }: PaletteRowProps) {
         style={{ background: meta.color }}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold" style={{ color: T.textPrimary }}>
+        <p className="text-xs font-semibold text-foreground">
           {meta.label}
         </p>
         <p className="text-[10px] leading-snug text-muted-foreground">
@@ -94,10 +83,7 @@ export function WorkflowNodePalettePanel({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: T.textPrimary }}
-            >
+            <h2 className="text-sm font-semibold text-foreground">
               {t("palette.title")}
             </h2>
             <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -168,7 +154,7 @@ export function WorkflowPaletteDragPreview({ wfType }: { wfType: PlusPopoverType
         className="size-2 shrink-0 rounded-full"
         style={{ background: meta.color }}
       />
-      <span className="text-xs font-semibold" style={{ color: T.textPrimary }}>
+      <span className="text-xs font-semibold text-foreground">
         {meta.label}
       </span>
     </div>

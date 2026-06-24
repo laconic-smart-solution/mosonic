@@ -1,0 +1,752 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum UserPlanStatus {
+  active
+  suspended
+}
+
+enum WorkflowNodeType {
+  keyword_planner
+  text_generation
+  image_generation
+  video_generation
+  translation
+  transcription
+  summarization
+  branch
+  adapt
+  merge
+  intelligence
+}
+
+enum PipelineStatus {
+  running
+  completed
+  failed
+  paused
+}
+
+enum PipelineExecutionMode {
+  inline
+  queue
+}
+
+enum PipelineNodeExecutionStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+}
+
+enum ContentStatus {
+  draft
+  in_review
+  approved
+  rejected
+}
+
+enum UploadStatus {
+  pending
+  running
+  partial
+  completed
+  failed
+}
+
+enum PostStatus {
+  pending
+  scheduled
+  published
+  failed
+  cancelled
+  partial
+}
+
+enum PostAnalyticsSyncStatus {
+  pending
+  synced
+  partial
+  unavailable
+}
+
+enum WorkflowStatus {
+  generating
+  ready
+  failed
+  archived
+}
+
+enum RuleStatus {
+  processing
+  active
+  archived
+  failed
+}
+
+enum CreditTopupSource {
+  self_serve
+  admin
+}
+
+enum CreditTopupPurchaseStatus {
+  pending
+  active
+  cancelled
+}
+
+enum ServiceRateType {
+  text
+  image
+  video
+}
+
+enum CostEntryType {
+  openai_llm
+  openai_image
+  openai_video
+  zernio_account
+}
+
+enum BudgetOnLimitHit {
+  warn
+  stop
+}
+
+enum CampaignContentPromptStrategy {
+  fixed
+  rotate
+  ai_calendar
+}
+
+enum CampaignAutonomyMode {
+  off
+  review_optional
+  full_auto
+}
+
+enum PipelineLogLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum PipelineLogStatus {
+  started
+  completed
+  retrying
+  failed
+}
+
+model User {
+  userId                 String   @id @default(uuid())
+  authServerUserId       String   @unique
+  email                  String?
+  username               String?
+  firstName              String?
+  lastName               String?
+  avatarUrl              String?
+  role                   UserRole @default(CUSTOMER)
+  status                 UserStatus @default(ACTIVE)
+  lastLoginAt            DateTime?
+  zernioProfileId        String?  @unique
+  zernioConnectedAccounts Json    @default("[]")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  userPlans UserPlan[]
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model Plan {
+  planId          String   @id @default(uuid())
+  name            String
+  priceThb        Float
+  priceUsd        Float
+  creditsPerMonth Int?
+  creditsOverride Int?
+  isActive        Boolean  @default(true)
+  description     String?
+  features        String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userPlans UserPlan[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("plans")
+}
+
+model UserPlan {
+  id                   String         @id @default(uuid())
+  userId               String
+  planId               String
+  creditsPerMonth      Int
+  billingPeriod        DateTime
+  creditsUsed          Int            @default(0)
+  creditsRemaining     Int
+  status               UserPlanStatus @default(active)
+  lowBalanceNotifiedAt DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [planId], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([userId, status])
+  @@map("user_plans")
+}
+
+model CreditConfig {
+  singletonKey       String   @id @default("default")
+  creditPriceUsd     Float    @default(0.01)
+  marginTarget       Float    @default(3.0)
+  basicUsersPerMonth Int      @default(50)
+  overheadFactor     Float    @default(0)
+  derivedMargin      Float    @default(0)
+  changeHistory      Json     @default("[]")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("credit_config")
+}
+
+model FixedCost {
+  fixedCostId String   @id @default(uuid())
+  name        String
+  amountUsd   Float
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("fixed_costs")
+}
+
+model ServiceRate {
+  serviceRateId   String          @id @default(uuid())
+  serviceType     ServiceRateType
+  provider        String
+  model           String
+  avgPricePerCall Float?
+  pricePerImage   Float?
+  pricePerSecond  Float?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([serviceType, provider, model])
+  @@map("service_rates")
+}
+
+model NodeCreditPrice {
+  nodeCreditPriceId String   @id @default(uuid())
+  nodeType          String   @unique
+  costUsd           Float
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("node_credit_prices")
+}
+
+model CreditLedger {
+  id                     String   @id @default(uuid())
+  userId                 String
+  pipelineRef            String
+  campaignRef            String?
+  contentRef             String?
+  nodeId                 String
+  nodeType               String
+  provider               String
+  model                  String   @default("openai")
+  rawCostUsd             Float
+  overheadUsd            Float
+  marginAppliedUsd       Float
+  creditPriceUsdSnapshot Float
+  creditsCharged         Float
+  billingPeriod          DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId, billingPeriod])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([pipelineRef])
+  @@map("credit_ledger")
+}
+
+model CreditTopup {
+  id          String            @id @default(uuid())
+  userId      String
+  packageId   String?
+  credits     Float
+  priceUsd    Float             @default(0)
+  source      CreditTopupSource @default(self_serve)
+  adminUserId String?
+  reason      String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([adminUserId])
+  @@map("credit_topups")
+}
+
+model CreditTopupPurchase {
+  topupPurchaseId String                    @id @default(uuid())
+  userId          String
+  packageId       String
+  credits         Float
+  amount          Float
+  currencyCode    String                    @default("THB")
+  transactionId   String                    @unique
+  status          CreditTopupPurchaseStatus @default(pending)
+  purchaseDate    DateTime                  @default(now())
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@index([userId, purchaseDate(sort: Desc)])
+  @@index([status])
+  @@map("credit_topup_purchases")
+}
+
+model Workflow {
+  workflowId   String         @id @default(uuid())
+  userId       String?
+  ruleRef      String
+  name         String
+  nodes        String[]       @default([])
+  edges        Json           @default("[]")
+  isTemplate   Boolean        @default(false)
+  templateName String?
+  version      Int            @default(1)
+  versions     Json           @default("[]")
+  status       WorkflowStatus @default(generating)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  workflowNodes WorkflowNode[]
+
+  @@index([ruleRef, status])
+  @@index([isTemplate, templateName])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("workflows")
+}
+
+model WorkflowNode {
+  nodeId      String           @id @default(uuid())
+  workflowRef String
+  userId      String?
+  type        WorkflowNodeType
+  order       Int
+  isLocked    Boolean          @default(true)
+  userPrompt  String?
+  config      Json             @default("{}")
+  lane        String?
+  x           Float?
+  y           Float?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  workflow Workflow @relation(fields: [workflowRef], references: [workflowId], onDelete: Cascade)
+
+  @@index([workflowRef, order])
+  @@index([userId, workflowRef])
+  @@map("workflow_nodes")
+}
+
+model Rule {
+  ruleId           String     @id @default(uuid())
+  userId           String?
+  name             String
+  brand            Json       @default("{}")
+  audience         Json       @default("{}")
+  campaign         Json       @default("{}")
+  channels         Json       @default("[]")
+  contentGuidelines Json      @default("{}")
+  originalInput    Json       @default("{}")
+  status           RuleStatus @default(active)
+  versions         Json       @default("[]")
+  approvalPolicy   Json       @default("[]")
+  autonomyPolicy   Json?
+  newsTrigger      Json       @default("{}")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([name])
+  @@index([status, updatedAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("rules")
+}
+
+model Pipeline {
+  pipelineId            String                @id @default(uuid())
+  userId                String?
+  workflowRef           String
+  ruleRef               String
+  contentPrompt         String
+  name                  String                @default("")
+  nodes                 Json                  @default("[]")
+  status                PipelineStatus        @default(running)
+  startedAt             DateTime              @default(now())
+  completedAt           DateTime?
+  pausedNodeId          String?
+  pausedLaneId          String?
+  executionMode         PipelineExecutionMode @default(inline)
+  graph                 Json                  @default("{}")
+  ruleOverlay           Json?
+  metadata              Json                  @default("{}")
+  creditsCharged        Int?                  @default(0)
+  creditChargeBreakdown Json?
+  creditsReconciled     Boolean?              @default(false)
+
+  @@index([workflowRef, status])
+  @@index([ruleRef, startedAt(sort: Desc)])
+  @@index([userId, startedAt(sort: Desc)])
+  @@map("pipelines")
+}
+
+model PipelineLog {
+  logId        String            @id @default(uuid())
+  pipelineRef  String
+  workflowRef  String
+  nodeId       String
+  nodeType     WorkflowNodeType
+  order        Int?
+  level        PipelineLogLevel
+  status       PipelineLogStatus
+  message      String
+  retryCount   Int               @default(0)
+  timestamp    DateTime
+  expiresAt    DateTime
+
+  @@index([pipelineRef, timestamp(sort: Desc)])
+  @@index([expiresAt])
+  @@map("pipeline_logs")
+}
+
+model Content {
+  contentId           String        @id @default(uuid())
+  userId              String?
+  pipelineRef         String
+  workflowRef         String
+  ruleRef             String
+  outputs             Json          @default("{}")
+  userEdits           Json          @default("{}")
+  nodePromptOverrides Json          @default("{}")
+  nodeOutputs         Json          @default("{}")
+  nodeUserEdits       Json          @default("{}")
+  laneOutputs         Json          @default("{}")
+  currentVersion      Int?
+  versions            Json?
+  status              ContentStatus @default(draft)
+  approval            Json          @default("{}")
+  variantId           String?
+  experimentId        String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([workflowRef, status])
+  @@index([ruleRef, updatedAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([pipelineRef])
+  @@map("contents")
+}
+
+model Upload {
+  uploadId        String       @id @default(uuid())
+  userId          String?
+  contentRef      String
+  workflowRef     String
+  ruleRef         String
+  channels        Json         @default("[]")
+  status          UploadStatus @default(pending)
+  resolvedOutputs Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([contentRef, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("uploads")
+}
+
+model Post {
+  postId          String     @id @default(uuid())
+  userId          String
+  uploadRef       String
+  ruleRef         String
+  contentRef      String
+  zernioPostId    String?
+  channels        String[]
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  status          PostStatus @default(pending)
+  platformResults Json       @default("[]")
+  retryCount      Int        @default(0)
+  failureReason   String?
+  publishedNow    Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([uploadRef, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([ruleRef, createdAt(sort: Desc)])
+  @@index([zernioPostId])
+  @@index([status, scheduledAt])
+  @@map("posts")
+}
+
+model PostAnalytics {
+  postId          String                  @id
+  zernioPostId    String
+  ruleRef         String
+  userId          String
+  syncStatus      PostAnalyticsSyncStatus @default(pending)
+  pulledAt        DateTime
+  period          Json
+  platformMetrics Json                    @default("[]")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([zernioPostId])
+  @@index([ruleRef, pulledAt(sort: Desc)])
+  @@index([userId])
+  @@map("post_analytics")
+}
+
+model Analytics {
+  analyticsId        String   @id @default(uuid())
+  ruleRef            String   @unique
+  period             Json
+  pulledAt           DateTime
+  contentPerformance Json     @default("[]")
+  campaignSummary    Json     @default("{}")
+  feedbackSignal     Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("analytics")
+}
+
+model CostEntry {
+  id             String        @id @default(uuid())
+  userId         String
+  pipelineRef    String
+  campaignRef    String
+  contentRef     String?
+  nodeId         String?
+  nodeType       String?
+  provider       String
+  providerModel  String?
+  entryType      CostEntryType
+  inputTokens    Int           @default(0)
+  outputTokens   Int           @default(0)
+  totalTokens    Int           @default(0)
+  imageCount     Int           @default(0)
+  imageSize      String?
+  imageQuality   String?
+  videoSeconds   Int           @default(0)
+  videoResolution String?
+  accountCount   Int           @default(0)
+  costUsd        Float
+  billingPeriod  DateTime
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, billingPeriod])
+  @@index([userId, pipelineRef])
+  @@index([userId, campaignRef])
+  @@map("cost_entries")
+}
+
+model BudgetSettings {
+  userId              String           @id
+  monthlyLimitUsd     Float?
+  warningThresholdPct Int              @default(80)
+  onMonthlyLimitHit   BudgetOnLimitHit @default(warn)
+  perRunLimitUsd      Float?
+  onRunLimitHit       BudgetOnLimitHit @default(stop)
+  emailAlerts         Boolean          @default(true)
+  inAppAlerts         Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@map("budget_settings")
+}
+
+model CampaignSchedule {
+  scheduleId            String                        @id @default(uuid())
+  userId                String
+  ruleRef               String
+  workflowTemplateId    String?
+  workflowRef           String?
+  contentPromptStrategy CampaignContentPromptStrategy @default(fixed)
+  contentPrompts        String[]                      @default([])
+  timezone              String                        @default("UTC")
+  enabled               Boolean                       @default(true)
+  nextRunAt             DateTime
+  lastRunAt             DateTime?
+  lastPipelineId        String?
+  failureCount          Int                           @default(0)
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+
+  @@index([userId])
+  @@index([ruleRef])
+  @@index([enabled, nextRunAt])
+  @@map("campaign_schedules")
+}
+
+model CampaignAutonomyPolicy {
+  policyId                  String               @id @default(uuid())
+  ruleRef                   String               @unique
+  userId                    String
+  enabled                   Boolean              @default(false)
+  mode                      CampaignAutonomyMode @default(off)
+  allowedChannels           String[]             @default([])
+  maxPostsPerDay            Int                  @default(5)
+  quietHours                Json?
+  blockIfPendingSuggestions Boolean              @default(true)
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  @@index([userId])
+  @@map("campaign_autonomy_policies")
+}
+
+model NewsTriggerLog {
+  id                 String   @id @default(uuid())
+  runId              String
+  group              String
+  ruleId             String?
+  ranAt              DateTime
+  completedAt        DateTime?
+  articlesFetched    Int      @default(0)
+  topArticlesPicked  Int      @default(0)
+  rulesChecked       Int      @default(0)
+  rulesMatched       Int      @default(0)
+  pipelinesTriggered Int      @default(0)
+  details            Json     @default("[]")
+  errorMessage       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("news_trigger_logs")
+}
+
+model IntegrationApiKey {
+  keyId     String   @id @default(uuid())
+  userId    String
+  name      String
+  keyHash   String
+  scopes    String[] @default(["pipeline:start"])
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("integration_api_keys")
+}
+
+model WebhookSubscription {
+  subscriptionId String   @id @default(uuid())
+  userId         String
+  url            String
+  secret         String
+  events         String[] @default([])
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  deliveryId      String   @id @default(uuid())
+  subscriptionId  String
+  event           String
+  payload         Json
+  attempts        Int      @default(0)
+  lastStatusCode  Int?
+  lastError       String?
+  deliveredAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [subscriptionId], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@map("webhook_deliveries")
+}
+
+model WebhookEvent {
+  eventId     String   @id
+  event       String
+  processedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("webhook_events")
+}
+
+model SyncLock {
+  id        String   @id
+  owner     String
+  expiresAt DateTime
+
+  @@map("sync_locks")
+}
+
+model ApiProviderBillingSettings {
+  provider         String   @id
+  prepaidCreditUsd Float    @default(0)
+  updatedBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("api_provider_billing_settings")
+  
+}
+model HeygenUserAvatar {
+  id              String   @id @default(uuid())
+  userId          String
+  lookId          String   @unique
+  name            String
+  previewImageUrl String?
+  avatarType      String   @default("photo_avatar")
+  assetId         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("heygen_user_avatars")
+}

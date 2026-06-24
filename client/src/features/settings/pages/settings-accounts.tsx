@@ -1,32 +1,62 @@
 import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Info } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AccountChannelsSection } from "@/features/settings/components/account-channels-section"
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
 import { AccountSettingsToolbar } from "@/features/settings/components/account-settings-toolbar"
+import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
+import { SocialUnlockConfirmDialog } from "@/features/settings/components/social-unlock-confirm-dialog"
+import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
+import { toastApiError } from "@/shared/lib/toast-error"
+import { isInsufficientCredits, parseApiError } from "@/shared/lib/api-error"
+import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { usageQueryKeys } from "@/shared/queries/usage.query"
 import {
   useDisconnectZernioAccountMutation,
   useSyncZernioAccountsMutation,
   useZernioAccountsQuery,
+  useZernioConnectionCreditQuery,
   useZernioConnectMutation,
+  useZernioUnlockMutation,
+  zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
-import { zernioService } from "@/shared/services/zernio.service"
+import { useUserStore } from "@/shared/stores/user.store"
+
+const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
 export default function SettingsAccountsPage() {
   const { t } = useTranslation("settings")
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const hydrated = useAuthStoreHydrated()
+  const user = useUserStore((s) => s.user)
   const accountsQuery = useZernioAccountsQuery()
+  const connectionCreditQuery = useZernioConnectionCreditQuery()
+  const unlockMutation = useZernioUnlockMutation()
   const connectMutation = useZernioConnectMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
   const handledOAuthRef = useRef(false)
   const initialSyncRef = useRef(false)
-  const [profileBusy, setProfileBusy] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingPlatform, setPendingPlatform] = useState<string | null>(null)
+
+  const creditsEach = connectionCreditQuery.data?.creditsEach ?? 0
+  const creditsRemaining = connectionCreditQuery.data?.creditsRemaining ?? 0
+
+  const pendingChannelDef = pendingPlatform
+    ? ACCOUNT_CHANNELS.find((c) => c.apiKey === pendingPlatform)
+    : undefined
+  const pendingChannelLabel = pendingChannelDef
+    ? t(`channels.${pendingChannelDef.id}.label`)
+    : pendingPlatform ?? ""
 
   useEffect(() => {
     const connected = searchParams.get("connected")
@@ -38,7 +68,7 @@ export default function SettingsAccountsPage() {
     if (initialSyncRef.current) return
     initialSyncRef.current = true
     syncMutation.mutate(undefined, {
-      onError: () => toast.error(t("oauth.syncFailed")),
+      onError: (err) => toastApiError(err, "settings:oauth.syncFailed"),
     })
   }, [searchParams, syncMutation, t])
 
@@ -50,6 +80,11 @@ export default function SettingsAccountsPage() {
     handledOAuthRef.current = true
     if (connected) {
       toast.success(t("oauth.connectedToast", { platform: connected }))
+      void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
+      void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+      void queryClient.invalidateQueries({
+        queryKey: zernioQueryKeys.connectionCredit,
+      })
       syncMutation.mutate(undefined, {
         onSuccess: () => {
           toast.success(t("oauth.syncedToast"))
@@ -63,18 +98,30 @@ export default function SettingsAccountsPage() {
       return
     }
     toast.error(t("oauth.callbackFailed"))
-  }, [searchParams, setSearchParams, syncMutation, t])
+  }, [queryClient, searchParams, setSearchParams, syncMutation, t])
 
-  async function ensureProfile() {
-    setProfileBusy(true)
-    try {
-      await zernioService.createProfile()
-      toast.success(t("oauth.profileReady"))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("oauth.profileFailed"))
-    } finally {
-      setProfileBusy(false)
-    }
+  function requestUnlock(platform: string) {
+    setPendingPlatform(platform)
+    setConfirmOpen(true)
+  }
+
+  function confirmUnlock() {
+    if (!pendingPlatform) return
+    unlockMutation.mutate(pendingPlatform, {
+      onSuccess: () => {
+        setConfirmOpen(false)
+        setPendingPlatform(null)
+        toast.success(t("oauth.unlockedToast"))
+      },
+      onError: (err) => {
+        if (isInsufficientCredits(err)) {
+          toastApiError(err, "settings:unlockConfirm.insufficientTitle")
+          void connectionCreditQuery.refetch()
+          return
+        }
+        toastApiError(err, "settings:oauth.unlockFailed")
+      },
+    })
   }
 
   function connect(platform: string) {
@@ -82,54 +129,103 @@ export default function SettingsAccountsPage() {
       onSuccess: ({ connectUrl }) => {
         window.location.href = connectUrl
       },
-      onError: () => toast.error(t("oauth.connectUrlFailed")),
+      onError: (err) => {
+        if (parseApiError(err).status === 403) {
+          toast.error(t("oauth.unlockRequired"))
+          void accountsQuery.refetch()
+          return
+        }
+        toastApiError(err, "settings:oauth.connectUrlFailed")
+      },
     })
   }
 
   function disconnect(channel: string) {
     disconnectMutation.mutate(channel, {
       onSuccess: () => toast.success(t("oauth.disconnected")),
-      onError: () => toast.error(t("oauth.disconnectFailed")),
+      onError: (err) => toastApiError(err, "settings:oauth.disconnectFailed"),
     })
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-8 pb-14 sm:px-7">
-      <AccountSettingsPageHeader
-        actions={
-          <AccountSettingsToolbar
-            onCreateProfile={ensureProfile}
-            onSyncAccounts={() => syncMutation.mutate()}
-            createBusy={profileBusy}
-            syncBusy={syncMutation.isPending}
-          />
-        }
-      />
+    <PageShell>
+      <div className="flex w-full flex-col gap-6">
+        <AccountSettingsPageHeader />
 
-      <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-sm font-semibold">{t("language.sectionTitle")}</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">{t("language.sectionDesc")}</p>
-        <div className="mt-4">
-          <LanguageSwitcher size="default" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
+          <AccountUserProfileCard user={user} loading={hydrated && !user} />
+
+          <div className="flex min-w-0 flex-col gap-6">
+            <section className={panelClass}>
+              <div className="border-b border-border px-5 py-4">
+                <h2 className="font-heading text-[17px] tracking-tight text-foreground">
+                  {t("language.sectionTitle")}
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">{t("language.sectionDesc")}</p>
+              </div>
+              <div className="p-5">
+                <LanguageSwitcher size="default" />
+              </div>
+            </section>
+
+            <Alert className="border-dashed bg-muted/30">
+              <Info className="size-4 text-muted-foreground" aria-hidden />
+              <AlertTitle className="text-sm">{t("oauth.alertTitle")}</AlertTitle>
+              <AlertDescription className="text-[13px] leading-relaxed">
+                {t("oauth.alertDesc")}
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h2 className="font-heading text-[17px] tracking-tight text-foreground">
+                    {t("channels.sectionTitle")}
+                  </h2>
+                  <p className="mt-1 text-[13px] text-muted-foreground">{t("channels.sectionDesc")}</p>
+                </div>
+                <AccountSettingsToolbar
+                  onSyncAccounts={() =>
+                    syncMutation.mutate(undefined, {
+                      onError: (err) =>
+                        toastApiError(err, "settings:oauth.syncFailed"),
+                    })
+                  }
+                  syncBusy={syncMutation.isPending}
+                />
+              </div>
+
+              <AccountChannelsSection
+                accounts={accountsQuery.data?.accounts}
+                unlockedChannels={accountsQuery.data?.unlockedChannels}
+                loading={accountsQuery.isLoading}
+                onUnlock={requestUnlock}
+                onConnect={connect}
+                onDisconnect={disconnect}
+                unlockPending={unlockMutation.isPending}
+                connectPending={connectMutation.isPending}
+                disconnectPending={disconnectMutation.isPending}
+                creditsEach={creditsEach}
+                hideHeader
+              />
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <Alert className="border-dashed bg-muted/30">
-        <Info className="size-4 text-muted-foreground" aria-hidden />
-        <AlertTitle className="text-sm">{t("oauth.alertTitle")}</AlertTitle>
-        <AlertDescription className="text-[13px] leading-relaxed">
-          {t("oauth.alertDesc")}
-        </AlertDescription>
-      </Alert>
-
-      <AccountChannelsSection
-        accounts={accountsQuery.data?.accounts}
-        loading={accountsQuery.isLoading}
-        onConnect={connect}
-        onDisconnect={disconnect}
-        connectPending={connectMutation.isPending}
-        disconnectPending={disconnectMutation.isPending}
+      <SocialUnlockConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open)
+          if (!open) setPendingPlatform(null)
+        }}
+        channelLabel={pendingChannelLabel}
+        creditsEach={creditsEach}
+        creditsRemaining={creditsRemaining}
+        loading={connectionCreditQuery.isLoading}
+        onConfirm={confirmUnlock}
+        isUnlocking={unlockMutation.isPending}
       />
-    </div>
+    </PageShell>
   )
 }

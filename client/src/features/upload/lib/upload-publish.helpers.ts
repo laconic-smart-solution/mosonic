@@ -1,5 +1,3 @@
-import axios from "axios"
-
 import type {
   ChannelPublishRequest,
   PublishUploadRequest,
@@ -8,6 +6,8 @@ import type {
   UploadDetail,
   UploadResolvedOutputs,
 } from "@/shared/types/upload.type"
+
+export { getApiErrorMessage } from "@/shared/lib/api-error"
 
 export type CaptionSourceOption =
   | "text"
@@ -23,16 +23,6 @@ export type ChannelSelection = {
   captionSource: CaptionSourceOption
   captionDraft: string
   mediaChoice: MediaChoice
-}
-
-export function getApiErrorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { message?: string | string[] } | undefined
-    if (typeof data?.message === "string") return data.message
-    if (Array.isArray(data?.message)) return data.message.join(", ")
-  }
-  if (err instanceof Error) return err.message
-  return "Something went wrong"
 }
 
 export function previewCaption(ro: {

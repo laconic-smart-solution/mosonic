@@ -32,7 +32,12 @@
     "video_generation": "วิดีโอ",
     "translation": "แปลภาษา",
     "transcription": "ถอดเสียง",
-    "summarization": "สรุปเนื้อหา"
+    "summarization": "สรุปเนื้อหา",
+    "adapt": "ปรับแต่ง",
+    "intelligence": "ข่าวกรอง",
+    "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
+    "rule_generation": "สร้างกฎ",
+    "workflow_generation": "สร้างเวิร์กโฟลว์"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"
@@ -181,9 +186,13 @@
       "resolution720p": "720p (Sora 2)",
       "duration4s": "4 วิ",
       "duration8s": "8 วิ",
+      "duration10s": "10 วิ",
       "duration12s": "12 วิ",
       "duration16s": "16 วิ",
       "duration20s": "20 วิ",
+      "duration30s": "30 วิ",
+      "duration40s": "40 วิ",
+      "duration60s": "60 วิ",
       "low": "ต่ำ",
       "high": "สูง",
       "autoDetect": "ตรวจจับอัตโนมัติ",
@@ -217,6 +226,8 @@
     "channel": "ช่องทาง: {{channel}}",
     "fanInBarrier": "จุดรวมสาย",
     "configured": "ตั้งค่าแล้ว",
+    "temperature": "อุณหภูมิ {{value}}",
+    "maxTokens": "{{value}} โทเค็น",
     "intelligenceTypes": {
       "all": "ทั้งหมด",
       "trend": "เทรนด์",
@@ -252,7 +263,9 @@
     "saveChanges": "บันทึกการเปลี่ยนแปลง",
     "runPipeline": "รันไปป์ไลน์",
     "stopPipeline": "หยุดไปป์ไลน์",
-    "generateContent": "สร้างเนื้อหา"
+    "generateContent": "สร้างเนื้อหา",
+    "generateWorkflow": "สร้างเวิร์กโฟลว์",
+    "generateWorkflowAndContent": "สร้างเวิร์กโฟลว์และเนื้อหา"
   },
   "palette": {
     "title": "โหนด",
@@ -292,11 +305,15 @@
   },
   "presenter": {
     "saveWorkflowFirst": "บันทึกเวิร์กโฟลว์ก่อนอัปโหลดอวตาร",
+    "saveWorkflowToSync": "บันทึกเวิร์กโฟลว์เพื่ออัปโหลดอวตารใหม่หรือซิงก์การตั้งค่าผู้นำเสนอกับเซิร์ฟเวอร์ คุณยังเลือกอวตารและเสียงในเครื่องได้",
     "saveFailed": "บันทึกการตั้งค่าผู้นำเสนอไม่ได้ บันทึกเวิร์กโฟลว์แล้วลองอีกครั้ง",
     "deleteConfirm": "ลบ \"{{name}}\" จากบัญชี HeyGen ของคุณ? ไม่สามารถยกเลิกได้",
+    "deleteSuccess": "ลบอวตาร \"{{name}}\" แล้ว",
     "deleteFailed": "ลบอวตารไม่ได้ ลองอีกครั้ง",
     "fileTooLarge": "รูปต้องไม่เกิน 32MB",
     "uploadFailed": "อัปโหลดล้มเหลว ลองอีกครั้ง",
+    "uploadSuccess": "อัปโหลดอวตาร \"{{name}}\" แล้ว",
+    "backgroundUploadSuccess": "อัปโหลดภาพพื้นหลังแล้ว",
     "avatar": "อวตาร",
     "clearSelection": "ล้างการเลือก",
     "loadingAvatars": "กำลังโหลดอวตาร…",
@@ -338,10 +355,19 @@
     "removedLanes": "ลบสาย: {{lanes}}",
     "videoSettingsSaveFailed": "บันทึกการตั้งค่าวิดีโอไม่ได้ ใช้บันทึกเวิร์กโฟลว์ก่อนรัน"
   },
+  "toast": {
+    "saved": "บันทึกเวิร์กโฟลว์เรียบร้อยแล้ว",
+    "saveFailed": "บันทึกเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง",
+    "nameUpdated": "อัปเดตชื่อเวิร์กโฟลว์แล้ว",
+    "nameUpdateFailed": "อัปเดตชื่อเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง"
+  },
   "toasts": {
     "replacedAdaptNodes": "แทนที่โหนด Adapt ที่ไม่ได้กำหนดสายด้วย Adapt ต่อช่องทางจาก Branch",
     "branchNeedsChannels": "Branch ต้องมีช่องทางกระจายอย่างน้อยสองช่องทางในกฎแคมเปญ",
     "addNodeBeforeSave": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนบันทึก",
+    "disconnectedNode": "โหนด {{label}} ไม่ได้เชื่อมกับเวิร์กโฟลว์ กรุณาเชื่อมต่อหรือลบออก",
+    "removedDisconnectedNode": "ลบโหนด {{label}} ที่ไม่ได้เชื่อมออกจากเวิร์กโฟลว์แล้ว",
+    "removedDisconnectedNodes": "ลบโหนดที่ไม่ได้เชื่อม {{count}} โหนดออกจากเวิร์กโฟลว์แล้ว",
     "pipelineStartFailed": "เริ่มไปป์ไลน์ไม่ได้ ลองอีกครั้ง",
     "enterPostTopic": "กรุณาใส่สิ่งที่ต้องการโพสต์",
     "addNodeBeforeRun": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนรัน",
@@ -373,7 +399,16 @@
     "postPlaceholder": "เช่น ลดราคาคริสต์มาส 50% จนถึง 25 ธ.ค.…",
     "exitPreviewHint": "ล้างหรือคลิกไปป์ไลน์ที่เลือกอีกครั้งเพื่อออกจากตัวอย่างและสร้าง",
     "saveBeforeGenerateHint": "บันทึกการแก้เวิร์กโฟลว์หรือใช้การตั้งค่าโหนดก่อนสร้าง ยังแก้พรอมpt นี้ได้",
-    "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}"
+    "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}",
+    "emptyWorkflowHint": "ตั้งค่าเวิร์กโฟลว์ด้วยตัวช่วย Q&A จากนั้นสร้างคอนเทนต์ในแต่ละรอบ",
+    "modeUseCurrentWorkflow": "ใช้เวิร์กโฟลว์ปัจจุบัน",
+    "modeGenerateWorkflow": "สร้างเวิร์กโฟลว์อัตโนมัติ",
+    "modeTabCurrent": "ปัจจุบัน",
+    "modeTabAuto": "อัตโนมัติ",
+    "generateWorkflowPlaceholder": "เช่น คำบรรยาย Instagram + Facebook แปลภาษาไทย รูปหลัก…",
+    "autoWorkflowHint": "AI จะสร้างเวิร์กโฟลว์จากโพสต์และกฎแคมเปญของคุณ แล้วสร้างเนื้อหาต่อ",
+    "hidePrompt": "ซ่อนพื้นที่พรอมpt",
+    "showPrompt": "แสดงพื้นที่พรอมpt"
   },
   "nodesLabel_one": "โหนด",
   "nodesLabel_other": "โหนด",
@@ -419,8 +454,13 @@
   "usedPipelines": {
     "aria": "ไปป์ไลน์ที่ใช้แล้ว",
     "title": "ไปป์ไลน์ที่ใช้แล้ว",
-    "previewing": "กำลังดูรัน · คลิกอีกครั้งหรือล้างเพื่อแก้เวิร์กโฟลว์",
-    "clear": "ล้าง",
+    "previewing": "กำลังดูรันนี้ กดนำไปใช้เพื่อคัดลอกโครงสร้างเข้าเวิร์กโฟลว์",
+    "apply": "นำไปใช้กับเวิร์กโฟลว์",
+    "applying": "กำลังนำไปใช้…",
+    "clear": "ล้างการดูตัวอย่าง",
+    "rename": "เปลี่ยนชื่อไปป์ไลน์",
+    "applySuccess": "นำโครงสร้างไปป์ไลน์ไปใช้กับเวิร์กโฟลว์แล้ว บันทึกเมื่อพร้อม",
+    "applyFailed": "นำไปป์ไลน์ไปใช้กับเวิร์กโฟลว์ไม่ได้",
     "noPrompt": "ไม่มีพรอมpt",
     "nodes_one": "โหนด",
     "nodes_other": "โหนด",
@@ -479,10 +519,88 @@
     "defaultVideoSettings": "ตั้งค่าวิดีโอเริ่มต้น",
     "defaultSummarySettings": "ตั้งค่าสรุปเริ่มต้น",
     "reflowOk": "จัดรูปแบบใหม่ได้",
+    "backgroundKept": "คงพื้นหลัง",
     "presenter": "ผู้นำเสนอ",
     "cinematic": "ภาพยนตร์"
   },
   "rebuildTooltip": "รีเฟรชโหนดเวิร์กโฟลว์จากกฎและช่องทางปัจจุบัน",
+  "qaWizard": {
+    "title": "สร้างเวิร์กโฟลว์",
+    "yes": "ใช่",
+    "no": "ไม่",
+    "back": "ย้อนกลับ",
+    "next": "ถัดไป",
+    "generate": "สร้างเวิร์กโฟลว์",
+    "generating": "กำลังสร้าง…",
+    "selectAll": "เลือกทั้งหมด",
+    "deselectAll": "ยกเลิกทั้งหมด",
+    "progress": "ขั้นตอน {{current}} จาก {{total}}",
+    "validation": {
+      "selectAtLeastOneChannel": "เลือกอย่างน้อยหนึ่งช่องทาง",
+      "selectAtLeastOneLanguage": "เลือกอย่างน้อยหนึ่งภาษาเป้าหมาย"
+    },
+    "languages": {
+      "thai": "ไทย",
+      "english": "อังกฤษ",
+      "japanese": "ญี่ปุ่น",
+      "chinese": "จีน",
+      "korean": "เกาหลี",
+      "spanish": "สเปน",
+      "french": "ฝรั่งเศส",
+      "german": "เยอรมัน"
+    },
+    "steps": {
+      "webSearch": {
+        "title": "ใช้การค้นหาเว็บสำหรับคอนเทนต์นี้หรือไม่?",
+        "description": "เพิ่มขั้นตอน intelligence ก่อนสร้างข้อความเพื่อรวบรวมข้อมูลเทรนด์และตลาด"
+      },
+      "keywordPlanner": {
+        "title": "วางแผนคีย์เวิร์ดเป้าหมายหรือไม่?",
+        "description": "เพิ่มขั้นตอนวางแผนคีย์เวิร์ดก่อนสร้างข้อความจากกฎแคมเปญของคุณ"
+      },
+      "summary": {
+        "title": "สรุปคอนเทนต์หรือไม่?",
+        "description": "เลือกว่าช่องทางใดในกฎแคมเปญจะได้รับการสรุปในขั้นตอนถัดไป"
+      },
+      "summaryChannels": {
+        "title": "ช่องทางใดต้องการสรุป?",
+        "description": "แสดงเฉพาะช่องทางจากกฎแคมเปญของคุณ"
+      },
+      "image": {
+        "title": "สร้างรูปภาพหรือไม่?",
+        "description": "เลือกว่าช่องทางใดในกฎแคมเปญจะได้รับรูปภาพในขั้นตอนถัดไป"
+      },
+      "imageChannels": {
+        "title": "ช่องทางใดต้องการรูปภาพ?",
+        "description": "แสดงเฉพาะช่องทางจากกฎแคมเปญของคุณ"
+      },
+      "video": {
+        "title": "สร้างวิดีโอหรือไม่?",
+        "description": "เลือกว่าช่องทางใดในกฎแคมเปญจะได้รับวิดีโอในขั้นตอนถัดไป"
+      },
+      "videoChannels": {
+        "title": "ช่องทางใดต้องการวิดีโอ?",
+        "description": "แสดงเฉพาะช่องทางจากกฎแคมเปญของคุณ"
+      },
+      "translate": {
+        "title": "แปลคอนเทนต์หรือไม่?",
+        "description": "เลือกว่าช่องทางใดในกฎแคมเปญต้องการการแปลในขั้นตอนถัดไป"
+      },
+      "translationChannels": {
+        "title": "ช่องทางใดต้องการการแปล?",
+        "description": "แสดงเฉพาะช่องทางจากกฎแคมเปญของคุณ"
+      },
+      "targetLanguages": {
+        "title": "ภาษาเป้าหมาย",
+        "description": "จะเพิ่มขั้นตอนแปลหนึ่งขั้นต่อหนึ่งภาษา"
+      },
+      "additionalMessage": {
+        "title": "มีอะไรเพิ่มเติมไหม?",
+        "description": "คำแนะนำเสริมสำหรับรอบนี้ (โทน หัวข้อ CTA ฯลฯ)",
+        "placeholder": "เช่น ประกาศลดราคา Black Friday 50% แบบเร่งด่วน…"
+      }
+    }
+  },
   "aria": {
     "openNodeSettings": "เปิดการตั้งค่าโหนด",
     "addNode": "เพิ่มโหนด",

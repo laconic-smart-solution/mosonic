@@ -1,10 +1,9 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
+import type { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
-import { Model } from 'mongoose';
-import { startOfDayLocal, subHoursLocal } from './news-trigger-date.util';
+import { startOfDayLocal } from './news-trigger-date.util';
 import { EventsService } from '../events/events.service';
 import {
   newsPipelineStartedNotification,
@@ -12,17 +11,19 @@ import {
 } from '../events/notification.util';
 import { emitNewsRunUpdate } from './news-trigger-run-events';
 import { summarizeNewsTriggerLog } from './news-trigger-run-summary.util';
+import type { NewsTriggerLogLike } from './news-trigger-run-summary.util';
 import { OrchestrationService } from '../orchestration/orchestration.service';
+import { PipelineStatus } from '../pipeline/schemas/pipeline.schema';
+import type { INewsTriggerLogRepository } from '../repositories/interfaces/news-trigger-log.repository.interface';
+import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 import {
-  Pipeline,
-  PipelineStatus,
-} from '../pipeline/schemas/pipeline.schema';
-import {
-  NewsTriggerSchedule,
-  Rule,
-  RuleStatus,
-  type RuleDocument,
-} from '../rule/schemas/rule.schema';
+  NEWS_TRIGGER_LOG_REPOSITORY,
+  PIPELINE_REPOSITORY,
+  RULE_REPOSITORY,
+} from '../repositories/tokens';
+import { Rule, RuleStatus } from '../rule/schemas/rule.schema';
 import { UserRole } from '../users/schemas/user.schema';
 import { WorkflowResolveService } from '../workflow/workflow-resolve.service';
 import {
@@ -30,11 +31,7 @@ import {
   NEWS_TRIGGER_JOB_PROCESS_SINGLE,
   NEWS_TRIGGER_QUEUE,
 } from './news-trigger.constants';
-import {
-  NewsTriggerLog,
-  type NewsTriggerLogDetail,
-  type NewsTriggerLogDocument,
-} from './schemas/news-trigger-log.schema';
+import type { NewsTriggerLogDetail } from './schemas/news-trigger-log.schema';
 import { NewsFetchService } from './services/news-fetch.service';
 import {
   NewsPickerService,
@@ -62,18 +59,30 @@ type TriggerLockOpts = {
   dayKey: string;
 };
 
+type NewsTriggerConfig = {
+  country?: string;
+  language?: string;
+  category?: string;
+  keywords?: string[];
+  minRelevanceScore?: number;
+  maxPostsPerDay?: number;
+};
+
+/** How many GPT-ranked articles to evaluate per news run before skipping. */
+const NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT = 5;
+
 @Processor(NEWS_TRIGGER_QUEUE)
 @Injectable()
 export class NewsTriggerProcessor extends WorkerHost {
   private readonly logger = new Logger(NewsTriggerProcessor.name);
 
   constructor(
-    @InjectModel(Rule.name)
-    private readonly ruleModel: Model<RuleDocument>,
-    @InjectModel(NewsTriggerLog.name)
-    private readonly logModel: Model<NewsTriggerLogDocument>,
-    @InjectModel(Pipeline.name)
-    private readonly pipelineModel: Model<Pipeline>,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
+    @Inject(NEWS_TRIGGER_LOG_REPOSITORY)
+    private readonly logs: INewsTriggerLogRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     private readonly config: ConfigService,
     private readonly newsFetch: NewsFetchService,
     private readonly newsPicker: NewsPickerService,
@@ -130,7 +139,7 @@ export class NewsTriggerProcessor extends WorkerHost {
 
     this.logger.log(`[NewsTrigger] run=${runId} group=${groupKey}`);
 
-    const log = await this.logModel.create({
+    await this.logs.create({
       runId,
       group: groupKey,
       ranAt: new Date(),
@@ -139,7 +148,7 @@ export class NewsTriggerProcessor extends WorkerHost {
     const logDetails: NewsTriggerLogDetail[] = [];
 
     try {
-      const eligibleRules = await this.loadEligibleRules(
+      const eligibleRules = await this.rules.findNewsTriggerGroupEligible(
         country,
         language,
         category,
@@ -155,22 +164,29 @@ export class NewsTriggerProcessor extends WorkerHost {
         limit: 10,
       });
 
-      await log.updateOne({ articlesFetched: articles.length });
+      await this.logs.updateByRunId(runId, { articlesFetched: articles.length });
 
       if (!articles.length) {
         this.logger.log(`[NewsTrigger] no articles for group=${groupKey}`);
         return;
       }
 
-      const topArticles = await this.newsPicker.pickTopArticles(articles, 2);
-      await log.updateOne({ topArticlesPicked: topArticles.length });
+      const topArticles = await this.newsPicker.pickTopArticles(
+        articles,
+        NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT,
+      );
+      await this.logs.updateByRunId(runId, {
+        topArticlesPicked: topArticles.length,
+      });
 
       if (!topArticles.length) {
         this.logger.log('[NewsTrigger] picker returned no articles');
         return;
       }
 
-      await log.updateOne({ rulesChecked: eligibleRules.length });
+      await this.logs.updateByRunId(runId, {
+        rulesChecked: eligibleRules.length,
+      });
 
       if (!eligibleRules.length) return;
 
@@ -251,10 +267,10 @@ export class NewsTriggerProcessor extends WorkerHost {
         }
       }
 
-      await log.updateOne({
+      await this.logs.updateByRunId(runId, {
         rulesMatched: totalMatched,
         pipelinesTriggered: totalTriggered,
-        details: logDetails,
+        details: logDetails as unknown as Prisma.InputJsonValue,
       });
 
       this.logger.log(
@@ -262,7 +278,7 @@ export class NewsTriggerProcessor extends WorkerHost {
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await log.updateOne({ errorMessage: msg });
+      await this.logs.updateByRunId(runId, { errorMessage: msg });
       this.logger.error(`[NewsTrigger] run=${runId} failed: ${msg}`);
       throw err;
     }
@@ -278,12 +294,12 @@ export class NewsTriggerProcessor extends WorkerHost {
       `[NewsTrigger] manual run start run=${runId} rule=${ruleId} user=${userId}`,
     );
 
-    let log = await this.logModel.findOne({ runId }).exec();
+    let log = await this.logs.findByRunId(runId);
     if (!log) {
       this.logger.warn(
         `[NewsTrigger] pending log missing for run=${runId}, creating at worker`,
       );
-      log = await this.logModel.create({
+      log = await this.logs.create({
         runId,
         group: groupKey,
         ruleId,
@@ -312,9 +328,9 @@ export class NewsTriggerProcessor extends WorkerHost {
     const logDetails: NewsTriggerLogDetail[] = [];
 
     try {
-      const rule = await this.ruleModel.findOne({ ruleId }).lean().exec();
+      const rule = await this.rules.findById(ruleId);
       if (!rule) {
-        await this.finalizeManualRun(log, ruleId, userId, {
+        await this.finalizeManualRun(runId, ruleId, userId, {
           errorMessage: 'rule not found',
           details: logDetails,
         });
@@ -322,7 +338,7 @@ export class NewsTriggerProcessor extends WorkerHost {
       }
 
       if (rule.userId !== userId) {
-        await this.finalizeManualRun(log, ruleId, userId, {
+        await this.finalizeManualRun(runId, ruleId, userId, {
           errorMessage: 'userId mismatch',
           details: logDetails,
         });
@@ -330,14 +346,14 @@ export class NewsTriggerProcessor extends WorkerHost {
       }
 
       if (rule.status !== RuleStatus.Active) {
-        await this.finalizeManualRun(log, ruleId, userId, {
+        await this.finalizeManualRun(runId, ruleId, userId, {
           errorMessage: 'rule not active',
           details: logDetails,
         });
         return;
       }
 
-      const nt = rule.newsTrigger;
+      const nt = rule.newsTrigger as NewsTriggerConfig | null;
       const country = nt?.country ?? 'us';
       const language = nt?.language ?? 'en';
       const category = nt?.category ?? '';
@@ -346,7 +362,7 @@ export class NewsTriggerProcessor extends WorkerHost {
         .filter(Boolean)
         .slice(0, 5);
 
-      await log.updateOne({ rulesChecked: 1 });
+      await this.logs.updateByRunId(runId, { rulesChecked: 1 });
 
       const articles = await this.newsFetch.fetchTopArticles({
         country,
@@ -356,19 +372,24 @@ export class NewsTriggerProcessor extends WorkerHost {
         limit: 10,
       });
 
-      await log.updateOne({ articlesFetched: articles.length });
+      await this.logs.updateByRunId(runId, { articlesFetched: articles.length });
 
       if (!articles.length) {
         this.logger.log(`[NewsTrigger] manual: no articles for rule=${ruleId}`);
-        await this.finalizeManualRun(log, ruleId, userId, { details: logDetails });
+        await this.finalizeManualRun(runId, ruleId, userId, { details: logDetails });
         return;
       }
 
-      const topArticles = await this.newsPicker.pickTopArticles(articles, 2);
-      await log.updateOne({ topArticlesPicked: topArticles.length });
+      const topArticles = await this.newsPicker.pickTopArticles(
+        articles,
+        NEWS_TRIGGER_ARTICLE_CANDIDATE_COUNT,
+      );
+      await this.logs.updateByRunId(runId, {
+        topArticlesPicked: topArticles.length,
+      });
 
       if (!topArticles.length) {
-        await this.finalizeManualRun(log, ruleId, userId, { details: logDetails });
+        await this.finalizeManualRun(runId, ruleId, userId, { details: logDetails });
         return;
       }
 
@@ -385,7 +406,7 @@ export class NewsTriggerProcessor extends WorkerHost {
         );
 
         const skip = await this.evaluateRuleForTrigger(
-          rule as Rule,
+          rule,
           article,
           today,
           logDetails,
@@ -394,7 +415,7 @@ export class NewsTriggerProcessor extends WorkerHost {
         if (skip) continue;
 
         const result = await this.triggerPipelineForArticle(
-          rule as Rule,
+          rule,
           article,
           userId,
           logDetails,
@@ -408,7 +429,7 @@ export class NewsTriggerProcessor extends WorkerHost {
         }
       }
 
-      await this.finalizeManualRun(log, ruleId, userId, {
+      await this.finalizeManualRun(runId, ruleId, userId, {
         rulesMatched: totalMatched,
         pipelinesTriggered: totalTriggered,
         details: logDetails,
@@ -419,31 +440,37 @@ export class NewsTriggerProcessor extends WorkerHost {
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await this.finalizeManualRun(log, ruleId, userId, { errorMessage: msg });
+      await this.finalizeManualRun(runId, ruleId, userId, { errorMessage: msg });
       this.logger.error(`[NewsTrigger] manual run=${runId} failed: ${msg}`);
       throw err;
     }
   }
 
   private async finalizeManualRun(
-    log: NewsTriggerLogDocument,
+    runId: string,
     ruleId: string,
     userId: string,
-    patch: Record<string, unknown>,
+    patch: {
+      errorMessage?: string;
+      rulesMatched?: number;
+      pipelinesTriggered?: number;
+      details?: NewsTriggerLogDetail[];
+    },
   ): Promise<void> {
     const completedAt = new Date();
-    const runId = log.runId;
-    const updateResult = await this.logModel.updateOne(
-      { runId },
-      { ...patch, completedAt, ruleId },
-    );
+    const updated = await this.logs.updateByRunId(runId, {
+      ...patch,
+      details: patch.details as Prisma.InputJsonValue | undefined,
+      completedAt,
+      ruleId,
+    });
     this.logger.log(
-      `[NewsTrigger] finalizeManualRun persisted run=${runId} matched=${updateResult.matchedCount} modified=${updateResult.modifiedCount}`,
+      `[NewsTrigger] finalizeManualRun persisted run=${runId} updated=${updated ? 'yes' : 'no'}`,
     );
 
     if (!userId) return;
 
-    const doc = await this.logModel.findOne({ runId }).lean().exec();
+    const doc = await this.logs.findByRunId(runId);
     if (!doc) {
       this.logger.error(
         `[NewsTrigger] finalizeManualRun log missing after update run=${runId}`,
@@ -451,16 +478,16 @@ export class NewsTriggerProcessor extends WorkerHost {
       return;
     }
 
-    const summary = summarizeNewsTriggerLog(doc, ruleId);
+    const summary = summarizeNewsTriggerLog(doc as unknown as NewsTriggerLogLike, ruleId);
     if (summary.status === 'running') {
       this.logger.warn(
-        `[NewsTrigger] finalizeManualRun still running run=${log.runId} — skip emit`,
+        `[NewsTrigger] finalizeManualRun still running run=${runId} — skip emit`,
       );
       return;
     }
 
     this.logger.log(
-      `[NewsTrigger] finalizeManualRun run=${log.runId} rule=${ruleId} ` +
+      `[NewsTrigger] finalizeManualRun run=${runId} rule=${ruleId} ` +
         `status=${summary.status} outcome=${summary.outcome ?? 'n/a'} message="${summary.message.slice(0, 80)}"`,
     );
 
@@ -504,15 +531,20 @@ export class NewsTriggerProcessor extends WorkerHost {
   }
 
   private async triggerPipelineForArticle(
-    rule: Rule,
+    rule: RuleRecord,
     article: PickedArticle,
     userId: string,
     logDetails: NewsTriggerLogDetail[],
     lockOpts: TriggerLockOpts,
   ): Promise<'triggered' | 'skipped'> {
-    const relevance = await this.newsRelevance.checkRelevance(article, rule);
+    const ruleForRelevance = rule as unknown as Rule;
+    const relevance = await this.newsRelevance.checkRelevance(
+      article,
+      ruleForRelevance,
+    );
 
-    const minScore = rule.newsTrigger?.minRelevanceScore ?? 70;
+    const nt = rule.newsTrigger as NewsTriggerConfig | null;
+    const minScore = nt?.minRelevanceScore ?? 70;
     if (!relevance.compatible || relevance.score < minScore) {
       await this.releaseLockIfNeeded(rule.ruleId, lockOpts);
       logDetails.push({
@@ -545,7 +577,7 @@ export class NewsTriggerProcessor extends WorkerHost {
     const contentPrompt = this.promptBuilder.build({
       article,
       relevance,
-      rule,
+      rule: ruleForRelevance,
     });
 
     const { pipelineId } = await this.orchestration.startPipeline({
@@ -567,13 +599,7 @@ export class NewsTriggerProcessor extends WorkerHost {
       auth: { userId, role: UserRole.CUSTOMER },
     });
 
-    await this.ruleModel.updateOne(
-      { ruleId: rule.ruleId },
-      {
-        'newsTrigger.lastTriggeredAt': new Date(),
-        $inc: { 'newsTrigger.totalTriggeredCount': 1 },
-      },
-    );
+    await this.recordNewsTriggerFired(rule.ruleId);
 
     const notif = newsPipelineStartedNotification({
       pipelineId,
@@ -608,6 +634,17 @@ export class NewsTriggerProcessor extends WorkerHost {
     return 'triggered';
   }
 
+  private async recordNewsTriggerFired(ruleId: string): Promise<void> {
+    const existing = await this.rules.findById(ruleId);
+    if (!existing) return;
+    const nt = (existing.newsTrigger ?? {}) as Record<string, unknown>;
+    await this.rules.updateNewsTrigger(ruleId, {
+      ...nt,
+      lastTriggeredAt: new Date().toISOString(),
+      totalTriggeredCount: Number(nt.totalTriggeredCount ?? 0) + 1,
+    } as Prisma.InputJsonValue);
+  }
+
   private async releaseLockIfNeeded(
     ruleId: string,
     lockOpts: TriggerLockOpts,
@@ -616,43 +653,11 @@ export class NewsTriggerProcessor extends WorkerHost {
     await this.lockService.releaseLock(ruleId, lockOpts.dayKey);
   }
 
-  private async loadEligibleRules(
-    country: string,
-    language: string,
-    category: string,
-  ): Promise<Rule[]> {
-    const today = startOfDayLocal(new Date());
-    const eightHoursAgo = subHoursLocal(new Date(), 8);
-
-    const docs = await this.ruleModel
-      .find({
-        'newsTrigger.enabled': true,
-        'newsTrigger.country': country,
-        'newsTrigger.language': language,
-        'newsTrigger.category': category,
-        status: RuleStatus.Active,
-        $or: [
-          { 'newsTrigger.lastTriggeredAt': null },
-          {
-            'newsTrigger.schedule': NewsTriggerSchedule.Daily,
-            'newsTrigger.lastTriggeredAt': { $lt: today },
-          },
-          {
-            'newsTrigger.schedule': NewsTriggerSchedule.TwiceDaily,
-            'newsTrigger.lastTriggeredAt': { $lt: eightHoursAgo },
-          },
-        ],
-      } as Record<string, unknown>)
-      .lean()
-      .exec();
-
-    return docs as Rule[];
-  }
-
-  private mergeGroupKeywords(rules: Rule[]): string[] {
+  private mergeGroupKeywords(rules: RuleRecord[]): string[] {
     const set = new Set<string>();
     for (const rule of rules) {
-      for (const kw of rule.newsTrigger?.keywords ?? []) {
+      const nt = rule.newsTrigger as NewsTriggerConfig | null;
+      for (const kw of nt?.keywords ?? []) {
         const t = kw.trim().toLowerCase();
         if (t) set.add(t);
       }
@@ -661,15 +666,16 @@ export class NewsTriggerProcessor extends WorkerHost {
   }
 
   private async evaluateRuleForTrigger(
-    rule: Rule,
+    rule: RuleRecord,
     article: PickedArticle,
     today: Date,
     logDetails: NewsTriggerLogDetail[],
     lockOpts: TriggerLockOpts,
   ): Promise<boolean> {
     const userId = rule.userId ?? '';
+    const ruleForRelevance = rule as unknown as Rule;
 
-    if (!this.newsRelevance.keywordPreFilter(article, rule)) {
+    if (!this.newsRelevance.keywordPreFilter(article, ruleForRelevance)) {
       await this.releaseLockIfNeeded(rule.ruleId, lockOpts);
       logDetails.push({
         ruleId: rule.ruleId,
@@ -682,11 +688,12 @@ export class NewsTriggerProcessor extends WorkerHost {
       return true;
     }
 
-    const maxPosts = rule.newsTrigger?.maxPostsPerDay ?? 1;
-    const newsCountToday = await this.pipelineModel.countDocuments({
+    const nt = rule.newsTrigger as NewsTriggerConfig | null;
+    const maxPosts = nt?.maxPostsPerDay ?? 1;
+    const newsCountToday = await this.pipelines.count({
       ruleRef: rule.ruleId,
-      'metadata.source': 'news',
-      startedAt: { $gte: today },
+      metadata: { path: ['source'], equals: 'news' },
+      startedAt: { gte: today },
     });
     if (newsCountToday >= maxPosts) {
       await this.releaseLockIfNeeded(rule.ruleId, lockOpts);
@@ -703,7 +710,7 @@ export class NewsTriggerProcessor extends WorkerHost {
     const maxConcurrent = Number(
       this.config.get('SCHEDULER_MAX_CONCURRENT_PER_USER', 2),
     );
-    const running = await this.pipelineModel.countDocuments({
+    const running = await this.pipelines.count({
       userId,
       status: PipelineStatus.Running,
     });

@@ -126,18 +126,23 @@ const videoAspect = z.enum([
 ]);
 
 const SORA_DURATION_LITERALS = [4, 8, 12, 16, 20] as const;
+const PRESENTER_DURATION_LITERALS = [10, 20, 30, 40, 60] as const;
 
-function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+function snapToNearestDuration(
+  raw: unknown,
+  allowed: readonly number[],
+  fallback: number,
+): number {
   const n =
     typeof raw === 'number'
       ? raw
       : typeof raw === 'string' && raw.trim()
         ? Number(raw)
-        : 8;
-  const value = Number.isFinite(n) ? n : 8;
-  let best: (typeof SORA_DURATION_LITERALS)[number] = SORA_DURATION_LITERALS[0];
+        : fallback;
+  const value = Number.isFinite(n) ? n : fallback;
+  let best = allowed[0];
   let bestDiff = Math.abs(value - best);
-  for (const s of SORA_DURATION_LITERALS) {
+  for (const s of allowed) {
     const d = Math.abs(value - s);
     if (d < bestDiff) {
       best = s;
@@ -147,18 +152,25 @@ function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[numbe
   return best;
 }
 
-const soraDurationSchema = z.preprocess(
-  (val) => (val === undefined ? undefined : snapToSoraDuration(val)),
-  z
-    .union([
-      z.literal(4),
-      z.literal(8),
-      z.literal(12),
-      z.literal(16),
-      z.literal(20),
-    ])
-    .optional(),
-);
+function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+  return snapToNearestDuration(
+    raw,
+    SORA_DURATION_LITERALS,
+    8,
+  ) as (typeof SORA_DURATION_LITERALS)[number];
+}
+
+function snapToPresenterDuration(
+  raw: unknown,
+): (typeof PRESENTER_DURATION_LITERALS)[number] {
+  return snapToNearestDuration(
+    raw,
+    PRESENTER_DURATION_LITERALS,
+    20,
+  ) as (typeof PRESENTER_DURATION_LITERALS)[number];
+}
+
+const videoDurationSchema = z.preprocess((val) => val, z.number().optional());
 
 const videoModeSchema = z.enum(['cinematic', 'presenter']).optional();
 
@@ -168,13 +180,13 @@ const heygenExpressivenessSchema = z
   .enum(['low', 'medium', 'high'])
   .optional();
 
-const videoConfigSchema = z
+const videoConfigObjectSchema = z
   .object({
     laneId: laneIdSchema,
     mode: videoModeSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
-    duration: soraDurationSchema,
+    duration: videoDurationSchema,
     resolution: z.string().min(1).optional(),
     aspectRatio: videoAspect.optional(),
     negativePrompt: z.string().max(2000).optional(),
@@ -189,17 +201,16 @@ const videoConfigSchema = z
     heygenMotionPrompt: z.string().max(500).optional(),
     removeBackground: z.boolean().optional(),
   })
-  .strict()
-  .superRefine((data, ctx) => {
-    const mode = data.mode ?? 'cinematic';
-    if (mode === 'presenter' && !data.heygenAvatarId?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'heygenAvatarId is required when mode is presenter',
-        path: ['heygenAvatarId'],
-      });
-    }
-  });
+  .strict();
+
+const videoConfigSchema = videoConfigObjectSchema.transform((data) => {
+  const mode = data.mode ?? 'cinematic';
+  const duration =
+    mode === 'presenter'
+      ? snapToPresenterDuration(data.duration)
+      : snapToSoraDuration(data.duration);
+  return { ...data, duration };
+});
 
 const transcriptionConfigSchema = z
   .object({
@@ -246,7 +257,8 @@ const keywordPlannerConfigSchema = z
 
 const branchConfigSchema = z
   .object({
-    mode: z.enum(['rule_channels']).optional(),
+    mode: z.enum(['rule_channels', 'wizard_channels']).optional(),
+    channels: z.array(z.string().min(1)).optional(),
   })
   .strict();
 
@@ -271,14 +283,16 @@ export const IntelligenceSearchType = z.enum([
 ]);
 export type IntelligenceSearchTypeValue = z.infer<typeof IntelligenceSearchType>;
 
-const intelligenceConfigSchema = z
+const intelligenceConfigObjectSchema = z
   .object({
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     searchType: IntelligenceSearchType.default('all'),
     customPrompt: z.string().nullable().optional(),
   })
-  .strict()
+  .strict();
+
+const intelligenceConfigSchema = intelligenceConfigObjectSchema
   .superRefine((val, ctx) => {
     if (val.searchType === 'custom') {
       const p = val.customPrompt?.trim();
@@ -292,10 +306,18 @@ const intelligenceConfigSchema = z
     }
   });
 
-const SCHEMAS: Record<
-  WorkflowNodeType,
-  z.ZodObject<Record<string, z.ZodTypeAny>>
-> = {
+function configSchemaShapeKeys(schema: z.ZodTypeAny): string[] {
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+  const inner = (schema as { _def?: { in?: unknown } })._def?.in;
+  if (inner instanceof z.ZodObject) {
+    return Object.keys(inner.shape);
+  }
+  return [];
+}
+
+const SCHEMAS: Record<WorkflowNodeType, z.ZodTypeAny> = {
   [WorkflowNodeType.KeywordPlanner]: keywordPlannerConfigSchema,
   [WorkflowNodeType.TextGeneration]: textConfigSchema,
   [WorkflowNodeType.ImageGeneration]: imageConfigSchema,
@@ -413,18 +435,35 @@ export type ParseWorkflowNodeConfigResult =
  * Unknown keys are rejected by `.strict()` then stripped by parsing only known shape.
  */
 /**
- * Incomplete presenter setup (mode without avatar) is stored as cinematic until an
- * avatar is chosen. Pipeline start still requires avatar+voice when mode is presenter.
+ * Fall back to cinematic only when clearing avatar in presenter mode.
+ * Pipeline execution still requires avatar+voice via video-generation.service.
  */
 export function coerceVideoConfigForPersist(
   raw: Record<string, unknown>,
 ): Record<string, unknown> {
-  const mode = raw.mode ?? 'cinematic';
-  const hasAvatar = String(raw.heygenAvatarId ?? '').trim().length > 0;
-  if (mode === 'presenter' && !hasAvatar) {
-    return { ...raw, mode: 'cinematic' };
+  const next = { ...raw };
+  const hasAvatar = String(next.heygenAvatarId ?? '').trim().length > 0;
+  const clearingAvatar =
+    'heygenAvatarId' in raw && !String(raw.heygenAvatarId ?? '').trim();
+
+  if (next.mode === 'presenter' && !hasAvatar && clearingAvatar) {
+    next.mode = 'cinematic';
   }
-  return raw;
+  return next;
+}
+
+function configShapeKeys(type: WorkflowNodeType): string[] {
+  if (type === WorkflowNodeType.VideoGeneration) {
+    return Object.keys(videoConfigObjectSchema.shape);
+  }
+  if (type === WorkflowNodeType.Intelligence) {
+    return Object.keys(intelligenceConfigObjectSchema.shape);
+  }
+  const schema = SCHEMAS[type];
+  if (schema instanceof z.ZodObject) {
+    return Object.keys(schema.shape);
+  }
+  return [];
 }
 
 export function parseWorkflowNodeConfig(
@@ -438,7 +477,11 @@ export function parseWorkflowNodeConfig(
       : {};
 
   const picked: Record<string, unknown> = {};
-  const allowed = new Set(Object.keys(schema.shape));
+  const allowed = new Set(
+    type === WorkflowNodeType.VideoGeneration
+      ? Object.keys(videoConfigObjectSchema.shape)
+      : configSchemaShapeKeys(schema),
+  );
   for (const [k, v] of Object.entries(obj)) {
     if (allowed.has(k)) {
       picked[k] = v;
@@ -465,7 +508,10 @@ export function parseWorkflowNodeConfig(
     };
   }
 
-  return { ok: true, data: mergeWithDefaults(type, result.data) };
+  return {
+    ok: true,
+    data: mergeWithDefaults(type, result.data as Record<string, unknown>),
+  };
 }
 
 export function parseWorkflowNodeConfigOrThrow(
@@ -477,4 +523,38 @@ export function parseWorkflowNodeConfigOrThrow(
     throw new Error(r.errors.join('; '));
   }
   return r.data;
+}
+
+/** Rule fields used for campaign-aware node defaults (e.g. Instagram → 9:16 video). */
+export type RuleNodeConfigHint = {
+  channels?: Array<{ channel?: string }>;
+  audience?: { language?: string };
+};
+
+/**
+ * Full workflow node defaults plus rule-aware overrides (Generate more, append node).
+ */
+export function defaultWorkflowNodeConfigForRule(
+  type: WorkflowNodeType,
+  rule?: RuleNodeConfigHint | null,
+): WorkflowNodeConfig {
+  const channels = rule?.channels ?? [];
+  const hasInstagram = channels.some(
+    (c) => (c.channel ?? '').toLowerCase() === 'instagram',
+  );
+  const audienceLang = rule?.audience?.language?.trim();
+
+  const overrides: Record<string, unknown> = {};
+  if (type === WorkflowNodeType.VideoGeneration && hasInstagram) {
+    overrides.aspectRatio = NodeAspectRatio.R9x16;
+  }
+  if (
+    type === WorkflowNodeType.Transcription &&
+    audienceLang &&
+    audienceLang.length > 0
+  ) {
+    overrides.language = audienceLang;
+  }
+
+  return mergeWithDefaults(type, overrides);
 }

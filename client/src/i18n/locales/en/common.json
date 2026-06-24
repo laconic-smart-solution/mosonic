@@ -1,13 +1,21 @@
 {
-  "appName": "NeuralTex",
+  "appName": "Mosonic",
   "appTagline": "AI Platform",
   "platform": "Platform",
   "account": "Account",
   "accountMenu": "Account menu",
   "logOut": "Log out",
+  "credits": {
+    "remaining": "{{count}} credits remaining",
+    "loading": "Loading credits",
+    "unavailable": "Credits unavailable",
+    "viewUsage": "View usage details"
+  },
   "pendingSuggestions": "Pending AI suggestions",
   "language": "Language",
   "languageDescription": "Choose the language for the application interface.",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
   "languages": {
     "en": "English",
     "th": "ไทย",
@@ -16,9 +24,9 @@
   "systemMessagesEnglish": "System messages from the server may appear in English.",
   "searchPlaceholder": "Search pages…",
   "search": {
-    "ariaLabel": "Search content and pages",
-    "placeholder": "Search content and pages…",
-    "noMatches": "No matching pages or content.",
+    "ariaLabel": "Search pages and routes",
+    "placeholder": "Search pages and routes…",
+    "noMatches": "No matching pages or routes.",
     "goTo": "Go to",
     "content": "Content",
     "searching": "Searching…",
@@ -70,8 +78,14 @@
     "posts": "Posts",
     "analytics": "Analytics",
     "cost": "Costs",
+    "usage": "Usage",
     "settingsAccounts": "Account settings",
     "admin": "Admin"
+  },
+  "breadcrumb": {
+    "detail": "Details",
+    "review": "Review",
+    "newsTrigger": "News trigger"
   },
   "routes": {
     "dashboard": "Dashboard",
@@ -86,6 +100,7 @@
     "components": "Components",
     "pipelines": "Pipelines",
     "cost": "Costs",
+    "usage": "Usage",
     "settings": "Settings",
     "admin": "Admin"
   },
@@ -115,10 +130,10 @@
       "subtitle": "Linked accounts",
       "keywords": "settings account profile users"
     },
-    "analytics": {
-      "title": "Analytics",
-      "subtitle": "Metrics and reports",
-      "keywords": "analytics metrics stats"
+    "posts": {
+      "title": "Posts",
+      "subtitle": "Published and scheduled posts",
+      "keywords": "posts publish social metrics analytics"
     }
   },
   "status": {
@@ -140,7 +155,10 @@
     "network": "Network error. Check your connection and try again.",
     "unauthorized": "You are not signed in.",
     "forbidden": "You do not have permission to do that.",
-    "notFound": "Not found."
+    "notFound": "Not found.",
+    "validation": "Please check your input and try again.",
+    "payloadTooLarge": "The file is too large.",
+    "serviceUnavailable": "Service is temporarily unavailable. Please try again."
   },
   "pagination": {
     "page": "Page {{page}}",
@@ -153,5 +171,15 @@
   "empty": "No items yet",
   "noData": "No data",
   "optional": "Optional",
-  "required": "Required"
+  "required": "Required",
+  "toast": {
+    "eyebrow": {
+      "success": "Saved",
+      "error": "Failed",
+      "warning": "Heads up",
+      "info": "Note",
+      "loading": "Loading",
+      "default": "Note"
+    }
+  }
 }

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { CircleAlert, Inbox, LayoutGrid } from "lucide-react"
 
 import { PersistedShadcnPagination } from "@/components/core/persisted-shadcn-pagination"
+import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -182,22 +183,6 @@ export default function PipelinesPage() {
     selectedMissingFromList ? selectedWorkflowId : undefined,
   )
 
-  const workflowNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const row of workflowsQuery.data?.data ?? []) {
-      map.set(row.workflowId, row.name)
-    }
-    const selectedName = selectedWorkflowQuery.data?.workflow?.name?.trim()
-    if (selectedWorkflowId && selectedName) {
-      map.set(selectedWorkflowId, selectedName)
-    }
-    return map
-  }, [
-    workflowsQuery.data?.data,
-    selectedWorkflowId,
-    selectedWorkflowQuery.data?.workflow?.name,
-  ])
-
   const workflowOptions = useMemo(() => {
     const opts = (workflowsQuery.data?.data ?? []).map((row) => ({
       workflowId: row.workflowId,
@@ -270,10 +255,7 @@ export default function PipelinesPage() {
   }
 
   return (
-    <div
-      className="min-h-full w-full bg-[color:var(--nt-canvas)] px-4 py-5 sm:px-5"
-      style={{ minHeight: "100%" }}
-    >
+    <PageShell>
       <PipelineStopConfirmDialog
         pipelineId={stopPipelineId}
         open={!!stopPipelineId}
@@ -486,12 +468,11 @@ export default function PipelinesPage() {
                       layout
                       variants={cardVariants}
                       transition={{ duration: 0.22 }}
-                      className="min-h-[220px]"
+                      className="min-h-[190px]"
                     >
                       <PipelineListCard
                         item={item}
                         index={index}
-                        workflowName={workflowNameById.get(item.workflowRef)}
                         onOpen={openPipeline}
                         onStop={(row) => setStopPipelineId(row.pipelineId)}
                       />
@@ -524,6 +505,6 @@ export default function PipelinesPage() {
           </>
         )}
       </motion.div>
-    </div>
+    </PageShell>
   )
 }

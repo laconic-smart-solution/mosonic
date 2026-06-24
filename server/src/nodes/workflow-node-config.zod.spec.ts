@@ -136,6 +136,18 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.duration).toBe(20);
   });
 
+  it('snaps presenter duration to allowed HeyGen values', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      mode: 'presenter',
+      heygenAvatarId: 'av-1',
+      heygenVoiceId: 'voice-1',
+      duration: 35,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.duration).toBe(30);
+  });
+
   it('defaults video mode to cinematic', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {});
     expect(r.ok).toBe(true);
@@ -143,27 +155,33 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.mode).toBe('cinematic');
   });
 
-  it('requires heygenAvatarId when mode is presenter', () => {
+  it('allows presenter mode before avatar is chosen', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
       mode: 'presenter',
       heygenVoiceId: 'voice-1',
     });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.mode).toBe('presenter');
+    expect(r.data.heygenVoiceId).toBe('voice-1');
   });
 
-  it('coerceVideoConfigForPersist drops presenter mode without avatar', () => {
+  it('coerceVideoConfigForPersist keeps presenter mode when selecting presenter', () => {
     const coerced = coerceVideoConfigForPersist({
       mode: 'presenter',
       heygenVoiceId: 'voice-1',
     });
-    const r = parseWorkflowNodeConfig(
-      WorkflowNodeType.VideoGeneration,
-      coerced,
-    );
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.data.mode).toBe('cinematic');
-    expect(r.data.heygenVoiceId).toBe('voice-1');
+    expect(coerced.mode).toBe('presenter');
+  });
+
+  it('coerceVideoConfigForPersist falls back to cinematic when clearing avatar', () => {
+    const coerced = coerceVideoConfigForPersist({
+      mode: 'presenter',
+      heygenVoiceId: 'voice-1',
+      heygenAvatarId: '',
+    });
+    expect(coerced.mode).toBe('cinematic');
+    expect(coerced.heygenAvatarId).toBe('');
   });
 
   it('accepts presenter config with avatar and voice', () => {

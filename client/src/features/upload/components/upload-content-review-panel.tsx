@@ -10,26 +10,30 @@ import { useNavigate } from "react-router-dom"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import i18n from "@/i18n"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
+import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
+import { WorkflowNodeGuideSection } from "@/features/workflow/components/workflow-node-guide-section"
 import {
   backendTypeToCanvas,
   buildGenerateMoreDefaultConfig,
   type GenerateMoreRuleHint,
 } from "@/features/workflow/data/workflow-model"
+import { randomUuid } from "@/lib/random-uuid"
 
 import {
   type OutputKey,
@@ -94,8 +98,6 @@ export type UploadContentReviewPanelProps = {
   embedInUpload?: boolean
   /** Middle column when embedded in the Upload workspace (caption, media, publish) */
   preview?: ReactNode
-  /** Left column when embedded: scheduled/post status + platform card preview */
-  channelPreview?: ReactNode
   /** Fired whenever per-node outputs / edits change (used to resolve pinned drag-drop captions). */
   onWorkflowLayersChange?: (layers: WorkflowNodeLayersSnapshot) => void
   /** Channel keys (tabs) to show in Generated contents header filter. */
@@ -109,7 +111,6 @@ export function UploadContentReviewPanel({
   uploadId,
   embedInUpload = false,
   preview,
-  channelPreview,
   onWorkflowLayersChange,
   generationChannelKeys,
   generationDefaultKey = "all",
@@ -123,17 +124,13 @@ export function UploadContentReviewPanel({
   const ruleQuery = useRuleByIdQuery<GenerateMoreRuleHint>(data?.ruleRef)
   const ruleHint = ruleQuery.data
 
-  const workflowQuery = useGetWorkflowQuery(data?.workflowRef, {
-    refetchInterval: false,
-  })
+  const workflowQuery = useGetWorkflowQuery(data?.workflowRef)
   const workflowNodes = useMemo(
     () => workflowQuery.data?.nodes ?? [],
     [workflowQuery.data?.nodes]
   )
 
-  const pipelineQuery = useGetPipelineQuery(data?.pipelineRef, {
-    refetchInterval: false,
-  })
+  const pipelineQuery = useGetPipelineQuery(data?.pipelineRef)
 
   const sortedWorkflowNodes = useMemo(
     () => [...workflowNodes].sort((a, b) => a.order - b.order),
@@ -156,6 +153,12 @@ export function UploadContentReviewPanel({
       ),
     [sortedWorkflowNodes, nodeOutputs, nodeUserEdits]
   )
+
+  const creditByNodeId = useMemo(
+    () => data?.creditUsage?.byNodeId ?? {},
+    [data?.creditUsage?.byNodeId],
+  )
+  const totalCreditsUsed = data?.creditUsage?.totalCredits ?? 0
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approveEnabled, setApproveEnabled] = useState(false)
@@ -184,6 +187,9 @@ export function UploadContentReviewPanel({
   const [genMoreConfigDraft, setGenMoreConfigDraft] = useState<
     Record<string, unknown>
   >({})
+  const [genMoreDraftNodeId, setGenMoreDraftNodeId] = useState<string | null>(
+    null,
+  )
   const [isGeneratingMore, setIsGeneratingMore] = useState(false)
   const [generateMorePending, setGenerateMorePending] = useState<{
     nodeId: string
@@ -280,7 +286,6 @@ export function UploadContentReviewPanel({
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
       "video_generation",
-      "transcription",
       "summarization",
       "translation",
       "image_generation",
@@ -432,6 +437,7 @@ export function UploadContentReviewPanel({
         }
         setGlobalRerunning(false)
         setRerunNodeId(null)
+        void queryClient.invalidateQueries({ queryKey: ["content", contentId] })
         toast.success(i18n.t("upload:toast.nodeUpdated"))
       }),
     ]
@@ -476,8 +482,8 @@ export function UploadContentReviewPanel({
       setHasUnsavedChanges(false)
       setApproveEnabled(true)
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.saveFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.saveFailed")
     },
   })
 
@@ -485,6 +491,7 @@ export function UploadContentReviewPanel({
     if (!genMoreOpen || !contentId) return
     setSelectedGenType(null)
     setGenMoreConfigDraft({})
+    setGenMoreDraftNodeId(null)
     let cancelled = false
     setAvailableTypesLoading(true)
     void contentService
@@ -500,9 +507,9 @@ export function UploadContentReviewPanel({
         setAvailableTypes(generateMoreTypes.filter((t) => supported.has(t)))
         setAvailableTypesLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
-        toast.error(i18n.t("upload:toast.loadOutputsFailed"))
+        toastApiError(err, "upload:toast.loadOutputsFailed")
         setAvailableTypesLoading(false)
         setAvailableTypes(generateMoreTypes)
       })
@@ -528,7 +535,9 @@ export function UploadContentReviewPanel({
         const { nodeId } = await contentService.generateNode(contentId, {
           type,
           config,
+          ...(genMoreDraftNodeId ? { nodeId: genMoreDraftNodeId } : {}),
         })
+        setGenMoreDraftNodeId(null)
         setRunState(nodeId, { phase: "running", stream: "", errorMessage: "" })
         generateMoreRetryRef.current = { type, config, nodeId }
         setGenerateMorePending({ nodeId, type, config })
@@ -537,13 +546,13 @@ export function UploadContentReviewPanel({
             queryKey: ["workflow", data.workflowRef],
           })
         }
-      } catch {
-        toast.error(i18n.t("upload:toast.startGenerationFailed"))
+      } catch (err) {
+        toastApiError(err, "upload:toast.startGenerationFailed")
         generateMoreRetryRef.current = { type, config, nodeId: "" }
         setIsGeneratingMore(false)
       }
     },
-    [contentId, data?.workflowRef, queryClient, setRunState]
+    [contentId, data?.workflowRef, genMoreDraftNodeId, queryClient, setRunState]
   )
 
   const approveMutation = useMutation({
@@ -563,8 +572,8 @@ export function UploadContentReviewPanel({
         navigate(`/upload/${approvedId}`)
       }
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.approveFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.approveFailed")
     },
   })
 
@@ -578,8 +587,8 @@ export function UploadContentReviewPanel({
         (old) => (old ? { ...old, status: "rejected" } : old)
       )
     },
-    onError: () => {
-      toast.error(i18n.t("upload:toast.rejectFailed"))
+    onError: (err) => {
+      toastApiError(err, "upload:toast.rejectFailed")
     },
   })
 
@@ -612,8 +621,8 @@ export function UploadContentReviewPanel({
         data.contentId
       )
       navigate(`/upload/${uploadId}`)
-    } catch {
-      toast.error(i18n.t("upload:toast.openUploadFailed"))
+    } catch (err) {
+      toastApiError(err, "upload:toast.openUploadFailed")
       navigate("/upload")
     } finally {
       setUploadNavLoading(false)
@@ -655,8 +664,8 @@ export function UploadContentReviewPanel({
         },
       })
       setRerunNodeId(null)
-    } catch {
-      toast.error(i18n.t("upload:toast.rerunFailed"))
+    } catch (err) {
+      toastApiError(err, "upload:toast.rerunFailed")
       setGlobalRerunning(false)
       setRunState(nodeId, {
         phase: "error",
@@ -680,12 +689,12 @@ export function UploadContentReviewPanel({
       const outKey: OutputKey = key === "image" ? "image" : "video"
       updateNodeUserEdit(nodeId, outKey, url)
       setRunState(nodeId, emptyRunState())
-    } catch {
+    } catch (err) {
       setRunState(nodeId, {
         phase: "error",
         errorMessage: "Upload failed. Try again.",
       })
-      toast.error(i18n.t("upload:toast.mediaUploadFailed"))
+      toastApiError(err, "upload:toast.mediaUploadFailed")
     }
   }
 
@@ -706,6 +715,8 @@ export function UploadContentReviewPanel({
 
   const workflowTitle = workflowQuery.data?.workflow?.name ?? "Content review"
 
+  useSetBreadcrumbLabel(workflowTitle)
+
   const workflowDisplayName = workflowQuery.data?.workflow?.name
 
   const copyOutput = useCallback(async (text: string) => {
@@ -720,6 +731,13 @@ export function UploadContentReviewPanel({
     } catch {
       toast.error(i18n.t("upload:toast.copyFailed"))
     }
+  }, [])
+
+  const closeGenMore = useCallback(() => {
+    setGenMoreOpen(false)
+    setSelectedGenType(null)
+    setGenMoreConfigDraft({})
+    setGenMoreDraftNodeId(null)
   }, [])
 
   if (!contentId) {
@@ -757,65 +775,62 @@ export function UploadContentReviewPanel({
     )
   }
 
-  const genMorePopover = (
-    <Popover
+  const genMoreButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-9 text-xs shadow-sm"
+      disabled={blockPipeline || saveLoading}
+      onClick={() => setGenMoreOpen(true)}
+    >
+      <Sparkles className="mr-1.5 size-3.5 text-primary" />
+      Generate more
+    </Button>
+  )
+
+  const genMoreDialog = (
+    <Dialog
       open={genMoreOpen}
       onOpenChange={(open) => {
-        setGenMoreOpen(open)
-        if (!open) {
-          setSelectedGenType(null)
-          setGenMoreConfigDraft({})
+        if (open) {
+          setGenMoreOpen(true)
+          return
         }
+        closeGenMore()
       }}
     >
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 border-[#EDE9E1] bg-card text-xs text-[#0F1F3D] shadow-sm"
-            disabled={blockPipeline || saveLoading}
-          >
-            <Sparkles className="mr-1.5 size-3.5 text-[#00A589]" />
-            Generate more
-          </Button>
-        }
-      />
-      <PopoverContent
-        className="w-[min(100vw-2rem,300px)] p-4"
-        side="bottom"
-        align="start"
-      >
-        <PopoverHeader className="space-y-0 pb-3">
-          <PopoverTitle className="text-sm font-semibold text-[#0F1F3D]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold">
             {selectedGenType
               ? pipelineStepLabel(selectedGenType)
               : "Add another output"}
-          </PopoverTitle>
-        </PopoverHeader>
+          </DialogTitle>
+        </DialogHeader>
         {availableTypesLoading ? (
-          <p className="text-xs text-[#A89D8E]">Loading…</p>
+          <p className="text-xs text-muted-foreground">Loading…</p>
         ) : !selectedGenType ? (
           availableTypes.length === 0 ? (
-            <p className="text-xs leading-relaxed text-[#857A6C]">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               No output types are available.
             </p>
           ) : (
-            <div className="flex max-h-[280px] flex-col gap-2 overflow-y-auto pr-1">
+            <div className="flex max-h-[min(60vh,360px)] flex-col gap-2 overflow-y-auto pr-1">
               {availableTypes.map((t) => (
                 <button
                   key={t}
                   type="button"
-                  className="flex w-full items-center gap-2.5 rounded-xl border border-[#EDE9E1] bg-[color:var(--nt-canvas)] px-3 py-2.5 text-left text-sm text-[#0F1F3D] transition-colors hover:border-[#00C9A7]/50 hover:bg-[#E0FAF5]/30"
+                  className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
                   onClick={() => {
                     setSelectedGenType(t)
+                    setGenMoreDraftNodeId(randomUuid())
                     setGenMoreConfigDraft(
                       buildGenerateMoreDefaultConfig(t, ruleHint)
                     )
                   }}
                 >
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#E0FAF5]">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <PipelineTypeIcon type={t} />
                   </span>
                   <span className="font-medium">{pipelineStepLabel(t)}</span>
@@ -829,27 +844,32 @@ export function UploadContentReviewPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="-ml-2 h-8 justify-start text-xs text-[#857A6C]"
-              onClick={() => setSelectedGenType(null)}
+              className="-ml-2 h-8 justify-start text-xs text-muted-foreground"
+              onClick={() => {
+                setSelectedGenType(null)
+                setGenMoreDraftNodeId(null)
+              }}
             >
               ← Change type
             </Button>
-            <p className="text-[11px] leading-relaxed text-[#857A6C]">
-              Tune how this step runs. The campaign brief from the original run
-              is reused automatically.
-            </p>
-            <div className="max-h-[min(50vh,320px)] overflow-y-auto pr-1">
+            <WorkflowNodeGuideSection
+              canvasType={backendTypeToCanvas(selectedGenType)}
+            />
+            <div className="max-h-[min(55vh,420px)] overflow-y-auto pr-1">
               <WorkflowNodeConfigFields
                 canvasType={backendTypeToCanvas(selectedGenType)}
                 config={genMoreConfigDraft}
                 onChange={setGenMoreConfigDraft}
+                workflowId={data?.workflowRef}
+                nodeId={genMoreDraftNodeId ?? undefined}
+                persistPresenterToServer={false}
                 compact
               />
             </div>
             <Button
               type="button"
               size="sm"
-              className="h-9 w-full bg-[#254C94] text-white hover:bg-[#1A3260]"
+              className="h-9 w-full"
               disabled={blockPipeline}
               onClick={() =>
                 void submitGenerateMore(selectedGenType, genMoreConfigDraft)
@@ -859,36 +879,26 @@ export function UploadContentReviewPanel({
             </Button>
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+      </DialogContent>
+    </Dialog>
   )
 
   return (
     <TooltipProvider>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {showRejectedBanner ? (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-900 dark:text-amber-200">
             This content has been rejected. You can continue editing.
           </div>
         ) : null}
 
         {embedInUpload && preview !== undefined ? (
-          <div className="grid max-h-[100vh] min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-4 py-4 md:px-5 lg:grid-cols-3 lg:gap-5">
-            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-xl border border-[#EDE9E1] bg-card p-4 shadow-sm">
-              <div className="max-h-[70vh] min-w-0 flex-1 space-y-3">
-                {channelPreview ?? (
-                  <p className="text-xs text-muted-foreground">
-                    Select a channel to see how the post will look.
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="grid min-w-0 gap-4 px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-5">
+            <div className="min-w-0">{preview}</div>
 
-            <div className="h-full min-w-0 overflow-y-auto">{preview}</div>
-
-            <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-[#EDE9E1] bg-card shadow-sm">
-              <div className="border-b border-[#EDE9E1] px-4 py-2.5">
-                <p className="text-[11px] font-semibold tracking-wide text-[#A89D8E] uppercase">
+            <div className="flex min-w-0 max-h-[89vh] overflow-y-auto flex-col rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-4 py-2.5">
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Generation
                 </p>
                 {generationFilterLabel ? (
@@ -897,20 +907,28 @@ export function UploadContentReviewPanel({
                   </p>
                 ) : null}
               </div>
-              <div className="h-full min-h-0 flex-1 overflow-y-auto">
-                <div className="w-full border-b border-[#EDE9E1] px-4 py-3 [&_button]:w-full">
-                  {genMorePopover}
+              <div className="min-w-0">
+                <div className="w-full border-b border-border px-4 py-3 [&_button]:w-full">
+                  {genMoreButton}
                 </div>
                 <div className="px-4 py-3">
                   <div className="mb-3 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-semibold tracking-widest text-[#A89D8E] uppercase">
-                        Generated contents
-                      </p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                          Generated contents
+                        </p>
+                        {totalCreditsUsed > 0 ? (
+                          <CreditUsageBadge
+                            credits={totalCreditsUsed}
+                            showLabel
+                          />
+                        ) : null}
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
-                        className="relative h-9 shrink-0 border-[#EDE9E1] text-[#62594E] hover:bg-[#F7F4EF] sm:min-w-[140px]"
+                        className="relative h-9 shrink-0 sm:min-w-[140px]"
                         disabled={saveLoading || blockPipeline}
                         onClick={() => void handleSave()}
                       >
@@ -937,7 +955,7 @@ export function UploadContentReviewPanel({
                       >
                         <TabsList
                           variant="default"
-                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-[#EDE9E1] bg-[#F7F4EF] p-0.5"
+                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-border bg-muted/50 p-0.5"
                         >
                           <TabsTrigger
                             value="all"
@@ -1017,6 +1035,7 @@ export function UploadContentReviewPanel({
                           setLightboxUrl={setLightboxUrl}
                           uploadMediaForNode={uploadMediaForNode}
                           onCopyOutput={(t) => void copyOutput(t)}
+                          creditsUsed={creditByNodeId[nodeId] ?? 0}
                         />
                       )
                     })}
@@ -1043,15 +1062,13 @@ export function UploadContentReviewPanel({
               <ContentDetailReviewHeader
                 workflowTitle={workflowTitle}
                 data={data}
-                breadcrumbParentHref={embedInUpload ? "/upload" : "/content"}
-                breadcrumbParentLabel={embedInUpload ? "Upload" : "Content"}
               />
 
               {data.newsMeta ? (
                 <ContentNewsSourceBanner newsMeta={data.newsMeta} />
               ) : null}
 
-              <div className="mb-4">{genMorePopover}</div>
+              <div className="mb-4">{genMoreButton}</div>
 
               <div className="flex flex-col gap-4">
                 {generationNodes.map((wfNode, cardIndex) => {
@@ -1190,6 +1207,7 @@ export function UploadContentReviewPanel({
         <ContentDetailRerunSheet
           openNodeId={rerunNodeId}
           workflowNodes={workflowNodes}
+          workflowId={data?.workflowRef}
           globalRerunning={blockPipeline}
           configDraft={rerunConfigDraft}
           onConfigChange={setRerunConfigDraft}
@@ -1212,6 +1230,8 @@ export function UploadContentReviewPanel({
           onApproveConfirm={handleApproveConfirm}
           onRejectConfirm={() => rejectMutation.mutateAsync()}
         />
+
+        {genMoreDialog}
       </div>
     </TooltipProvider>
   )

@@ -2,22 +2,22 @@ import type { Edge } from "@xyflow/react"
 
 import i18n from "@/i18n"
 import type { WfNodeData, WfRfNode } from "@/features/workflow/data/workflow-model"
+import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
+import { laneKeyFromRfNode } from "@/features/workflow/lib/workflow-lane-layout"
+import { VIDEO_CINEMATIC_UI_ENABLED } from "@/features/workflow/lib/video-generation-ui"
 
-import { canvasNextMatrix } from "@workflow-next-matrix"
+import { canvasNextMatrix, type PlusPopoverKey } from "@workflow-next-matrix"
 
 /** Canvas wfType values allowed in the plus-insert popover. */
 export const PLUS_POPOVER_TYPES = [
   "keywords",
   "intelligence",
   "text",
-  "transcription",
   "branch",
-  "adapt",
   "image",
   "video",
   "summarization",
   "translation",
-  "merge",
 ] as const
 
 export type PlusPopoverType = (typeof PLUS_POPOVER_TYPES)[number]
@@ -44,32 +44,30 @@ const STARTER_NODES: readonly PlusPopoverType[] = [
   "keywords",
   "intelligence",
   "text",
-  "transcription",
 ]
 
 const TRUNK_ONLY = new Set<PlusPopoverType>([
   "keywords",
   "intelligence",
   "branch",
-  "merge",
 ])
 
 const ENRICHMENT_BEFORE_TEXT: readonly PlusPopoverType[] = [
   "keywords",
   "intelligence",
-  "transcription",
 ]
 
-const NEXT_MATRIX: Record<string, readonly PlusPopoverType[]> =
+const NEXT_MATRIX: Record<string, readonly PlusPopoverKey[]> =
   canvasNextMatrix()
 
 function buildCanPrecede(
-  matrix: Record<string, readonly PlusPopoverType[]>,
+  matrix: Record<string, readonly PlusPopoverKey[]>,
 ): Record<string, PlusPopoverType[]> {
   const result: Record<string, PlusPopoverType[]> = {}
   for (const [from, targets] of Object.entries(matrix)) {
     if (!isPlusType(from)) continue
     for (const to of targets) {
+      if (!isPlusType(to)) continue
       if (!result[to]) result[to] = []
       if (!result[to].includes(from)) {
         result[to].push(from)
@@ -156,7 +154,7 @@ function adaptNodeByLane(ctx: ValidationContext): Map<string, string> {
   for (const node of ctx.nodes) {
     if (node.data.wfType !== "adapt") continue
     const lane = node.data.lane?.trim()
-    if (lane) map.set(lane, node.id)
+    if (lane) map.set(normalizeLaneId(lane), node.id)
   }
   return map
 }
@@ -182,7 +180,7 @@ export function inferGraphContext(
 }
 
 function applyExtraRules(
-  types: PlusPopoverType[],
+  types: PlusPopoverKey[],
   ctx: ValidationContext,
   opts: {
     sourceNodeId?: string
@@ -192,7 +190,7 @@ function applyExtraRules(
   },
 ): PlusPopoverType[] {
   const graphMode = hasWorkflowBranch(ctx.nodes)
-  let result = [...types]
+  let result: PlusPopoverKey[] = [...types]
 
   if (ctx.nodes.some((n) => n.data.wfType === "branch")) {
     result = result.filter((t) => t !== "branch")
@@ -214,7 +212,7 @@ function applyExtraRules(
           isPlusType(opts.targetWfType))
 
   if (laneContext) {
-    result = result.filter((t) => !TRUNK_ONLY.has(t))
+    result = result.filter((t) => !(isPlusType(t) && TRUNK_ONLY.has(t)))
   }
 
   if (result.includes("adapt")) {
@@ -235,10 +233,10 @@ function applyExtraRules(
   }
 
   if (opts.forInsert && opts.targetWfType === "text") {
-    result = result.filter((t) => ENRICHMENT_BEFORE_TEXT.includes(t))
+    result = result.filter((t) => ENRICHMENT_BEFORE_TEXT.includes(t as PlusPopoverType))
   }
 
-  return result
+  return filterPlusTypes(result)
 }
 
 export function getMatrixNextTypes(sourceWfType: string): PlusPopoverType[] {
@@ -330,7 +328,7 @@ export function toValidationNodes(rfNodes: WfRfNode[]): ValidationGraphNode[] {
       id: n.id,
       data: {
         wfType: n.data.wfType,
-        lane: n.data.lane,
+        lane: laneKeyFromRfNode(n) || null,
       },
     }))
 }
@@ -366,13 +364,65 @@ function wfTypeLabel(wfType: string): string {
   return i18n.t(`workflow:nodeTypesShort.${wfType}`, { defaultValue: wfType })
 }
 
+function workflowNodeLabel(node: WfRfNode): string {
+  if (node.type === "plus_placeholder") return node.id
+  return wfTypeLabel(node.data.wfType)
+}
+
+/** Nodes with no incident edges while the workflow graph has connections. */
+export function getDisconnectedWorkflowNodeIds(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): string[] {
+  const persistable = rfNodes.filter((node) => node.type !== "plus_placeholder")
+  if (persistable.length <= 1 || edges.length === 0) {
+    return []
+  }
+
+  const incident = new Set<string>()
+  for (const edge of edges) {
+    if (edge.source) incident.add(edge.source)
+    if (edge.target) incident.add(edge.target)
+  }
+
+  return persistable
+    .filter((node) => !incident.has(node.id))
+    .map((node) => node.id)
+}
+
+export function getDisconnectedWorkflowNodeLabels(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): string[] {
+  const ids = new Set(getDisconnectedWorkflowNodeIds(rfNodes, edges))
+  return rfNodes
+    .filter((node) => ids.has(node.id))
+    .map((node) => workflowNodeLabel(node))
+}
+
+export function stripDisconnectedWorkflowNodes(
+  rfNodes: WfRfNode[],
+  edges: Edge[],
+): { nodes: WfRfNode[]; removedIds: string[]; removedLabels: string[] } {
+  const disconnectedIds = getDisconnectedWorkflowNodeIds(rfNodes, edges)
+  if (disconnectedIds.length === 0) {
+    return { nodes: rfNodes, removedIds: [], removedLabels: [] }
+  }
+
+  const idSet = new Set(disconnectedIds)
+  const removedLabels = rfNodes
+    .filter((node) => idSet.has(node.id))
+    .map((node) => workflowNodeLabel(node))
+
+  return {
+    nodes: rfNodes.filter((node) => !idSet.has(node.id)),
+    removedIds: disconnectedIds,
+    removedLabels,
+  }
+}
+
 function laneIdFromRfNode(node: WfRfNode): string {
-  if (node.type === "plus_placeholder") return ""
-  const data = node.data as WfNodeData
-  const fromLane = data.lane?.trim()
-  if (fromLane) return fromLane
-  const config = data.config as { laneId?: string } | undefined
-  return typeof config?.laneId === "string" ? config.laneId.trim() : ""
+  return laneKeyFromRfNode(node)
 }
 
 /**
@@ -427,16 +477,23 @@ export function getBranchSubgraphLaneErrors(
   return errors
 }
 
-/** Merge HeyGen/video patch without marking presenter until an avatar exists. */
+/** Merge HeyGen/video patch; fall back to cinematic only when avatar is cleared in presenter mode. */
 export function mergeHeygenVideoConfig(
   current: Record<string, unknown>,
   patch: Record<string, unknown>,
 ): Record<string, unknown> {
-  const hasAvatar = Boolean(
-    String(patch.heygenAvatarId ?? current.heygenAvatarId ?? "").trim(),
-  )
   const next: Record<string, unknown> = { ...current, ...patch }
-  if (next.mode === "presenter" && !hasAvatar) {
+  const hasAvatar = Boolean(String(next.heygenAvatarId ?? "").trim())
+  const clearingAvatar =
+    "heygenAvatarId" in patch &&
+    !String(patch.heygenAvatarId ?? "").trim()
+
+  if (
+    VIDEO_CINEMATIC_UI_ENABLED &&
+    next.mode === "presenter" &&
+    !hasAvatar &&
+    clearingAvatar
+  ) {
     next.mode = "cinematic"
   }
   return next

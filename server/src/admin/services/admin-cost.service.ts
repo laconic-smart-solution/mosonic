@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { CostEntry, type CostEntryDocument } from '../../cost/schemas/cost-entry.schema';
-import { User, type UserDocument } from '../../users/schemas/user.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import type { CostEntryRecord } from '../../repositories/interfaces/cost-entry.repository.interface';
+import type { ICostEntryRepository } from '../../repositories/interfaces/cost-entry.repository.interface';
+import type { IUserRepository } from '../../repositories/interfaces/user.repository.interface';
+import {
+  COST_ENTRY_REPOSITORY,
+  USER_REPOSITORY,
+} from '../../repositories/tokens';
 
 function monthStart(d = new Date()): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -10,12 +13,50 @@ function monthStart(d = new Date()): Date {
   return x;
 }
 
+function groupSum(
+  entries: CostEntryRecord[],
+  field: keyof CostEntryRecord,
+): Map<string, number> {
+  const acc = new Map<string, number>();
+  for (const e of entries) {
+    const key = String(e[field] ?? 'unknown');
+    acc.set(key, (acc.get(key) ?? 0) + e.costUsd);
+  }
+  return acc;
+}
+
+function groupSumWithCount(
+  entries: CostEntryRecord[],
+  field: keyof CostEntryRecord,
+): Map<string, { total: number; count: number }> {
+  const acc = new Map<string, { total: number; count: number }>();
+  for (const e of entries) {
+    const key = String(e[field] ?? 'unknown');
+    const cur = acc.get(key) ?? { total: 0, count: 0 };
+    cur.total += e.costUsd;
+    cur.count += 1;
+    acc.set(key, cur);
+  }
+  return acc;
+}
+
+function dailyTrend(entries: CostEntryRecord[]): Array<{ date: string; costUsd: number }> {
+  const byDay = new Map<string, number>();
+  for (const e of entries) {
+    const day = e.createdAt.toISOString().slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + e.costUsd);
+  }
+  return [...byDay.entries()]
+    .map(([date, costUsd]) => ({ date, costUsd }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 @Injectable()
 export class AdminCostService {
   constructor(
-    @InjectModel(CostEntry.name)
-    private readonly costModel: Model<CostEntryDocument>,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(COST_ENTRY_REPOSITORY)
+    private readonly costEntries: ICostEntryRepository,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   async getPlatformCostSummary(from?: Date, to?: Date) {
@@ -23,129 +64,73 @@ export class AdminCostService {
     const fromDate = from ?? mStart;
     const toDate = to ?? new Date();
 
-    const match = { createdAt: { $gte: fromDate, $lte: toDate } };
+    const entries = await this.costEntries.findInCreatedAtRange(
+      fromDate,
+      toDate,
+    );
 
-    const [
-      totalCost,
-      byProvider,
-      byModel,
-      byNodeType,
-      byEntryType,
-      topUsers,
-      dailyTrend,
-    ] = await Promise.all([
-      this.costModel
-        .aggregate([
-          { $match: match },
-          { $group: { _id: null, total: { $sum: '$costUsd' } } },
-        ])
-        .then((r) => r[0]?.total ?? 0),
+    const totalCost = entries.reduce((sum, e) => sum + e.costUsd, 0);
+    const byProvider = groupSum(entries, 'provider');
+    const byEntryType = groupSum(entries, 'entryType');
+    const byNodeType = groupSumWithCount(entries, 'nodeType');
+    const byModel = groupSumWithCount(entries, 'providerModel');
 
-      this.costModel.aggregate([
-        { $match: match },
-        { $group: { _id: '$provider', total: { $sum: '$costUsd' } } },
-        { $sort: { total: -1 } },
-      ]),
+    const userTotals = groupSum(entries, 'userId');
+    const topUsers = [...userTotals.entries()]
+      .map(([userId, total]) => ({ userId, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
 
-      this.costModel.aggregate([
-        { $match: match },
-        {
-          $group: {
-            _id: '$providerModel',
-            total: { $sum: '$costUsd' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { total: -1 } },
-        { $limit: 10 },
-      ]),
-
-      this.costModel.aggregate([
-        { $match: match },
-        {
-          $group: {
-            _id: '$nodeType',
-            total: { $sum: '$costUsd' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { total: -1 } },
-      ]),
-
-      this.costModel.aggregate([
-        { $match: match },
-        { $group: { _id: '$entryType', total: { $sum: '$costUsd' } } },
-        { $sort: { total: -1 } },
-      ]),
-
-      this.costModel.aggregate([
-        { $match: match },
-        { $group: { _id: '$userId', total: { $sum: '$costUsd' } } },
-        { $sort: { total: -1 } },
-        { $limit: 10 },
-      ]),
-
-      this.costModel.aggregate([
-        { $match: match },
-        {
-          $group: {
-            _id: {
-              $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
-            },
-            total: { $sum: '$costUsd' },
-          },
-        },
-        { $sort: { _id: 1 } },
-      ]),
-    ]);
-
-    const userIds = topUsers.map((u) => u._id).filter(Boolean) as string[];
-    const users = await this.userModel
-      .find({ userId: { $in: userIds } }, { email: 1, firstName: 1, lastName: 1, username: 1 })
-      .lean();
+    const userIds = topUsers.map((u) => u.userId).filter(Boolean);
+    const userRows = await this.users.findManyByUserIds(userIds, {
+      email: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+    });
 
     const userMap = Object.fromEntries(
-      users.map((u) => [
+      userRows.map((u) => [
         u.userId,
         {
           email: u.email,
-          displayName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username || '',
+          displayName:
+            [u.firstName, u.lastName].filter(Boolean).join(' ') ||
+            u.username ||
+            '',
         },
       ]),
     );
 
     return {
       totalCostUsd: totalCost,
-      byProvider: Object.fromEntries(
-        byProvider.map((r) => [r._id ?? 'unknown', r.total]),
-      ),
-      byEntryType: Object.fromEntries(
-        byEntryType.map((r) => [r._id ?? 'unknown', r.total]),
-      ),
-      byNodeType: byNodeType.map((r) => ({
-        nodeType: r._id ?? 'unknown',
-        costUsd: r.total,
-        count: r.count,
-      })),
-      byModel: byModel.map((r) => ({
-        model: r._id ?? 'unknown',
-        costUsd: r.total,
-        count: r.count,
-      })),
+      byProvider: Object.fromEntries(byProvider),
+      byEntryType: Object.fromEntries(byEntryType),
+      byNodeType: [...byNodeType.entries()]
+        .map(([nodeType, stats]) => ({
+          nodeType,
+          costUsd: stats.total,
+          count: stats.count,
+        }))
+        .sort((a, b) => b.costUsd - a.costUsd),
+      byModel: [...byModel.entries()]
+        .map(([model, stats]) => ({
+          model,
+          costUsd: stats.total,
+          count: stats.count,
+        }))
+        .sort((a, b) => b.costUsd - a.costUsd)
+        .slice(0, 10),
       topUsers: topUsers.map((r) => {
-        const uid = r._id as string;
-        const u = userMap[uid];
+        const u = userMap[r.userId];
         return {
-          userId: uid,
+          userId: r.userId,
           email: u?.email ?? 'unknown',
           displayName: u?.displayName ?? '',
           costUsd: r.total,
         };
       }),
-      dailyTrend: dailyTrend.map((row) => ({
-        date: row._id,
-        costUsd: row.total,
-      })),
+      dailyTrend: dailyTrend(entries),
     };
   }
 
@@ -156,19 +141,8 @@ export class AdminCostService {
     lastMonth.setHours(0, 0, 0, 0);
 
     const [thisMonthTotal, lastMonthTotal] = await Promise.all([
-      this.costModel
-        .aggregate([
-          { $match: { billingPeriod: thisMonth } },
-          { $group: { _id: null, total: { $sum: '$costUsd' } } },
-        ])
-        .then((r) => r[0]?.total ?? 0),
-
-      this.costModel
-        .aggregate([
-          { $match: { billingPeriod: lastMonth } },
-          { $group: { _id: null, total: { $sum: '$costUsd' } } },
-        ])
-        .then((r) => r[0]?.total ?? 0),
+      this.costEntries.sumForBillingPeriod(thisMonth),
+      this.costEntries.sumForBillingPeriod(lastMonth),
     ]);
 
     const changePct =

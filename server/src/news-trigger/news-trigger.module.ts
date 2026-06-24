@@ -1,13 +1,11 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
-import { Pipeline, PipelineSchema } from '../pipeline/schemas/pipeline.schema';
-import { Rule, RuleSchema } from '../rule/schemas/rule.schema';
+import { RepositoriesModule } from '../repositories/repositories.module';
 import { WorkflowModule } from '../workflow/workflow.module';
 import { NEWS_TRIGGER_QUEUE } from './news-trigger.constants';
 import { NewsTriggerController } from './news-trigger.controller';
@@ -15,10 +13,6 @@ import { NewsTriggerCron } from './news-trigger.cron';
 import { NewsTriggerManualService } from './news-trigger-manual.service';
 import { NewsTriggerRunService } from './news-trigger-run.service';
 import { NewsTriggerProcessor } from './news-trigger.processor';
-import {
-  NewsTriggerLog,
-  NewsTriggerLogSchema,
-} from './schemas/news-trigger-log.schema';
 import { NewsFetchService } from './services/news-fetch.service';
 import { NewsPickerService } from './services/news-picker.service';
 import { NewsPromptBuilderService } from './services/news-prompt-builder.service';
@@ -52,11 +46,7 @@ class NewsTriggerModuleBootstrap implements OnModuleInit {
     EventsModule,
     OrchestrationModule,
     WorkflowModule,
-    MongooseModule.forFeature([
-      { name: Rule.name, schema: RuleSchema },
-      { name: NewsTriggerLog.name, schema: NewsTriggerLogSchema },
-      { name: Pipeline.name, schema: PipelineSchema },
-    ]),
+    RepositoriesModule,
     BullModule.registerQueue({
       name: NEWS_TRIGGER_QUEUE,
       defaultJobOptions: {

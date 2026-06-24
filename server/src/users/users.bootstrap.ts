@@ -1,8 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, type UserDocument, UserRole } from './schemas/user.schema';
+import { UserRole } from '../domain/users/user.types';
+import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
+import { USER_REPOSITORY } from '../repositories/tokens';
 
 @Injectable()
 export class UsersBootstrap implements OnModuleInit {
@@ -10,7 +10,7 @@ export class UsersBootstrap implements OnModuleInit {
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -27,11 +27,10 @@ export class UsersBootstrap implements OnModuleInit {
       .filter(Boolean);
     if (ids.length === 0) return;
 
-    const res = await this.userModel.updateMany(
-      { authServerUserId: { $in: ids } },
-      { $set: { role: UserRole.ADMIN } },
-    );
-    this.log.log(`Bootstrapped ADMIN role for ${res.modifiedCount} user(s).`);
+    const modifiedCount = await this.users.updateManyByAuthServerUserIds(ids, {
+      role: UserRole.ADMIN,
+    });
+    this.log.log(`Bootstrapped ADMIN role for ${modifiedCount} user(s).`);
   }
 
   private async seedDefaultAdmin(): Promise<void> {
@@ -56,24 +55,23 @@ export class UsersBootstrap implements OnModuleInit {
       return;
     }
 
-    const existing = await this.userModel
-      .findOne({ authServerUserId })
-      .exec();
+    const existing = await this.users.findByAuthServerUserId(authServerUserId);
 
     if (existing) {
-      existing.role = UserRole.ADMIN;
-      if (username) existing.username = username;
-      if (email) existing.email = email;
-      if (firstName) existing.firstName = firstName;
-      if (lastName) existing.lastName = lastName;
-      await existing.save();
+      await this.users.update(existing.userId, {
+        role: UserRole.ADMIN,
+        ...(username ? { username } : {}),
+        ...(email ? { email } : {}),
+        ...(firstName ? { firstName } : {}),
+        ...(lastName ? { lastName } : {}),
+      });
       this.log.log(
         `Default admin ensured (existing): authServerUserId=${authServerUserId}`,
       );
       return;
     }
 
-    await this.userModel.create({
+    await this.users.create({
       authServerUserId,
       username: username || 'admin',
       email,

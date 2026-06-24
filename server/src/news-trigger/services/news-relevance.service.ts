@@ -10,6 +10,27 @@ export interface RelevanceResult {
   suggestedAngle: string;
 }
 
+const MIN_KEYWORD_TOKEN_LENGTH = 3;
+
+/** Split user keywords into lowercase tokens for flexible headline matching. */
+export function tokenizeNewsKeywords(keywords: string[]): string[] {
+  const tokens = new Set<string>();
+  for (const keyword of keywords) {
+    const normalized = keyword.trim().toLowerCase();
+    if (!normalized) continue;
+    if (normalized.length >= MIN_KEYWORD_TOKEN_LENGTH) {
+      tokens.add(normalized);
+    }
+    for (const part of normalized.split(/[\s,/|]+/)) {
+      const token = part.trim();
+      if (token.length >= MIN_KEYWORD_TOKEN_LENGTH) {
+        tokens.add(token);
+      }
+    }
+  }
+  return [...tokens];
+}
+
 @Injectable()
 export class NewsRelevanceService {
   private readonly logger = new Logger(NewsRelevanceService.name);
@@ -17,21 +38,20 @@ export class NewsRelevanceService {
   constructor(private readonly llm: LlmService) {}
 
   keywordPreFilter(article: PickedArticle, rule: Rule): boolean {
+    const userKeywords = (rule.newsTrigger?.keywords ?? [])
+      .map((k) => String(k).trim())
+      .filter(Boolean);
+
+    if (!userKeywords.length) return true;
+
     const articleText = [article.title, article.description]
       .join(' ')
       .toLowerCase();
 
-    const keywords = [
-      ...(rule.newsTrigger?.keywords ?? []),
-      rule.brand?.industry,
-      ...(rule.campaign?.goals ?? []),
-    ]
-      .filter(Boolean)
-      .map((k) => String(k).toLowerCase());
+    const tokens = tokenizeNewsKeywords(userKeywords);
+    if (!tokens.length) return true;
 
-    if (!keywords.length) return true;
-
-    return keywords.some((kw) => articleText.includes(kw));
+    return tokens.some((token) => articleText.includes(token));
   }
 
   async checkRelevance(

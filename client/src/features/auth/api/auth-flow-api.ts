@@ -2,6 +2,7 @@ import axios from "axios"
 
 import { appConfig } from "@/app/config/app-config"
 import apiClient from "@/shared/api/api-client"
+import { getApiErrorMessage } from "@/shared/lib/api-error"
 import { extractTokensFromAuthResponse } from "@/shared/lib/extract-auth-tokens"
 
 function pick(obj: unknown, path: string[]): unknown {
@@ -14,14 +15,19 @@ function pick(obj: unknown, path: string[]): unknown {
 }
 
 export function authFlowErrorMessage(err: unknown, fallback: string): string {
-  if (err && typeof err === "object" && "response" in err) {
-    const data = (err as { response?: { data?: { message?: unknown } } }).response?.data
-    const m = data?.message
-    if (typeof m === "string") return m
-    if (Array.isArray(m)) return m.filter((x) => typeof x === "string").join(", ")
-  }
-  if (err instanceof Error) return err.message
-  return fallback
+  return getApiErrorMessage(err, fallback)
+}
+
+export function parseAuthApiViolations(err: unknown, fallback: string): string {
+  return getApiErrorMessage(err, fallback)
+}
+
+export function setAuthFormApiError(
+  setError: (name: "root", error: { message: string }) => void,
+  err: unknown,
+  fallback: string,
+): void {
+  setError("root", { message: getApiErrorMessage(err, fallback) })
 }
 
 export type SignupBody = {
@@ -60,7 +66,10 @@ export async function verifyOtp(body: { email: string; otp: string }) {
   return { raw: data, accessToken, refreshToken, email, userId }
 }
 
-export async function changePassword(newPassword: string, accessToken: string): Promise<void> {
+export async function changePassword(
+  newPassword: string,
+  accessToken: string,
+): Promise<void> {
   await axios.post(
     `${appConfig.apiBaseUrl}/auth/change-password`,
     { newPassword },

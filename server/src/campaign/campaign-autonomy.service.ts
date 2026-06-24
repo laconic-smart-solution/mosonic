@@ -1,11 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { AnalyticsRepository } from '../analytics/analytics.repository';
-import { FeedbackSignalStatus } from '../analytics/schemas/analytics.schema';
 import { ContentService } from '../content/content.service';
 import { ContentStatus } from '../content/schemas/content.schema';
+import type { ContentApprovalState } from '../content/schemas/content.schema';
 import { allRequiredStepsApproved } from '../content/content-approval.util';
 import { EventsService } from '../events/events.service';
 import { McpService } from '../mcp/mcp.service';
@@ -13,13 +10,11 @@ import {
   PipelineNodeExecutionStatus,
   type PipelineDocument,
 } from '../pipeline/schemas/pipeline.schema';
+import type { ICampaignAutonomyPolicyRepository } from '../repositories/interfaces/campaign-autonomy-policy.repository.interface';
+import { CAMPAIGN_AUTONOMY_POLICY_REPOSITORY } from '../repositories/tokens';
 import { UploadService } from '../upload/upload.service';
 import { UserRole } from '../users/schemas/user.schema';
-import {
-  AutonomyMode,
-  CampaignAutonomyPolicy,
-  type CampaignAutonomyPolicyDocument,
-} from './schemas/campaign-autonomy-policy.schema';
+import { AutonomyMode } from './schemas/campaign-autonomy-policy.schema';
 
 @Injectable()
 export class CampaignAutonomyService {
@@ -27,12 +22,11 @@ export class CampaignAutonomyService {
 
   constructor(
     private readonly config: ConfigService,
-    @InjectModel(CampaignAutonomyPolicy.name)
-    private readonly policyModel: Model<CampaignAutonomyPolicyDocument>,
+    @Inject(CAMPAIGN_AUTONOMY_POLICY_REPOSITORY)
+    private readonly policies: ICampaignAutonomyPolicyRepository,
     private readonly contentService: ContentService,
     private readonly uploadService: UploadService,
     private readonly mcpService: McpService,
-    private readonly analyticsRepo: AnalyticsRepository,
     private readonly events: EventsService,
   ) {}
 
@@ -48,9 +42,7 @@ export class CampaignAutonomyService {
       return;
     }
 
-    const policy = await this.policyModel
-      .findOne({ ruleRef: args.pipeline.ruleRef })
-      .exec();
+    const policy = await this.policies.findByRuleRef(args.pipeline.ruleRef);
     if (!policy?.enabled || policy.mode === AutonomyMode.Off) {
       return;
     }
@@ -79,7 +71,7 @@ export class CampaignAutonomyService {
         auth,
       );
       if (content.status !== ContentStatus.Approved) {
-        if (!allRequiredStepsApproved(content.approval)) {
+        if (!allRequiredStepsApproved(content.approval as unknown as ContentApprovalState | undefined)) {
           this.emitBlocked(args, 'Approval steps incomplete');
           return;
         }
@@ -128,7 +120,9 @@ export class CampaignAutonomyService {
   }
 
   private async evaluateBlockReason(
-    policy: CampaignAutonomyPolicyDocument,
+    policy: {
+      quietHours?: unknown;
+    },
     pipeline: PipelineDocument,
     contentId: string,
   ): Promise<string | null> {
@@ -137,16 +131,6 @@ export class CampaignAutonomyService {
     );
     if (failed) {
       return 'Pipeline has failed nodes';
-    }
-
-    if (policy.blockIfPendingSuggestions) {
-      const analytics = await this.analyticsRepo.findByRuleRef(pipeline.ruleRef);
-      const pending = (analytics?.feedbackSignal?.suggestions ?? []).filter(
-        (s) => s.status === FeedbackSignalStatus.Pending,
-      );
-      if (pending.length > 0) {
-        return 'Pending analytics suggestions';
-      }
     }
 
     const accounts = await this.mcpService.getConnectedAccounts(
@@ -167,11 +151,15 @@ export class CampaignAutonomyService {
       return 'Content failed moderation gate';
     }
 
-    if (policy.quietHours) {
+    const quietHours = policy.quietHours as
+      | { start?: string; end?: string }
+      | null
+      | undefined;
+    if (quietHours?.start && quietHours?.end) {
       const now = new Date();
       const hour = now.getUTCHours();
-      const start = parseInt(policy.quietHours.start.split(':')[0] ?? '22', 10);
-      const end = parseInt(policy.quietHours.end.split(':')[0] ?? '7', 10);
+      const start = parseInt(quietHours.start.split(':')[0] ?? '22', 10);
+      const end = parseInt(quietHours.end.split(':')[0] ?? '7', 10);
       if (start > end) {
         if (hour >= start || hour < end) {
           return 'Quiet hours';

@@ -1,5 +1,7 @@
 import i18n from "@/i18n"
 
+const WORKFLOW_GUIDE_NS = "workflow"
+
 export type WorkflowNodeGuide = {
   usage: string
   example: string
@@ -27,10 +29,13 @@ export function getWorkflowNodeGuide(
     return undefined
   }
   const base = `guide.${canvasType}`
-  const tips = i18n.t(`${base}.tips`, { defaultValue: "" })
+  const tips = i18n.t(`${base}.tips`, {
+    ns: WORKFLOW_GUIDE_NS,
+    defaultValue: "",
+  })
   return {
-    usage: i18n.t(`${base}.usage`),
-    example: i18n.t(`${base}.example`),
+    usage: i18n.t(`${base}.usage`, { ns: WORKFLOW_GUIDE_NS }),
+    example: i18n.t(`${base}.example`, { ns: WORKFLOW_GUIDE_NS }),
     ...(tips ? { tips } : {}),
   }
 }

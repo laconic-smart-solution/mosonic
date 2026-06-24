@@ -1,4 +1,4 @@
-import { getSharedSocket } from "./socket-client"
+import { getSharedSocket, joinSocketRoom, leaveSocketRoom } from "./socket-client"
 
 export type RuleStartedEvent = { ruleId: string }
 export type RuleReadingInputEvent = { ruleId: string; message?: string }
@@ -8,14 +8,11 @@ export type RuleCompletedEvent = { ruleId: string }
 export type RuleFailedEvent = { ruleId: string; message?: string }
 
 export function joinRuleRoom(ruleId: string) {
-  const socket = getSharedSocket()
-  socket.emit("join", { room: `rule_${ruleId}` })
-  return socket
+  return joinSocketRoom(`rule_${ruleId}`)
 }
 
 export function leaveRuleRoom(ruleId: string) {
-  const socket = getSharedSocket()
-  socket.emit("leave", { room: `rule_${ruleId}` })
+  leaveSocketRoom(`rule_${ruleId}`)
 }
 
 export function onRuleStarted(handler: (payload: RuleStartedEvent) => void) {
