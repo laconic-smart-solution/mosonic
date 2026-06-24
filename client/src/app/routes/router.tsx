@@ -3,8 +3,12 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 import AppLayout from "@/components/core/layouts/app-layout"
 import { AdminShell } from "@/features/admin/components/admin-shell"
 import { AdminRoute, GuestOnlyRoute, ProtectedLayout } from "@/features/auth/components/auth-routes"
+import { MarketingLayout } from "@/features/marketing/components/marketing-layout"
 import {
   HomePage,
+  LandingPage,
+  PricingPage,
+  AboutPage,
   DashboardPage,
   RulesPage,
   NewsTriggerPage,
@@ -41,8 +45,17 @@ import {
 
 export const router = createBrowserRouter([
   {
-    path: "/",
-    element: <HomePage />,
+    element: <MarketingLayout />,
+    children: [
+      { path: "/", element: <LandingPage /> },
+      { path: "/home", element: <HomePage /> },
+      { path: "/pricing", element: <PricingPage /> },
+      { path: "/about", element: <AboutPage /> },
+    ],
+  },
+  {
+    path: "/landing",
+    element: <Navigate to="/" replace />,
   },
   {
     path: "/login",

@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
   {
     id: "home",
     labelKey: "nav.home",
-    path: "/",
+    path: "/home",
     icon: (active) => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
@@ -284,7 +284,7 @@ export function SidebarPanel() {
   }
 
   const handleHome = () => {
-    navigate("/")
+    navigate("/home")
     closeMobileIfNeeded()
   }
 

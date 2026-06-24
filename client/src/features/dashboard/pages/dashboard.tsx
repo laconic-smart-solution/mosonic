@@ -153,7 +153,7 @@ export default function DashboardPage() {
               {t("dashboard:header.subtitle")}
             </p>
           </div>
-          <Button size="lg" className="shrink-0 gap-2 shadow-sm" onClick={() => navigate("/")}>
+          <Button size="lg" className="shrink-0 gap-2 shadow-sm" onClick={() => navigate("/home")}>
             <Zap className="size-4" aria-hidden />
             {t("dashboard:header.startGeneration")}
           </Button>

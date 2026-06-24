@@ -7,7 +7,6 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits } from "@/shared/lib/api-error"
 
 import { HomeBackdrop } from "@/features/home/components/home-backdrop"
-import { PageShell } from "@/components/app/page-shell"
 import { HomeFooter } from "@/features/home/components/home-footer"
 import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
 import type { Attachment } from "@/components/core/prompt-area"
@@ -16,7 +15,6 @@ import { GenerationCreditConfirmDialog } from "@/features/credit/components/gene
 import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
 import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
 import { HomeStage } from "@/features/home/components/home-stage"
-import { HomeNavbar } from "@/features/home/components/home-navbar"
 import {
   HOME_TEMPLATE_DEFS,
   PROMPT_SUGGESTION_KEYS,
@@ -331,9 +329,8 @@ export default function HomePage() {
   }
 
   return (
-    <PageShell variant="marketing" className="bg-background font-sans">
+    <>
       <HomeBackdrop />
-      <HomeNavbar />
 
       {isAuthenticated && showExtractionOverlay ? (
         <RuleExtractionProgress
@@ -348,7 +345,7 @@ export default function HomePage() {
         />
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col items-center pt-14">
+      <div className="flex min-h-0 flex-1 flex-col items-center">
         <HomeStage
           mounted={mounted}
           orbPulse={orbPulse}
@@ -469,6 +466,6 @@ export default function HomePage() {
           />
         </>
       ) : null}
-    </PageShell>
+    </>
   )
 }

@@ -1,7 +1,9 @@
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 
 import Logo from "@/assets/icon/logo"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { TopbarCreditBalance } from "@/components/core/topbar-credit-balance"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,8 +17,13 @@ import { initialsFromDisplayName } from "@/shared/lib/user-initials"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
-export function HomeNavbar() {
-  const { t } = useTranslation(["home", "common"])
+const MARKETING_NAV = [
+  { path: "/pricing", labelKey: "marketing:nav.pricing" },
+  { path: "/about", labelKey: "marketing:nav.about" },
+] as const
+
+export function MarketingNavbar() {
+  const { t } = useTranslation(["home", "common", "marketing"])
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   const user = useUserStore((s) => s.user)
@@ -30,11 +37,11 @@ export function HomeNavbar() {
   }
 
   return (
-    <header className="fixed top-0 right-0 left-0 z-20 flex items-center justify-between border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-md sm:px-6">
+    <header className="fixed top-0 right-0 left-0 z-20 flex h-14 items-center justify-between border-b border-border/60 bg-background/40 px-4 backdrop-blur-md sm:px-6">
       <button
         type="button"
         onClick={() => navigate("/")}
-        className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#00A589]/25"
+        className="relative z-10 flex w-fit shrink-0 items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#00A589]/25"
         aria-label={t("common:appName")}
       >
         <Logo className="size-7 shrink-0" />
@@ -43,7 +50,36 @@ export function HomeNavbar() {
         </span>
       </button>
 
-      <div className="flex items-center gap-2 sm:gap-2.5">
+      <nav
+        className="pointer-events-none absolute inset-x-0 hidden items-center justify-center md:flex"
+        aria-label={t("marketing:nav.ariaLabel")}
+      >
+        <div className="pointer-events-auto flex items-center gap-0.5">
+          {MARKETING_NAV.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                cn(
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+                  isActive
+                    ? "bg-foreground/5 text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )
+              }
+            >
+              {t(item.labelKey)}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      <div className="relative z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <LanguageSwitcher
+          size="sm"
+          className="h-8 min-w-[6.75rem] rounded-full border-border/60 bg-background/60 text-xs shadow-none"
+        />
+        <ThemeToggle className="size-8 rounded-full hover:bg-foreground/5" />
         {accessToken ? (
           <>
             <TopbarCreditBalance
