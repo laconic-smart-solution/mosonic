@@ -23,6 +23,10 @@ export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pa
 export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
 export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
 
+export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
+export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
+export const AboutPage = PageLoader(lazy(() => import("@/features/marketing/pages/about")))
+
 export const LoginPage = PageLoader(lazy(() => import("@/features/auth/pages/login")))
 export const SignupPage = PageLoader(lazy(() => import("@/features/auth/pages/signup")))
 export const ForgotPasswordPage = PageLoader(

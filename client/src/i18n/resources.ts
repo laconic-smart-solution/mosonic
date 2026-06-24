@@ -9,6 +9,7 @@ import enCredit from "./locales/en/credit.json"
 import enUsage from "./locales/en/usage.json"
 import enDashboard from "./locales/en/dashboard.json"
 import enHome from "./locales/en/home.json"
+import enMarketing from "./locales/en/marketing.json"
 import enLogs from "./locales/en/logs.json"
 import enNotifications from "./locales/en/notifications.json"
 import enPipeline from "./locales/en/pipeline.json"
@@ -30,6 +31,7 @@ import thCredit from "./locales/th/credit.json"
 import thUsage from "./locales/th/usage.json"
 import thDashboard from "./locales/th/dashboard.json"
 import thHome from "./locales/th/home.json"
+import thMarketing from "./locales/th/marketing.json"
 import thLogs from "./locales/th/logs.json"
 import thNotifications from "./locales/th/notifications.json"
 import thPipeline from "./locales/th/pipeline.json"
@@ -51,6 +53,7 @@ import zhCredit from "./locales/zh-CN/credit.json"
 import zhUsage from "./locales/zh-CN/usage.json"
 import zhDashboard from "./locales/zh-CN/dashboard.json"
 import zhHome from "./locales/zh-CN/home.json"
+import zhMarketing from "./locales/zh-CN/marketing.json"
 import zhLogs from "./locales/zh-CN/logs.json"
 import zhNotifications from "./locales/zh-CN/notifications.json"
 import zhPipeline from "./locales/zh-CN/pipeline.json"
@@ -66,6 +69,7 @@ export const I18N_NAMESPACES = [
   "validation",
   "auth",
   "home",
+  "marketing",
   "dashboard",
   "rules",
   "workflow",
@@ -92,6 +96,7 @@ export const resources = {
     validation: enValidation,
     auth: enAuth,
     home: enHome,
+    marketing: enMarketing,
     dashboard: enDashboard,
     rules: enRules,
     workflow: enWorkflow,
@@ -114,6 +119,7 @@ export const resources = {
     validation: thValidation,
     auth: thAuth,
     home: thHome,
+    marketing: thMarketing,
     dashboard: thDashboard,
     rules: thRules,
     workflow: thWorkflow,
@@ -136,6 +142,7 @@ export const resources = {
     validation: zhValidation,
     auth: zhAuth,
     home: zhHome,
+    marketing: zhMarketing,
     dashboard: zhDashboard,
     rules: zhRules,
     workflow: zhWorkflow,

@@ -1762,7 +1762,7 @@ export default function WorkflowPage() {
           type="button"
           className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
           style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/home")}
           title={t("fab.goHome")}
         >
           <Home className="size-4" />

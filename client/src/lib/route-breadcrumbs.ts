@@ -184,6 +184,7 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   },
 
   // Marketing home
+  { pattern: "/home", labelKey: "nav.home", href: "/home" },
   { pattern: "/", labelKey: "nav.home", href: "/" },
 ]
 

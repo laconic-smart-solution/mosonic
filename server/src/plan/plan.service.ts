@@ -82,6 +82,23 @@ export class PlanService implements OnModuleInit {
     return withCredits;
   }
 
+  async listPublicPlans() {
+    const plans = await this.plans.findAllSortedByPrice();
+    const activePlans = plans.filter((plan) => plan.isActive);
+
+    return Promise.all(
+      activePlans.map(async (plan) => ({
+        planId: plan.planId,
+        name: plan.name,
+        priceThb: plan.priceThb,
+        priceUsd: plan.priceUsd,
+        creditsPerMonth: await this.getCreditsForPlan(plan),
+        description: plan.description ?? null,
+        features: plan.features ?? [],
+      })),
+    );
+  }
+
   async createPlan(dto: CreatePlanDto) {
     return this.plans.create({
       ...dto,
