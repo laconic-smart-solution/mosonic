@@ -41,6 +41,8 @@ import {
   AdminApiUsagePage,
   AdminContentPage,
   AdminContentDetailPage,
+  AdminFaqPage,
+  AdminFaqDocumentDetailPage,
 } from "../constants/lazyload"
 
 export const router = createBrowserRouter([
@@ -149,6 +151,8 @@ export const router = createBrowserRouter([
           { path: "api-usage", element: <AdminApiUsagePage /> },
           { path: "content", element: <AdminContentPage /> },
           { path: "content/:contentId", element: <AdminContentDetailPage /> },
+          { path: "faq", element: <AdminFaqPage /> },
+          { path: "faq/documents/:documentId", element: <AdminFaqDocumentDetailPage /> },
         ],
       },
     ],

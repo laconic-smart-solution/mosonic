@@ -55,3 +55,7 @@ export const AdminContentPage = PageLoader(lazy(() => import("@/features/admin/p
 export const AdminContentDetailPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-content-detail")),
 )
+export const AdminFaqPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-faq-page")))
+export const AdminFaqDocumentDetailPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-faq-document-detail")),
+)

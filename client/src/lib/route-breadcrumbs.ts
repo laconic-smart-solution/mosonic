@@ -29,6 +29,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     href: "/admin/content/:contentId",
   },
   {
+    pattern: "/admin/faq/documents/:documentId",
+    labelKey: "breadcrumb.detail",
+    parent: "/admin/faq",
+    dynamic: true,
+    href: "/admin/faq/documents/:documentId",
+  },
+  {
     pattern: "/admin/users/:userId",
     labelKey: "breadcrumb.detail",
     parent: "/admin/users",
@@ -97,6 +104,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     labelKey: "layout.nav.content",
     ns: "admin",
     href: "/admin/content",
+    parent: "/admin",
+  },
+  {
+    pattern: "/admin/faq",
+    labelKey: "layout.nav.faq",
+    ns: "admin",
+    href: "/admin/faq",
     parent: "/admin",
   },
   { pattern: "/admin", labelKey: "layout.title", ns: "admin", href: "/admin/dashboard" },

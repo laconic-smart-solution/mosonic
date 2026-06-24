@@ -7,6 +7,7 @@ import {
   Gauge,
   History,
   LayoutDashboard,
+  MessageCircleQuestion,
   Plug,
   Users,
   Workflow,
@@ -17,8 +18,10 @@ import { Link, Outlet, useLocation } from "react-router-dom"
 import { BreadcrumbOverrideProvider } from "@/components/app/breadcrumb-override.context"
 import { cn } from "@/lib/utils"
 
+import { AdminFaqChatbot } from "@/features/admin/components/admin-faq-chatbot"
+
 const NAV_ITEMS: {
-  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "apiUsage" | "content"
+  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "apiUsage" | "content" | "faq"
   href: string
   icon: LucideIcon
 }[] = [
@@ -31,6 +34,7 @@ const NAV_ITEMS: {
   { key: "cost", href: "/admin/cost", icon: Coins },
   { key: "apiUsage", href: "/admin/api-usage", icon: Plug },
   { key: "content", href: "/admin/content", icon: FileText },
+  { key: "faq", href: "/admin/faq", icon: MessageCircleQuestion },
 ]
 
 function pathActive(pathname: string, href: string) {
@@ -81,10 +85,11 @@ export function AdminLayout() {
           </Link>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto">
+      <main className="relative min-w-0 flex-1 overflow-auto">
         <BreadcrumbOverrideProvider>
           <Outlet />
         </BreadcrumbOverrideProvider>
+        <AdminFaqChatbot />
       </main>
     </div>
   )

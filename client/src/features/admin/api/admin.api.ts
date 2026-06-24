@@ -147,4 +147,39 @@ export const adminApi = {
     apiClient
       .put(`/admin/api-usage/${provider}/prepaid`, { prepaidCreditUsd })
       .then((r) => r.data),
+
+  listFaqDocuments: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/admin/faq/documents", { params }).then((r) => r.data),
+
+  getFaqDocument: (documentId: string) =>
+    apiClient.get(`/admin/faq/documents/${documentId}`).then((r) => r.data),
+
+  listFaqDocumentFaqs: (
+    documentId: string,
+    params?: { page?: number; limit?: number },
+  ) =>
+    apiClient
+      .get(`/admin/faq/documents/${documentId}/faqs`, { params })
+      .then((r) => r.data),
+
+  downloadFaqDocument: (documentId: string) =>
+    apiClient.get(`/admin/faq/documents/${documentId}/download`, {
+      responseType: "blob",
+    }),
+
+  uploadFaqDocument: (file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    return apiClient
+      .post("/admin/faq/documents", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data)
+  },
+
+  listFaqs: (params?: { page?: number; limit?: number; q?: string }) =>
+    apiClient.get("/admin/faq/faqs", { params }).then((r) => r.data),
+
+  askFaq: (body: { question: string; topK?: number }) =>
+    apiClient.post("/admin/faq/ask", body).then((r) => r.data),
 }
