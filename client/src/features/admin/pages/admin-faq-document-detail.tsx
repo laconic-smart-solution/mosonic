@@ -93,7 +93,7 @@ export default function AdminFaqDocumentDetailPage() {
     )
   }
 
-  const document = doc as FaqDocument
+  const faqDocument = doc as FaqDocument
 
   return (
     <PageShell>
@@ -101,14 +101,14 @@ export default function AdminFaqDocumentDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-[26px] leading-tight tracking-tight text-foreground">
-              {document.filename}
+              {faqDocument.filename}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">{t("faq.documentDetail")}</p>
           </div>
           <Button
             type="button"
             variant="outline"
-            disabled={!document.storage_path}
+            disabled={!faqDocument.storage_path}
             onClick={onDownload}
           >
             <Download className="size-4" aria-hidden />
@@ -117,13 +117,13 @@ export default function AdminFaqDocumentDetailPage() {
         </div>
 
         <div className={cn(panelClass, "grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3")}>
-          <DetailField label={t("faq.columns.status")} value={document.status} />
-          <DetailField label={t("faq.columns.faqCount")} value={document.faq_count} />
-          <DetailField label={t("faq.columns.size")} value={formatBytes(document.file_size)} />
-          <DetailField label={t("faq.columns.uploadedBy")} value={document.uploaded_by} />
-          <DetailField label={t("faq.columns.createdAt")} value={formatDate(document.created_at)} />
-          {document.error_message ? (
-            <DetailField label={t("faq.error")} value={document.error_message} />
+          <DetailField label={t("faq.columns.status")} value={faqDocument.status} />
+          <DetailField label={t("faq.columns.faqCount")} value={faqDocument.faq_count} />
+          <DetailField label={t("faq.columns.size")} value={formatBytes(faqDocument.file_size)} />
+          <DetailField label={t("faq.columns.uploadedBy")} value={faqDocument.uploaded_by} />
+          <DetailField label={t("faq.columns.createdAt")} value={formatDate(faqDocument.created_at)} />
+          {faqDocument.error_message ? (
+            <DetailField label={t("faq.error")} value={faqDocument.error_message} />
           ) : null}
         </div>
 
