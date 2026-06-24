@@ -35,6 +35,6 @@ import { ContentService } from './content.service';
     FileProxyService,
     ImageFileService,
   ],
-  exports: [ContentService],
+  exports: [ContentService, FileProxyService],
 })
 export class ContentModule {}
