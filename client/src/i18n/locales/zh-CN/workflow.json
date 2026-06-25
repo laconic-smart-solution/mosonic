@@ -524,10 +524,15 @@
     "cinematic": "电影感"
   },
   "rebuildTooltip": "根据当前规则和渠道设置刷新工作流节点。",
+  "freshness": {
+    "warningTitle": "无实时网络调研",
+    "warning": "此工作流没有 Intelligence 节点。内容将仅依据您的规则与简报生成，不会搜索网络上的最新趋势或新闻。仍会锚定当前日期，但时效性可能有限。"
+  },
   "qaWizard": {
     "title": "生成工作流",
     "yes": "是",
     "no": "否",
+    "webSearchHint": "选择“否”将跳过 Intelligence 步骤，不进行实时网络调研。内容仅依赖活动规则、简报和模型。",
     "back": "上一步",
     "next": "下一步",
     "generate": "生成工作流",

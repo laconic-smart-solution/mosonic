@@ -4,7 +4,9 @@
     "landing": "首页",
     "create": "创作",
     "pricing": "定价",
-    "about": "关于"
+    "about": "关于",
+    "menu": "菜单",
+    "openMenu": "打开菜单"
   },
   "landing": {
     "hero": {

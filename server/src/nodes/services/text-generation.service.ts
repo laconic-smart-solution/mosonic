@@ -1,4 +1,4 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -13,6 +13,7 @@ import {
   extractUsageFromAiMessage,
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
+import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
 import type {
   NodeExecutionInput,
@@ -74,6 +75,14 @@ function buildSystemPrompt(
     'You are a professional content writer.',
     'Write content strictly following the brand guidelines below.',
     'Never break character or deviate from the brand tone.',
+    '',
+    formatGenerationTemporalContext(),
+    intelligenceBrief
+      ? ''
+      : [
+          'No live intelligence brief was provided for this run.',
+          'Content must still reflect today\'s date above; do not invent outdated campaign years or stale news.',
+        ].join(' '),
     '',
     '=== BRAND ===',
     `Brand name: ${rule.brand.brandName}`,
@@ -202,6 +211,8 @@ function chunkToString(content: unknown): string {
 
 @Injectable()
 export class TextGenerationService {
+  private readonly logger = new Logger(TextGenerationService.name);
+
   constructor(private readonly llm: LlmService) {}
 
   /**
@@ -250,6 +261,15 @@ export class TextGenerationService {
     }
     const contentPrompt = input.contentPrompt ?? '';
     const normalized = normalizeTextGenerationConfig(input.config ?? {});
+    const hasIntelligenceBrief = Boolean(
+      input.previousOutputs?.intelligenceBrief?.trim() ||
+        input.previousOutputs?.intelligenceHints?.trim(),
+    );
+    if (!hasIntelligenceBrief) {
+      this.logger.warn(
+        `Text generation without intelligence brief | pipeline=${input.pipelineRef ?? 'n/a'} | node=${input.nodeId ?? 'n/a'}`,
+      );
+    }
     const systemPrompt = buildSystemPrompt(
       input.rule,
       normalized,

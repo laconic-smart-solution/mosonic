@@ -23,6 +23,11 @@
   },
   "systemMessagesEnglish": "System messages from the server may appear in English.",
   "searchPlaceholder": "Search pages…",
+  "topbar": {
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "theme": "Theme"
+  },
   "search": {
     "ariaLabel": "Search pages and routes",
     "placeholder": "Search pages and routes…",

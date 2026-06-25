@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  PipelineNodeExecutionStatus,
+import {
   PipelineStatus,
-  Prisma,
+  type PipelineNodeExecutionStatus,
+  type Prisma,
 } from '@prisma/client';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { UserRole } from '../../domain/users/user.types';
@@ -109,6 +109,17 @@ export class PrismaPipelineRepository implements IPipelineRepository {
     const result = await this.prisma.pipeline.updateMany({
       where: { pipelineId, creditsReconciled: { not: true } },
       data: { creditsReconciled: true },
+    });
+    return result.count > 0;
+  }
+
+  async claimPipelineFinalization(pipelineId: string): Promise<boolean> {
+    const result = await this.prisma.pipeline.updateMany({
+      where: { pipelineId, status: PipelineStatus.running },
+      data: {
+        status: PipelineStatus.completed,
+        completedAt: new Date(),
+      },
     });
     return result.count > 0;
   }

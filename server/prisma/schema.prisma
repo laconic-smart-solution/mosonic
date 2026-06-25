@@ -390,6 +390,7 @@ model Rule {
   channels         Json       @default("[]")
   contentGuidelines Json      @default("{}")
   originalInput    Json       @default("{}")
+  intake           Json?
   status           RuleStatus @default(active)
   versions         Json       @default("[]")
   approvalPolicy   Json       @default("[]")

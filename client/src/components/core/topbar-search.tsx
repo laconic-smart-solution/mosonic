@@ -25,7 +25,18 @@ import {
 
 const SEARCH_DEBOUNCE_MS = 300
 
-export function TopbarSearch() {
+type TopbarSearchProps = {
+  /** Icon-only trigger for narrow viewports. */
+  compact?: boolean
+  className?: string
+  onNavigate?: () => void
+}
+
+export function TopbarSearch({
+  compact = false,
+  className,
+  onNavigate,
+}: TopbarSearchProps) {
   const { t, i18n } = useTranslation("common")
   const navigate = useNavigate()
 
@@ -74,6 +85,7 @@ export function TopbarSearch() {
     setOpen(false)
     setQuery("")
     setDebounced("")
+    onNavigate?.()
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -92,8 +104,12 @@ export function TopbarSearch() {
         ref={triggerRef}
         type="button"
         className={cn(
-          "flex w-[280px] max-w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-left outline-none transition-shadow",
+          "cursor-pointer rounded-lg border text-left outline-none transition-shadow",
           "hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+          compact
+            ? "flex size-9 shrink-0 items-center justify-center p-0"
+            : "flex w-full max-w-full items-center gap-2 px-3 py-1.5 sm:w-[min(280px,100%)]",
+          className,
         )}
         style={{
           background: "#EDF2F7",
@@ -125,25 +141,29 @@ export function TopbarSearch() {
             strokeLinecap="round"
           />
         </svg>
-        <span
-          className="min-w-0 flex-1 truncate text-xs"
-          style={{ color: T.textMuted }}
-        >
-          {t("search.placeholder")}
-        </span>
-        <kbd
-          className="rounded border px-1.5 py-0.5 font-mono text-[9px]"
-          style={{
-            color: T.textMuted,
-            background: "#E8E6E0",
-            borderColor: "#D8D5CE",
-          }}
-        >
-          ⌘K
-        </kbd>
+        {!compact ? (
+          <>
+            <span
+              className="min-w-0 flex-1 truncate text-xs"
+              style={{ color: T.textMuted }}
+            >
+              {t("search.placeholder")}
+            </span>
+            <kbd
+              className="hidden rounded border px-1.5 py-0.5 font-mono text-[9px] sm:inline"
+              style={{
+                color: T.textMuted,
+                background: "#E8E6E0",
+                borderColor: "#D8D5CE",
+              }}
+            >
+              ⌘K
+            </kbd>
+          </>
+        ) : null}
       </PopoverTrigger>
       <PopoverContent
-        align="center"
+        align={compact ? "end" : "center"}
         sideOffset={6}
         className="w-[min(420px,calc(100vw-2rem))] gap-0 p-0"
         style={

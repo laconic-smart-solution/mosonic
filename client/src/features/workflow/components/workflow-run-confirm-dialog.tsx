@@ -22,6 +22,7 @@ type Props = {
   ruleId: string | undefined
   onConfirm: () => void
   isStarting?: boolean
+  showFreshnessWarning?: boolean
 }
 
 function formatCredits(value: number): string {
@@ -35,8 +36,10 @@ export function WorkflowRunConfirmDialog({
   ruleId,
   onConfirm,
   isStarting = false,
+  showFreshnessWarning = false,
 }: Props) {
   const { t } = useTranslation("credit")
+  const { t: tWorkflow } = useTranslation("workflow")
   const [topupOpen, setTopupOpen] = useState(false)
   const estimateQuery = usePipelineEstimateQuery(workflowId, ruleId, open)
 
@@ -146,6 +149,18 @@ export function WorkflowRunConfirmDialog({
                       {formatCredits(balanceAfter)}
                     </span>
                   </div>
+                </div>
+              )}
+
+              {showFreshnessWarning && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="size-4" />
+                    {tWorkflow("freshness.warningTitle")}
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {tWorkflow("freshness.warning")}
+                  </p>
                 </div>
               )}
 

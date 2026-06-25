@@ -35,6 +35,7 @@
     "emptyDefault": "Run a workflow to generate content, or relax the status filter.",
     "campaign": "Campaign",
     "channels": "{{count}} channels",
+    "variant": "Variant {{id}}",
     "outputs": "Outputs",
     "workflow": "Workflow",
     "pipeline": "Pipeline",

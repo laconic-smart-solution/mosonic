@@ -24,7 +24,7 @@ export function HomeOrb({ orbPulse }: HomeOrbProps) {
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="relative flex size-[292px] items-center justify-center">
+      <div className="relative flex size-[220px] items-center justify-center sm:size-[260px] md:size-[292px]">
         <div
           className={cn(
             "absolute inset-0 rounded-full border border-dashed border-primary/30 dark:border-border",
@@ -52,7 +52,8 @@ export function HomeOrb({ orbPulse }: HomeOrbProps) {
           aria-label={`${t("appName")} — tap for a surprise`}
           onClick={handleClick}
           className={cn(
-            "relative flex size-[260px] cursor-pointer items-center justify-center rounded-full border outline-none",
+            "relative flex cursor-pointer items-center justify-center rounded-full border outline-none",
+            "size-[200px] sm:size-[240px] md:size-[260px]",
             "focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             "border-primary/30 bg-gradient-to-br from-white via-white to-teal-50/50",
             "shadow-[0_12px_48px_rgba(0,165,137,0.16),0_4px_20px_rgba(15,31,61,0.08),inset_0_1px_0_rgba(255,255,255,1)]",
@@ -80,7 +81,7 @@ export function HomeOrb({ orbPulse }: HomeOrbProps) {
           />
           <div className="relative z-[1] flex flex-col items-center gap-2.5">
             <motion.div
-              className="relative size-16"
+              className="relative size-12 sm:size-14 md:size-16"
               animate={wiggle ? { scale: [1, 1.12, 1] } : { scale: 1 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             >

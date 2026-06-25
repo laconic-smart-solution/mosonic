@@ -529,10 +529,15 @@
     "cinematic": "Cinematic"
   },
   "rebuildTooltip": "Refresh workflow nodes from the current rule and channel settings.",
+  "freshness": {
+    "warningTitle": "No live web research",
+    "warning": "This workflow has no Intelligence node. Content will use your rule and brief only — it will not search the web for current trends or news. A date anchor still applies, but freshness may be limited."
+  },
   "qaWizard": {
     "title": "Generate workflow",
     "yes": "Yes",
     "no": "No",
+    "webSearchHint": "Choosing No skips the Intelligence step — no live web research. Content relies on your campaign rule, brief, and the model only.",
     "back": "Back",
     "next": "Next",
     "generate": "Generate workflow",

@@ -38,6 +38,7 @@ import { PipelineStopConfirmDialog } from "@/features/pipeline/components/pipeli
 import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
 import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
+import { workflowHasIntelligenceNode } from "@/features/workflow/lib/workflow-freshness.util"
 import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { rfNodesToApiPayload } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
@@ -1800,6 +1801,7 @@ export default function WorkflowPage() {
         workflowId={activeWorkflowId}
         ruleId={ruleId}
         isStarting={startPipelineMutation.isPending}
+        showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
         onConfirm={() => {
           if (pendingRunPrompt != null) {
             runStartPipelineMutation(pendingRunPrompt)

@@ -35,9 +35,11 @@ export function HomeStage({
   onOpenRecentContent,
   children,
 }: HomeStageProps) {
+  const showRecentRail = isRecentLoading || recentSlots.length > 0
+
   return (
-    <div className="relative flex min-h-0 w-full flex-1">
-      <div className="pointer-events-none absolute top-1/2 left-3 z-20 -translate-y-1/2 sm:left-5 md:left-8">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col">
+      <div className="pointer-events-none absolute inset-y-0 top-0 left-3 z-20 hidden items-center md:flex md:left-8">
         <div className="pointer-events-auto">
           <HomeTemplateRail
             templates={templates}
@@ -47,7 +49,7 @@ export function HomeStage({
           />
         </div>
       </div>
-      <div className="pointer-events-none absolute top-1/2 right-3 z-20 -translate-y-1/2 sm:right-5 md:right-8">
+      <div className="pointer-events-none absolute inset-y-0 top-0 right-3 z-20 hidden items-center md:flex md:right-8">
         <div className="pointer-events-auto">
           <HomeRecentRail
             slots={recentSlots}
@@ -61,13 +63,13 @@ export function HomeStage({
 
       <div
         className={[
-          "flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-10 sm:py-12",
+          "flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-6 sm:px-5 sm:py-10 md:py-12",
           "transition-all duration-[600ms]",
           mounted ? "translate-y-0 opacity-100" : "translate-y-2.5 opacity-0",
         ].join(" ")}
         style={{ transitionTimingFunction: "cubic-bezier(0.16,1,0.3,1)" }}
       >
-        <div className="flex w-full max-w-[640px] flex-col items-center gap-5 sm:gap-6">
+        <div className="flex w-full max-w-[640px] flex-col items-center gap-4 sm:gap-6">
           <HomeOrb orbPulse={orbPulse} />
           {children ? (
             <div className="flex w-full flex-col items-center gap-3">
@@ -75,6 +77,26 @@ export function HomeStage({
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex shrink-0 flex-col gap-4 border-t border-border/50 px-4 py-4 md:hidden">
+        <HomeTemplateRail
+          layout="horizontal"
+          templates={templates}
+          hovLeft={hovLeft}
+          onHover={setHovLeft}
+          onNavigate={onNavigateTemplate}
+        />
+        {showRecentRail ? (
+          <HomeRecentRail
+            layout="horizontal"
+            slots={recentSlots}
+            isLoading={isRecentLoading}
+            hovRight={hovRight}
+            onHover={setHovRight}
+            onOpenContent={onOpenRecentContent}
+          />
+        ) : null}
       </div>
     </div>
   )

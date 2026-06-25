@@ -679,6 +679,18 @@ export class OrchestrationService {
       return;
     }
 
+    const claimed = await this.pipelineRepo.claimPipelineFinalization(pipelineId);
+    if (!claimed) {
+      const fresh = await this.pipelineRepo.findById(pipelineId);
+      if (fresh?.status === PipelineStatus.Completed) {
+        return;
+      }
+      this.logger.warn(
+        `[pipeline:${pipelineId}] finalizePipeline claim failed — status=${fresh?.status ?? 'missing'}`,
+      );
+      return;
+    }
+
     const rule = await this.rules.findById(pipeline.ruleRef);
     if (!rule) {
       throw new NotFoundException(`Rule ${pipeline.ruleRef} not found`);
@@ -711,16 +723,6 @@ export class OrchestrationService {
       if (!primaryContentId.trim()) {
         throw new Error('No content artifact created for pipeline');
       }
-
-      await this.pipelineRepo.setPipelineStatus(
-        pipelineId,
-        PipelineStatus.Completed,
-        {
-          completedAt: new Date(),
-          pausedNodeId: null,
-          pausedLaneId: null,
-        },
-      );
 
       await this.reconcilePipelineCredits(pipelineId);
 
@@ -798,20 +800,31 @@ export class OrchestrationService {
       args.pipeline,
       args.variantId,
     );
-    const variantContext = this.buildContextFromPipeline(
-      pipelineForVariant,
-      args.rule,
+    const pipelineId = args.pipeline.pipelineId;
+    const existing = await this.contents.findByPipelineAndVariant(
+      pipelineId,
+      args.variantId,
     );
-    const contentId = await this.createContent({
-      pipelineId: args.pipeline.pipelineId,
-      workflowId: args.pipeline.workflowRef,
-      ruleId: args.pipeline.ruleRef,
-      context: variantContext,
-      userId: args.pipeline.userId ?? '',
-      pipeline: pipelineForVariant,
-      variantId: args.variantId,
-      experimentId: args.experimentId,
-    });
+
+    let contentId: string;
+    if (existing) {
+      contentId = existing.contentId;
+    } else {
+      const variantContext = this.buildContextFromPipeline(
+        pipelineForVariant,
+        args.rule,
+      );
+      contentId = await this.createContent({
+        pipelineId,
+        workflowId: args.pipeline.workflowRef,
+        ruleId: args.pipeline.ruleRef,
+        context: variantContext,
+        userId: args.pipeline.userId ?? '',
+        pipeline: pipelineForVariant,
+        variantId: args.variantId,
+        experimentId: args.experimentId,
+      });
+    }
 
     const contentDoc = await this.contents.findByContentId(contentId);
     if (!contentDoc) {
@@ -847,15 +860,23 @@ export class OrchestrationService {
         resolvedOutputs,
       )
       .filter((ch) => ch.included);
-    const { uploadId } = await this.uploadService.createUpload({
+
+    const uploadAuth: TenancyAuth = {
       userId: args.pipeline.userId ?? '',
-      contentRef: contentId,
-      workflowRef: args.pipeline.workflowRef,
-      ruleRef: args.pipeline.ruleRef,
-      resolvedOutputs,
-      ruleChannels,
-      channels,
-    });
+      role: UserRole.CUSTOMER,
+    };
+    const { uploadId } = await this.uploadService.refreshUploadForApprove(
+      {
+        userId: args.pipeline.userId ?? '',
+        contentRef: contentId,
+        workflowRef: args.pipeline.workflowRef,
+        ruleRef: args.pipeline.ruleRef,
+        resolvedOutputs,
+        ruleChannels,
+        channels,
+      },
+      uploadAuth,
+    );
     return { contentId, uploadId };
   }
 

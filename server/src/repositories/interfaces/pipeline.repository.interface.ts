@@ -36,6 +36,8 @@ export interface IPipelineRepository {
   distinctUserIdsSince(startedAtGte: Date): Promise<string[]>;
   claimCreditReconciliation(pipelineId: string): Promise<boolean>;
   markCreditsReconciled(pipelineId: string): Promise<void>;
+  /** Atomically marks a running pipeline completed; returns false if already finalized. */
+  claimPipelineFinalization(pipelineId: string): Promise<boolean>;
   findNodesSummaryByIds(
     pipelineIds: string[],
     auth?: TenancyAuth,
