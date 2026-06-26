@@ -5,11 +5,9 @@ export const HomePage         = PageLoader(lazy(() => import("@/features/home/pa
 export const DashboardPage    = PageLoader(lazy(() => import("@/features/dashboard/pages/dashboard")))
 export const RulesPage        = PageLoader(lazy(() => import("@/features/rules/pages/rules")))
 export const NewsTriggerPage  = PageLoader(lazy(() => import("@/features/rules/pages/news-trigger")))
-export const WorkflowPromptPage = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-prompt")))
 export const WorkflowPage       = PageLoader(lazy(() => import("@/features/workflow/pages/workflow")))
 export const WorkflowsListPage  = PageLoader(lazy(() => import("@/features/workflow/pages/workflows")))
 export const PipelinesPage      = PageLoader(lazy(() => import("@/features/pipeline/pages/pipelines")))
-export const RunPage          = PageLoader(lazy(() => import("@/features/run/pages/run")))
 export const ContentPage      = PageLoader(lazy(() => import("@/features/content/pages/content")))
 export const ContentDetailPage = PageLoader(lazy(() => import("@/features/content/pages/content-detail")))
 export const UploadPage       = PageLoader(lazy(() => import("@/features/upload/pages/upload")))
@@ -19,10 +17,6 @@ export const SettingsAccountsPage = PageLoader(
   lazy(() => import("@/features/settings/pages/settings-accounts")),
 )
 export const UsagePage = PageLoader(lazy(() => import("@/features/usage/pages/usage")))
-export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
-export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
-export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
-
 export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
 export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
 export const AboutPage = PageLoader(lazy(() => import("@/features/marketing/pages/about")))

@@ -114,7 +114,7 @@ type GenerationStep = "started" | "generating" | "failed"
 type RouteState = {
   generating?: boolean
   ruleName?: string
-  /** Carried from home / workflow-prompt so the pipeline bar is pre-filled */
+  /** Carried from home so the pipeline bar is pre-filled */
   contentPrompt?: string
 }
 type ProcessingMode = "edit" | "processing" | "failed"
