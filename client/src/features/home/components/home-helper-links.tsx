@@ -42,11 +42,11 @@ export function HomeHelperLinks({
 
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
       <Button
         type="button"
         variant="outline"
-        className="h-8 rounded-full px-4 text-xs"
+        className="h-9 w-full rounded-full px-4 text-xs sm:h-8 sm:w-auto"
         onClick={onNavigateSetup}
       >
         {t("helper.setupRule")}
@@ -59,7 +59,7 @@ export function HomeHelperLinks({
             <Button
               type="button"
               variant="secondary"
-              className="h-8 max-w-[260px] rounded-full px-4 text-xs"
+              className="h-9 w-full max-w-none rounded-full px-4 text-xs sm:h-8 sm:max-w-[260px] sm:w-auto"
               title={
                 selectedRuleLabel
                   ? t("helper.selectedRule", { name: selectedRuleLabel })
@@ -74,7 +74,7 @@ export function HomeHelperLinks({
             </Button>
           }
         />
-        <PopoverContent className="w-[360px] p-3">
+        <PopoverContent className="w-[min(360px,calc(100vw-2rem))] p-3">
           <PopoverHeader className="mb-1">
             <PopoverTitle className="text-sm">{t("helper.savedRules")}</PopoverTitle>
           </PopoverHeader>

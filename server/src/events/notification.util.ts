@@ -184,3 +184,33 @@ export function workflowCompletedNotification(args: {
     action: { label: 'Open workflow', href },
   };
 }
+
+export function pipelineNodeReviewNotification(args: {
+  pipelineId: string;
+  nodeId: string;
+  nodeType: string;
+  ruleRef?: string;
+  lane?: string | null;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  const href = args.ruleRef?.trim()
+    ? `/workflow/${args.ruleRef.trim()}?pipelineId=${args.pipelineId}`
+    : `/pipelines`;
+  const laneLabel = args.lane?.trim() ? ` (${args.lane})` : '';
+  return {
+    title: 'Pipeline step needs review',
+    message: `Review ${args.nodeType.replace(/_/g, ' ')}${laneLabel} before continuing.`,
+    data: {
+      pipelineId: args.pipelineId,
+      nodeId: args.nodeId,
+      nodeType: args.nodeType,
+      ruleRef: args.ruleRef,
+      lane: args.lane ?? null,
+    },
+    action: { label: 'Review step', href },
+  };
+}

@@ -39,6 +39,14 @@ import {
 import { ContentReaderService } from '../preprocessing/content-reader.service';
 import { PreprocessingService } from '../preprocessing/preprocessing.service';
 import { RuleExtractionService } from './rule-extraction.service';
+import {
+  buildExtractionContext,
+  formatIntakeForContext,
+} from './rule-intake-prompt.util';
+import {
+  hasMeaningfulGuidedIntake,
+  mergeIntakeWithExtracted,
+} from './rule-intake-merge.util';
 import { CreditService } from '../credit/credit.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
 import { RULE_GENERATION_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
@@ -92,12 +100,16 @@ export class RuleService {
     );
 
     const now = new Date();
+    const hasGuidedIntake =
+      args.intake?.mode === 'guided' && hasMeaningfulGuidedIntake(args.intake);
     const originalType =
       args.files.length > 0
         ? OriginalInputType.File
         : args.urls.length > 0
           ? OriginalInputType.Url
-          : OriginalInputType.Text;
+          : hasGuidedIntake
+            ? OriginalInputType.Structured
+            : OriginalInputType.Text;
 
     const ruleId = randomUUID();
 
@@ -151,8 +163,11 @@ export class RuleService {
             ? `multipart://${ruleId}`
             : originalType === OriginalInputType.Url
               ? `urls://${args.urls.length}`
-              : `inline://${now.getTime()}`,
+              : originalType === OriginalInputType.Structured
+                ? `structured://${ruleId}`
+                : `inline://${now.getTime()}`,
       },
+      intake: args.intake ? (args.intake as Prisma.InputJsonValue) : undefined,
       status: RuleStatus.Processing,
       versions: [],
     });
@@ -433,14 +448,21 @@ export class RuleService {
         message: 'Reading your input...',
       });
 
+      const intakeNotes = args.intake?.additionalNotes?.trim() ?? '';
+      const userText = [args.input, intakeNotes].filter(Boolean).join('\n\n');
+      const intakeContext = args.intake
+        ? formatIntakeForContext(args.intake)
+        : '';
+      const payloadInput = [intakeContext, userText].filter(Boolean).join('\n\n');
+
       const payload = await this.preprocessing.resolvePayload({
-        userText: args.input,
+        userText: payloadInput,
         files: args.files,
         urls: args.urls,
       });
 
       const hasAnyContent =
-        payload.userText.trim().length > 0 ||
+        payloadInput.trim().length > 0 ||
         payload.chunks.some((c) =>
           c.kind === 'text' ? c.text.trim().length > 0 : c.base64.length > 0,
         );
@@ -463,8 +485,14 @@ export class RuleService {
         message: 'Analyzing your strategy...',
       });
 
-      const { draft: extracted } =
-        await this.ruleExtraction.extractRuleFromInput(summary);
+      const extractionContext = buildExtractionContext(summary, args.intake);
+
+      const { draft: extractedRaw } =
+        await this.ruleExtraction.extractRuleFromInput(
+          extractionContext,
+          args.intake,
+        );
+      const extracted = mergeIntakeWithExtracted(args.intake, extractedRaw);
 
       await this.creditService.deductCredits({
         userId: auth.userId,
@@ -498,13 +526,14 @@ export class RuleService {
           } as Prisma.InputJsonValue,
           channels: extracted.channels as Prisma.InputJsonValue,
           contentGuidelines: extracted.contentGuidelines as Prisma.InputJsonValue,
+          intake: args.intake ? (args.intake as Prisma.InputJsonValue) : undefined,
           status: 'active',
         },
         {
           versionNumber: 1,
           changedFields: ['*'],
           changedBy: VersionChangedBy.SystemSuggestion,
-          snapshot: extracted,
+          snapshot: { ...extracted, intake: args.intake ?? null },
           createdAt: new Date(),
         },
         auth,

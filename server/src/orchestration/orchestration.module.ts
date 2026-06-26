@@ -23,6 +23,8 @@ import { MediaNodeCompletionService } from './media-node-completion.service';
 import { PipelineNodeProcessor } from './processors/pipeline-node.processor';
 import { VideoCheckProcessor } from './processors/video-check.processor';
 import { VideoGenerateProcessor } from './processors/video-generate.processor';
+import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
+import { PipelineNodeReviewService } from './pipeline-node-review.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { QUEUES } from './types/queue.constants';
 import {
@@ -180,6 +182,8 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     GraphReplanService,
     RuleOverlayBuilderService,
     NodeExecutor,
+    PipelineNodeCompletionService,
+    PipelineNodeReviewService,
     PipelineNodeRunnerService,
     MediaNodeCompletionService,
     HeygenWebhookService,

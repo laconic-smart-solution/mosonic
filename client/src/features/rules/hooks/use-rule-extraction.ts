@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import type { Attachment } from "@/components/core/prompt-area"
+import type { RuleIntakeAnswers } from "@/features/rules/types/rule-intake.type"
 import {
   formatMaxFileSizeMb,
   RULE_EXTRACT_MAX_FILE_BYTES,
@@ -142,13 +143,24 @@ export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
   }, [hydrateCompletedRule, onFailed, processingRuleId, queryClient, t])
 
   const runExtract = useCallback(
-    async (text: string, attachments: Attachment[]) => {
+    async (
+      text: string,
+      attachments: Attachment[],
+      intake?: RuleIntakeAnswers,
+    ) => {
       const trimmed = text.trim()
       const hasFile = attachments.some(
         (a) => a.type === "file" && a.data instanceof File,
       )
       const hasUrl = attachments.some((a) => a.type === "url")
-      if (!trimmed && !hasFile && !hasUrl) return
+      const hasGuidedIntake =
+        intake?.mode === "guided" &&
+        Boolean(
+          intake.contentPurpose ||
+            (intake.channels && intake.channels.length > 0) ||
+            intake.brandName?.trim(),
+        )
+      if (!trimmed && !hasFile && !hasUrl && !hasGuidedIntake) return
 
       for (const a of attachments) {
         if (a.type === "file" && a.data instanceof File) {
@@ -166,7 +178,7 @@ export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
       }
 
       try {
-        const formData = buildRuleExtractFormData(text, attachments)
+        const formData = buildRuleExtractFormData(text, attachments, intake)
         const { ruleId } = await extractRuleMutation.mutateAsync(formData)
         const previewLabel =
           trimmed ||

@@ -50,8 +50,9 @@ export class RuleController {
     @UploadedFiles() files: Express.Multer.File[] | undefined,
     @Body('input') input?: string,
     @Body('urls') urlsRaw?: string,
+    @Body('intake') intakeRaw?: string,
   ): Promise<ExtractRuleResponseDto> {
-    const args = parseRuleExtractMultipart(files, input, urlsRaw);
+    const args = parseRuleExtractMultipart(files, input, urlsRaw, intakeRaw);
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.ruleService.requestExtraction(args, auth);
   }

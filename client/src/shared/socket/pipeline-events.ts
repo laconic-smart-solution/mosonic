@@ -70,6 +70,15 @@ export type NodeFailedFinalEvent = {
   nodeType: string
   message: string
 }
+export type NodeWaitingReviewEvent = {
+  pipelineId: string
+  nodeId: string
+  nodeType: string
+  order: number
+  totalNodes: number
+  lane?: string | null
+  output: Record<string, unknown>
+}
 
 export function joinPipelineRoom(pipelineId: string) {
   return joinSocketRoom(`pipeline:${pipelineId}`)
@@ -114,4 +123,9 @@ export function onNodeCompleted(handler: (payload: NodeCompletedEvent) => void) 
 }
 export function onNodeFailedFinal(handler: (payload: NodeFailedFinalEvent) => void) {
   return subscribePipelineEvent("node:failed_final", handler as SocketHandler)
+}
+export function onNodeWaitingReview(
+  handler: (payload: NodeWaitingReviewEvent) => void,
+) {
+  return subscribePipelineEvent("node:waiting_review", handler as SocketHandler)
 }

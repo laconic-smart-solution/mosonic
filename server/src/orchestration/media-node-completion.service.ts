@@ -29,6 +29,7 @@ import {
 import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
 import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
+import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
@@ -48,6 +49,7 @@ export class MediaNodeCompletionService {
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly resolver: DependencyResolverService,
+    private readonly completion: PipelineNodeCompletionService,
     private readonly pipelineNodeRunner: PipelineNodeRunnerService,
     private readonly events: EventsService,
     private readonly costService: CostService,
@@ -143,12 +145,6 @@ export class MediaNodeCompletionService {
     payload: NodeJobPayload,
     result: VideoCompleteResult,
   ): Promise<void> {
-    await this.pipelineRepo.updateNodeStatus(
-      payload.pipelineId,
-      payload.nodeId,
-      PipelineNodeExecutionStatus.Completed,
-      { video: result.video },
-    );
     await this.pipelineRepo.clearExternalJobId(
       payload.pipelineId,
       payload.nodeId,
@@ -161,16 +157,23 @@ export class MediaNodeCompletionService {
       ? this.pipelineRepo.getNode(pipeline, payload.nodeId)
       : undefined;
 
-    this.events.emitToPipeline(payload.pipelineId, 'node:completed', {
+    if (node?.reviewRegeneratePrompt?.trim()) {
+      await this.pipelineRepo.patchNode(payload.pipelineId, payload.nodeId, {
+        reviewRegeneratePrompt: null,
+      });
+    }
+
+    await this.completion.handleNodeSucceeded({
       pipelineId: payload.pipelineId,
       nodeId: payload.nodeId,
       nodeType: payload.nodeType,
       order: payload.order,
       totalNodes: payload.totalNodes,
+      lane: node?.lane ?? payload.lane,
       output: { video: result.video },
+      ruleRef: payload.ruleId,
     });
 
-    await this.resolver.onNodeCompleted(payload.pipelineId, payload.nodeId);
     await this.resolver.maybeFinalize(payload.pipelineId);
 
     this.logger.log(

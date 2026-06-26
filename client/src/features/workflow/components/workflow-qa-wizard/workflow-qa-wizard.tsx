@@ -172,10 +172,15 @@ export function WorkflowQaWizard({
 
         <div className="min-h-[148px] px-6 py-5">
           {currentStep === "webSearch" ? (
-            <YesNoButtons
-              value={answers.useWebSearch}
-              onChange={(useWebSearch) => patchAnswers({ useWebSearch })}
-            />
+            <div className="flex flex-col gap-3">
+              <YesNoButtons
+                value={answers.useWebSearch}
+                onChange={(useWebSearch) => patchAnswers({ useWebSearch })}
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t("qaWizard.webSearchHint")}
+              </p>
+            </div>
           ) : null}
 
           {currentStep === "keywordPlanner" ? (

@@ -11,6 +11,7 @@ export type RuleRecord = {
   channels: unknown;
   contentGuidelines: unknown;
   originalInput: unknown;
+  intake: unknown;
   status: RuleStatus;
   versions: unknown;
   approvalPolicy: unknown;

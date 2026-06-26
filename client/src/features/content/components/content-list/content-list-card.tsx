@@ -213,6 +213,11 @@ export function ContentListCard({ item, index, onOpen }: Props) {
                     {t("list.channels", { count: laneCount })}
                   </p>
                 ) : null}
+                {item.variantId ? (
+                  <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+                    {t("list.variant", { id: item.variantId })}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

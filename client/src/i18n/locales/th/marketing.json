@@ -4,7 +4,9 @@
     "landing": "หน้าแรก",
     "create": "สร้าง",
     "pricing": "ราคา",
-    "about": "เกี่ยวกับเรา"
+    "about": "เกี่ยวกับเรา",
+    "menu": "เมนู",
+    "openMenu": "เปิดเมนู"
   },
   "landing": {
     "hero": {

@@ -15,6 +15,8 @@ export type PipelineNodeExecution = {
   input: string;
   output: string | null;
   retryCount: number;
+  reviewRegenerateCount?: number;
+  reviewRegeneratePrompt?: string | null;
   executedAt: string | Date | null;
   lane: string | null;
   variantId: string | null;

@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class StartPipelineDto {
   @IsString()
@@ -17,4 +17,9 @@ export class StartPipelineDto {
   @IsOptional()
   @IsBoolean()
   useLearnings?: boolean;
+
+  /** User review policy for manual runs: auto (default) or step. */
+  @IsOptional()
+  @IsIn(['auto', 'step'])
+  executionMode?: 'auto' | 'step';
 }

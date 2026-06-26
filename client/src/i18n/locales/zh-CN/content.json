@@ -35,6 +35,7 @@
     "emptyDefault": "运行工作流生成内容，或放宽状态筛选。",
     "campaign": "活动",
     "channels": "{{count}} 个渠道",
+    "variant": "变体 {{id}}",
     "outputs": "输出",
     "workflow": "工作流",
     "pipeline": "流水线",
