@@ -247,7 +247,28 @@
     "done": "完成",
     "completed": "已完成",
     "failed_final": "失败",
-    "failed": "失败"
+    "failed": "失败",
+    "waiting_review": "待审核"
+  },
+  "stepMode": {
+    "executionModeTitle": "执行模式",
+    "auto": "自动",
+    "autoHint": "连续运行所有节点",
+    "step": "逐步",
+    "stepHint": "每个节点完成后暂停供审核",
+    "reviewTitle": "审核输出",
+    "reviewDialogTitle": "审核节点输出",
+    "reviewDialogDescription": "在继续流水线之前审核并编辑 {{node}} 的输出。",
+    "clickToReview": "点击此节点以审核生成的输出。",
+    "openReview": "审核",
+    "continue": "继续",
+    "regenerate": "重新生成",
+    "regenerateWithCredits": "重新生成（{{credits}} 积分）",
+    "regeneratePlaceholder": "重新生成的可选说明…",
+    "replaceImage": "替换图片",
+    "replaceVideo": "替换视频",
+    "previewAlt": "生成预览",
+    "reviewFailed": "提交审核失败"
   },
   "validation": {
     "laneAssignment": "{{type}} 必须分配到渠道（从分支节点添加，而非从主干 Text 添加）。",
@@ -607,7 +628,8 @@
     }
   },
   "aria": {
-    "openNodeSettings": "打开节点设置",
+    "openNodeInfo": "显示节点信息",
+    "openNodeSettings": "打开节点配置",
     "addNode": "添加节点",
     "deleteNode": "删除节点",
     "insertNode": "插入节点",

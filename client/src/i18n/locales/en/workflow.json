@@ -252,7 +252,28 @@
     "done": "Done",
     "completed": "Completed",
     "failed_final": "Failed",
-    "failed": "Failed"
+    "failed": "Failed",
+    "waiting_review": "Review"
+  },
+  "stepMode": {
+    "executionModeTitle": "Execution mode",
+    "auto": "Auto",
+    "autoHint": "Run all nodes without pausing",
+    "step": "Step",
+    "stepHint": "Pause after each node for review",
+    "reviewTitle": "Review output",
+    "reviewDialogTitle": "Review node output",
+    "reviewDialogDescription": "Review and edit output for {{node}} before continuing the pipeline.",
+    "clickToReview": "Click this node to review the generated output.",
+    "openReview": "Review",
+    "continue": "Continue",
+    "regenerate": "Regenerate",
+    "regenerateWithCredits": "Regenerate ({{credits}} credits)",
+    "regeneratePlaceholder": "Optional instruction for regeneration…",
+    "replaceImage": "Replace image",
+    "replaceVideo": "Replace video",
+    "previewAlt": "Generated preview",
+    "reviewFailed": "Could not submit review"
   },
   "validation": {
     "laneAssignment": "{{type}} must be assigned to a channel (add it from a lane node, not from trunk Text).",
@@ -612,7 +633,8 @@
     }
   },
   "aria": {
-    "openNodeSettings": "Open node settings",
+    "openNodeInfo": "Show node information",
+    "openNodeSettings": "Open node configuration",
     "addNode": "Add node",
     "deleteNode": "Delete node",
     "insertNode": "Insert node",

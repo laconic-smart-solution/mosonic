@@ -68,6 +68,19 @@ export interface IPipelineRepository {
   ): Promise<void>;
   markNodeSkipped(pipelineId: string, nodeId: string): Promise<void>;
   resetNodeToPending(pipelineId: string, nodeId: string): Promise<void>;
+  prepareNodeForReviewRegenerate(
+    pipelineId: string,
+    nodeId: string,
+    options: {
+      reviewRegeneratePrompt: string | null;
+      clearOutput?: boolean;
+    },
+  ): Promise<void>;
+  patchNode(
+    pipelineId: string,
+    nodeId: string,
+    patch: Partial<PipelineNodeExecution>,
+  ): Promise<void>;
   setPipelineStatus(
     pipelineId: string,
     status: PipelineStatus,
@@ -91,4 +104,5 @@ export interface IPipelineRepository {
     edges?: WorkflowGraphEdge[],
   ): PreviousOutputs;
   allNodesTerminal(pipeline: PipelineRecord): boolean;
+  hasAwaitingReview(pipeline: PipelineRecord): boolean;
 }

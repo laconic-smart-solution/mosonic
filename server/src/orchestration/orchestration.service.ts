@@ -35,7 +35,8 @@ import {
   parsePipelineNodes,
 } from '../repositories/prisma/pipeline-nodes.util';
 import {
-  PipelineExecutionMode,
+  PipelineDispatchMode,
+  PipelineUserExecutionMode,
   PipelineNodeExecutionStatus,
   PipelineStatus,
 } from '../pipeline/schemas/pipeline.schema';
@@ -72,6 +73,8 @@ import { countNodesByLane } from './lane-pause.util';
 import { CampaignAutonomyService } from '../campaign/campaign-autonomy.service';
 import { OutboundWebhookService } from '../integrations/outbound-webhook.service';
 import { GraphReplanService } from './graph-replan.service';
+import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
+import { PipelineNodeReviewService } from './pipeline-node-review.service';
 import { RuleOverlayBuilderService } from './rule-overlay-builder.service';
 import { buildApprovalStateFromPolicy } from '../content/content-approval.util';
 import { buildLinearEdgesFromOrder, parseWorkflowEdges } from '../workflow/workflow-graph.util';
@@ -114,6 +117,7 @@ export class OrchestrationService {
     private readonly resolver: DependencyResolverService,
     private readonly loggingService: LoggingService,
     private readonly graphReplan: GraphReplanService,
+    private readonly nodeReview: PipelineNodeReviewService,
     private readonly campaignAutonomy: CampaignAutonomyService,
     private readonly outboundWebhooks: OutboundWebhookService,
     @Inject(forwardRef(() => ContentService))
@@ -129,6 +133,7 @@ export class OrchestrationService {
     ruleId: string;
     contentPrompt: string;
     useLearnings?: boolean;
+    executionMode?: 'auto' | 'step';
     metadata?: {
       source?: 'manual' | 'scheduler' | 'integration' | 'news';
       scheduleId?: string;
@@ -277,6 +282,7 @@ export class OrchestrationService {
         input: '',
         output: null,
         retryCount: 0,
+        reviewRegenerateCount: 0,
         executedAt: null,
       })) as Prisma.InputJsonValue,
       status: PipelineStatus.Running,
@@ -284,9 +290,13 @@ export class OrchestrationService {
       completedAt: null,
       pausedNodeId: null,
       pausedLaneId: null,
-      executionMode: this.useQueue
-        ? PipelineExecutionMode.Queue
-        : PipelineExecutionMode.Inline,
+      dispatchMode: this.useQueue
+        ? PipelineDispatchMode.Queue
+        : PipelineDispatchMode.Inline,
+      executionMode:
+        input.executionMode === 'step'
+          ? PipelineUserExecutionMode.Step
+          : PipelineUserExecutionMode.Auto,
       ruleOverlay: (ruleOverlay ?? null) as unknown as Prisma.InputJsonValue,
       metadata: {
         source: input.metadata?.source ?? 'manual',
@@ -616,7 +626,7 @@ export class OrchestrationService {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
 
-    if (pipeline.executionMode === PipelineExecutionMode.Queue) {
+    if (pipeline.dispatchMode === PipelineDispatchMode.Queue) {
       if (pipeline.status !== PipelineStatus.Paused) {
         throw new BadRequestException('Pipeline is not paused');
       }
@@ -641,6 +651,135 @@ export class OrchestrationService {
     paused.resolve();
   }
 
+  async estimateReviewRegenerateCredits(
+    pipelineId: string,
+    nodeId: string,
+    auth: TenancyAuth,
+  ): Promise<{
+    creditsRequired: number;
+    creditsRemaining: number;
+    sufficient: boolean;
+    creditNodeType: string | null;
+  }> {
+    const creditsRemaining = await this.getCreditsRemaining(auth.userId);
+    const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${pipelineId} not found`);
+    }
+
+    const node = this.pipelineRepo.getNode(pipeline, nodeId);
+    if (
+      !node ||
+      node.status !== PipelineNodeExecutionStatus.WaitingReview ||
+      node.type === WorkflowNodeType.Merge ||
+      node.type === WorkflowNodeType.Branch
+    ) {
+      return {
+        creditsRequired: 0,
+        creditsRemaining,
+        sufficient: true,
+        creditNodeType: null,
+      };
+    }
+
+    const creditNodeType = resolveCreditNodeTypeForPipelineNode(
+      node.type,
+      (node.config ?? undefined) as Record<string, unknown> | undefined,
+    );
+    const creditsRequired =
+      (await this.nodeCreditPriceService.getActiveCostCredit(creditNodeType)) ??
+      0;
+
+    return {
+      creditsRequired,
+      creditsRemaining,
+      sufficient: creditsRequired <= 0 || creditsRemaining >= creditsRequired,
+      creditNodeType,
+    };
+  }
+
+  async reviewNode(
+    pipelineId: string,
+    nodeId: string,
+    dto: {
+      action: 'continue' | 'edit' | 'regenerate';
+      editedContent?: string;
+      regenerateInstruction?: string;
+      mediaUrl?: string;
+    },
+    auth: TenancyAuth,
+  ): Promise<{ success: boolean; noop?: boolean }> {
+    if (dto.action === 'regenerate') {
+      await this.chargeForPipelineReviewRegenerate({
+        pipelineId,
+        nodeId,
+        auth,
+      });
+    }
+
+    return this.nodeReview.reviewNode({
+      pipelineId,
+      nodeId,
+      action: dto.action,
+      editedContent: dto.editedContent,
+      regenerateInstruction: dto.regenerateInstruction,
+      mediaUrl: dto.mediaUrl,
+      auth,
+    });
+  }
+
+  private async chargeForPipelineReviewRegenerate(args: {
+    pipelineId: string;
+    nodeId: string;
+    auth: TenancyAuth;
+  }): Promise<void> {
+    const pipeline = await this.pipelineRepo.findById(
+      args.pipelineId,
+      args.auth,
+    );
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${args.pipelineId} not found`);
+    }
+
+    const node = this.pipelineRepo.getNode(pipeline, args.nodeId);
+    if (
+      !node ||
+      node.status !== PipelineNodeExecutionStatus.WaitingReview ||
+      node.type === WorkflowNodeType.Merge ||
+      node.type === WorkflowNodeType.Branch
+    ) {
+      return;
+    }
+
+    const creditNodeType = resolveCreditNodeTypeForPipelineNode(
+      node.type,
+      (node.config ?? undefined) as Record<string, unknown> | undefined,
+    );
+    const creditsEach =
+      (await this.nodeCreditPriceService.getActiveCostCredit(creditNodeType)) ??
+      0;
+    if (creditsEach <= 0) return;
+
+    const creditsRemaining = await this.getCreditsRemaining(args.auth.userId);
+    if (creditsRemaining < creditsEach) {
+      throw new InsufficientCreditsException({
+        requiredCredits: creditsEach,
+        creditsRemaining,
+      });
+    }
+
+    const config = await this.creditCalculation.getConfig();
+    await this.creditService.chargeSingleNodeRun({
+      userId: args.auth.userId,
+      pipelineRef: args.pipelineId,
+      contentRef: '',
+      nodeId: args.nodeId,
+      nodeType: creditNodeType,
+      credits: creditsEach,
+      creditPriceUsd: config.creditPriceUsd,
+    });
+  }
+
   async skipNode(
     pipelineId: string,
     nodeId: string,
@@ -650,7 +789,7 @@ export class OrchestrationService {
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
-    if (pipeline.executionMode !== PipelineExecutionMode.Queue) {
+    if (pipeline.dispatchMode !== PipelineDispatchMode.Queue) {
       throw new BadRequestException('Skip is only supported for queue pipelines');
     }
     if (pipeline.status !== PipelineStatus.Paused) {
@@ -960,6 +1099,7 @@ export class OrchestrationService {
       status: string;
       pausedNodeId: string | null;
       pausedLaneId: string | null;
+      executionMode: string;
       startedAt: Date;
       completedAt: Date | null;
       contentId?: string;
@@ -981,6 +1121,7 @@ export class OrchestrationService {
       status: string;
       output: Record<string, unknown> | null;
       retryCount: number;
+      reviewRegenerateCount: number;
       executedAt: Date | null;
     }>;
   }> {
@@ -1002,6 +1143,7 @@ export class OrchestrationService {
         status: pipeline.status,
         pausedNodeId: pipeline.pausedNodeId ?? null,
         pausedLaneId: pipeline.pausedLaneId ?? null,
+        executionMode: pipeline.executionMode ?? 'auto',
         startedAt: pipeline.startedAt,
         completedAt: pipeline.completedAt,
         ...artifacts,
@@ -1030,6 +1172,7 @@ export class OrchestrationService {
         status: node.status,
         output: parsePipelineNodeOutputString(node.output),
         retryCount: node.retryCount,
+        reviewRegenerateCount: node.reviewRegenerateCount ?? 0,
         executedAt: node.executedAt ? new Date(node.executedAt) : null,
       })),
     };

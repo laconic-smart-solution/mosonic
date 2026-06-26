@@ -247,7 +247,28 @@
     "done": "เสร็จ",
     "completed": "เสร็จสมบูรณ์",
     "failed_final": "ล้มเหลว",
-    "failed": "ล้มเหลว"
+    "failed": "ล้มเหลว",
+    "waiting_review": "ตรวจสอบ"
+  },
+  "stepMode": {
+    "executionModeTitle": "โหมดการรัน",
+    "auto": "อัตโนมัติ",
+    "autoHint": "รันทุกโหนดโดยไม่หยุด",
+    "step": "ทีละขั้น",
+    "stepHint": "หยุดหลังแต่ละโหนดเพื่อตรวจสอบ",
+    "reviewTitle": "ตรวจสอบผลลัพธ์",
+    "reviewDialogTitle": "ตรวจสอบผลลัพธ์โหนด",
+    "reviewDialogDescription": "ตรวจสอบและแก้ไขผลลัพธ์ของ {{node}} ก่อนดำเนินการต่อ",
+    "clickToReview": "คลิกโหนดนี้เพื่อตรวจสอบผลลัพธ์ที่สร้าง",
+    "openReview": "ตรวจสอบ",
+    "continue": "ดำเนินการต่อ",
+    "regenerate": "สร้างใหม่",
+    "regenerateWithCredits": "สร้างใหม่ ({{credits}} เครดิต)",
+    "regeneratePlaceholder": "คำสั่งเพิ่มเติมสำหรับการสร้างใหม่ (ไม่บังคับ)…",
+    "replaceImage": "เปลี่ยนรูปภาพ",
+    "replaceVideo": "เปลี่ยนวิดีโอ",
+    "previewAlt": "ตัวอย่างที่สร้าง",
+    "reviewFailed": "ส่งการตรวจสอบไม่สำเร็จ"
   },
   "validation": {
     "laneAssignment": "{{type}} ต้องกำหนดช่องทาง (เพิ่มจากโหนดในสาย ไม่ใช่จาก Text บนท่อหลัก)",
@@ -607,7 +628,8 @@
     }
   },
   "aria": {
-    "openNodeSettings": "เปิดการตั้งค่าโหนด",
+    "openNodeInfo": "แสดงข้อมูลโหนด",
+    "openNodeSettings": "เปิดการกำหนดค่าโหนด",
     "addNode": "เพิ่มโหนด",
     "deleteNode": "ลบโหนด",
     "insertNode": "แทรกโหนด",

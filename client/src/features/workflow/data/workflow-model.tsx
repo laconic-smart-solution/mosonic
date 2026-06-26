@@ -243,6 +243,7 @@ export const STATUS_MAP = {
   retrying: { bg: "#FFEDD5", text: "#EA580C", border: "#FDBA74", dot: "#EA580C" },
   done: { bg: "#DCFCE7", text: "#16A34A", border: "#86EFAC", dot: "#16A34A" },
   completed: { bg: "#DCFCE7", text: "#16A34A", border: "#86EFAC", dot: "#16A34A" },
+  waiting_review: { bg: "#CCFBF1", text: "#0D9488", border: "#5EEAD4", dot: "#0D9488" },
   failed_final: { bg: "#FEE2E2", text: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
   failed: { bg: "#FEE2E2", text: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
 } as const
@@ -270,6 +271,8 @@ export type WfNodeData = {
   settingsOpen?: boolean
   onRetry?: () => void
   onSkip?: () => void
+  onOpenReview?: () => void
+  reviewText?: string
   onOpenAddPopover?: (event: MouseEvent, nodeId: string) => void
   readOnly?: boolean
 } & Record<string, unknown>
@@ -646,6 +649,7 @@ const STATUS_CHIP: Record<NodeStatus, ChipColor> = {
   retrying: "amber",
   done: "green",
   completed: "green",
+  waiting_review: "indigo",
   failed_final: "red",
   failed: "red",
 }

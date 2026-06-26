@@ -23,6 +23,7 @@ import type {
 import type { IPipelineRepository } from '../interfaces/pipeline.repository.interface';
 import {
   applyNodeStatusUpdate,
+  incrementReviewRegenerate,
   parsePipelineGraph,
   parsePipelineNodes,
   updatePipelineNode,
@@ -250,6 +251,36 @@ export class PrismaPipelineRepository implements IPipelineRepository {
     );
   }
 
+  prepareNodeForReviewRegenerate(
+    pipelineId: string,
+    nodeId: string,
+    options: {
+      reviewRegeneratePrompt: string | null;
+      clearOutput?: boolean;
+    },
+  ): Promise<void> {
+    return this.mutateNode(pipelineId, nodeId, (nodes) => {
+      let next = incrementReviewRegenerate(nodes, nodeId);
+      next = updatePipelineNode(next, nodeId, {
+        status: 'pending',
+        reviewRegeneratePrompt: options.reviewRegeneratePrompt,
+        executedAt: null,
+        ...(options.clearOutput ? { output: null } : {}),
+      });
+      return next;
+    });
+  }
+
+  patchNode(
+    pipelineId: string,
+    nodeId: string,
+    patch: Partial<PipelineNodeExecution>,
+  ): Promise<void> {
+    return this.mutateNode(pipelineId, nodeId, (nodes) =>
+      updatePipelineNode(nodes, nodeId, patch),
+    );
+  }
+
   async setPipelineStatus(
     pipelineId: string,
     status: PipelineStatus,
@@ -325,7 +356,15 @@ export class PrismaPipelineRepository implements IPipelineRepository {
 
   allNodesTerminal(pipeline: PipelineRecord): boolean {
     return parsePipelineNodes(pipeline.nodes).every(
-      (n) => n.status === 'completed' || n.status === 'skipped',
+      (n) =>
+        n.status === 'completed' ||
+        n.status === 'skipped',
+    );
+  }
+
+  hasAwaitingReview(pipeline: PipelineRecord): boolean {
+    return parsePipelineNodes(pipeline.nodes).some(
+      (n) => n.status === 'waiting_review',
     );
   }
 }

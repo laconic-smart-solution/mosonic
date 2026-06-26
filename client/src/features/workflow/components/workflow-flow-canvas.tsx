@@ -13,7 +13,6 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 import type { MouseEvent, ReactNode } from "react"
-import { createPortal } from "react-dom"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -91,6 +90,7 @@ import { toast } from "sonner"
 import { NodeSelectPopover } from "./node-select-popover"
 import { PlusEdge } from "./plus-edge"
 import { PlusPlaceholderNode } from "./plus-placeholder-node"
+import { nodeHasConfigurableSettings } from "./workflow-node-config-fields"
 import { WorkflowPropertiesPanel } from "./workflow-properties-panel"
 import {
   WorkflowNodePalette,
@@ -247,12 +247,11 @@ type WorkflowFlowCanvasProps = {
   runtimeById?: Record<string, Record<string, unknown>>
   onRetryNode?: (nodeId: string) => void
   onSkipNode?: (nodeId: string) => void
+  onOpenReviewNode?: (nodeId: string) => void
   /** Fired when nodes/edges change in edit mode (not selection-only). */
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
   workflowId?: string
-  /** Portal target so the properties panel stacks above the bottom prompt bar. */
-  overlayRoot?: HTMLElement | null
 }
 
 export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowFlowCanvasProps>(
@@ -270,10 +269,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       runtimeById = {},
       onRetryNode,
       onSkipNode,
+      onOpenReviewNode,
       onCanvasEdited,
       onConfigDraftChange,
       workflowId,
-      overlayRoot,
     },
     ref,
   ) {
@@ -791,10 +790,19 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const onNodeClick = useCallback(
       (event: MouseEvent, node: WfRfNode) => {
-        if (readOnly || node.type !== "plus_placeholder") return
-        setPopover({ mode: "initial", anchor: anchorFromEvent(event) })
+        if (node.type === "plus_placeholder") {
+          if (readOnly) return
+          setPopover({ mode: "initial", anchor: anchorFromEvent(event) })
+          return
+        }
+        if (
+          node.data.status === "waiting_review" &&
+          onOpenReviewNode
+        ) {
+          onOpenReviewNode(node.id)
+        }
       },
-      [readOnly],
+      [onOpenReviewNode, readOnly],
     )
 
     const persistedNodeIds = useMemo(
@@ -993,6 +1001,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         const hasBranch =
           node.type !== "branchNode" &&
           nodes.some((n) => n.type === "branchNode")
+        const runtime = runtimeById[node.id]
 
         return {
           ...node,
@@ -1004,18 +1013,23 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               readOnly || (node.type === "mergeNode" && hasBranch)
                 ? undefined
                 : () => deleteNode(node.id),
-            onOpenSettings: readOnly
-              ? undefined
-              : () => {
-                  if (settingsNodeId === node.id) {
-                    closePanel()
-                    return
-                  }
-                  openSettingsPanel(node.id)
-                },
+            onOpenSettings:
+              readOnly || !nodeHasConfigurableSettings(wfType)
+                ? undefined
+                : () => {
+                    if (settingsNodeId === node.id) {
+                      closePanel()
+                      return
+                    }
+                    openSettingsPanel(node.id)
+                  },
             settingsOpen: settingsNodeId === node.id,
             onRetry: onRetryNode ? () => onRetryNode(node.id) : undefined,
             onSkip: onSkipNode ? () => onSkipNode(node.id) : undefined,
+            onOpenReview:
+              runtime?.status === "waiting_review" && onOpenReviewNode
+                ? () => onOpenReviewNode(node.id)
+                : undefined,
             onOpenAddPopover: showAddButton
               ? (event: MouseEvent) => openAfterPopover(event, node.id)
               : undefined,
@@ -1033,6 +1047,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       nodes,
       onRetryNode,
       onSkipNode,
+      onOpenReviewNode,
       closePanel,
       openAfterPopover,
       openInitialPopover,
@@ -1259,47 +1274,22 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           </ReactFlow>
           </WorkflowCanvasDropZone>
 
-          {selNode && !readOnly ? (
-            <>
-              <div className="w-1/2 shrink-0" aria-hidden />
-              {overlayRoot
-                ? createPortal(
-                    <div className="absolute inset-y-0 right-0 z-50 flex w-1/2 min-w-0 flex-col">
-                      <WorkflowPropertiesPanel
-                        selNode={selNode}
-                        propConfig={propConfig}
-                        setPropConfig={handlePropConfigChange}
-                        nodePersisted={persistedNodeIds.has(selNode.id)}
-                        resolvedChannels={resolvedChannels}
-                        workflowId={workflowId}
-                        onClose={closePanel}
-                        onApply={applyChanges}
-                        onReset={() => {
-                          setPropConfig(selNode.config ?? {})
-                        }}
-                      />
-                    </div>,
-                    overlayRoot,
-                  )
-                : (
-                    <div className="flex w-1/2 shrink-0 min-w-0 flex-col">
-                      <WorkflowPropertiesPanel
-                        selNode={selNode}
-                        propConfig={propConfig}
-                        setPropConfig={handlePropConfigChange}
-                        nodePersisted={persistedNodeIds.has(selNode.id)}
-                        resolvedChannels={resolvedChannels}
-                        workflowId={workflowId}
-                        onClose={closePanel}
-                        onApply={applyChanges}
-                        onReset={() => {
-                          setPropConfig(selNode.config ?? {})
-                        }}
-                      />
-                    </div>
-                  )}
-            </>
-          ) : null}
+          <WorkflowPropertiesPanel
+            open={Boolean(selNode) && !readOnly}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) closePanel()
+            }}
+            selNode={selNode}
+            propConfig={propConfig}
+            setPropConfig={handlePropConfigChange}
+            nodePersisted={selNode ? persistedNodeIds.has(selNode.id) : false}
+            resolvedChannels={resolvedChannels}
+            workflowId={workflowId}
+            onApply={applyChanges}
+            onReset={() => {
+              if (selNode) setPropConfig(selNode.config ?? {})
+            }}
+          />
 
           <NodeSelectPopover
             open={popover != null}

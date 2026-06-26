@@ -6,6 +6,9 @@ import type {
   PipelinePageQueryPayload,
   PipelinePageResponse,
   PipelineStatsResponse,
+  NodeReviewPayload,
+  NodeReviewResponse,
+  ReviewRegenerateEstimateResponse,
   RetryNodePayload,
   RetryNodeResponse,
   SkipNodePayload,
@@ -44,6 +47,28 @@ export const pipelineService = {
     payload: SkipNodePayload,
   ): Promise<SkipNodeResponse> => {
     const response = await apiClient.post(`/pipeline/${pipelineId}/skip-node`, payload)
+    return response.data
+  },
+
+  reviewNode: async (
+    pipelineId: string,
+    nodeId: string,
+    payload: NodeReviewPayload,
+  ): Promise<NodeReviewResponse> => {
+    const response = await apiClient.post(
+      `/pipeline/${pipelineId}/nodes/${nodeId}/review`,
+      payload,
+    )
+    return response.data
+  },
+
+  estimateReviewRegenerate: async (
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<ReviewRegenerateEstimateResponse> => {
+    const response = await apiClient.get(
+      `/pipeline/${pipelineId}/nodes/${nodeId}/review/estimate`,
+    )
     return response.data
   },
 
