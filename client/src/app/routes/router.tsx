@@ -8,7 +8,6 @@ import {
   HomePage,
   LandingPage,
   PricingPage,
-  AboutPage,
   DashboardPage,
   RulesPage,
   NewsTriggerPage,
@@ -53,7 +52,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <LandingPage /> },
       { path: "/home", element: <HomePage /> },
       { path: "/pricing", element: <PricingPage /> },
-      { path: "/about", element: <AboutPage /> },
+      { path: "/about", element: <Navigate to="/#about" replace /> },
     ],
   },
   {
