@@ -54,7 +54,9 @@
     "operation": "类型",
     "provider": "提供商",
     "credits": "积分",
-    "empty": "该时段暂无活动记录"
+    "empty": "该时段暂无活动记录",
+    "refundOperation": "退款 — {{operation}}",
+    "refundProvider": "退款"
   },
   "range": {
     "month": "本月",

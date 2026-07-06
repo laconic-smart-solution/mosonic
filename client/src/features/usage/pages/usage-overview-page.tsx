@@ -59,6 +59,17 @@ function formatOperation(nodeType: string): string {
   return nodeType.replace(/_/g, " ")
 }
 
+function isRefundEntry(creditsCharged: number): boolean {
+  return creditsCharged < 0
+}
+
+function formatLedgerCredits(creditsCharged: number): string {
+  if (isRefundEntry(creditsCharged)) {
+    return `+${formatCredits(-creditsCharged)}`
+  }
+  return formatCredits(creditsCharged)
+}
+
 export default function UsageOverviewPage() {
   const { t } = useTranslation("usage")
   const { t: tc } = useTranslation("common")
@@ -235,17 +246,30 @@ export default function UsageOverviewPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                ledgerEntries.map((row) => (
+                ledgerEntries.map((row) => {
+                  const refund = isRefundEntry(row.creditsCharged)
+                  return (
                   <TableRow key={row._id ?? `${row.pipelineRef}-${row.createdAt}`}>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {new Date(row.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-sm capitalize">
-                      {formatOperation(row.nodeType)}
+                      {refund
+                        ? t("ledger.refundOperation", {
+                            operation: formatOperation(row.nodeType),
+                          })
+                        : formatOperation(row.nodeType)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{row.provider}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      {formatCredits(row.creditsCharged)}
+                    <TableCell className="text-muted-foreground">
+                      {refund ? t("ledger.refundProvider") : row.provider}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-mono tabular-nums",
+                        refund && "text-emerald-600 dark:text-emerald-400",
+                      )}
+                    >
+                      {formatLedgerCredits(row.creditsCharged)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -261,7 +285,8 @@ export default function UsageOverviewPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+                })
               )}
             </TableBody>
           </Table>

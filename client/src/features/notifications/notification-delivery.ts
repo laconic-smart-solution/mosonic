@@ -72,6 +72,26 @@ function showInAppToast(payload: AppNotificationPayload): void {
     return
   }
 
+  if (payload.sector === "billing" && payload.type === "credit.refunded") {
+    toast.success(payload.title, {
+      id: `noti-${payload.id}`,
+      description: payload.message,
+      duration: 8000,
+      style: { "--nt-duration": "8000ms" } as CSSProperties,
+      action: payload.action
+        ? {
+            label: payload.action.label,
+            onClick: () => {
+              window.location.href = payload.action!.href.startsWith("/")
+                ? payload.action!.href
+                : `/${payload.action!.href}`
+            },
+          }
+        : undefined,
+    })
+    return
+  }
+
   toast(payload.title, {
     id: `noti-${payload.id}`,
     description: payload.message,
