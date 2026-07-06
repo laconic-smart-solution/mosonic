@@ -169,19 +169,6 @@ export const usePipelineStatsQuery = (
   })
 }
 
-export const useReplanPipelineMutation = () => {
-  return useMutation({
-    mutationFn: ({
-      pipelineId,
-      operations,
-    }: {
-      pipelineId: string
-      operations: Parameters<typeof pipelineService.replan>[1]
-    }) => pipelineService.replan(pipelineId, operations),
-    meta: { toastNs: "workflow", toastKey: "toasts.replanFailed", silent: true },
-  })
-}
-
 export const useCancelPipelineMutation = () => {
   return useMutation({
     mutationFn: (pipelineId: string) => pipelineService.cancel(pipelineId),

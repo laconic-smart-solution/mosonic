@@ -141,7 +141,11 @@
     "nodeDone": "เสร็จ",
     "nodePending": "รอดำเนินการ",
     "generated": "สร้างแล้ว",
-    "rerun": "รันใหม่"
+    "rerun": "รันใหม่",
+    "running": "กำลังรัน",
+    "noOutputYet": "ยังไม่มีผลลัพธ์",
+    "seeMore": "ดูเพิ่มเติม",
+    "seeLess": "ดูน้อยลง"
   },
   "version": {
     "restore": "กู้คืน"

@@ -152,15 +152,15 @@
   /* Radius — 10px base */
   --radius: 0.625rem;
 
-  /* Sidebar — navy */
-  --sidebar: #040B15;
-  --sidebar-foreground: #A0AEC0;
-  --sidebar-primary: #00C9A7;
-  --sidebar-primary-foreground: #040B15;
-  --sidebar-accent: #091528;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #0F1F3D;
-  --sidebar-ring: #00C9A7;
+  /* Sidebar — light */
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #4A5568;
+  --sidebar-primary: #00A589;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EDF2F7;
+  --sidebar-accent-foreground: #090C11;
+  --sidebar-border: #EDE9E1;
+  --sidebar-ring: #00A589;
 
   /* Mosonic JS/Tailwind bridge (mirrors src/lib/tokens.ts) */
   --nt-canvas: #F7F4EF;
@@ -181,8 +181,8 @@
   --nt-red: #dc2626;
   --nt-red-bg: #fee2e2;
   --nt-red-border: #fca5a5;
-  --nt-sidebar: #040B15;
-  --nt-sidebar-border: #0F1F3D;
+  --nt-sidebar: #FFFFFF;
+  --nt-sidebar-border: #EDE9E1;
   --nt-topbar-bg: rgba(255, 255, 255, 0.92);
   --nt-topbar-border: #EDE9E1;
   --nt-accent-light: #E0FAF5;

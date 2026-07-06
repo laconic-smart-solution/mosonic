@@ -13,8 +13,8 @@
       "eyebrow": "Built in Thailand, for Thai growth",
       "title": "Plant one idea. Grow content everywhere.",
       "subtitle": "Strategy in. Content and publishing out.",
-      "ctaPrimary": "Start free",
-      "ctaSecondary": "See how it works"
+      "ctaStartFree": "Start free",
+      "ctaGoToWorkspace": "Go to workspace"
     },
     "problem": {
       "eyebrow": "The problem we solve",
@@ -114,55 +114,7 @@
     "checkoutNote": "New accounts start on the Free plan. Sign in to upgrade or renew at Usage → Plans.",
     "loadError": "Could not load plans. Please refresh and try again.",
     "loading": "Loading plans…",
-    "empty": "No plans available right now.",
-    "comparison": {
-      "eyebrow": "Features",
-      "title": "Everything you need to plan, create, and publish",
-      "subtitle": "Compare generation, workflow, publishing, and analytics across every plan.",
-      "unavailable": "Feature comparison is unavailable right now.",
-      "limited": "Limited",
-      "creditsValue": "{{count}} / mo",
-      "categories": {
-        "generation": {
-          "title": "Content generation",
-          "rows": {
-            "monthlyCredits": "Monthly credits",
-            "textGeneration": "Text generation",
-            "imageGeneration": "Image generation",
-            "videoGeneration": "Video generation",
-            "translation": "Translation",
-            "versionHistory": "Version history"
-          }
-        },
-        "workflow": {
-          "title": "Workflow & orchestration",
-          "rows": {
-            "workflowTemplates": "Workflow templates",
-            "multiNodePipelines": "Multi-node pipelines",
-            "nodeRerun": "Single-node re-run",
-            "liveGenerationLogs": "Live generation logs"
-          }
-        },
-        "publishing": {
-          "title": "Publishing",
-          "rows": {
-            "socialChannels": "Social channels",
-            "scheduledPublishing": "Scheduled publishing",
-            "channelPreviews": "Channel previews",
-            "multiChannelUpload": "Multi-channel upload"
-          }
-        },
-        "analytics": {
-          "title": "Analytics & support",
-          "rows": {
-            "usageDashboard": "Usage dashboard",
-            "campaignAnalytics": "Campaign analytics",
-            "ruleFeedback": "Rule improvement feedback",
-            "prioritySupport": "Priority support"
-          }
-        }
-      }
-    }
+    "empty": "No plans available right now."
   },
   "footer": {
     "tagline": "AI content and publishing built for Thai SMEs and the agencies that grow them.",

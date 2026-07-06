@@ -141,7 +141,11 @@
     "nodeDone": "完成",
     "nodePending": "待处理",
     "generated": "已生成",
-    "rerun": "重新运行"
+    "rerun": "重新运行",
+    "running": "运行中",
+    "noOutputYet": "暂无输出",
+    "seeMore": "查看更多",
+    "seeLess": "收起"
   },
   "version": {
     "restore": "恢复"

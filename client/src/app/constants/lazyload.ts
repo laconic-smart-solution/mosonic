@@ -28,11 +28,6 @@ export const UsageTopupPage = PageLoader(
 export const UsagePlansPage = PageLoader(
   lazy(() => import("@/features/usage/pages/usage-plans-page")),
 )
-export const LogsPage         = PageLoader(lazy(() => import("@/features/logs/pages/logs")))
-export const ComponentsLibPage      = PageLoader(lazy(() => import("@/features/components-lib/pages/components-lib")))
-export const WorkflowGeneratePage   = PageLoader(lazy(() => import("@/features/workflow/pages/workflow-generate")))
-
-export const UsagePage = PageLoader(lazy(() => import("@/features/usage/pages/usage")))
 export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
 export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
 export const AboutPage = PageLoader(lazy(() => import("@/features/marketing/pages/about")))

@@ -111,27 +111,4 @@ export const pipelineService = {
     const response = await apiClient.patch(`/pipeline/${pipelineId}`, payload)
     return response.data
   },
-
-  replan: async (
-    pipelineId: string,
-    operations: Array<
-      | { op: "skip_node"; nodeId: string }
-      | { op: "retry_node"; nodeId: string }
-      | { op: "remove_pending_node"; nodeId: string }
-      | {
-          op: "insert_node"
-          afterNodeId: string
-          spec: {
-            type: string
-            lane?: string | null
-            config?: Record<string, unknown>
-          }
-        }
-    >,
-  ): Promise<{ success: boolean; nodeCount: number }> => {
-    const response = await apiClient.post(`/pipeline/${pipelineId}/replan`, {
-      operations,
-    })
-    return response.data
-  },
 }

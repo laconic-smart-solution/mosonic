@@ -396,9 +396,6 @@
     "retryFailed": "ลองใหม่ไม่ได้ ลองอีกครั้ง",
     "skipFailed": "ข้ามไม่ได้ ลองอีกครั้ง",
     "describeWorkflow": "กรุณาอธิบายเวิร์กโฟลว์ที่ต้องการสร้าง",
-    "noReplanNode": "ไม่มีโหนดสำหรับแนบ replan",
-    "translationInserted": "แทรกโหนดแปลแล้ว กำลังดำเนินการต่อ…",
-    "replanFailed": "Replan ล้มเหลว",
     "pipelineStopped": "หยุดไปป์ไลน์แล้ว"
   },
   "processing": {
@@ -406,10 +403,6 @@
     "retrying": "กำลังลองใหม่... ครั้งที่ {{attempt}}/{{max}}",
     "running": "กำลังรัน...",
     "nodesCompleted": "เสร็จ {{completed}} จาก {{total}} โหนด",
-    "pipelinePaused": "ไปป์ไลน์หยุดชั่วคราว",
-    "pipelinePausedChannel": "ไปป์ไลน์หยุดชั่วคราว (ช่องทาง: {{channel}})",
-    "pipelinePausedHint": "— ลองใหม่ที่โหนดที่ล้มเหลวหรือใช้ replan ด้านล่าง",
-    "addTranslationLane": "เพิ่มแปล (สาย)",
     "startOver": "เริ่มใหม่",
     "systemMessagesEnglishHint": "ข้อความจากเซิร์ฟเวอร์อาจแสดงเป็นภาษาอังกฤษ"
   },

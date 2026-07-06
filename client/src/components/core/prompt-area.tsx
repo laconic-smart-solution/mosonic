@@ -72,6 +72,11 @@ export function PromptArea({
 
   const hasContent = value.trim().length > 0 || attachments.length > 0
 
+  const getTextareaMaxHeight = React.useCallback(() => {
+    if (typeof window === "undefined") return 200
+    return window.matchMedia("(max-width: 639px)").matches ? 128 : 200
+  }, [])
+
   const focusTextarea = React.useCallback(() => {
     if (disabled) return
     setExpanded(true)
@@ -94,12 +99,13 @@ export function PromptArea({
   React.useLayoutEffect(() => {
     const el = textareaRef.current
     if (!el) return
+    const maxHeight = getTextareaMaxHeight()
     el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-  }, [value, expanded])
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+  }, [value, expanded, getTextareaMaxHeight])
 
   React.useEffect(() => {
-    function handleOutside(e: MouseEvent) {
+    function handleOutside(e: PointerEvent) {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
@@ -108,8 +114,8 @@ export function PromptArea({
         if (!hasContent) setExpanded(false)
       }
     }
-    document.addEventListener("mousedown", handleOutside)
-    return () => document.removeEventListener("mousedown", handleOutside)
+    document.addEventListener("pointerdown", handleOutside)
+    return () => document.removeEventListener("pointerdown", handleOutside)
   }, [hasContent])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -180,7 +186,7 @@ export function PromptArea({
           : "cursor-text",
         expanded
           ? "rounded-2xl border-teal-400"
-          : "rounded-full border-border hover:border-muted-foreground/40",
+          : "rounded-2xl border-border sm:rounded-full hover:border-muted-foreground/40",
         className
       )}
       onPointerDownCapture={(e) => {
@@ -211,7 +217,7 @@ export function PromptArea({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+            <div className="flex flex-wrap gap-1.5 px-3 pt-3 sm:px-4">
               {attachments.map((att) => (
                 <motion.span
                   key={att.id}
@@ -230,14 +236,16 @@ export function PromptArea({
                   ) : (
                     <Globe className="h-3 w-3" />
                   )}
-                  <span className="max-w-[200px] truncate">{att.label}</span>
+                  <span className="max-w-[calc(100vw-6rem)] truncate sm:max-w-[200px]">
+                    {att.label}
+                  </span>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       removeAttachment(att.id)
                     }}
-                    className="opacity-50 transition-opacity hover:opacity-100"
+                    className="-m-1 rounded-full p-1 opacity-50 transition-opacity hover:opacity-100 touch-manipulation"
                     aria-label={`Remove ${att.label}`}
                   >
                     <X className="h-3 w-3" />
@@ -260,45 +268,52 @@ export function PromptArea({
             className="overflow-hidden"
           >
             <div
-              className="flex items-center gap-1.5 px-4 pt-3"
+              className="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center sm:gap-1.5 sm:px-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <input
-                type="text"
-                value={urlValue}
-                onChange={(e) => setUrlValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    addUrl()
-                  }
-                  if (e.key === "Escape") {
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <input
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={urlValue}
+                  onChange={(e) => setUrlValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      addUrl()
+                    }
+                    if (e.key === "Escape") {
+                      setUrlOpen(false)
+                      setUrlValue("")
+                    }
+                  }}
+                  placeholder="https://example.com"
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-md border border-border bg-card px-2.5 py-2 text-base outline-none transition-colors focus:border-teal-400 sm:py-1.5 sm:text-sm"
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={addUrl}
+                  className="min-h-10 rounded-md bg-navy-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-navy-500 touch-manipulation sm:min-h-0 sm:py-1.5"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setUrlOpen(false)
                     setUrlValue("")
-                  }
-                }}
-                placeholder="https://example.com"
-                autoFocus
-                className="flex-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm outline-none transition-colors focus:border-teal-400"
-              />
-              <button
-                type="button"
-                onClick={addUrl}
-                className="rounded-md bg-navy-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-navy-500"
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUrlOpen(false)
-                  setUrlValue("")
-                }}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-muted"
-              >
-                Cancel
-              </button>
+                  }}
+                  className="min-h-10 rounded-md border border-border px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-muted touch-manipulation sm:min-h-0 sm:py-1.5"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -306,8 +321,8 @@ export function PromptArea({
 
       <div
         className={cn(
-          "flex w-full items-center",
-          expanded ? "px-4 pb-2 pt-3" : "h-[52px] pl-5 pr-1.5"
+          "flex w-full items-end sm:items-center",
+          expanded ? "px-3 pb-2 pt-3 sm:px-4" : "min-h-[52px] pl-4 pr-1.5 sm:pl-5"
         )}
       >
         <textarea
@@ -318,17 +333,23 @@ export function PromptArea({
           disabled={disabled}
           placeholder={disabled ? "Save workflow changes or exit run view first" : placeholder}
           rows={1}
+          enterKeyHint="send"
           className={cn(
-            "min-w-0 flex-1 resize-none border-none bg-transparent text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground placeholder:line-clamp-1",
+            "min-w-0 flex-1 resize-none border-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground placeholder:line-clamp-1 sm:text-sm",
             disabled && "pointer-events-none",
             expanded
-              ? "max-h-[200px] min-h-[24px]"
+              ? "max-h-[min(128px,40dvh)] min-h-[24px] sm:max-h-[200px]"
               : "h-6 overflow-hidden"
           )}
           onPointerDown={(e) => e.stopPropagation()}
           onFocus={() => {
             onFocus?.()
             setExpanded(true)
+            if (window.matchMedia("(max-width: 639px)").matches) {
+              requestAnimationFrame(() => {
+                textareaRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+              })
+            }
           }}
           onBlur={onBlur}
         />
@@ -340,7 +361,7 @@ export function PromptArea({
           }}
           disabled={submitLocked || !hasContent}
           className={cn(
-            "ml-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-[0.92]",
+            "ml-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors active:scale-[0.92] touch-manipulation sm:h-9 sm:w-9",
             "disabled:cursor-not-allowed",
             submitLocked || !hasContent
               ? "bg-muted text-muted-foreground"
@@ -369,7 +390,7 @@ export function PromptArea({
             className="overflow-hidden"
           >
             <div
-              className="flex items-center gap-0.5 border-t border-border px-3 py-2"
+              className="flex flex-wrap items-center gap-0.5 border-t border-border px-2 py-2 sm:px-3"
               onClick={(e) => e.stopPropagation()}
             >
               {enableFiles && (
@@ -395,9 +416,11 @@ export function PromptArea({
                   label="Add image"
                 />
               )}
-              <div className="flex-1" />
-              <span className="mr-2 tabular-nums text-[11px] text-muted-foreground">
-                {value.length} / {maxLength}
+              <span className="ml-auto mr-1 shrink-0 tabular-nums text-[11px] text-muted-foreground sm:mr-2">
+                <span className="sm:hidden">{value.length}</span>
+                <span className="hidden sm:inline">
+                  {value.length} / {maxLength}
+                </span>
               </span>
             </div>
           </motion.div>
@@ -425,7 +448,7 @@ function ToolButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+        "flex h-10 w-10 items-center justify-center rounded-md transition-colors touch-manipulation sm:h-8 sm:w-8",
         active
           ? "bg-teal-50 text-teal-700"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"

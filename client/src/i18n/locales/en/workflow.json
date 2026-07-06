@@ -401,9 +401,6 @@
     "retryFailed": "Could not retry. Please try again.",
     "skipFailed": "Could not skip. Please try again.",
     "describeWorkflow": "Please describe what workflow should be generated.",
-    "noReplanNode": "No node to attach replan operation.",
-    "translationInserted": "Translation node inserted; resuming…",
-    "replanFailed": "Replan failed.",
     "pipelineStopped": "Pipeline stopped"
   },
   "processing": {
@@ -411,10 +408,6 @@
     "retrying": "Retrying... attempt {{attempt}}/{{max}}",
     "running": "Running...",
     "nodesCompleted": "{{completed}} of {{total}} nodes completed",
-    "pipelinePaused": "Pipeline paused",
-    "pipelinePausedChannel": "Pipeline paused (channel: {{channel}})",
-    "pipelinePausedHint": "— retry the failed node or use replan actions below.",
-    "addTranslationLane": "Add translation (lane)",
     "startOver": "Start Over",
     "systemMessagesEnglishHint": "System messages from the server may appear in English."
   },
