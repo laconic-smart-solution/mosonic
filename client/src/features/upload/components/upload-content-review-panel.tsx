@@ -42,7 +42,7 @@ import {
   mergeNodeOutputLayers,
   outputKeyForNodeType,
 } from "@/features/content/data/content-review-helpers"
-import { buildGenerationNodesForContent, resolveNodeConfigSource } from "@/features/upload/lib/upload-generation-nodes"
+import { buildGenerationNodesForContent } from "@/features/upload/lib/upload-generation-nodes"
 import {
   filterGenerationNodesForChannel,
   staticTextFromLayer,
@@ -337,22 +337,6 @@ export function UploadContentReviewPanel({
       markDirty()
     },
     [markDirty]
-  )
-
-  const getNodeConfigById = useCallback(
-    (nodeId: string) => {
-      const n = resolveNodeConfigSource(
-        nodeId,
-        workflowNodes,
-        pipelineQuery.data?.nodes,
-      )
-      if (!n) return {}
-      return {
-        ...buildGenerateMoreDefaultConfig(n.type, ruleHint),
-        ...(n.config ?? {}),
-      }
-    },
-    [pipelineQuery.data?.nodes, ruleHint, workflowNodes],
   )
 
   const setRunState = useCallback(
