@@ -99,7 +99,7 @@ const NAV: NavItem[] = [
     id: "rules",
     labelKey: "nav.rules",
     path: "/rules",
-    icon: (active) => (
+    icon: () => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
           d="M3 4h10M3 8h7M3 12h5"
@@ -121,7 +121,7 @@ const NAV: NavItem[] = [
     id: "workflows",
     labelKey: "nav.workflows",
     path: "/workflows",
-    icon: (active) => (
+    icon: () => (
       <GitBranch
         className="size-4 shrink-0"
         strokeWidth={1.65}
@@ -133,7 +133,7 @@ const NAV: NavItem[] = [
     id: "pipelines",
     labelKey: "nav.pipelines",
     path: "/pipelines",
-    icon: (active) => (
+    icon: () => (
       <Play
         className="size-4 shrink-0"
         strokeWidth={1.65}
@@ -146,7 +146,7 @@ const NAV: NavItem[] = [
     labelKey: "nav.content",
     path: "/content",
     badgeColor: "#D97706",
-    icon: (active) => (
+    icon: () => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <rect
           x="2"
@@ -170,7 +170,7 @@ const NAV: NavItem[] = [
     id: "posts",
     labelKey: "nav.posts",
     path: "/posts",
-    icon: (active) => (
+    icon: () => (
       <Megaphone
         className="size-4 shrink-0"
         strokeWidth={1.65}
@@ -182,7 +182,7 @@ const NAV: NavItem[] = [
     id: "usage",
     labelKey: "nav.usage",
     path: "/usage",
-    icon: (active) => (
+    icon: () => (
       <Wallet
         className="size-4 shrink-0"
         strokeWidth={1.65}
@@ -194,7 +194,7 @@ const NAV: NavItem[] = [
     id: "settings-accounts",
     labelKey: "nav.settingsAccounts",
     path: "/settings/accounts",
-    icon: (active) => (
+    icon: () => (
       <UserCog
         className="size-4 shrink-0"
         strokeWidth={1.65}

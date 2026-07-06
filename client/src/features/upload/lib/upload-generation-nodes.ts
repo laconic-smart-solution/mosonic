@@ -33,11 +33,7 @@ function templateNodeIdBase(nodeId: string, lanes?: string[]): string {
 export function resolveNodeConfigSource(
   nodeId: string,
   workflowNodes: WorkflowNode[],
-  pipelineNodes?: Array<{
-    nodeId: string
-    config?: Record<string, unknown>
-    lane?: string | null
-  }>,
+  pipelineNodes?: PipelineNodeSnapshot[],
 ): WorkflowNode | undefined {
   const direct = workflowNodes.find((n) => n.nodeId === nodeId)
   if (direct) return direct
