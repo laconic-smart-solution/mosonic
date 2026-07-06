@@ -39,6 +39,7 @@ export function useCreditTopupMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
+      void queryClient.invalidateQueries({ queryKey: ["pipeline", "review-estimate"] })
       void queryClient.invalidateQueries({ queryKey: creditQueryKeys.generationCosts })
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
     },

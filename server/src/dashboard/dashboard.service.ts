@@ -40,9 +40,15 @@ function monthRange(now: Date): DateRange {
   return { from, to };
 }
 
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value as string);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function safeIso(d: unknown): string | null {
-  if (d instanceof Date && !Number.isNaN(d.getTime())) return d.toISOString();
-  return null;
+  const parsed = toDate(d);
+  return parsed?.toISOString() ?? null;
 }
 
 function flattenChannels(uploads: UploadRecord[]): FlatChannel[] {
@@ -56,9 +62,9 @@ function flattenChannels(uploads: UploadRecord[]): FlatChannel[] {
         channel: ch.channel,
         caption: (ch.caption ?? '').toString(),
         status: ch.status as UploadChannelStatus,
-        scheduledAt: ch.scheduledAt ?? null,
-        publishedAt: ch.publishedAt ?? null,
-        updatedAt: upload.updatedAt,
+        scheduledAt: toDate(ch.scheduledAt),
+        publishedAt: toDate(ch.publishedAt),
+        updatedAt: toDate(upload.updatedAt) ?? new Date(),
       });
     }
   }

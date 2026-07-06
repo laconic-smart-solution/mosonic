@@ -177,9 +177,6 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   { pattern: "/usage/plans", labelKey: "tabs.plans", ns: "usage", href: "/usage/plans", parent: "/usage" },
   { pattern: "/usage/topup", labelKey: "tabs.topup", ns: "usage", href: "/usage/topup", parent: "/usage" },
   { pattern: "/usage", labelKey: "nav.usage", href: "/usage" },
-  { pattern: "/logs", labelKey: "routes.logs", href: "/logs" },
-  { pattern: "/components", labelKey: "routes.components", href: "/components" },
-  { pattern: "/run", labelKey: "routes.liveRun", href: "/run" },
 
   // Auth
   { pattern: "/login", labelKey: "signIn.title", ns: "auth", href: "/login", parent: "/" },

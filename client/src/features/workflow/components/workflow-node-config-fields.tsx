@@ -374,6 +374,11 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
   }
 }
 
+/** True when the node type exposes editable fields in the configuration dialog. */
+export function nodeHasConfigurableSettings(canvasType: string): boolean {
+  return (getWorkflowNodeFieldDefs()[canvasType] ?? []).length > 0
+}
+
 /** Locale-aware field definitions; refreshed when language changes via getWorkflowNodeFieldDefs(). */
 export const WORKFLOW_NODE_FIELD_DEFS = getWorkflowNodeFieldDefs()
 

@@ -1,4 +1,5 @@
 import { RuleStatus as PrismaRuleStatus } from '@prisma/client';
+import type { RuleIntakeAnswers } from '../rule-intake.types';
 
 export const RuleStatus = {
   ...PrismaRuleStatus,
@@ -26,6 +27,7 @@ export enum OriginalInputType {
   File = 'file',
   Url = 'url',
   Text = 'text',
+  Structured = 'structured',
 }
 
 export enum VersionChangedBy {
@@ -169,6 +171,8 @@ export interface Rule {
   channels: ChannelEntry[];
   contentGuidelines: ContentGuidelines;
   originalInput: OriginalInput;
+  /** Structured wizard answers from rule creation (guided or express). */
+  intake?: RuleIntakeAnswers | null;
   status: RuleStatus;
   versions: RuleVersion[];
   approvalPolicy: Array<{ role: string; required: boolean }>;

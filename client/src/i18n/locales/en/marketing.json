@@ -4,7 +4,9 @@
     "landing": "Home",
     "create": "Create",
     "pricing": "Pricing",
-    "about": "About"
+    "about": "About",
+    "menu": "Menu",
+    "openMenu": "Open menu"
   },
   "landing": {
     "hero": {

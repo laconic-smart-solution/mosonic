@@ -51,6 +51,17 @@ export function incrementNodeRetry(
   );
 }
 
+export function incrementReviewRegenerate(
+  nodes: PipelineNodeExecution[],
+  nodeId: string,
+): PipelineNodeExecution[] {
+  return nodes.map((n) =>
+    n.nodeId === nodeId
+      ? { ...n, reviewRegenerateCount: (n.reviewRegenerateCount ?? 0) + 1 }
+      : n,
+  );
+}
+
 export function applyNodeStatusUpdate(
   nodes: PipelineNodeExecution[],
   nodeId: string,

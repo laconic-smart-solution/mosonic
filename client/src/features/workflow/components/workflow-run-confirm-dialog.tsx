@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AlertTriangle, Coins, Loader2, Play, Wallet } from "lucide-react"
 
@@ -12,6 +12,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import {
+  readStoredPipelineExecutionMode,
+  writeStoredPipelineExecutionMode,
+  type PipelineUserExecutionMode,
+} from "@/features/workflow/lib/pipeline-execution-mode.storage"
 import { usePipelineEstimateQuery } from "@/shared/queries/pipeline.query"
 import { TopupDialog } from "@/features/credit/components/topup-dialog"
 
@@ -20,8 +25,9 @@ type Props = {
   onOpenChange: (open: boolean) => void
   workflowId: string | undefined
   ruleId: string | undefined
-  onConfirm: () => void
+  onConfirm: (executionMode: PipelineUserExecutionMode) => void
   isStarting?: boolean
+  showFreshnessWarning?: boolean
 }
 
 function formatCredits(value: number): string {
@@ -35,10 +41,21 @@ export function WorkflowRunConfirmDialog({
   ruleId,
   onConfirm,
   isStarting = false,
+  showFreshnessWarning = false,
 }: Props) {
   const { t } = useTranslation("credit")
+  const { t: tWorkflow } = useTranslation("workflow")
   const [topupOpen, setTopupOpen] = useState(false)
+  const [executionMode, setExecutionMode] = useState<PipelineUserExecutionMode>(
+    () => readStoredPipelineExecutionMode(),
+  )
   const estimateQuery = usePipelineEstimateQuery(workflowId, ruleId, open)
+
+  useEffect(() => {
+    if (open) {
+      setExecutionMode(readStoredPipelineExecutionMode())
+    }
+  }, [open])
 
   const estimate = estimateQuery.data
   const loading = estimateQuery.isLoading || estimateQuery.isFetching
@@ -49,6 +66,11 @@ export function WorkflowRunConfirmDialog({
 
   const confirmDisabled =
     isStarting || loading || estimateQuery.isError || !estimate || !sufficient
+
+  function selectMode(mode: PipelineUserExecutionMode) {
+    setExecutionMode(mode)
+    writeStoredPipelineExecutionMode(mode)
+  }
 
   return (
     <>
@@ -75,6 +97,64 @@ export function WorkflowRunConfirmDialog({
             </p>
           ) : (
             <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  {tWorkflow("stepMode.executionModeTitle")}
+                </span>
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border p-1">
+                  <button
+                    type="button"
+                    disabled={isStarting}
+                    onClick={() => selectMode("auto")}
+                    className={cn(
+                      "rounded-xl px-3 py-2 text-left text-sm transition-colors",
+                      executionMode === "auto"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted/60",
+                    )}
+                  >
+                    <span className="block font-medium">
+                      {tWorkflow("stepMode.auto")}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-[11px]",
+                        executionMode === "auto"
+                          ? "text-primary-foreground/80"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {tWorkflow("stepMode.autoHint")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isStarting}
+                    onClick={() => selectMode("step")}
+                    className={cn(
+                      "rounded-xl px-3 py-2 text-left text-sm transition-colors",
+                      executionMode === "step"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted/60",
+                    )}
+                  >
+                    <span className="block font-medium">
+                      {tWorkflow("stepMode.step")}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-[11px]",
+                        executionMode === "step"
+                          ? "text-primary-foreground/80"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {tWorkflow("stepMode.stepHint")}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-border bg-muted/30 p-3">
                   <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -149,6 +229,18 @@ export function WorkflowRunConfirmDialog({
                 </div>
               )}
 
+              {showFreshnessWarning && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="size-4" />
+                    {tWorkflow("freshness.warningTitle")}
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {tWorkflow("freshness.warning")}
+                  </p>
+                </div>
+              )}
+
               {!sufficient && totalCredits > 0 && (
                 <div className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
@@ -181,7 +273,10 @@ export function WorkflowRunConfirmDialog({
             >
               {t("runConfirm.cancel")}
             </Button>
-            <Button onClick={onConfirm} disabled={confirmDisabled}>
+            <Button
+              onClick={() => onConfirm(executionMode)}
+              disabled={confirmDisabled}
+            >
               {isStarting && <Loader2 className="size-4 animate-spin" />}
               {isStarting
                 ? t("runConfirm.starting")

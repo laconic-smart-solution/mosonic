@@ -5,10 +5,11 @@ export type StrategyAttachment = {
   data?: File | string
 }
 
-/** Multipart body for `POST /rule/extract`: fields `input`, repeated `files`, optional `urls` (JSON array). */
+/** Multipart body for `POST /rule/extract`: fields `input`, repeated `files`, optional `urls` (JSON array), optional `intake` (JSON). */
 export function buildRuleExtractFormData(
   text: string,
   attachments: StrategyAttachment[],
+  intake?: Record<string, unknown>,
 ): FormData {
   const fd = new FormData()
   const trimmed = text.trim()
@@ -26,6 +27,7 @@ export function buildRuleExtractFormData(
     fd.append("files", a.data)
   }
   if (urls.length > 0) fd.append("urls", JSON.stringify(urls))
+  if (intake) fd.append("intake", JSON.stringify(intake))
   return fd
 }
 

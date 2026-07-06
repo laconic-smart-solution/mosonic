@@ -59,6 +59,56 @@
     "description": "输入活动背景信息，我们将据此创建规则。",
     "placeholder": "描述您的品牌、受众、渠道和活动目标…"
   },
+  "qaWizard": {
+    "title": "创建活动规则",
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "yes": "是",
+    "no": "否",
+    "back": "上一步",
+    "next": "下一步",
+    "generate": "创建规则",
+    "generating": "创建中…",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "path": {
+      "guidedTitle": "引导设置",
+      "guidedDescription": "回答品牌、受众和渠道问题，仍可附加文件和链接。",
+      "expressTitle": "快速",
+      "expressShort": "仅提示词 + 文件",
+      "expressDescription": "粘贴简报或上传资料，可选内容用途。"
+    },
+    "purpose": {
+      "social_marketing": { "title": "社交营销", "description": "社交媒体帖子、广告和活动。" },
+      "thought_leadership": { "title": "思想领导力", "description": "专业见解与权威内容。" },
+      "internal_comms": { "title": "内部沟通", "description": "团队、HR 或内部公告。" },
+      "educational": { "title": "教育", "description": "教学、讲解与教程。" },
+      "ecommerce": { "title": "电商", "description": "产品推广与转化文案。" },
+      "other": { "title": "其他", "description": "其他 — 在备注中说明。" }
+    },
+    "languages": {
+      "thai": "泰语", "english": "英语", "japanese": "日语", "chinese": "中文",
+      "korean": "韩语", "spanish": "西班牙语", "french": "法语", "german": "德语"
+    },
+    "validation": {
+      "selectPurpose": "请选择内容用途。",
+      "selectAtLeastOneChannel": "请至少选择一个渠道。",
+      "selectPrimaryLanguage": "请选择受众主要语言。"
+    },
+    "review": {
+      "purpose": "用途", "brand": "品牌", "audience": "受众",
+      "channels": "渠道", "sources": "资料来源", "sourceSummary": "{{count}} 个附件"
+    },
+    "steps": {
+      "purpose": { "title": "内容用途是什么？", "description": "影响提取规则时的语气、CTA 和标签默认值。", "notesPlaceholder": "可选用途备注…" },
+      "sources": { "title": "资料来源", "description": "添加简报、链接、文档或品牌图片（若上一步已填写可跳过）。", "placeholder": "粘贴简报或附加 PDF、URL、图片…" },
+      "brand": { "title": "品牌", "description": "谁在发声？留空则从资料推断。", "toneLabel": "品牌语气标签", "tonePlaceholder": "例如：友好、专业" },
+      "audience": { "title": "受众", "description": "内容应触达谁？", "locationsLabel": "地区", "locationsPlaceholder": "例如：泰国、曼谷", "primaryLanguageLabel": "主要语言", "targetLanguagesLabel": "目标语言（可选）" },
+      "channels": { "title": "发布渠道", "description": "内容将发布到哪里？" },
+      "campaign": { "title": "活动", "description": "目标、关键词与时间。", "goalsPlaceholder": "例如：品牌知名度", "keywordsPlaceholder": "例如：AI 营销", "useHashtags": "规则中包含话题标签", "hashtagsPlaceholder": "例如：#品牌名", "formatsPlaceholder": "例如：短帖", "startDate": "开始日期", "endDate": "结束日期" },
+      "guidelines": { "title": "指南", "description": "注意事项与 SEO。", "dosPlaceholder": "例如：使用表情", "dontsPlaceholder": "例如：不提竞争对手", "requiredPlaceholder": "例如：始终包含 CTA", "useSeo": "包含 SEO 关键词指引", "seoPlaceholder": "例如：AI 内容生成" },
+      "review": { "title": "确认", "description": "提取规则前请确认。" }
+    }
+  },
   "drawer": {
     "title": "规则列表",
     "description": "选择规则以更新画布。",

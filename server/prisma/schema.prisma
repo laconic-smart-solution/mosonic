@@ -43,9 +43,14 @@ enum PipelineStatus {
   paused
 }
 
-enum PipelineExecutionMode {
+enum PipelineDispatchMode {
   inline
   queue
+}
+
+enum PipelineUserExecutionMode {
+  auto
+  step
 }
 
 enum PipelineNodeExecutionStatus {
@@ -54,6 +59,7 @@ enum PipelineNodeExecutionStatus {
   completed
   failed
   skipped
+  waiting_review
 }
 
 enum ContentStatus {
@@ -415,6 +421,7 @@ model Rule {
   channels         Json       @default("[]")
   contentGuidelines Json      @default("{}")
   originalInput    Json       @default("{}")
+  intake           Json?
   status           RuleStatus @default(active)
   versions         Json       @default("[]")
   approvalPolicy   Json       @default("[]")
@@ -442,7 +449,8 @@ model Pipeline {
   completedAt           DateTime?
   pausedNodeId          String?
   pausedLaneId          String?
-  executionMode         PipelineExecutionMode @default(inline)
+  dispatchMode          PipelineDispatchMode      @default(inline)
+  executionMode         PipelineUserExecutionMode @default(auto)
   graph                 Json                  @default("{}")
   ruleOverlay           Json?
   metadata              Json                  @default("{}")

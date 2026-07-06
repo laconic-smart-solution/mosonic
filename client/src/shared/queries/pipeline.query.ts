@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import i18n from "@/i18n"
 import { pipelineService } from "../services/pipeline.service"
+import { usageQueryKeys } from "./usage.query"
 import type {
   GetPipelineResponse,
   PipelinePageQueryPayload,
   PipelineStatsResponse,
+  NodeReviewPayload,
   RetryNodePayload,
   SkipNodePayload,
   StartPipelinePayload,
@@ -72,6 +74,51 @@ export const useSkipNodeMutation = () => {
       payload: SkipNodePayload
     }) => pipelineService.skipNode(pipelineId, payload),
     meta: { toastNs: "workflow", toastKey: "toasts.skipFailed", silent: true },
+  })
+}
+
+export const useReviewNodeMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      pipelineId,
+      nodeId,
+      payload,
+    }: {
+      pipelineId: string
+      nodeId: string
+      payload: NodeReviewPayload
+    }) => pipelineService.reviewNode(pipelineId, nodeId, payload),
+    onSuccess: (_data, variables) => {
+      if (variables.payload.action === "regenerate") {
+        void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
+        void queryClient.invalidateQueries({
+          queryKey: [
+            "pipeline",
+            "review-estimate",
+            variables.pipelineId,
+            variables.nodeId,
+          ],
+        })
+      }
+    },
+    meta: { toastNs: "workflow", toastKey: "stepMode.reviewFailed", silent: true },
+  })
+}
+
+export const useReviewRegenerateEstimateQuery = (
+  pipelineId: string | undefined,
+  nodeId: string | undefined,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ["pipeline", "review-estimate", pipelineId ?? "", nodeId ?? ""],
+    queryFn: () =>
+      pipelineService.estimateReviewRegenerate(pipelineId!, nodeId!),
+    enabled: enabled && !!pipelineId && !!nodeId,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
   })
 }
 

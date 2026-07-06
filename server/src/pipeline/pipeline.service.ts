@@ -146,9 +146,36 @@ export class PipelineService {
     ruleId: string;
     contentPrompt: string;
     useLearnings?: boolean;
+    executionMode?: 'auto' | 'step';
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     return this.orchestration.startPipeline(args);
+  }
+
+  estimateReviewRegenerate(
+    pipelineId: string,
+    nodeId: string,
+    auth: TenancyAuth,
+  ) {
+    return this.orchestration.estimateReviewRegenerateCredits(
+      pipelineId,
+      nodeId,
+      auth,
+    );
+  }
+
+  reviewNode(
+    pipelineId: string,
+    nodeId: string,
+    dto: {
+      action: 'continue' | 'edit' | 'regenerate';
+      editedContent?: string;
+      regenerateInstruction?: string;
+      mediaUrl?: string;
+    },
+    auth: TenancyAuth,
+  ): Promise<{ success: boolean; noop?: boolean }> {
+    return this.orchestration.reviewNode(pipelineId, nodeId, dto, auth);
   }
 
   estimatePipeline(dto: EstimatePipelineDto, auth: TenancyAuth) {

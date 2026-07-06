@@ -125,6 +125,7 @@ export class NodeExecutor {
       contentPrompt: input.context.contentPrompt,
       previousOutputs: input.context.previousOutputs,
       intelligenceContext: input.intelligenceContext,
+      nodeUserPrompt: input.node.userPrompt?.trim() || undefined,
       onChunk: (chunk) => {
         this.emitDual(input, 'node:streaming', {
           pipelineId: input.pipelineId,
@@ -138,21 +139,23 @@ export class NodeExecutor {
     await this.recordNodeCostIfApplicable(input, result);
     const output = this.mapNodeOutput(input.node.type, result);
 
-    this.events.emitToPipeline(input.pipelineId, 'node:completed', {
-      pipelineId: input.pipelineId,
-      nodeId: input.node.nodeId,
-      nodeType: input.node.type,
-      order: input.node.order,
-      totalNodes: input.totalNodes,
-      output,
-    });
-    if (input.contentId) {
-      this.events.emitToContent(input.contentId, 'node:rerun_completed', {
-        contentId: input.contentId,
+    if (!input.suppressCompletedEmit) {
+      this.events.emitToPipeline(input.pipelineId, 'node:completed', {
+        pipelineId: input.pipelineId,
         nodeId: input.node.nodeId,
         nodeType: input.node.type,
+        order: input.node.order,
+        totalNodes: input.totalNodes,
         output,
       });
+      if (input.contentId) {
+        this.events.emitToContent(input.contentId, 'node:rerun_completed', {
+          contentId: input.contentId,
+          nodeId: input.node.nodeId,
+          nodeType: input.node.type,
+          output,
+        });
+      }
     }
 
     return { nodeId: input.node.nodeId, type: input.node.type, output };

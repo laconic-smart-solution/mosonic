@@ -5,6 +5,7 @@ export type StartPipelinePayload = {
   ruleId: string
   contentPrompt: string
   useLearnings?: boolean
+  executionMode?: "auto" | "step"
 }
 
 export type StartPipelineResponse = {
@@ -81,6 +82,25 @@ export type UpdatePipelineNameResponse = {
   name: string
 }
 
+export type NodeReviewPayload = {
+  action: "continue" | "edit" | "regenerate"
+  editedContent?: string
+  regenerateInstruction?: string
+  mediaUrl?: string
+}
+
+export type NodeReviewResponse = {
+  success: boolean
+  noop?: boolean
+}
+
+export type ReviewRegenerateEstimateResponse = {
+  creditsRequired: number
+  creditsRemaining: number
+  sufficient: boolean
+  creditNodeType: string | null
+}
+
 export type RetryNodePayload = {
   nodeId: string
 }
@@ -103,6 +123,7 @@ export type PipelineNodeRuntimeStatus =
   | "completed"
   | "failed"
   | "skipped"
+  | "waiting_review"
 export type PipelineStatus = "running" | "paused" | "completed" | "failed"
 
 export type PipelineNodeSnapshot = {
@@ -116,6 +137,7 @@ export type PipelineNodeSnapshot = {
   status: PipelineNodeRuntimeStatus
   output: Record<string, unknown> | null
   retryCount: number
+  reviewRegenerateCount?: number
   executedAt: string | null
 }
 
@@ -127,6 +149,7 @@ export type GetPipelineResponse = {
     name: string
     contentPrompt: string
     status: PipelineStatus
+    executionMode?: "auto" | "step"
     pausedNodeId?: string | null
     pausedLaneId?: string | null
     startedAt: string

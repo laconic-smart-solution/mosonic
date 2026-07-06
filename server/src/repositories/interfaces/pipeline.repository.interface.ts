@@ -36,6 +36,8 @@ export interface IPipelineRepository {
   distinctUserIdsSince(startedAtGte: Date): Promise<string[]>;
   claimCreditReconciliation(pipelineId: string): Promise<boolean>;
   markCreditsReconciled(pipelineId: string): Promise<void>;
+  /** Atomically marks a running pipeline completed; returns false if already finalized. */
+  claimPipelineFinalization(pipelineId: string): Promise<boolean>;
   findNodesSummaryByIds(
     pipelineIds: string[],
     auth?: TenancyAuth,
@@ -66,6 +68,19 @@ export interface IPipelineRepository {
   ): Promise<void>;
   markNodeSkipped(pipelineId: string, nodeId: string): Promise<void>;
   resetNodeToPending(pipelineId: string, nodeId: string): Promise<void>;
+  prepareNodeForReviewRegenerate(
+    pipelineId: string,
+    nodeId: string,
+    options: {
+      reviewRegeneratePrompt: string | null;
+      clearOutput?: boolean;
+    },
+  ): Promise<void>;
+  patchNode(
+    pipelineId: string,
+    nodeId: string,
+    patch: Partial<PipelineNodeExecution>,
+  ): Promise<void>;
   setPipelineStatus(
     pipelineId: string,
     status: PipelineStatus,
@@ -89,4 +104,5 @@ export interface IPipelineRepository {
     edges?: WorkflowGraphEdge[],
   ): PreviousOutputs;
   allNodesTerminal(pipeline: PipelineRecord): boolean;
+  hasAwaitingReview(pipeline: PipelineRecord): boolean;
 }

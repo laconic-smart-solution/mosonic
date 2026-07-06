@@ -18,6 +18,10 @@ import type {
 } from '../../domain/content/content.types';
 import type { IContentRepository } from '../interfaces/content.repository.interface';
 import { mergeTenancyWhere } from './prisma.util';
+import {
+  dedupeContentIndexRows,
+  sortContentIndexRows,
+} from './content-page-dedupe.util';
 
 type PageDocLean = {
   contentId: string;
@@ -25,6 +29,7 @@ type PageDocLean = {
   workflowRef: string;
   ruleRef: string;
   status: ContentStatus;
+  variantId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   outputs: unknown;
@@ -64,6 +69,19 @@ export class PrismaContentRepository implements IContentRepository {
   ): Promise<ContentRecord | null> {
     return this.prisma.content.findFirst({
       where: mergeTenancyWhere({ pipelineRef }, auth),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findByPipelineAndVariant(
+    pipelineRef: string,
+    variantId: string | null,
+  ): Promise<ContentRecord | null> {
+    return this.prisma.content.findFirst({
+      where: {
+        pipelineRef,
+        variantId: variantId ?? null,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -114,33 +132,65 @@ export class PrismaContentRepository implements IContentRepository {
       where.AND = andClauses;
     }
 
-    const orderBy = { [sortBy]: sortOrder } as Prisma.ContentOrderByWithRelationInput;
+    const sortByField = sortBy === 'createdAt' ? 'createdAt' : 'updatedAt';
 
-    const [docs, total] = await Promise.all([
-      this.prisma.content.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-        select: {
-          contentId: true,
-          pipelineRef: true,
-          workflowRef: true,
-          ruleRef: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-          outputs: true,
-          userEdits: true,
-          nodeOutputs: true,
-          nodeUserEdits: true,
-          laneOutputs: true,
-        },
-      }),
-      this.prisma.content.count({ where }),
-    ]);
+    const indexRows = await this.prisma.content.findMany({
+      where,
+      select: {
+        contentId: true,
+        pipelineRef: true,
+        variantId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-    const pageDocs = docs as PageDocLean[];
+    const deduped = sortContentIndexRows(
+      dedupeContentIndexRows(
+        indexRows.map((row) => ({
+          contentId: row.contentId,
+          pipelineRef: row.pipelineRef,
+          variantId: row.variantId ?? null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        })),
+      ),
+      sortByField,
+      sortOrder,
+    );
+
+    const total = deduped.length;
+    const pageSlice = deduped.slice(skip, skip + limit);
+    const pageIds = pageSlice.map((row) => row.contentId);
+
+    if (pageIds.length === 0) {
+      return { data: [], total };
+    }
+
+    const docs = await this.prisma.content.findMany({
+      where: { contentId: { in: pageIds } },
+      select: {
+        contentId: true,
+        pipelineRef: true,
+        workflowRef: true,
+        ruleRef: true,
+        status: true,
+        variantId: true,
+        createdAt: true,
+        updatedAt: true,
+        outputs: true,
+        userEdits: true,
+        nodeOutputs: true,
+        nodeUserEdits: true,
+        laneOutputs: true,
+      },
+    });
+
+    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const pageDocs = pageIds
+      .map((id) => docById.get(id))
+      .filter((doc): doc is PageDocLean => doc != null);
+
     const pipelineRefs = [
       ...new Set(pageDocs.map((d) => d.pipelineRef).filter(Boolean)),
     ];
@@ -243,6 +293,7 @@ export class PrismaContentRepository implements IContentRepository {
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
       status: doc.status as SchemaContentStatus,
+      variantId: doc.variantId ?? null,
       createdAt: doc.createdAt.toISOString(),
       updatedAt: doc.updatedAt.toISOString(),
       outputs,
@@ -255,18 +306,33 @@ export class PrismaContentRepository implements IContentRepository {
     byStatus: Partial<Record<ContentStatus, number>>;
   }> {
     const where = mergeTenancyWhere({}, auth);
-    const rows = await this.prisma.content.groupBy({
-      by: ['status'],
+    const indexRows = await this.prisma.content.findMany({
       where,
-      _count: { _all: true },
+      select: {
+        contentId: true,
+        pipelineRef: true,
+        variantId: true,
+        createdAt: true,
+        updatedAt: true,
+        status: true,
+      },
     });
+    const deduped = dedupeContentIndexRows(
+      indexRows.map((row) => ({
+        contentId: row.contentId,
+        pipelineRef: row.pipelineRef,
+        variantId: row.variantId ?? null,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        status: row.status,
+      })),
+    );
     const byStatus: Partial<Record<ContentStatus, number>> = {};
-    let total = 0;
-    for (const row of rows) {
-      total += row._count._all;
-      byStatus[row.status] = row._count._all;
+    for (const row of deduped) {
+      if (!row.status) continue;
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
     }
-    return { total, byStatus };
+    return { total: deduped.length, byStatus };
   }
 
   async updateEditableState(
