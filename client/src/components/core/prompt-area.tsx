@@ -99,6 +99,10 @@ export function PromptArea({
   React.useLayoutEffect(() => {
     const el = textareaRef.current
     if (!el) return
+    if (!expanded) {
+      el.style.height = ""
+      return
+    }
     const maxHeight = getTextareaMaxHeight()
     el.style.height = "auto"
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
@@ -335,7 +339,7 @@ export function PromptArea({
           rows={1}
           enterKeyHint="send"
           className={cn(
-            "min-w-0 flex-1 resize-none border-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground placeholder:line-clamp-1 sm:text-sm",
+            "min-w-0 flex-1 resize-none overflow-y-auto border-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground placeholder:line-clamp-1 sm:text-sm",
             disabled && "pointer-events-none",
             expanded
               ? "max-h-[min(128px,40dvh)] min-h-[24px] sm:max-h-[200px]"
