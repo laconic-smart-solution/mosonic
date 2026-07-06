@@ -12,9 +12,61 @@ function isSkippableType(type: WorkflowNodeType): boolean {
   return SKIP_GENERATION_TYPES.has(type)
 }
 
-function templateNodeIdBase(nodeId: string): string {
+function templateNodeIdBase(nodeId: string, lanes?: string[]): string {
   const sep = nodeId.lastIndexOf("__")
-  return sep >= 0 ? nodeId.slice(0, sep) : nodeId
+  if (sep >= 0) return nodeId.slice(0, sep)
+  if (lanes?.length) {
+    const sorted = [...lanes].sort((a, b) => b.length - a.length)
+    for (const lane of sorted) {
+      const suffix = `_${lane}`
+      if (
+        nodeId.length > suffix.length &&
+        nodeId.toLowerCase().endsWith(suffix.toLowerCase())
+      ) {
+        return nodeId.slice(0, -suffix.length)
+      }
+    }
+  }
+  return nodeId
+}
+
+export function resolveNodeConfigSource(
+  nodeId: string,
+  workflowNodes: WorkflowNode[],
+  pipelineNodes?: Array<{
+    nodeId: string
+    config?: Record<string, unknown>
+    lane?: string | null
+  }>,
+): WorkflowNode | undefined {
+  const direct = workflowNodes.find((n) => n.nodeId === nodeId)
+  if (direct) return direct
+
+  const lanes = [
+    ...new Set(
+      (pipelineNodes ?? [])
+        .map((n) => n.lane?.trim())
+        .filter((lane): lane is string => Boolean(lane)),
+    ),
+  ]
+  const base = templateNodeIdBase(nodeId, lanes)
+  const template = workflowNodes.find((n) => n.nodeId === base)
+  const pipelineNode = pipelineNodes?.find((n) => n.nodeId === nodeId)
+  if (!template && !pipelineNode) return undefined
+
+  return {
+    ...(template ?? {
+      nodeId,
+      type: (pipelineNode?.type as WorkflowNodeType) ?? "text_generation",
+      order: pipelineNode?.order ?? 0,
+      isLocked: false,
+    }),
+    nodeId,
+    config: {
+      ...(template?.config ?? {}),
+      ...(pipelineNode?.config ?? {}),
+    },
+  }
 }
 
 function inferTypeFromOutputLayer(

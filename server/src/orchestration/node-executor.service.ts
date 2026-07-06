@@ -151,7 +151,7 @@ export class NodeExecutor {
       if (input.contentId) {
         this.events.emitToContent(input.contentId, 'node:rerun_completed', {
           contentId: input.contentId,
-          nodeId: input.node.nodeId,
+          nodeId: input.contentOutputNodeId ?? input.node.nodeId,
           nodeType: input.node.type,
           output,
         });
@@ -169,10 +169,17 @@ export class NodeExecutor {
     this.events.emitToPipeline(input.pipelineId, event, pipelinePayload);
     if (!input.contentId) return;
     const { pipelineId: _drop, ...rest } = pipelinePayload;
-    this.events.emitToContent(input.contentId, event, {
+    const contentPayload: Record<string, unknown> = {
       ...rest,
       contentId: input.contentId,
-    });
+    };
+    if (
+      input.contentOutputNodeId &&
+      typeof contentPayload.nodeId === 'string'
+    ) {
+      contentPayload.nodeId = input.contentOutputNodeId;
+    }
+    this.events.emitToContent(input.contentId, event, contentPayload);
   }
 
   private executeNodeByType(
