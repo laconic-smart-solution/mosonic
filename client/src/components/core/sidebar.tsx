@@ -297,7 +297,7 @@ export function SidebarPanel() {
             "group-data-[collapsible=icon]:justify-center"
           )}
         >
-          <div className="rounded-sm border border-sidebar-border bg-sidebar-accent/60 px-1 dark:bg-sidebar-accent/40">
+          <div className="rounded-sm px-1 dark:bg-sidebar-accent/40">
             <BrandLogo size="nav" className="size-[30px] shrink-0" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">

@@ -17,11 +17,31 @@ import type {
   ContentUserEdits,
 } from '../../domain/content/content.types';
 import type { IContentRepository } from '../interfaces/content.repository.interface';
+import {
+  collectMediaFilterFields,
+  contentPageItemMatchesMediaFilters,
+} from '../../content/content-page-media-filter.util';
 import { mergeTenancyWhere } from './prisma.util';
 import {
   dedupeContentIndexRows,
   sortContentIndexRows,
 } from './content-page-dedupe.util';
+
+const PAGE_DOC_SELECT = {
+  contentId: true,
+  pipelineRef: true,
+  workflowRef: true,
+  ruleRef: true,
+  status: true,
+  variantId: true,
+  createdAt: true,
+  updatedAt: true,
+  outputs: true,
+  userEdits: true,
+  nodeOutputs: true,
+  nodeUserEdits: true,
+  laneOutputs: true,
+} as const;
 
 type PageDocLean = {
   contentId: string;
@@ -106,17 +126,9 @@ export class PrismaContentRepository implements IContentRepository {
     if (query.filter?.pipelineRef) where.pipelineRef = query.filter.pipelineRef;
     if (query.filter?.status) where.status = query.filter.status;
 
-    const andClauses: Prisma.ContentWhereInput[] = [];
-    if (query.filter?.hasImage === true) {
-      andClauses.push(mediaFieldOrClause('image'));
-    }
-    if (query.filter?.hasVideo === true) {
-      andClauses.push(mediaFieldOrClause('video'));
-    }
-    if (query.filter?.hasSummary === true) {
-      andClauses.push(mediaFieldOrClause('summary'));
-    }
+    const mediaFilterFields = collectMediaFilterFields(query.filter);
 
+    const andClauses: Prisma.ContentWhereInput[] = [];
     const searchTrim = query.search?.trim();
     if (searchTrim) {
       andClauses.push({
@@ -159,31 +171,26 @@ export class PrismaContentRepository implements IContentRepository {
       sortOrder,
     );
 
-    const total = deduped.length;
+    if (deduped.length === 0) {
+      return { data: [], total: 0 };
+    }
+
+    if (mediaFilterFields.length > 0) {
+      return this.findPageWithMediaFilters(
+        deduped,
+        mediaFilterFields,
+        skip,
+        limit,
+        auth,
+      );
+    }
+
     const pageSlice = deduped.slice(skip, skip + limit);
     const pageIds = pageSlice.map((row) => row.contentId);
 
-    if (pageIds.length === 0) {
-      return { data: [], total };
-    }
-
     const docs = await this.prisma.content.findMany({
       where: { contentId: { in: pageIds } },
-      select: {
-        contentId: true,
-        pipelineRef: true,
-        workflowRef: true,
-        ruleRef: true,
-        status: true,
-        variantId: true,
-        createdAt: true,
-        updatedAt: true,
-        outputs: true,
-        userEdits: true,
-        nodeOutputs: true,
-        nodeUserEdits: true,
-        laneOutputs: true,
-      },
+      select: PAGE_DOC_SELECT,
     });
 
     const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
@@ -198,7 +205,46 @@ export class PrismaContentRepository implements IContentRepository {
 
     return {
       data: pageDocs.map((doc) => this.toPageItem(doc, pipelineById)),
-      total,
+      total: deduped.length,
+    };
+  }
+
+  private async findPageWithMediaFilters(
+    deduped: Array<{
+      contentId: string;
+      pipelineRef: string;
+    }>,
+    mediaFilterFields: ReturnType<typeof collectMediaFilterFields>,
+    skip: number,
+    limit: number,
+    auth: TenancyAuth,
+  ): Promise<{ data: ContentPageItemDto[]; total: number }> {
+    const allIds = deduped.map((row) => row.contentId);
+
+    const docs = await this.prisma.content.findMany({
+      where: { contentId: { in: allIds } },
+      select: PAGE_DOC_SELECT,
+    });
+
+    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const pipelineRefs = [
+      ...new Set(docs.map((d) => d.pipelineRef).filter(Boolean)),
+    ];
+    const pipelineById = await this.loadPipelineNodes(pipelineRefs, auth);
+
+    const matchingItems: ContentPageItemDto[] = [];
+    for (const row of deduped) {
+      const doc = docById.get(row.contentId);
+      if (!doc) continue;
+      const item = this.toPageItem(doc, pipelineById);
+      if (contentPageItemMatchesMediaFilters(item, mediaFilterFields)) {
+        matchingItems.push(item);
+      }
+    }
+
+    return {
+      data: matchingItems.slice(skip, skip + limit),
+      total: matchingItems.length,
     };
   }
 
@@ -402,37 +448,4 @@ export class PrismaContentRepository implements IContentRepository {
     ]);
     return { rows, total };
   }
-}
-
-function mediaFieldOrClause(
-  field: 'image' | 'video' | 'summary',
-): Prisma.ContentWhereInput {
-  const nonEmpty = (path: string[]): Prisma.ContentWhereInput => ({
-    OR: [
-      {
-        outputs: {
-          path,
-          not: Prisma.DbNull,
-        },
-      },
-    ],
-  });
-  return {
-    OR: [
-      {
-        outputs: {
-          path: [field],
-          string_contains: ' ',
-        },
-      },
-      {
-        userEdits: {
-          path: [field],
-          string_contains: ' ',
-        },
-      },
-      nonEmpty(['outputs', field]),
-      nonEmpty(['userEdits', field]),
-    ],
-  };
 }
