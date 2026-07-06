@@ -35,6 +35,8 @@ import {
   parseWorkflowNodeConfigOrThrow,
 } from '../nodes/workflow-node-config.zod';
 import { mergeResolvedOutputs } from './content-output.utils';
+import { resolveRerunWorkflowNodeId } from './content-rerun-node-resolve.util';
+import { buildContentRerunPreviousOutputs } from './content-rerun-previous-outputs.util';
 import { buildNodeOutputMapFromPipeline } from '../pipeline/pipeline-output-parse';
 import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
 import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
@@ -70,7 +72,10 @@ import {
   USER_PLAN_REPOSITORY,
   WORKFLOW_NODE_REPOSITORY,
 } from '../repositories/tokens';
-import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
+import {
+  parsePipelineGraph,
+  parsePipelineNodes,
+} from '../repositories/prisma/pipeline-nodes.util';
 
 export type ContentDetailResponse = {
   contentId: string;
@@ -356,11 +361,60 @@ export class ContentService {
       throw new NotFoundException(`Pipeline ${content.pipelineRef} not found`);
     }
 
-    const wfNode = await this.workflowNodes.findByWorkflowAndNodeId(
+    const pipelineNodes = parsePipelineNodes(pipeline.nodes);
+    const pipelineGraph = parsePipelineGraph(pipeline.graph);
+    const workflowNodeRecords = await this.workflowNodes.findByWorkflow(
       content.workflowRef,
-      dto.nodeId,
       auth,
     );
+    const workflowNodesForResolve = workflowNodeRecords.map((n) => ({
+      nodeId: n.nodeId,
+      type: typeof n.type === 'string' ? n.type : String(n.type ?? ''),
+      config: n.config,
+    }));
+
+    const rerunTarget = resolveRerunWorkflowNodeId(
+      dto.nodeId,
+      workflowNodesForResolve,
+      pipelineNodes,
+      pipelineGraph.lanes,
+    );
+    if (!rerunTarget) {
+      throw new NotFoundException(
+        `Workflow node ${dto.nodeId} not found for workflow`,
+      );
+    }
+
+    const wfNodeRecord = await this.workflowNodes.findByWorkflowAndNodeId(
+      content.workflowRef,
+      rerunTarget.workflowNodeId,
+      auth,
+    );
+
+    const pipelineNode = pipelineNodes.find(
+      (n) => n.nodeId === rerunTarget.outputNodeId,
+    );
+
+    const wfNode =
+      wfNodeRecord ??
+      (pipelineNode
+        ? ({
+            nodeId: rerunTarget.workflowNodeId,
+            workflowRef: content.workflowRef,
+            userId: auth.userId ?? null,
+            type: pipelineNode.type as WorkflowNodeRecord['type'],
+            order: pipelineNode.order,
+            isLocked: pipelineNode.isLocked,
+            userPrompt: pipelineNode.userPrompt || null,
+            config: pipelineNode.config as Prisma.JsonValue,
+            lane: pipelineNode.lane,
+            x: null,
+            y: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } satisfies WorkflowNodeRecord)
+        : null);
+
     if (!wfNode) {
       throw new NotFoundException(
         `Workflow node ${dto.nodeId} not found for workflow`,
@@ -372,23 +426,32 @@ export class ContentService {
       throw new NotFoundException(`Rule ${content.ruleRef} not found`);
     }
 
-    const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
-      content.workflowRef,
-      auth,
+    const workflowNodesOrdered = workflowNodeRecords.map((n) => ({
+      nodeId: n.nodeId,
+      type: typeof n.type === 'string' ? n.type : String(n.type ?? ''),
+    }));
+    const editableSnapshot = this.resolveEditableState(content);
+    const ancestorOutputs = buildContentRerunPreviousOutputs(
+      pipeline,
+      rerunTarget.outputNodeId,
+      editableSnapshot.nodeOutputs ?? {},
+      editableSnapshot.nodeUserEdits ?? {},
     );
     /** Resolved outputs match what the user sees (edits over AI). */
-    const resolved = mergeResolvedOutputs(
-      this.resolveEditableState(content),
-      { workflowNodesOrdered },
-    );
+    const resolved = mergeResolvedOutputs(editableSnapshot, {
+      workflowNodesOrdered,
+      pipelineNodesOrdered: this.pipelineNodesForMerge(pipeline),
+    });
     const previousOutputsFromDb: PreviousOutputs = {
-      keywords: resolved.keywords,
-      text: resolved.text,
-      image: resolved.image,
-      translatedText: resolved.translatedText,
-      video: resolved.video,
-      transcription: resolved.transcription,
-      summary: resolved.summary,
+      keywords: ancestorOutputs.keywords ?? resolved.keywords,
+      text: ancestorOutputs.text ?? resolved.text,
+      image: ancestorOutputs.image ?? resolved.image,
+      translatedText: ancestorOutputs.translatedText ?? resolved.translatedText,
+      video: ancestorOutputs.video ?? resolved.video,
+      transcription: ancestorOutputs.transcription ?? resolved.transcription,
+      summary: ancestorOutputs.summary ?? resolved.summary,
+      intelligenceBrief: ancestorOutputs.intelligenceBrief,
+      intelligenceHints: ancestorOutputs.intelligenceHints,
     };
     const previousOutputs = this.mergeRerunPreviousOutputs(
       previousOutputsFromDb,
@@ -396,22 +459,54 @@ export class ContentService {
     );
 
     let nodeForRun = wfNode;
+    const pipelineConfig = this.asRecord(pipelineNode?.config);
+    const baseConfig = {
+      ...this.asRecord(wfNode.config),
+      ...pipelineConfig,
+    };
     if (dto.updatedConfig && Object.keys(dto.updatedConfig).length > 0) {
-      const mergedConfig = parseWorkflowNodeConfigOrThrow(
-        wfNode.type as unknown as WorkflowNodeType,
-        {
-        ...this.asRecord(wfNode.config),
-        ...dto.updatedConfig,
-      });
-      await this.workflowNodes.updateConfig(
-        content.workflowRef,
-        dto.nodeId,
-        mergedConfig as unknown as Prisma.InputJsonValue,
-        auth,
-      );
+      try {
+        const mergedConfig = parseWorkflowNodeConfigOrThrow(
+          wfNode.type as unknown as WorkflowNodeType,
+          {
+            ...baseConfig,
+            ...dto.updatedConfig,
+          },
+        );
+        if (wfNodeRecord) {
+          await this.workflowNodes.updateConfig(
+            content.workflowRef,
+            rerunTarget.workflowNodeId,
+            mergedConfig as unknown as Prisma.InputJsonValue,
+            auth,
+          );
+        }
+        nodeForRun = {
+          ...wfNode,
+          config: mergedConfig as unknown as Prisma.JsonValue,
+        };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Ignoring invalid re-run config for ${rerunTarget.outputNodeId}: ${msg}`,
+        );
+        if (Object.keys(baseConfig).length > 0) {
+          nodeForRun = {
+            ...wfNode,
+            config: parseWorkflowNodeConfigOrThrow(
+              wfNode.type as unknown as WorkflowNodeType,
+              baseConfig,
+            ) as unknown as Prisma.JsonValue,
+          };
+        }
+      }
+    } else if (Object.keys(baseConfig).length > 0) {
       nodeForRun = {
         ...wfNode,
-        config: mergedConfig as unknown as Prisma.JsonValue,
+        config: parseWorkflowNodeConfigOrThrow(
+          wfNode.type as unknown as WorkflowNodeType,
+          baseConfig,
+        ) as unknown as Prisma.JsonValue,
       };
     }
 
@@ -419,7 +514,7 @@ export class ContentService {
       userId: auth.userId,
       contentId: content.contentId,
       pipelineId: pipeline.pipelineId,
-      nodeId: dto.nodeId,
+      nodeId: rerunTarget.outputNodeId,
       nodeType: nodeForRun.type,
       nodeConfig: this.asRecord(nodeForRun.config),
     });
@@ -428,6 +523,7 @@ export class ContentService {
       content,
       pipeline,
       wfNode: nodeForRun,
+      outputNodeId: rerunTarget.outputNodeId,
       rule,
       dto,
       previousOutputs,
@@ -739,14 +835,23 @@ export class ContentService {
     content: ContentRecord;
     pipeline: PipelineRecord;
     wfNode: WorkflowNodeRecord;
+    outputNodeId: string;
     rule: RuleRecord;
     dto: RerunNodeDto;
     previousOutputs: PreviousOutputs;
     auth: TenancyAuth;
     creditsCharged: number;
   }): Promise<void> {
-    const { content, pipeline, wfNode, rule, previousOutputs, auth, creditsCharged } =
-      args;
+    const {
+      content,
+      pipeline,
+      wfNode,
+      outputNodeId,
+      rule,
+      previousOutputs,
+      auth,
+      creditsCharged,
+    } = args;
     const userId = auth.userId;
     const contentPrompt = pipeline.contentPrompt;
     try {
@@ -772,20 +877,30 @@ export class ContentService {
         contentId: content.contentId,
         userId: pipeline.userId ?? content.userId ?? undefined,
         ruleId: rule.ruleId,
+        contentOutputNodeId: outputNodeId,
       });
       await this.persistNodeCompletion(
         content.contentId,
         content.workflowRef,
-        wfNode.nodeId,
+        outputNodeId,
         result.output as Record<string, unknown>,
         auth,
       );
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Re-run failed. Please try again.';
+      this.events.emitToContent(content.contentId, 'node:failed_final', {
+        contentId: content.contentId,
+        nodeId: outputNodeId,
+        message,
+      });
       await this.refundContentNodeCharge({
         userId,
         contentId: content.contentId,
         pipelineId: pipeline.pipelineId,
-        nodeId: wfNode.nodeId,
+        nodeId: outputNodeId,
         nodeType: wfNode.type,
         nodeConfig: this.asRecord(wfNode.config),
         credits: creditsCharged,

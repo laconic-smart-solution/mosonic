@@ -104,6 +104,8 @@ export interface PipelineMetadata {
   scheduleId?: string;
   experimentId?: string;
   newsMeta: PipelineNewsMeta | null;
+  /** Workflow template node IDs selected for step-mode review. */
+  reviewNodeIds?: string[];
 }
 
 export interface PipelineCreditChargeEntry {

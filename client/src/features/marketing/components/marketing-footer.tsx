@@ -30,10 +30,18 @@ export function MarketingFooter() {
             <ul className="flex flex-col gap-2">
               <li>
                 <Link
-                  to="/home"
+                  to={{ pathname: "/", hash: "features" }}
                   className="transition-colors hover:text-teal-600 dark:hover:text-teal-400"
                 >
                   {t("footer.features")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to={{ pathname: "/", hash: "how-it-works" }}
+                  className="transition-colors hover:text-teal-600 dark:hover:text-teal-400"
+                >
+                  {t("nav.howItWorks")}
                 </Link>
               </li>
               <li>
@@ -54,7 +62,7 @@ export function MarketingFooter() {
             <ul className="flex flex-col gap-2">
               <li>
                 <Link
-                  to="/about"
+                  to={{ pathname: "/", hash: "about" }}
                   className="transition-colors hover:text-teal-600 dark:hover:text-teal-400"
                 >
                   {t("nav.about")}

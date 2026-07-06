@@ -39,6 +39,7 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
+import { HomeBackdrop } from "../components/home-backdrop"
 
 export default function HomePage() {
   const { t } = useTranslation("home")
@@ -333,7 +334,7 @@ export default function HomePage() {
 
   return (
     <div className="relative flex min-h-[100dvh] w-full flex-1 flex-col overflow-x-hidden bg-background pt-14">
-
+      <HomeBackdrop />
       {isAuthenticated && showExtractionOverlay ? (
         <RuleExtractionProgress
           ruleId={processingRuleId ?? ""}

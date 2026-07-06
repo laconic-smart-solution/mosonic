@@ -100,6 +100,7 @@ export class PipelineController {
       contentPrompt: dto.contentPrompt,
       useLearnings: dto.useLearnings,
       executionMode: dto.executionMode,
+      reviewNodeIds: dto.reviewNodeIds,
       auth,
     });
   }

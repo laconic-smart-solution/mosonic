@@ -141,7 +141,11 @@
     "nodeDone": "done",
     "nodePending": "pending",
     "generated": "Generated",
-    "rerun": "Re-run"
+    "rerun": "Re-run",
+    "running": "Running",
+    "noOutputYet": "No output yet.",
+    "seeMore": "See more",
+    "seeLess": "See less"
   },
   "header": {
     "updated": "Updated {{date}}"

@@ -401,6 +401,19 @@ export class CreditService {
 
     if (updated) {
       this.emitBalanceUpdated(updated);
+      const operation = args.nodeType.replace(/_/g, ' ');
+      this.emitCreditRefundNotification({
+        userId: args.userId,
+        credits: args.credits,
+        message: `${args.credits.toLocaleString()} credits were refunded after ${operation} did not complete.`,
+        data: {
+          pipelineId: args.pipelineRef,
+          contentId: args.contentRef,
+          nodeId: args.nodeId,
+          nodeType: args.nodeType,
+          credits: args.credits,
+        },
+      });
     }
   }
 
@@ -572,7 +585,19 @@ export class CreditService {
         creditsRemaining: total,
         clearLowBalanceNotified: true,
       });
-      if (updated) this.emitBalanceUpdated(updated);
+      if (updated) {
+        this.emitBalanceUpdated(updated);
+        this.emitCreditRefundNotification({
+          userId: args.userId,
+          credits: total,
+          message: `${total.toLocaleString()} credits were refunded for generation steps that did not run.`,
+          data: {
+            pipelineId: args.pipelineId,
+            credits: total,
+            itemCount: rows.length,
+          },
+        });
+      }
     } catch (err) {
       this.logger.warn(
         `Pipeline credit refund failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -656,6 +681,27 @@ export class CreditService {
         creditsRemaining: userPlan.creditsRemaining,
         creditsUsed: userPlan.creditsUsed,
         creditsPerMonth: userPlan.creditsPerMonth,
+      });
+    } catch {
+      // noop — credit layer must not break pipelines
+    }
+  }
+
+  private emitCreditRefundNotification(args: {
+    userId: string;
+    credits: number;
+    message: string;
+    data?: Record<string, unknown>;
+  }): void {
+    try {
+      this.events.emitUserNotification({
+        userId: args.userId,
+        sector: 'billing',
+        type: 'credit.refunded',
+        title: 'Credits refunded',
+        message: args.message,
+        data: args.data,
+        action: { label: 'View activity', href: '/usage' },
       });
     } catch {
       // noop — credit layer must not break pipelines

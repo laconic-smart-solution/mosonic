@@ -54,7 +54,9 @@
     "operation": "ประเภท",
     "provider": "ผู้ให้บริการ",
     "credits": "เครดิต",
-    "empty": "ไม่มีกิจกรรมในช่วงเวลานี้"
+    "empty": "ไม่มีกิจกรรมในช่วงเวลานี้",
+    "refundOperation": "คืนเครดิต — {{operation}}",
+    "refundProvider": "คืนเครดิต"
   },
   "range": {
     "month": "เดือนนี้",

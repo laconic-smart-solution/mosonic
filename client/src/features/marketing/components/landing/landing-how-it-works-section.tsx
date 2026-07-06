@@ -29,7 +29,8 @@ export function LandingHowItWorksSection() {
 
   return (
     <motion.section
-      className="border-t border-border py-20 backdrop-blur-[2px] sm:py-24"
+      id="how-it-works"
+      className="scroll-mt-20 border-t border-border py-20 backdrop-blur-[2px] sm:py-24"
       variants={landingStaggerContainer}
       initial={reduceMotion ? false : "hidden"}
       whileInView={reduceMotion ? undefined : "show"}

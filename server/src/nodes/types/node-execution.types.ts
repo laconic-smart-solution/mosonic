@@ -43,6 +43,8 @@ export interface NodeExecutorInput {
   totalNodes: number;
   /** When set, mirrors pipeline node events to `content_${contentId}` for content re-run UX. */
   contentId?: string;
+  /** When set, content socket events use this id (materialized pipeline node key). */
+  contentOutputNodeId?: string;
   /** App-local tenant id for cost attribution. */
   userId?: string;
   /** Rule id (stored as campaignRef on cost entries). */

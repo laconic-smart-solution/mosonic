@@ -20,7 +20,6 @@ import type {
   VideoJobProvider,
 } from '../nodes/services/video-generation.service';
 import { getVideoGenerationMode } from '../nodes/services/video-generation.service';
-import { PRESENTER_WORDS_PER_SECOND } from '../nodes/services/presenter-script.util';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
@@ -100,8 +99,7 @@ export class MediaNodeCompletionService {
     payload: NodeJobPayload,
     meta: PresenterScriptMeta,
   ): Promise<void> {
-    const approxSeconds = Math.round(meta.wordCount / PRESENTER_WORDS_PER_SECOND);
-    const message = `Script ready: ${meta.wordCount} words, ~${approxSeconds}s (${meta.method})`;
+    const message = `Target ${meta.targetSeconds}s · script ${meta.wordCount}w · voice ${meta.voiceSpeed.toFixed(2)}x (${meta.method})`;
     try {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + PIPELINE_LOG_RETENTION_DAYS);
@@ -177,7 +175,7 @@ export class MediaNodeCompletionService {
     await this.resolver.maybeFinalize(payload.pipelineId);
 
     this.logger.log(
-      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node?.lane ?? 'trunk'}`,
+      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node?.lane ?? 'trunk'} duration=${result.videoCost.videoSeconds}s`,
     );
   }
 

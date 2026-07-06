@@ -60,6 +60,13 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
     onRetry,
   } = props
 
+  const interactionsLocked =
+    globalRerunning ||
+    run.phase === "running" ||
+    run.phase === "streaming" ||
+    run.phase === "processing" ||
+    run.phase === "retrying"
+
   return (
     <motion.div
       layout
@@ -106,6 +113,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
           <>
             <Textarea
               value={displayText}
+              disabled={interactionsLocked}
               onChange={(e) => {
                 updateOutput(key, e.target.value)
                 if (run.stream) {
@@ -134,12 +142,20 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                 onRemove={() => updateOutput("image", undefined)}
               />
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">
+              <label
+                className={cn(
+                  "flex flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors",
+                  interactionsLocked
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:border-primary hover:bg-primary/10 hover:text-primary",
+                )}
+              >
                 <ImageIcon className="mb-2 size-7 opacity-70" />
                 <input
                   type="file"
                   accept="image/jpeg,image/png,.jpg,.jpeg,.png"
                   className="hidden"
+                  disabled={interactionsLocked}
                   onChange={(e) => {
                     const f = e.target.files?.[0]
                     e.target.value = ""
@@ -159,12 +175,20 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
                 <MediaVideoBlock url={editedOutputs.video} />
               </div>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">
+              <label
+                className={cn(
+                  "flex flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-border py-7 text-center text-[13px] text-muted-foreground transition-colors",
+                  interactionsLocked
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:border-primary hover:bg-primary/10 hover:text-primary",
+                )}
+              >
                 <Video className="mb-2 size-7 opacity-70" />
                 <input
                   type="file"
                   accept="video/mp4,.mp4"
                   className="hidden"
+                  disabled={interactionsLocked}
                   onChange={(e) => {
                     const f = e.target.files?.[0]
                     e.target.value = ""
@@ -183,7 +207,7 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
             variant="outline"
             size="sm"
             className="h-8 border-border bg-transparent text-xs text-muted-foreground hover:bg-muted"
-            disabled={!nodeId || globalRerunning}
+            disabled={!nodeId || interactionsLocked}
             onClick={() => onOpenRerun(key)}
           >
             <RefreshCw className="mr-1.5 size-3" />

@@ -1,7 +1,7 @@
 import { Menu } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { NavLink, useNavigate } from "react-router-dom"
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom"
 
 import Logo from "@/assets/icon/logo"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -27,9 +27,11 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
 const MARKETING_NAV = [
-  { path: "/pricing", labelKey: "marketing:nav.pricing" },
-  { path: "/about", labelKey: "marketing:nav.about" },
-] as const
+  { type: "hash" as const, hash: "features", labelKey: "marketing:nav.features" },
+  { type: "hash" as const, hash: "how-it-works", labelKey: "marketing:nav.howItWorks" },
+  { type: "hash" as const, hash: "about", labelKey: "marketing:nav.about" },
+  { type: "route" as const, path: "/pricing", labelKey: "marketing:nav.pricing" },
+]
 
 function marketingNavLinkClass(isActive: boolean, compact = false) {
   return cn(
@@ -55,19 +57,37 @@ function MarketingNavLinks({
   onNavigate,
 }: MarketingNavLinksProps) {
   const { t } = useTranslation("marketing")
+  const location = useLocation()
 
   return (
     <div className={cn(compact ? "flex flex-col gap-0.5" : "flex items-center gap-0.5", className)}>
-      {MARKETING_NAV.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          onClick={onNavigate}
-          className={({ isActive }) => marketingNavLinkClass(isActive, compact)}
-        >
-          {t(item.labelKey)}
-        </NavLink>
-      ))}
+      {MARKETING_NAV.map((item) => {
+        if (item.type === "hash") {
+          const isActive =
+            location.pathname === "/" && location.hash === `#${item.hash}`
+          return (
+            <Link
+              key={item.hash}
+              to={{ pathname: "/", hash: item.hash }}
+              onClick={onNavigate}
+              className={marketingNavLinkClass(isActive, compact)}
+            >
+              {t(item.labelKey)}
+            </Link>
+          )
+        }
+
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            onClick={onNavigate}
+            className={({ isActive }) => marketingNavLinkClass(isActive, compact)}
+          >
+            {t(item.labelKey)}
+          </NavLink>
+        )
+      })}
     </div>
   )
 }

@@ -19,6 +19,8 @@ export type PipelineMetadata = {
   scheduleId?: string;
   experimentId?: string;
   newsMeta?: { title?: string; url?: string } | null;
+  /** Workflow template node IDs selected for step-mode review. */
+  reviewNodeIds?: string[];
 };
 
 export function parsePipelineMetadata(json: unknown): PipelineMetadata {

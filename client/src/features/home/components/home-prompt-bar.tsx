@@ -25,7 +25,7 @@ export function HomePromptBar({
   submitDisabled = false,
 }: HomePromptBarProps) {
   return (
-    <div className="w-full max-w-[600px]">
+    <div className="w-full max-w-[600px] px-0">
       <PromptArea
         value={prompt}
         onChange={onPromptChange}

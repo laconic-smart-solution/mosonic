@@ -129,7 +129,7 @@ export function BillingPlanCard({
 
       {isEnterprise ? (
         <Link
-          to="/about"
+          to="/#about"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }), "mt-6 w-full")}
         >
           {actionLabel}

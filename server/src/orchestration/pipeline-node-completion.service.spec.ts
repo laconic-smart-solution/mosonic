@@ -108,6 +108,55 @@ describe('PipelineNodeCompletionService', () => {
     expect(resolver.onNodeCompleted).not.toHaveBeenCalled();
   });
 
+  it('step mode with subset reviewNodeIds auto-completes unselected nodes', async () => {
+    pipelineRepo.findById.mockResolvedValue(
+      mockPipeline({
+        executionMode: PipelineUserExecutionMode.Step,
+        metadata: {
+          source: 'manual',
+          reviewNodeIds: ['img-1'],
+        },
+      }),
+    );
+
+    await service.handleNodeSucceeded(baseCtx);
+
+    expect(pipelineRepo.updateNodeStatus).toHaveBeenCalledWith(
+      'p1',
+      'text-1',
+      PipelineNodeExecutionStatus.Completed,
+      baseCtx.output,
+    );
+    expect(resolver.onNodeCompleted).toHaveBeenCalledWith('p1', 'text-1');
+    expect(events.emitToPipeline).not.toHaveBeenCalledWith(
+      'p1',
+      'node:waiting_review',
+      expect.anything(),
+    );
+  });
+
+  it('step mode with subset reviewNodeIds pauses selected nodes', async () => {
+    pipelineRepo.findById.mockResolvedValue(
+      mockPipeline({
+        executionMode: PipelineUserExecutionMode.Step,
+        metadata: {
+          source: 'manual',
+          reviewNodeIds: ['text-1'],
+        },
+      }),
+    );
+
+    await service.handleNodeSucceeded(baseCtx);
+
+    expect(pipelineRepo.updateNodeStatus).toHaveBeenCalledWith(
+      'p1',
+      'text-1',
+      PipelineNodeExecutionStatus.WaitingReview,
+      baseCtx.output,
+    );
+    expect(resolver.onNodeCompleted).not.toHaveBeenCalled();
+  });
+
   it('merge node passes through immediately in step mode', async () => {
     pipelineRepo.findById.mockResolvedValue(
       mockPipeline({ executionMode: PipelineUserExecutionMode.Step }),

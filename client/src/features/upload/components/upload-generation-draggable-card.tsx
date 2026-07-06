@@ -1,6 +1,7 @@
 import { useDraggable } from "@dnd-kit/core"
 import { GripVertical, Loader2, RefreshCw } from "lucide-react"
 import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { Button } from "@/components/ui/button"
@@ -58,6 +59,7 @@ type Props = {
 }
 
 export function UploadGenerationDraggableCard(props: Props) {
+  const { t } = useTranslation("content")
   const {
     wfNode,
     cardIndex,
@@ -147,17 +149,24 @@ export function UploadGenerationDraggableCard(props: Props) {
   )
   const dragId = paletteDragIdForNode(nodeId)
 
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: dragId,
-    data: payload ?? undefined,
-    disabled: !payload,
-  })
-
   const showStreaming =
     run.phase === "streaming" ||
     run.phase === "running" ||
     run.phase === "processing" ||
     run.phase === "retrying"
+
+  const interactionsLocked = showStreaming || globalRerunning || blockPipeline
+
+  const runningStatusLabel =
+    run.processingMessage ||
+    run.retryLabel ||
+    t("review.generating")
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: dragId,
+    data: payload ?? undefined,
+    disabled: !payload || interactionsLocked,
+  })
 
   const lane =
     typeof wfNode.config?.laneId === "string" ? wfNode.config.laneId : null
@@ -184,10 +193,11 @@ export function UploadGenerationDraggableCard(props: Props) {
         "rounded-lg border border-border bg-card shadow-sm transition-shadow",
         highlight,
         payload ? "" : "opacity-95",
+        interactionsLocked && "border-primary/30 bg-primary/[0.03]",
       )}
     >
       <div className="flex items-start gap-2 border-b border-border/80 px-2 py-2">
-        {payload ? (
+        {payload && !interactionsLocked ? (
           <button
             type="button"
             className="mt-0.5 flex shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing"
@@ -200,9 +210,17 @@ export function UploadGenerationDraggableCard(props: Props) {
         ) : (
           <span
             className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center text-[10px] text-muted-foreground"
-            title="This step has no draggable preview yet"
+            title={
+              interactionsLocked
+                ? "Unavailable while this step is running"
+                : "This step has no draggable preview yet"
+            }
           >
-            —
+            {showStreaming ? (
+              <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden />
+            ) : (
+              "—"
+            )}
           </span>
         )}
         <div className="min-w-0 flex-1">
@@ -219,54 +237,98 @@ export function UploadGenerationDraggableCard(props: Props) {
           variant="outline"
           size="sm"
           className="h-8 shrink-0 gap-1 px-2 text-[11px]"
-          disabled={globalRerunning}
+          disabled={interactionsLocked}
           onClick={() => onOpenRerun(nodeId)}
         >
           {showStreaming ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <>
+              <Loader2 className="size-3.5 animate-spin" />
+              {t("review.running")}
+            </>
           ) : (
-            <RefreshCw className="size-3.5" />
+            <>
+              <RefreshCw className="size-3.5" />
+              {t("review.rerun")}
+            </>
           )}
-          Rerun
         </Button>
       </div>
 
       {!expanded ? (
         <div className="space-y-2 px-3 py-2.5">
-          {run.phase === "error" && run.errorMessage ? (
-            <p className="text-[11px] text-red-600">{run.errorMessage}</p>
-          ) : null}
-          {isTextLike ? (
-            <p className="line-clamp-3 whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">
-              {displayText || "—"}
-            </p>
-          ) : key === "image" && thumbImage ? (
-            <div className="h-16 overflow-hidden rounded-md border bg-muted/30">
-              <FileServiceImage
-                url={thumbImage}
-                alt=""
-                className="size-full object-cover"
-                loadingClassName="size-full min-h-16 text-[10px]"
-              />
-            </div>
-          ) : key === "video" && thumbVideo ? (
-            <div className="h-16 overflow-hidden rounded-md border bg-black">
-              <FileServiceVideo
-                url={thumbVideo}
-                className="size-full object-cover"
-                muted
-              />
-            </div>
+          {showStreaming ? (
+            <>
+              <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-[11px] text-primary">
+                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                <span className="min-w-0 leading-snug">{runningStatusLabel}</span>
+              </div>
+              {isTextLike && displayText ? (
+                <p className="line-clamp-4 whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">
+                  {displayText}
+                </p>
+              ) : key === "image" && thumbImage ? (
+                <div className="h-16 overflow-hidden rounded-md border bg-muted/30 opacity-80">
+                  <FileServiceImage
+                    url={thumbImage}
+                    alt=""
+                    className="size-full object-cover"
+                    loadingClassName="size-full min-h-16 text-[10px]"
+                  />
+                </div>
+              ) : key === "video" && thumbVideo ? (
+                <div className="h-16 overflow-hidden rounded-md border bg-black opacity-80">
+                  <FileServiceVideo
+                    url={thumbVideo}
+                    className="size-full object-cover"
+                    muted
+                  />
+                </div>
+              ) : !isTextLike ? (
+                <div className="flex h-16 items-center justify-center rounded-md border border-dashed border-primary/20 bg-muted/20">
+                  <Loader2 className="size-5 animate-spin text-primary/50" aria-hidden />
+                </div>
+              ) : null}
+            </>
           ) : (
-            <p className="text-[11px] text-muted-foreground">No output yet.</p>
+            <>
+              {run.phase === "error" && run.errorMessage ? (
+                <p className="text-[11px] text-red-600">{run.errorMessage}</p>
+              ) : null}
+              {isTextLike ? (
+                <p className="line-clamp-3 whitespace-pre-wrap text-[11px] leading-snug text-muted-foreground">
+                  {displayText || "—"}
+                </p>
+              ) : key === "image" && thumbImage ? (
+                <div className="h-16 overflow-hidden rounded-md border bg-muted/30">
+                  <FileServiceImage
+                    url={thumbImage}
+                    alt=""
+                    className="size-full object-cover"
+                    loadingClassName="size-full min-h-16 text-[10px]"
+                  />
+                </div>
+              ) : key === "video" && thumbVideo ? (
+                <div className="h-16 overflow-hidden rounded-md border bg-black">
+                  <FileServiceVideo
+                    url={thumbVideo}
+                    className="size-full object-cover"
+                    muted
+                  />
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("review.noOutputYet")}
+                </p>
+              )}
+              <button
+                type="button"
+                className="text-[11px] font-medium text-primary hover:underline"
+                onClick={() => setExpanded(true)}
+              >
+                {t("review.seeMore")}
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            className="text-[11px] font-medium text-primary hover:underline"
-            onClick={() => setExpanded(true)}
-          >
-            See more
-          </button>
         </div>
       ) : (
         <div className="border-t border-border/60">
@@ -275,7 +337,7 @@ export function UploadGenerationDraggableCard(props: Props) {
             cardIndex={cardIndex}
             run={run}
             editedOutputs={editedOutputsForCard}
-            globalRerunning={blockPipeline}
+            globalRerunning={interactionsLocked}
             displayText={displayText}
             hasBodyOutput={hasBodyOutput}
             isTextLike={isTextLike}
@@ -300,10 +362,11 @@ export function UploadGenerationDraggableCard(props: Props) {
           <div className="px-3 pb-2">
             <button
               type="button"
-              className="text-[11px] font-medium text-primary hover:underline"
+              className="text-[11px] font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
+              disabled={showStreaming}
               onClick={() => setExpanded(false)}
             >
-              See less
+              {t("review.seeLess")}
             </button>
           </div>
         </div>

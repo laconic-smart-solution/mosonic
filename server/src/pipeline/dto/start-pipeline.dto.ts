@@ -1,4 +1,11 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class StartPipelineDto {
   @IsString()
@@ -22,4 +29,13 @@ export class StartPipelineDto {
   @IsOptional()
   @IsIn(['auto', 'step'])
   executionMode?: 'auto' | 'step';
+
+  /**
+   * Workflow template node IDs to pause for review when executionMode is step.
+   * Omit for legacy behavior (pause all reviewable steps).
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  reviewNodeIds?: string[];
 }

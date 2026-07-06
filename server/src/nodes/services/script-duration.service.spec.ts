@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LlmService } from '../../llm/llm.service';
+import { calcWordBudget } from './presenter-script.util';
 import { ScriptDurationService } from './script-duration.service';
 
 describe('ScriptDurationService', () => {
@@ -34,8 +35,26 @@ describe('ScriptDurationService', () => {
     service = moduleRef.get(ScriptDurationService);
   });
 
-  it('returns unchanged when within rewrite threshold', async () => {
+  it('expands short scripts under 85% of word budget', async () => {
     const script = 'Short caption for the product launch today.';
+    invoke.mockResolvedValue({
+      content:
+        'Hey there! We are excited to share our latest product launch with you today and hope you love what we built.',
+    });
+
+    const result = await service.fitScriptToDuration(script, 10);
+    expect(result.method).toBe('expanded');
+    expect(result.wordCount).toBeGreaterThan(countWords(script));
+    expect(invoke).toHaveBeenCalled();
+  });
+
+  it('returns unchanged when within expand and rewrite thresholds', async () => {
+    const budget = calcWordBudget(10);
+    const script = Array.from(
+      { length: Math.ceil(budget * 0.9) },
+      (_, i) => `word${i}`,
+    ).join(' ');
+
     const result = await service.fitScriptToDuration(script, 10);
     expect(result.method).toBe('unchanged');
     expect(result.script).toBe(script);
@@ -56,7 +75,7 @@ describe('ScriptDurationService', () => {
     expect(invoke).toHaveBeenCalled();
   });
 
-  it('falls back to trim when GPT fails', async () => {
+  it('falls back to trim when GPT rewrite fails', async () => {
     const longScript = Array.from({ length: 400 }, (_, i) => `word${i}`).join(
       ' ',
     );
@@ -65,7 +84,7 @@ describe('ScriptDurationService', () => {
     const result = await service.fitScriptToDuration(longScript, 10);
     expect(result.method).toBe('trimmed');
     expect(result.script.endsWith('…')).toBe(true);
-    expect(result.wordCount).toBeLessThanOrEqual(25);
+    expect(result.wordCount).toBeLessThanOrEqual(calcWordBudget(10));
   });
 
   it('hard-trims when GPT returns too many words', async () => {
@@ -77,6 +96,19 @@ describe('ScriptDurationService', () => {
 
     const result = await service.fitScriptToDuration(longScript, 10);
     expect(result.method).toBe('rewritten');
-    expect(result.wordCount).toBeLessThanOrEqual(25);
+    expect(result.wordCount).toBeLessThanOrEqual(calcWordBudget(10));
+  });
+
+  it('keeps original script when expand fails', async () => {
+    const script = 'Brief launch note.';
+    invoke.mockRejectedValue(new Error('API error'));
+
+    const result = await service.fitScriptToDuration(script, 10);
+    expect(result.method).toBe('unchanged');
+    expect(result.script).toBe(script);
   });
 });
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}

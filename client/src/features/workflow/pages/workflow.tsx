@@ -40,6 +40,7 @@ import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wiz
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
 import { WorkflowNodeReviewDialog } from "@/features/workflow/components/workflow-node-review-dialog"
 import { workflowHasIntelligenceNode } from "@/features/workflow/lib/workflow-freshness.util"
+import { listReviewableWorkflowNodes } from "@/features/workflow/lib/workflow-review-nodes"
 import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { rfNodesToApiPayload, getWfNodeTypeLabel } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
@@ -78,7 +79,6 @@ import {
   usePipelinePageQuery,
   useRetryNodeMutation,
   useReviewNodeMutation,
-  useReplanPipelineMutation,
   useSkipNodeMutation,
   useStartPipelineMutation,
   useUpdatePipelineNameMutation,
@@ -96,8 +96,6 @@ import {
   onNodeWaitingReview,
   onPipelineCompleted,
   onPipelineFailed,
-  onPipelinePaused,
-  onPipelineLanePaused,
   onPipelineStarted,
 } from "@/shared/socket/pipeline-events"
 import { getSharedSocket } from "@/shared/socket/socket-client"
@@ -182,8 +180,6 @@ export default function WorkflowPage() {
     searchParams.get("pipelineId") ?? undefined
   )
   const [pipelineFailedMessage, setPipelineFailedMessage] = useState("")
-  const [pipelinePaused, setPipelinePaused] = useState(false)
-  const [pausedLaneId, setPausedLaneId] = useState<string | null>(null)
   const [reviewNodeId, setReviewNodeId] = useState<string | null>(null)
   const [reviewRefillNonce, setReviewRefillNonce] = useState(0)
   const [totalNodes, setTotalNodes] = useState<number | null>(null)
@@ -252,7 +248,6 @@ export default function WorkflowPage() {
   const retryNodeMutation = useRetryNodeMutation()
   const reviewNodeMutation = useReviewNodeMutation()
   const skipNodeMutation = useSkipNodeMutation()
-  const replanMutation = useReplanPipelineMutation()
   const applyPipelineToWorkflow = useApplyPipelineToWorkflowMutation()
   const updatePipelineNameMutation = useUpdatePipelineNameMutation()
   const runningPipelineQuery = useGetPipelineQuery(pipelineId, {
@@ -297,7 +292,6 @@ export default function WorkflowPage() {
     }) => {
       if (pipelineCompletionHandledRef.current) return
       pipelineCompletionHandledRef.current = true
-      setPipelinePaused(false)
       void queryClient.invalidateQueries({ queryKey: ["usage", "summary"] })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
       const completedPipelineId = args.pipelineId
@@ -449,6 +443,11 @@ export default function WorkflowPage() {
     setCanvasEdited(false)
     setConfigDraftDirty(false)
   }, [apiNodes])
+
+  const reviewableWorkflowNodes = useMemo(
+    () => listReviewableWorkflowNodes(apiNodes ?? []),
+    [apiNodes],
+  )
 
   useEffect(() => {
     setCanvasEdited(false)
@@ -642,8 +641,6 @@ export default function WorkflowPage() {
       setTotalNodes(null)
       setCompletedNodes(0)
       completedNodeIdsRef.current.clear()
-      setPipelinePaused(false)
-      setPausedLaneId(null)
       setPipelineFailedMessage("")
     },
     [],
@@ -660,12 +657,8 @@ export default function WorkflowPage() {
       setCompletedNodes(completedNodeIdsRef.current.size)
 
       if (snap.pipeline.status === "paused") {
-        setPipelinePaused(true)
-        setPausedLaneId(snap.pipeline.pausedLaneId ?? null)
         setProcessingMode("processing")
       } else if (snap.pipeline.status === "running") {
-        setPipelinePaused(false)
-        setPausedLaneId(null)
         setProcessingMode("processing")
         if (completedNodeIdsRef.current.size >= snap.nodes.length && snap.nodes.length > 0) {
           maybeTryFinalizePipeline(snap.pipeline.pipelineId)
@@ -794,7 +787,6 @@ export default function WorkflowPage() {
         return params
       })
       setProcessingMode("processing")
-      setPipelinePaused(false)
       setTotalNodes(null)
       setCompletedNodes(0)
       completedNodeIdsRef.current.clear()
@@ -913,16 +905,6 @@ export default function WorkflowPage() {
           },
         }))
       }),
-      onPipelinePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (!allowsPipelineSocket(id)) return
-        setPipelinePaused(true)
-        setPausedLaneId(laneId ?? null)
-      }),
-      onPipelineLanePaused(({ pipelineId: id, pausedLaneId: laneId }) => {
-        if (!allowsPipelineSocket(id)) return
-        setPipelinePaused(true)
-        setPausedLaneId(laneId ?? null)
-      }),
       onPipelineCompleted(({ pipelineId: id, contentId, uploadId }) => {
         if (!allowsPipelineSocket(id)) return
         pipelineInFlightRef.current = false
@@ -935,7 +917,6 @@ export default function WorkflowPage() {
       onPipelineFailed(({ pipelineId: id, message, reason }) => {
         if (!allowsPipelineSocket(id)) return
         pipelineInFlightRef.current = false
-        setPipelinePaused(false)
         if (reason === "cancelled") {
           resetPipelineProcessingStateRef.current()
           return
@@ -1084,13 +1065,23 @@ export default function WorkflowPage() {
     contentPrompt: string,
     workflowIdOverride?: string,
     executionMode: PipelineUserExecutionMode = "auto",
+    reviewNodeIds?: string[],
   ) {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
     const useLearnings = searchParams.get("useLearnings") === "1"
     pipelineInFlightRef.current = true
     startPipelineMutation.mutate(
-      { workflowId, ruleId, contentPrompt, useLearnings, executionMode },
+      {
+        workflowId,
+        ruleId,
+        contentPrompt,
+        useLearnings,
+        executionMode,
+        ...(executionMode === "step" && reviewNodeIds
+          ? { reviewNodeIds }
+          : {}),
+      },
       {
         onSuccess: ({ pipelineId: id }) => {
           pipelineInFlightRef.current = false
@@ -1110,7 +1101,6 @@ export default function WorkflowPage() {
             return params
           })
           setProcessingMode("processing")
-          setPipelinePaused(false)
           setTotalNodes(null)
           setCompletedNodes(0)
           completedNodeIdsRef.current.clear()
@@ -1285,7 +1275,6 @@ export default function WorkflowPage() {
       return params
     })
     setProcessingMode("edit")
-    setPipelinePaused(false)
     setPipelineFailedMessage("")
     setNodeRuntimeById({})
     setCompletedNodes(0)
@@ -1318,7 +1307,6 @@ export default function WorkflowPage() {
       { pipelineId, payload: { nodeId: pipelineNodeId } },
       {
         onSuccess: () => {
-          setPipelinePaused(false)
           setNodeRuntimeById((prev) => ({
             ...prev,
             [nodeId]: {
@@ -1404,7 +1392,6 @@ export default function WorkflowPage() {
       { pipelineId, payload: { nodeId: pipelineNodeId } },
       {
         onSuccess: () => {
-          setPipelinePaused(false)
           setNodeRuntimeById((prev) => ({
             ...prev,
             [nodeId]: {
@@ -1443,8 +1430,6 @@ export default function WorkflowPage() {
     setTotalNodes(null)
     setCompletedNodes(0)
     completedNodeIdsRef.current.clear()
-    setPipelinePaused(false)
-    setPausedLaneId(null)
   }
 
   function handleTogglePipelineSnapshot(item: PipelinePageItem) {
@@ -1637,55 +1622,6 @@ export default function WorkflowPage() {
           <p className="text-[10px] text-muted-foreground">
             {t("processing.systemMessagesEnglishHint")}
           </p>
-          {pipelinePaused ? (
-            <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              {pausedLaneId
-                ? t("processing.pipelinePausedChannel", { channel: pausedLaneId })
-                : t("processing.pipelinePaused")}
-              {t("processing.pipelinePausedHint")}
-              {pipelineId ? (
-                <div className="mt-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 border-amber-400 bg-card text-[11px]"
-                    disabled={replanMutation.isPending}
-                    onClick={() => {
-                      const nodes = runningPipelineQuery.data?.nodes ?? []
-                      const afterId =
-                        nodes.find(
-                          (n) => n.status === "failed" || n.status === "pending",
-                        )?.nodeId ?? nodes.at(-1)?.nodeId
-                      if (!afterId) {
-                        toast.error(t("toasts.noReplanNode"))
-                        return
-                      }
-                      void replanMutation
-                        .mutateAsync({
-                          pipelineId,
-                          operations: [
-                            {
-                              op: "insert_node",
-                              afterNodeId: afterId,
-                              spec: { type: "translation", lane: pausedLaneId },
-                            },
-                          ],
-                        })
-                        .then(() => {
-                          toast.success(t("toasts.translationInserted"))
-                          setPipelinePaused(false)
-                          void runningPipelineQuery.refetch()
-                        })
-                        .catch((err) => toastApiError(err, "workflow:toasts.replanFailed"))
-                    }}
-                  >
-                    {t("processing.addTranslationLane")}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
             <span>
               {progressPercent == null
@@ -1988,11 +1924,17 @@ export default function WorkflowPage() {
         }}
         workflowId={activeWorkflowId}
         ruleId={ruleId}
+        reviewableNodes={reviewableWorkflowNodes}
         isStarting={startPipelineMutation.isPending}
         showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
-        onConfirm={(executionMode) => {
+        onConfirm={(executionMode, reviewNodeIds) => {
           if (pendingRunPrompt != null) {
-            runStartPipelineMutation(pendingRunPrompt, undefined, executionMode)
+            runStartPipelineMutation(
+              pendingRunPrompt,
+              undefined,
+              executionMode,
+              reviewNodeIds,
+            )
           }
         }}
       />
