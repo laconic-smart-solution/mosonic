@@ -14,6 +14,14 @@ export type CreditBalanceUpdatedPayload = {
   creditsPerMonth: number
 }
 
+export type PlanUpdatedPayload = {
+  userId: string
+  planId: string
+  planName: string
+  creditsRemaining: number
+  creditsPerMonth: number
+}
+
 export function onCreditLowBalance(
   handler: (payload: CreditLowBalancePayload) => void,
 ): () => void {
@@ -28,4 +36,12 @@ export function onCreditBalanceUpdated(
   const socket = getSharedSocket()
   socket.on("credit:balance_updated", handler)
   return () => socket.off("credit:balance_updated", handler)
+}
+
+export function onPlanUpdated(
+  handler: (payload: PlanUpdatedPayload) => void,
+): () => void {
+  const socket = getSharedSocket()
+  socket.on("plan:updated", handler)
+  return () => socket.off("plan:updated", handler)
 }

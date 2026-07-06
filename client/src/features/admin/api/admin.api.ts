@@ -121,6 +121,35 @@ export const adminApi = {
   assignPlan: (planId: string, userId: string) =>
     apiClient.post(`/admin/plans/${planId}/assign`, { userId }).then((r) => r.data),
 
+  listTopupPlans: () => apiClient.get("/admin/topup-plans").then((r) => r.data),
+
+  createTopupPlan: (body: {
+    code: string
+    label: string
+    credits: number
+    priceUsd: number
+    priceThb: number
+    sortOrder: number
+    active: boolean
+  }) => apiClient.post("/admin/topup-plans", body).then((r) => r.data),
+
+  updateTopupPlan: (
+    code: string,
+    body: {
+      label: string
+      credits: number
+      priceUsd: number
+      priceThb: number
+      sortOrder: number
+      active: boolean
+    },
+  ) => apiClient.put(`/admin/topup-plans/${encodeURIComponent(code)}`, body).then((r) => r.data),
+
+  setTopupPlanActive: (code: string, active: boolean) =>
+    apiClient
+      .patch(`/admin/topup-plans/${encodeURIComponent(code)}/active`, { active })
+      .then((r) => r.data),
+
   getUsageHistory: (params?: Record<string, string | number | undefined>) =>
     apiClient.get("/admin/usage/history", { params }).then((r) => r.data),
 

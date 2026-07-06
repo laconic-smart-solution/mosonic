@@ -79,6 +79,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     parent: "/admin",
   },
   {
+    pattern: "/admin/topup-plans",
+    labelKey: "layout.nav.topupPlans",
+    ns: "admin",
+    href: "/admin/topup-plans",
+    parent: "/admin",
+  },
+  {
     pattern: "/admin/usage",
     labelKey: "layout.nav.usage",
     ns: "admin",
@@ -167,6 +174,8 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   { pattern: "/upload", labelKey: "routes.upload", href: "/upload" },
   { pattern: "/posts", labelKey: "nav.posts", href: "/posts" },
   { pattern: "/settings/accounts", labelKey: "nav.settingsAccounts", href: "/settings/accounts" },
+  { pattern: "/usage/plans", labelKey: "tabs.plans", ns: "usage", href: "/usage/plans", parent: "/usage" },
+  { pattern: "/usage/topup", labelKey: "tabs.topup", ns: "usage", href: "/usage/topup", parent: "/usage" },
   { pattern: "/usage", labelKey: "nav.usage", href: "/usage" },
 
   // Auth
