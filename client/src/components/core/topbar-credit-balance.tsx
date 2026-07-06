@@ -44,7 +44,7 @@ export function TopbarCreditBalance({
       <TooltipTrigger
         render={
           <Link
-            to="/usage"
+            to="/usage/topup"
             className={cn(
               "flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2.5 text-xs font-medium tabular-nums transition-colors outline-none hover:bg-muted",
               "focus-visible:ring-2 focus-visible:ring-ring/25",

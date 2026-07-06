@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
 import { CreditService } from './credit.service';
 import { PaymentStatusDto } from './dto/payment-status.dto';
+import { PaymentWebhookService } from './payment-webhook.service';
 
 const bodyPipe = new ValidationPipe({
   transform: true,
@@ -22,7 +23,7 @@ const bodyPipe = new ValidationPipe({
 @ApiTags('Webhook')
 export class PaymentWebhookController {
   constructor(
-    private readonly creditService: CreditService,
+    private readonly paymentWebhookService: PaymentWebhookService,
     private readonly config: ConfigService,
   ) {}
 
@@ -37,7 +38,7 @@ export class PaymentWebhookController {
       throw new UnauthorizedException('Invalid webhook secret');
     }
 
-    await this.creditService.handlePaymentWebhook(body);
+    await this.paymentWebhookService.handlePaymentStatus(body);
     return { ok: true };
   }
 }

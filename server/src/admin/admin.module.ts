@@ -5,10 +5,12 @@ import { AdminApiUsageController } from './controllers/admin-api-usage.controlle
 import { AdminOpenAiBillingController } from './controllers/admin-openai-billing.controller';
 import { AdminContentController } from './controllers/admin-content.controller';
 import { AdminFaqController } from './controllers/admin-faq.controller';
+import { AdminTopupPlansController } from './controllers/admin-topup-plans.controller';
 import { AdminCostController } from './controllers/admin-cost.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 import { AdminPipelineJobsController } from './controllers/admin-pipeline-jobs.controller';
 import { AdminUsersController } from './controllers/admin-users.controller';
+import { PaymentModule } from '../payment/payment.module';
 import { CreditModule } from '../credit/credit.module';
 import { PlanModule } from '../plan/plan.module';
 import { UsageModule } from '../usage/usage.module';
@@ -28,6 +30,7 @@ import { AdminFaqService } from './services/admin-faq.service';
   imports: [
     AuthModule,
     CreditModule,
+    PaymentModule,
     PlanModule,
     RepositoriesModule,
     UsageModule,
@@ -44,6 +47,7 @@ import { AdminFaqService } from './services/admin-faq.service';
     AdminCostController,
     AdminContentController,
     AdminFaqController,
+    AdminTopupPlansController,
     AdminPipelineJobsController,
   ],
   providers: [

@@ -109,7 +109,7 @@
     "includesPrevious": "Everything in {{plan}}, PLUS:",
     "contactSales": "Contact sales",
     "upgradeTo": "Upgrade to {{plan}}",
-    "checkoutNote": "New accounts start on the Free plan. Paid upgrades are assigned after signup — self-serve checkout is coming soon.",
+    "checkoutNote": "New accounts start on the Free plan. Sign in to upgrade or renew at Usage → Plans.",
     "loadError": "Could not load plans. Please refresh and try again.",
     "loading": "Loading plans…",
     "empty": "No plans available right now.",

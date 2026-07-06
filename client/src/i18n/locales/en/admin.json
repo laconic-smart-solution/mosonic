@@ -9,6 +9,7 @@
       "credit": "Credits",
       "nodeCredits": "Credit pricing",
       "plans": "Plans",
+      "topupPlans": "Topup plans",
       "usage": "Usage",
       "cost": "Cost (USD)",
       "content": "Content",
@@ -442,6 +443,38 @@
     "colCost": "Cost (USD)",
     "prev": "Previous",
     "next": "Next"
+  },
+  "topupPlans": {
+    "title": "Topup plans",
+    "subtitle": "Credit packages shown when users top up their balance.",
+    "create": "New topup plan",
+    "createTitle": "Create topup plan",
+    "editTitle": "Edit topup plan",
+    "edit": "Edit",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No topup plans yet.",
+    "loadError": "Could not load topup plans. Ensure the payment service is running.",
+    "saveError": "Could not save topup plan.",
+    "toggleActive": "Toggle active state for {{code}}",
+    "columns": {
+      "code": "Code",
+      "label": "Label",
+      "credits": "Credits",
+      "priceUsd": "USD",
+      "priceThb": "THB",
+      "sortOrder": "Order",
+      "status": "Status"
+    },
+    "fields": {
+      "code": "Code",
+      "label": "Label",
+      "credits": "Credits",
+      "priceUsd": "Price (USD)",
+      "priceThb": "Price (THB)",
+      "sortOrder": "Sort order",
+      "active": "Active"
+    }
   },
   "faq": {
     "title": "FAQ knowledge base",

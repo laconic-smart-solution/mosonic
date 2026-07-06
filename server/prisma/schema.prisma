@@ -112,6 +112,12 @@ enum CreditTopupPurchaseStatus {
   cancelled
 }
 
+enum PlanPurchaseStatus {
+  pending
+  active
+  cancelled
+}
+
 enum ServiceRateType {
   text
   image
@@ -333,6 +339,25 @@ model CreditTopupPurchase {
   @@index([userId, purchaseDate(sort: Desc)])
   @@index([status])
   @@map("credit_topup_purchases")
+}
+
+model PlanPurchase {
+  planPurchaseId String              @id @default(uuid())
+  userId         String
+  planId         String
+  amount         Float
+  currencyCode   String              @default("THB")
+  billingPeriod  DateTime
+  transactionId  String              @unique
+  status         PlanPurchaseStatus  @default(pending)
+  purchaseDate   DateTime            @default(now())
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId, purchaseDate(sort: Desc)])
+  @@index([userId, billingPeriod])
+  @@index([status])
+  @@map("plan_purchases")
 }
 
 model Workflow {
