@@ -9,8 +9,7 @@ import {
 } from '../pipeline/schemas/pipeline.schema';
 import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
 import { DependencyResolverService } from './dependency-resolver.service';
-import { effectiveUserExecutionMode } from './pipeline-user-execution-mode.util';
-import { PipelineUserExecutionMode } from '../pipeline/schemas/pipeline.schema';
+import { shouldPauseNodeForReview } from './pipeline-node-review-eligibility.util';
 
 export type NodeSucceededContext = {
   pipelineId: string;
@@ -44,10 +43,11 @@ export class PipelineNodeCompletionService {
       return;
     }
 
-    const isMerge = ctx.nodeType === WorkflowNodeType.Merge;
-    const mode = effectiveUserExecutionMode(pipeline);
-    const shouldPauseForReview =
-      mode === PipelineUserExecutionMode.Step && !isMerge;
+    const shouldPauseForReview = shouldPauseNodeForReview(
+      pipeline,
+      ctx.nodeId,
+      ctx.nodeType,
+    );
 
     if (shouldPauseForReview) {
       await this.pipelineRepo.updateNodeStatus(

@@ -6,6 +6,7 @@ export type StartPipelinePayload = {
   contentPrompt: string
   useLearnings?: boolean
   executionMode?: "auto" | "step"
+  reviewNodeIds?: string[]
 }
 
 export type StartPipelineResponse = {

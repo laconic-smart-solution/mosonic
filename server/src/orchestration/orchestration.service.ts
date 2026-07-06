@@ -74,6 +74,7 @@ import { CampaignAutonomyService } from '../campaign/campaign-autonomy.service';
 import { OutboundWebhookService } from '../integrations/outbound-webhook.service';
 import { GraphReplanService } from './graph-replan.service';
 import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
+import { validateAndNormalizeReviewNodeIds } from './pipeline-node-review-eligibility.util';
 import { PipelineNodeReviewService } from './pipeline-node-review.service';
 import { RuleOverlayBuilderService } from './rule-overlay-builder.service';
 import { buildApprovalStateFromPolicy } from '../content/content-approval.util';
@@ -134,6 +135,7 @@ export class OrchestrationService {
     contentPrompt: string;
     useLearnings?: boolean;
     executionMode?: 'auto' | 'step';
+    reviewNodeIds?: string[];
     metadata?: {
       source?: 'manual' | 'scheduler' | 'integration' | 'news';
       scheduleId?: string;
@@ -167,6 +169,22 @@ export class OrchestrationService {
     );
     if (nodes.length === 0) {
       throw new BadRequestException('Workflow has no nodes to execute');
+    }
+
+    let normalizedReviewNodeIds: string[] | undefined;
+    try {
+      normalizedReviewNodeIds = validateAndNormalizeReviewNodeIds({
+        executionMode: input.executionMode,
+        reviewNodeIds: input.reviewNodeIds,
+        workflowNodes: nodes.map((n) => ({
+          nodeId: n.nodeId,
+          type: n.type,
+        })),
+      });
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : String(err),
+      );
     }
 
     const workflowEdges = parseWorkflowEdges(workflow.edges);
@@ -303,6 +321,9 @@ export class OrchestrationService {
         scheduleId: input.metadata?.scheduleId,
         experimentId,
         newsMeta: input.metadata?.newsMeta ?? null,
+        ...(normalizedReviewNodeIds !== undefined
+          ? { reviewNodeIds: normalizedReviewNodeIds }
+          : {}),
       } as unknown as Prisma.InputJsonValue,
       creditsCharged: totalCredits,
       creditChargeBreakdown: creditBreakdown.map((row) => ({

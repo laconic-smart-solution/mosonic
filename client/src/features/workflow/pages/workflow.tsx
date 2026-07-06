@@ -40,6 +40,7 @@ import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wiz
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
 import { WorkflowNodeReviewDialog } from "@/features/workflow/components/workflow-node-review-dialog"
 import { workflowHasIntelligenceNode } from "@/features/workflow/lib/workflow-freshness.util"
+import { listReviewableWorkflowNodes } from "@/features/workflow/lib/workflow-review-nodes"
 import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { rfNodesToApiPayload, getWfNodeTypeLabel } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
@@ -442,6 +443,11 @@ export default function WorkflowPage() {
     setCanvasEdited(false)
     setConfigDraftDirty(false)
   }, [apiNodes])
+
+  const reviewableWorkflowNodes = useMemo(
+    () => listReviewableWorkflowNodes(apiNodes ?? []),
+    [apiNodes],
+  )
 
   useEffect(() => {
     setCanvasEdited(false)
@@ -1059,13 +1065,23 @@ export default function WorkflowPage() {
     contentPrompt: string,
     workflowIdOverride?: string,
     executionMode: PipelineUserExecutionMode = "auto",
+    reviewNodeIds?: string[],
   ) {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
     const useLearnings = searchParams.get("useLearnings") === "1"
     pipelineInFlightRef.current = true
     startPipelineMutation.mutate(
-      { workflowId, ruleId, contentPrompt, useLearnings, executionMode },
+      {
+        workflowId,
+        ruleId,
+        contentPrompt,
+        useLearnings,
+        executionMode,
+        ...(executionMode === "step" && reviewNodeIds
+          ? { reviewNodeIds }
+          : {}),
+      },
       {
         onSuccess: ({ pipelineId: id }) => {
           pipelineInFlightRef.current = false
@@ -1908,11 +1924,17 @@ export default function WorkflowPage() {
         }}
         workflowId={activeWorkflowId}
         ruleId={ruleId}
+        reviewableNodes={reviewableWorkflowNodes}
         isStarting={startPipelineMutation.isPending}
         showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
-        onConfirm={(executionMode) => {
+        onConfirm={(executionMode, reviewNodeIds) => {
           if (pendingRunPrompt != null) {
-            runStartPipelineMutation(pendingRunPrompt, undefined, executionMode)
+            runStartPipelineMutation(
+              pendingRunPrompt,
+              undefined,
+              executionMode,
+              reviewNodeIds,
+            )
           }
         }}
       />

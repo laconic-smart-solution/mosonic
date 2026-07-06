@@ -147,6 +147,7 @@ export class PipelineService {
     contentPrompt: string;
     useLearnings?: boolean;
     executionMode?: 'auto' | 'step';
+    reviewNodeIds?: string[];
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     return this.orchestration.startPipeline(args);
