@@ -29,6 +29,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     href: "/admin/content/:contentId",
   },
   {
+    pattern: "/admin/faq/documents/:documentId",
+    labelKey: "breadcrumb.detail",
+    parent: "/admin/faq",
+    dynamic: true,
+    href: "/admin/faq/documents/:documentId",
+  },
+  {
     pattern: "/admin/users/:userId",
     labelKey: "breadcrumb.detail",
     parent: "/admin/users",
@@ -72,6 +79,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     parent: "/admin",
   },
   {
+    pattern: "/admin/topup-plans",
+    labelKey: "layout.nav.topupPlans",
+    ns: "admin",
+    href: "/admin/topup-plans",
+    parent: "/admin",
+  },
+  {
     pattern: "/admin/usage",
     labelKey: "layout.nav.usage",
     ns: "admin",
@@ -97,6 +111,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     labelKey: "layout.nav.content",
     ns: "admin",
     href: "/admin/content",
+    parent: "/admin",
+  },
+  {
+    pattern: "/admin/faq",
+    labelKey: "layout.nav.faq",
+    ns: "admin",
+    href: "/admin/faq",
     parent: "/admin",
   },
   { pattern: "/admin", labelKey: "layout.title", ns: "admin", href: "/admin/dashboard" },
@@ -153,10 +174,9 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   { pattern: "/upload", labelKey: "routes.upload", href: "/upload" },
   { pattern: "/posts", labelKey: "nav.posts", href: "/posts" },
   { pattern: "/settings/accounts", labelKey: "nav.settingsAccounts", href: "/settings/accounts" },
+  { pattern: "/usage/plans", labelKey: "tabs.plans", ns: "usage", href: "/usage/plans", parent: "/usage" },
+  { pattern: "/usage/topup", labelKey: "tabs.topup", ns: "usage", href: "/usage/topup", parent: "/usage" },
   { pattern: "/usage", labelKey: "nav.usage", href: "/usage" },
-  { pattern: "/logs", labelKey: "routes.logs", href: "/logs" },
-  { pattern: "/components", labelKey: "routes.components", href: "/components" },
-  { pattern: "/run", labelKey: "routes.liveRun", href: "/run" },
 
   // Auth
   { pattern: "/login", labelKey: "signIn.title", ns: "auth", href: "/login", parent: "/" },
@@ -184,6 +204,7 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   },
 
   // Marketing home
+  { pattern: "/home", labelKey: "nav.home", href: "/home" },
   { pattern: "/", labelKey: "nav.home", href: "/" },
 ]
 

@@ -11,6 +11,7 @@ import {
   CREDIT_LEDGER_REPOSITORY,
   CREDIT_TOPUP_PURCHASE_REPOSITORY,
   CREDIT_TOPUP_REPOSITORY,
+  PLAN_PURCHASE_REPOSITORY,
   FIXED_COST_REPOSITORY,
   INTEGRATION_API_KEY_REPOSITORY,
   NEWS_TRIGGER_LOG_REPOSITORY,
@@ -42,6 +43,7 @@ import { PrismaCreditConfigRepository } from './prisma/prisma-credit-config.repo
 import { PrismaCreditLedgerRepository } from './prisma/prisma-credit-ledger.repository';
 import { PrismaCreditTopupPurchaseRepository } from './prisma/prisma-credit-topup-purchase.repository';
 import { PrismaCreditTopupRepository } from './prisma/prisma-credit-topup.repository';
+import { PrismaPlanPurchaseRepository } from './prisma/prisma-plan-purchase.repository';
 import { PrismaFixedCostRepository } from './prisma/prisma-fixed-cost.repository';
 import { PrismaIntegrationApiKeyRepository } from './prisma/prisma-integration-api-key.repository';
 import { PrismaNewsTriggerLogRepository } from './prisma/prisma-news-trigger-log.repository';
@@ -79,6 +81,10 @@ const repositoryProviders = [
   {
     provide: CREDIT_TOPUP_PURCHASE_REPOSITORY,
     useClass: PrismaCreditTopupPurchaseRepository,
+  },
+  {
+    provide: PLAN_PURCHASE_REPOSITORY,
+    useClass: PrismaPlanPurchaseRepository,
   },
   { provide: WORKFLOW_REPOSITORY, useClass: PrismaWorkflowRepository },
   { provide: WORKFLOW_NODE_REPOSITORY, useClass: PrismaWorkflowNodeRepository },

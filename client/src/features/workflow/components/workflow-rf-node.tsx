@@ -28,6 +28,7 @@ import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
 import { cn } from "@/lib/utils"
 import { WorkflowNodeAddButton } from "./workflow-node-add-button"
+import { WorkflowNodeInfoButton } from "./workflow-node-info-button"
 import { WorkflowNodeSettingsButton } from "./workflow-node-settings-button"
 
 type WorkflowRfNodeProps = NodeProps<
@@ -109,9 +110,14 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
     updateNodeInternals,
   ])
 
+  const isWaitingReview = data.status === "waiting_review"
+
   return (
     <div
-      className="relative flex flex-col select-none"
+      className={cn(
+        "relative flex flex-col select-none",
+        isWaitingReview && data.onOpenReview && "cursor-pointer",
+      )}
       style={{
         width: NODE_W,
         minHeight: isBranch || isMerge ? NODE_H : undefined,
@@ -193,12 +199,15 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             </span>
           ) : null}
 
-          {data.onOpenSettings ? (
-            <WorkflowNodeSettingsButton
-              active={data.settingsOpen}
-              onOpen={data.onOpenSettings}
-            />
-          ) : null}
+          <div className="flex shrink-0 items-center gap-1">
+            <WorkflowNodeInfoButton wfType={data.wfType} />
+            {data.onOpenSettings ? (
+              <WorkflowNodeSettingsButton
+                active={data.settingsOpen}
+                onOpen={data.onOpenSettings}
+              />
+            ) : null}
+          </div>
 
           {data.locked ? (
             <svg
@@ -246,7 +255,7 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             </div>
           ) : null}
 
-          {data.previewImage?.trim() ? (
+          {data.previewImage?.trim() && !isWaitingReview ? (
             previewImageSrc ? (
               <img
                 src={previewImageSrc}
@@ -264,7 +273,7 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             )
           ) : null}
 
-          {data.previewVideo?.trim() ? (
+          {data.previewVideo?.trim() && !isWaitingReview ? (
             previewVideoSrc ? (
               <video
                 src={previewVideoSrc}
@@ -283,10 +292,16 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             )
           ) : null}
 
-          {data.previewText ? (
+          {data.previewText && !isWaitingReview ? (
             <div className="line-clamp-3 rounded-md bg-muted px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">
               {data.previewText}
             </div>
+          ) : null}
+
+          {isWaitingReview ? (
+            <p className="rounded-md border border-teal-500/30 bg-teal-500/5 px-2 py-1.5 text-[10px] leading-snug text-teal-700 dark:text-teal-400">
+              {t("stepMode.clickToReview")}
+            </p>
           ) : null}
 
           <div className="mt-0.5 flex items-center justify-between">
@@ -332,6 +347,19 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
                   </button>
                 ) : null}
               </div>
+            ) : null}
+
+            {isWaitingReview && data.onOpenReview ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  data.onOpenReview?.()
+                }}
+                className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-teal-700 border-teal-500/40 bg-teal-500/10 dark:text-teal-400"
+              >
+                {t("stepMode.openReview")}
+              </button>
             ) : null}
 
             {selected && data.onDelete ? (

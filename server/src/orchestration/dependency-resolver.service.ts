@@ -35,6 +35,7 @@ import {
   PIPELINE_NODES_VIDEO_QUEUE,
   pipelineJobIdPrefix,
   pipelineNodeJobId,
+  pipelineNodeReplayJobId,
 } from './types/node-job.payload';
 
 const TERMINAL_STATUSES = new Set<string>([
@@ -427,7 +428,8 @@ export class DependencyResolverService {
     const hasPendingOrRunning = nodes.some(
       (n) =>
         n.status === PipelineNodeExecutionStatus.Pending ||
-        n.status === PipelineNodeExecutionStatus.Running,
+        n.status === PipelineNodeExecutionStatus.Running ||
+        n.status === PipelineNodeExecutionStatus.WaitingReview,
     );
     if (hasPendingOrRunning) {
       return;
@@ -548,9 +550,19 @@ export class DependencyResolverService {
     return edges.map((e) => `${e.from}->${e.to}`).join(', ');
   }
 
+  async enqueueNodeForReviewRegenerate(
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<void> {
+    const pipeline = await this.pipelineRepo.findById(pipelineId);
+    if (!pipeline) return;
+    await this.enqueueNode(pipeline, nodeId, { forceRegenerate: true, useReplayJobId: true });
+  }
+
   private async enqueueNode(
     pipeline: PipelineRecord,
     nodeId: string,
+    options?: { forceRegenerate?: boolean; useReplayJobId?: boolean },
   ): Promise<void> {
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
     if (!node || node.status !== PipelineNodeExecutionStatus.Pending) {
@@ -573,9 +585,12 @@ export class DependencyResolverService {
       totalNodes,
       contentPrompt: pipeline.contentPrompt,
       lane: node.lane ?? null,
+      ...(options?.forceRegenerate ? { forceRegenerate: true } : {}),
     };
 
-    const jobId = pipelineNodeJobId(pipeline.pipelineId, node.nodeId);
+    const jobId = options?.useReplayJobId
+      ? pipelineNodeReplayJobId(pipeline.pipelineId, node.nodeId)
+      : pipelineNodeJobId(pipeline.pipelineId, node.nodeId);
     const queue =
       node.type === WorkflowNodeType.VideoGeneration
         ? this.videoGenerateQueue

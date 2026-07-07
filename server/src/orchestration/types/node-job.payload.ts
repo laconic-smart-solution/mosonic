@@ -15,6 +15,8 @@ export interface NodeJobPayload {
   totalNodes: number;
   contentPrompt: string;
   lane?: string | null;
+  /** Deliberate user regenerate during step review — always re-run AI */
+  forceRegenerate?: boolean;
 }
 
 /** BullMQ custom job ids must not contain `:`. */

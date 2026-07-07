@@ -59,3 +59,50 @@ export function WorkflowNodeGuideSection({ canvasType }: WorkflowNodeGuideSectio
     </div>
   )
 }
+
+/** Compact guide copy for node info hover tooltips. */
+export function WorkflowNodeGuideTooltipContent({
+  canvasType,
+}: WorkflowNodeGuideSectionProps) {
+  const { t } = useTranslation("workflow")
+  const guide = getWorkflowNodeGuide(canvasType)
+
+  if (!guide) {
+    return (
+      <p className="max-w-[260px] text-[11px] leading-relaxed text-background/90">
+        {t("guide.defaultFallback")}
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex max-w-[min(300px,calc(100vw-4rem))] flex-col gap-2.5 text-left">
+      <div>
+        <p className="text-[10px] font-semibold tracking-wide text-background/70 uppercase">
+          {t("guide.labels.usage")}
+        </p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-background/95">
+          {guide.usage}
+        </p>
+      </div>
+      <div>
+        <p className="text-[10px] font-semibold tracking-wide text-background/70 uppercase">
+          {t("guide.labels.example")}
+        </p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-background/95">
+          {guide.example}
+        </p>
+      </div>
+      {guide.tips ? (
+        <div>
+          <p className="text-[10px] font-semibold tracking-wide text-amber-200 uppercase">
+            {t("guide.labels.tip")}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-background/95">
+            {guide.tips}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
+}

@@ -1,0 +1,213 @@
+---
+description: Java Spring Boot + PostgreSQL backend standards — layering, validation, pagination, persistence, and security conventions for this workspace
+globs: "**/*.java"
+alwaysApply: true
+---
+
+# Java Spring Boot + PostgreSQL Backend Rule
+
+## Architecture & Layering
+- Layered structure: `controller` -> `service` -> `repository` -> `domain` (+ `dto`, `mapper`).
+- Controllers are thin: request/response mapping and delegation only — no business logic, no direct repository calls.
+- Business logic and orchestration live in `@Service` classes; one service per aggregate/domain concern.
+- Never expose JPA entities directly from controllers or service return types — always map to DTOs.
+- Use a mapper layer (MapStruct preferred if already in the project) for entity<->DTO conversion; avoid manual field-by-field mapping scattered across services.
+
+## Dependency Injection
+- Use constructor injection only — declare fields `private final` and inject via `@RequiredArgsConstructor` (Lombok) or an explicit constructor.
+- Never use field injection (`@Autowired` on a field); it hides required dependencies and makes the class harder to test/construct in isolation.
+- Setter injection is not used for required collaborators; if a dependency is optional, model it explicitly (e.g., `Optional<T>` constructor param or a clearly named nullable field with a comment), not via `@Autowired(required = false)`.
+
+## DTO & Naming Conventions
+- Inbound payloads: `*Request` (e.g., `CreateUserRequest`, `MyPageRequest`).
+- Outbound payloads: `*Response` or `*Dto` consistently per module — don't mix both suffixes for the same kind of object in one service.
+- JPA entities: `*Entity` (or plain domain name if that's the existing project convention) — never reuse the same class name for both the entity and its DTO.
+- Mappers: `*Mapper` (e.g., `UserMapper`), with one mapper per entity/DTO pair rather than a single catch-all mapper class.
+- Keep naming consistent within a feature/module even if older code in the repo predates the convention — don't silently rename existing classes as a side effect of an unrelated change.
+
+### Request vs Response Types
+- All request DTOs (`*Request`) are regular classes with Jakarta Validation annotations on the fields (Lombok `@Data`/`@Getter`/`@Setter`/`@Builder` as needed) — not records. Validation annotations and Jackson deserialization onto records work, but classes keep request types consistent with mutable builder-style construction used elsewhere in this codebase and avoid surprises with partial/optional fields.
+- All response DTOs (`*Response`/`*Dto`) are Java `record`s, not classes. Records are a better fit for responses: they're immutable, give `equals`/`hashCode`/`toString` for free, and signal clearly that the object is a finished, read-only result, not something the response will continue to mutate.
+- Never nest a DTO as an inner/nested class or inner record inside another class (no `public class UserResponse { record Address(...) {} }`, no `class CreateUserRequest { static class Item {...} }`). Every request/response type — including nested objects like address, line-item, or filter sub-objects — is its own top-level file in `dto`, named and suffixed per the conventions above (e.g., `AddressDto`, `OrderItemDto`), even if it's only used by one parent DTO.
+- A response record composed of other response objects still composes by referencing other top-level records, not by declaring them inline:
+
+```java
+// BAD — nested/inner record, validation class mixed with record style
+public class OrderResponse {
+    public record Item(String sku, int qty) {}
+    private List<Item> items;
+}
+```
+
+```java
+// GOOD — request as a class, response as top-level records
+public class CreateOrderRequest {
+    @NotBlank
+    private String customerId;
+
+    @NotEmpty
+    private List<@Valid OrderItemRequest> items;
+}
+
+public record OrderItemDto(String sku, int qty) {}
+
+public record OrderResponse(String orderId, String customerId, List<OrderItemDto> items) {}
+```
+
+## API Contracts
+- Wrap all responses in the existing `ApiResponse<T>` envelope — don't introduce a second response shape in the same service.
+- Validate every inbound request body with Jakarta Validation (`@Valid`/`@Validated`) on the controller method, with constraints declared on the DTO, not re-checked manually in the service.
+- Use a centralized `@RestControllerAdvice` for exception -> HTTP status mapping; don't catch-and-swallow exceptions in controllers.
+- Throw specific, meaningful exceptions (e.g., `ResourceNotFoundException`, `BusinessRuleException`) from services rather than generic `RuntimeException`.
+- Error responses always follow the same shape regardless of which exception triggered them: a status/error code, a human-readable message, a timestamp, and a trace/request ID for correlation with logs — never let a raw stack trace or framework-default error body reach the client.
+- Map exception types to HTTP status consistently across the codebase (e.g., `ResourceNotFoundException` -> 404, `BusinessRuleException` -> 422, validation errors -> 400) so the same exception type always produces the same status everywhere it's thrown.
+
+## API Documentation
+- Every new or modified endpoint gets OpenAPI annotations: `@Operation(summary=, description=)` on the controller method, and `@Schema(description=)` on DTO fields that aren't self-explanatory from their name/type alone.
+- Document non-2xx responses with `@ApiResponse` (springdoc) where the endpoint has meaningful failure modes (e.g., 404 on lookup-by-id, 409 on conflict) — don't just document the happy path.
+- Keep `@Operation`/`@Schema` descriptions accurate when behavior changes; stale API docs are treated the same as a stale test — fix them in the same change.
+
+## Null Safety & Optional Usage
+- Repository methods that may legitimately find nothing return `Optional<T>` (e.g., `findById` variants you add yourself) rather than returning `null`.
+- `Optional` is for service-layer/internal use to express "may be absent" — unwrap it before it reaches a controller; controllers and DTOs never expose `Optional<T>` as a field or return type.
+- At the point an absent value is *not* acceptable, resolve the `Optional` immediately into a thrown exception (e.g., `.orElseThrow(() -> new ResourceNotFoundException(...))`) rather than passing the `Optional` further down and checking it later.
+- Don't use `Optional` for method parameters — use overloads or a clearly nullable, well-documented parameter instead.
+- Avoid returning `null` from service methods for collections — return an empty `List`/`Set`/`Map`, never `null`, so callers don't need defensive null checks.
+
+## Persistence & PostgreSQL Mapping
+- Use Spring Data JPA repositories; use `Specification` for dynamic/conditional filtering instead of building queries by string concatenation.
+- No inline/native SQL in controllers or services — keep it in the repository layer, and only when `Specification`/JPQL genuinely can't express the query.
+- Be explicit with PostgreSQL column mapping: `@Column(name=, length=)`, explicit enum strategy (`@Enumerated(EnumType.STRING)` unless the column is already numeric), and explicit timestamp types (`LocalDateTime`/`Instant` consistently, not mixed).
+- Follow the codebase's existing soft-delete convention (`is_enable` + `@SQLRestriction`/`@Where`) instead of hard deletes — never add a new soft-delete flag pattern.
+- Wrap multi-step writes in `@Transactional`; mark read-only query methods `@Transactional(readOnly = true)`.
+- Default collection associations to `FetchType.LAZY`; never set `FetchType.EAGER` on `@OneToMany`/`@ManyToMany` as a way to "fix" a lazy-loading exception.
+- When a query needs related entities, fetch them explicitly via `@EntityGraph` or `JOIN FETCH` in the query method rather than letting Hibernate lazy-load them one row at a time in a loop.
+- Watch for N+1 patterns when mapping a list of entities to DTOs in a loop — if each entity access triggers a fresh query for an association, fetch that association eagerly for the specific query instead of accepting per-row queries.
+- Every entity has standard audit fields — `createdAt`, `updatedAt`, and (where the codebase tracks it) `createdBy`/`updatedBy` — populated via `@CreatedDate`/`@LastModifiedDate`/`@CreatedBy`/`@LastModifiedBy` on a shared `BaseEntity`/`@MappedSuperclass`, not hand-set in each service method.
+- Don't reimplement audit-field logic per entity; extend the existing base auditing class/interface if one exists in the codebase.
+
+## Pagination
+- Standard request shape: `pageNumber`, `pageSize`, optional `sortBy`/`sortOrder`, plus a typed filter DTO — don't invent ad hoc pagination params per endpoint.
+- Paginated responses always include page metadata (`PageMeta`: total elements, total pages, current page, page size).
+
+## Security & Config
+- No plaintext secrets, connection strings, or API keys committed anywhere — read from environment variables / externalized config.
+- Never build queries via string concatenation with user input, even outside the repository layer.
+- Log meaningfully with SLF4J (`log.info/warn/error`) — no `System.out.println`; never log secrets, tokens, or full PII payloads.
+
+## Logging via AOP
+- Cross-cutting logging (method entry/exit, execution time, exception capture) belongs in an `@Aspect`, not hand-written `log.info`/`log.error` calls scattered through services and controllers.
+- Use a custom marker annotation (e.g., `@Loggable`) on methods/classes that should be logged, and a single `@Around` advice in a shared `aspect` package to apply it — don't write a new `@Before`/`@After` pair per class.
+- A pointcut targeting the controller or service layer (e.g., `execution(* com.app..*.controller..*(..))`) is acceptable for blanket entry/exit logging, but prefer the annotation-based approach for anything beyond basic layer-wide tracing, since it's explicit about intent and easy to opt out per method.
+- Standard fields to capture in the aspect: class + method name, execution time (ms), and a truncated/sanitized view of arguments and return value — never log raw request/response bodies that may contain secrets, tokens, or PII.
+- Exceptions should be logged once at the boundary where they're handled (typically the `@RestControllerAdvice` or the logging aspect's exception-handling branch) — don't log the same exception again at every layer it passes through.
+- Keep the aspect itself free of business logic; it should only observe and log, never alter control flow or mutate arguments/return values.
+- Don't mix manual `log.info("entering X")`/`log.info("exiting X")` style logging into methods that are already covered by the logging aspect — pick one mechanism per method to avoid duplicate/noisy logs.
+
+```java
+// Aspect — generic entry/exit/exception logging via annotation
+@Aspect
+@Component
+@Slf4j
+public class LoggingAspect {
+
+    @Around("@annotation(loggable)")
+    public Object logExecution(ProceedingJoinPoint pjp, Loggable loggable) throws Throwable {
+        String signature = pjp.getSignature().toShortString();
+        long start = System.currentTimeMillis();
+        try {
+            log.info("Enter {} args={}", signature, pjp.getArgs());
+            Object result = pjp.proceed();
+            log.info("Exit {} took={}ms", signature, System.currentTimeMillis() - start);
+            return result;
+        } catch (Exception ex) {
+            log.error("Error in {} took={}ms message={}", signature, System.currentTimeMillis() - start, ex.getMessage());
+            throw ex;
+        }
+    }
+}
+```
+
+```java
+// Usage — opt in per method, no manual log statements inside
+@Loggable
+@Transactional(readOnly = true)
+public ApiResponse<List<MyDto>> page(MyPageRequest request) {
+    return PageableSupport.query(repository, mapper, request.toPageAndFilter(), MyEntity.class, request.getFilter(), null);
+}
+```
+
+## Observability
+- Expose health via Spring Boot Actuator (`/actuator/health`); don't roll a custom health endpoint.
+- Group readiness vs liveness concerns properly when probes are used (e.g., Kubernetes) — DB connectivity belongs in readiness, not liveness.
+- Use Micrometer for custom metrics; name metrics with a consistent dot-namespaced convention scoped to the app/domain (e.g., `app.orders.created.count`, `app.orders.processing.time`) — don't invent ad hoc metric names per class.
+- Prefer tags/labels (e.g., `status`, `type`) over baking variants into the metric name itself (avoid `orders.created.success.count` + `orders.created.failed.count`; use `orders.created.count` tagged with `status=success|failed`).
+- Don't expose sensitive Actuator endpoints (`/env`, `/configprops`, `/heapdump`, etc.) publicly — restrict to internal network/management port or secure with auth.
+- Correlate logs with a request/trace ID (e.g., via MDC or Micrometer Tracing) so a single request's logs — including those from the logging aspect — can be followed across layers.
+
+## Security & Access Control
+- Use Spring Security with method-level authorization (`@PreAuthorize`/`@PostAuthorize`) on service methods for business-rule-level checks, not just URL-pattern security in `SecurityFilterChain`.
+- Express role/permission checks declaratively (`@PreAuthorize("hasRole('ADMIN')")` or a custom SpEL expression bean) rather than manual `if` checks against the principal scattered through service code.
+- Keep authorization checks in the service layer, not the controller — controllers shouldn't need to know about roles/permissions to do their job.
+- CORS config lives in one centralized `CorsConfigurationSource`/`WebMvcConfigurer` bean — never add controller-level `@CrossOrigin` annotations ad hoc.
+- Be explicit and minimal with CORS: allowed origins, methods, and headers should be a defined allowlist, never `*` in combination with `allowCredentials(true)`.
+- Sensitive operations (delete, role change, financial actions) require an explicit authorization check even if the route is already behind general authentication — don't rely on "logged in" as a stand-in for "authorized."
+
+## Caching
+- Use `@Cacheable`/`@CachePut`/`@CacheEvict` at the service layer, not in repositories or controllers, so caching stays a cross-cutting concern rather than leaking into persistence or transport logic.
+- Every `@Cacheable` method has a corresponding, explicit eviction path — adding a cache without defining when/how it's invalidated is not acceptable.
+- Key caches explicitly (`key = "#id"` or a defined `KeyGenerator`) — don't rely on default key generation for methods with multiple parameters, since it's easy to get accidental cache collisions.
+- Cache only data that's safe to be briefly stale; don't cache results that must always reflect the latest write (e.g., balances, inventory counts at the moment of an order) unless the eviction is synchronous with the write that changes them.
+- Set an explicit TTL per cache region — don't leave entries cached indefinitely by default.
+
+## Idempotency
+- Endpoints that create or mutate state and may be retried by a client or gateway (payment, order creation, webhook handlers) accept an idempotency key (e.g., `Idempotency-Key` header or a request field) and treat a duplicate key as "already done," not as a new operation.
+- Persist the idempotency key alongside the result of the original operation (or a dedicated idempotency table) so a retried request can return the original response instead of re-executing business logic.
+- Idempotency checks happen inside the same transaction as the write they're protecting — checking and writing in separate transactions reintroduces the race condition idempotency is meant to prevent.
+- Plain `GET` and other naturally idempotent reads don't need this pattern — reserve it for `POST`/`PUT`/`PATCH` operations with real side effects.
+
+## Profiles & Configuration
+- Environment-specific values live in `application-{profile}.yml` (`dev`, `test`, `staging`, `prod`); `application.yml` holds only defaults shared across all profiles.
+- Only connection details, external URLs, feature flags, and log levels should differ per profile — business logic must never branch on `@Profile`/active profile.
+- `@Profile`-annotated beans are acceptable for swapping infrastructure concerns (e.g., a mock vs. real external client), not for altering core business behavior.
+- Secrets are never inside `application-{profile}.yml` files even per-environment — reference them via `${ENV_VAR_NAME}` placeholders resolved from the environment/secret manager.
+- Each profile's datasource/pool sizing should be appropriate to its tier (smaller pool in `dev`/`test`, tuned pool in `prod`) — don't copy `prod` settings into `dev` or vice versa.
+
+## Testing
+- Add or update tests whenever behavior changes — no behavior change without a corresponding test update.
+- Use a test profile with an isolated datasource and JPA repository discovery disabled for unit tests that don't need persistence.
+
+## Anti-Patterns to Avoid
+
+```java
+// BAD — entity leaked, logic in controller, no validation
+@PostMapping("/users")
+public User createUser(@RequestBody UserEntity entity) {
+    if (entity.getEmail() == null) throw new RuntimeException("bad input");
+    return userRepository.save(entity);
+}
+```
+
+```java
+// GOOD — thin controller, validated DTO, entity never leaves the service layer
+@PostMapping("/users")
+public ApiResponse<UserDto> createUser(@RequestBody @Valid CreateUserRequest request) {
+    return userService.createUser(request);
+}
+```
+
+## Reference Patterns
+
+```java
+@PostMapping("/pageable")
+public ApiResponse<List<MyDto>> page(@RequestBody @Valid MyPageRequest request) {
+    return service.page(request);
+}
+```
+
+```java
+@Transactional(readOnly = true)
+public ApiResponse<List<MyDto>> page(MyPageRequest request) {
+    return PageableSupport.query(repository, mapper, request.toPageAndFilter(), MyEntity.class, request.getFilter(), null);
+}
+```

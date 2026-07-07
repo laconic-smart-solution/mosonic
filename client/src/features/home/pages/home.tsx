@@ -6,17 +6,12 @@ import { toast } from "sonner"
 import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits } from "@/shared/lib/api-error"
 
-import { HomeBackdrop } from "@/features/home/components/home-backdrop"
-import { PageShell } from "@/components/app/page-shell"
-import { HomeFooter } from "@/features/home/components/home-footer"
-import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
-import type { Attachment } from "@/components/core/prompt-area"
-import { buildStrategyInput } from "@/lib/strategy-input"
 import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
 import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
+import type { Attachment } from "@/components/core/prompt-area"
+import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
 import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
 import { HomeStage } from "@/features/home/components/home-stage"
-import { HomeNavbar } from "@/features/home/components/home-navbar"
 import {
   HOME_TEMPLATE_DEFS,
   PROMPT_SUGGESTION_KEYS,
@@ -26,7 +21,10 @@ import {
   consumeHomePendingPrompt,
   saveHomePendingPrompt,
 } from "@/features/home/lib/home-pending-prompt"
+import { buildStrategyInput } from "@/lib/strategy-input"
+import type { RuleIntakeAnswers } from "@/features/rules/types/rule-intake.type"
 import { RuleExtractionProgress } from "@/features/rules/components/rule-extraction-progress"
+import { CreateRuleWizard } from "@/features/rules/components/create-rule-wizard"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
 import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
@@ -41,6 +39,7 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 import type { RuleListItem } from "@/shared/services/rule.service"
 import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
+import { HomeBackdrop } from "../components/home-backdrop"
 
 export default function HomePage() {
   const { t } = useTranslation("home")
@@ -71,14 +70,12 @@ export default function HomePage() {
   const [ruleOptions, setRuleOptions] = useState<RuleListItem[]>([])
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
   const [pendingRuleId, setPendingRuleId] = useState<string | null>(null)
+  const [ruleWizardOpen, setRuleWizardOpen] = useState(false)
+  const [ruleWizardPrompt, setRuleWizardPrompt] = useState("")
+  const [ruleWizardKey, setRuleWizardKey] = useState(0)
   const [qaWizardOpen, setQaWizardOpen] = useState(false)
   const [qaInitialMessage, setQaInitialMessage] = useState("")
-  const [ruleGenConfirmOpen, setRuleGenConfirmOpen] = useState(false)
   const [workflowGenConfirmOpen, setWorkflowGenConfirmOpen] = useState(false)
-  const pendingRuleExtractRef = useRef<{
-    text: string
-    attachments: Attachment[]
-  } | null>(null)
   const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
   const pendingWorkflowRuleIdRef = useRef<string | null>(null)
 
@@ -250,13 +247,18 @@ export default function HomePage() {
       return
     }
 
-    pendingRuleExtractRef.current = { text, attachments }
-    setRuleGenConfirmOpen(true)
+    setRuleWizardPrompt(trimmed)
+    setRuleWizardKey((k) => k + 1)
+    setRuleWizardOpen(true)
   }
 
-  function executeRuleGeneration(text: string, attachments: Attachment[]) {
+  function executeRuleGeneration(
+    text: string,
+    attachments: Attachment[],
+    intake?: RuleIntakeAnswers,
+  ) {
     setOrbPulse(true)
-    void runExtract(text, attachments)
+    void runExtract(text, attachments, intake)
   }
 
   function handleQaSubmit(answers: WorkflowQAAnswers) {
@@ -331,10 +333,8 @@ export default function HomePage() {
   }
 
   return (
-    <PageShell variant="marketing" className="bg-background font-sans">
+    <div className="relative flex min-h-[100dvh] w-full flex-1 flex-col overflow-x-hidden bg-background pt-14">
       <HomeBackdrop />
-      <HomeNavbar />
-
       {isAuthenticated && showExtractionOverlay ? (
         <RuleExtractionProgress
           ruleId={processingRuleId ?? ""}
@@ -348,7 +348,7 @@ export default function HomePage() {
         />
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col items-center pt-14">
+      <div className="flex min-h-0 flex-1 flex-col items-center">
         <HomeStage
           mounted={mounted}
           orbPulse={orbPulse}
@@ -404,10 +404,18 @@ export default function HomePage() {
         </HomeStage>
       </div>
 
-      <HomeFooter />
-
       {isAuthenticated ? (
         <>
+          <CreateRuleWizard
+            open={ruleWizardOpen}
+            onOpenChange={setRuleWizardOpen}
+            initialPrompt={ruleWizardPrompt}
+            onPromptChange={setRuleWizardPrompt}
+            promptAreaKey={ruleWizardKey}
+            onExtract={executeRuleGeneration}
+            isExtracting={isExtracting}
+          />
+
           <WorkflowQaWizard
             key={workflowRuleId ?? "none"}
             open={qaWizardOpen}
@@ -422,23 +430,6 @@ export default function HomePage() {
             initialMessage={qaInitialMessage}
             isSubmitting={generateWorkflow.isPending}
             onSubmit={handleQaSubmit}
-          />
-
-          <GenerationCreditConfirmDialog
-            open={ruleGenConfirmOpen}
-            onOpenChange={(open) => {
-              setRuleGenConfirmOpen(open)
-              if (!open) pendingRuleExtractRef.current = null
-            }}
-            kind="rule"
-            isSubmitting={isExtracting}
-            onConfirm={() => {
-              const pending = pendingRuleExtractRef.current
-              if (!pending) return
-              setRuleGenConfirmOpen(false)
-              pendingRuleExtractRef.current = null
-              executeRuleGeneration(pending.text, pending.attachments)
-            }}
           />
 
           <GenerationCreditConfirmDialog
@@ -469,6 +460,6 @@ export default function HomePage() {
           />
         </>
       ) : null}
-    </PageShell>
+    </div>
   )
 }

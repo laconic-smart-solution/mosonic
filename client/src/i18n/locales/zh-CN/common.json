@@ -23,6 +23,11 @@
   },
   "systemMessagesEnglish": "来自服务器的系统消息可能显示为英文。",
   "searchPlaceholder": "搜索页面…",
+  "topbar": {
+    "menu": "菜单",
+    "openMenu": "打开菜单",
+    "theme": "主题"
+  },
   "search": {
     "ariaLabel": "搜索页面和路由",
     "placeholder": "搜索页面和路由…",
@@ -91,13 +96,10 @@
     "dashboard": "仪表板",
     "rules": "规则",
     "workflow": "工作流",
-    "liveRun": "实时运行",
     "content": "内容",
     "upload": "上传",
     "posts": "帖子",
     "analytics": "分析",
-    "logs": "日志",
-    "components": "组件",
     "pipelines": "流水线",
     "cost": "费用",
     "usage": "用量",

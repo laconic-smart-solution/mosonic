@@ -9,10 +9,12 @@
       "credit": "Credits",
       "nodeCredits": "Credit pricing",
       "plans": "Plans",
+      "topupPlans": "Topup plans",
       "usage": "Usage",
       "cost": "Cost (USD)",
       "content": "Content",
-      "apiUsage": "API usage"
+      "apiUsage": "API usage",
+      "faq": "FAQ"
     }
   },
   "dashboard": {
@@ -441,5 +443,90 @@
     "colCost": "Cost (USD)",
     "prev": "Previous",
     "next": "Next"
+  },
+  "topupPlans": {
+    "title": "Topup plans",
+    "subtitle": "Credit packages shown when users top up their balance.",
+    "create": "New topup plan",
+    "createTitle": "Create topup plan",
+    "editTitle": "Edit topup plan",
+    "edit": "Edit",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No topup plans yet.",
+    "loadError": "Could not load topup plans. Ensure the payment service is running.",
+    "saveError": "Could not save topup plan.",
+    "toggleActive": "Toggle active state for {{code}}",
+    "columns": {
+      "code": "Code",
+      "label": "Label",
+      "credits": "Credits",
+      "priceUsd": "USD",
+      "priceThb": "THB",
+      "sortOrder": "Order",
+      "status": "Status"
+    },
+    "fields": {
+      "code": "Code",
+      "label": "Label",
+      "credits": "Credits",
+      "priceUsd": "Price (USD)",
+      "priceThb": "Price (THB)",
+      "sortOrder": "Sort order",
+      "active": "Active"
+    }
+  },
+  "faq": {
+    "title": "FAQ knowledge base",
+    "subtitle": "Upload documents, review generated FAQs, and ask questions via the assistant.",
+    "tabsLabel": "FAQ sections",
+    "tabs": {
+      "documents": "Documents",
+      "faqs": "All FAQs"
+    },
+    "documentsHint": "Upload PDF, DOCX, TXT, or Markdown to generate FAQs and index document content.",
+    "upload": "Upload document",
+    "uploading": "Uploading…",
+    "uploadSuccess": "Document processed successfully.",
+    "uploadError": "Could not upload document.",
+    "download": "Download",
+    "downloadError": "Could not download document.",
+    "documentDetail": "Document details",
+    "documentNotFound": "Document not found.",
+    "generatedFaqs": "Generated FAQs",
+    "searchFaqs": "Search FAQs",
+    "viewDocument": "View document",
+    "emptyDocuments": "No documents uploaded yet.",
+    "emptyFaqs": "No FAQs found.",
+    "error": "Error",
+    "columns": {
+      "filename": "Filename",
+      "status": "Status",
+      "faqCount": "FAQs",
+      "size": "Size",
+      "uploadedBy": "Uploaded by",
+      "createdAt": "Uploaded",
+      "question": "Question",
+      "answer": "Answer",
+      "document": "Document"
+    },
+    "chat": {
+      "title": "FAQ assistant",
+      "subtitle": "Answers from your uploaded documents",
+      "toggle": "Open FAQ assistant",
+      "close": "Close FAQ assistant",
+      "empty": "Ask a question about your uploaded documentation.",
+      "placeholder": "Type your question…",
+      "inputLabel": "Your question",
+      "send": "Send message",
+      "thinking": "Thinking…",
+      "sources": "Sources",
+      "error": "Could not get an answer.",
+      "source": {
+        "faq": "From FAQ",
+        "llm": "AI answer",
+        "no_match": "No match"
+      }
+    }
   }
 }

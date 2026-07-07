@@ -121,6 +121,35 @@ export const adminApi = {
   assignPlan: (planId: string, userId: string) =>
     apiClient.post(`/admin/plans/${planId}/assign`, { userId }).then((r) => r.data),
 
+  listTopupPlans: () => apiClient.get("/admin/topup-plans").then((r) => r.data),
+
+  createTopupPlan: (body: {
+    code: string
+    label: string
+    credits: number
+    priceUsd: number
+    priceThb: number
+    sortOrder: number
+    active: boolean
+  }) => apiClient.post("/admin/topup-plans", body).then((r) => r.data),
+
+  updateTopupPlan: (
+    code: string,
+    body: {
+      label: string
+      credits: number
+      priceUsd: number
+      priceThb: number
+      sortOrder: number
+      active: boolean
+    },
+  ) => apiClient.put(`/admin/topup-plans/${encodeURIComponent(code)}`, body).then((r) => r.data),
+
+  setTopupPlanActive: (code: string, active: boolean) =>
+    apiClient
+      .patch(`/admin/topup-plans/${encodeURIComponent(code)}/active`, { active })
+      .then((r) => r.data),
+
   getUsageHistory: (params?: Record<string, string | number | undefined>) =>
     apiClient.get("/admin/usage/history", { params }).then((r) => r.data),
 
@@ -147,4 +176,39 @@ export const adminApi = {
     apiClient
       .put(`/admin/api-usage/${provider}/prepaid`, { prepaidCreditUsd })
       .then((r) => r.data),
+
+  listFaqDocuments: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/admin/faq/documents", { params }).then((r) => r.data),
+
+  getFaqDocument: (documentId: string) =>
+    apiClient.get(`/admin/faq/documents/${documentId}`).then((r) => r.data),
+
+  listFaqDocumentFaqs: (
+    documentId: string,
+    params?: { page?: number; limit?: number },
+  ) =>
+    apiClient
+      .get(`/admin/faq/documents/${documentId}/faqs`, { params })
+      .then((r) => r.data),
+
+  downloadFaqDocument: (documentId: string) =>
+    apiClient.get(`/admin/faq/documents/${documentId}/download`, {
+      responseType: "blob",
+    }),
+
+  uploadFaqDocument: (file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    return apiClient
+      .post("/admin/faq/documents", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data)
+  },
+
+  listFaqs: (params?: { page?: number; limit?: number; q?: string }) =>
+    apiClient.get("/admin/faq/faqs", { params }).then((r) => r.data),
+
+  askFaq: (body: { question: string; topK?: number }) =>
+    apiClient.post("/admin/faq/ask", body).then((r) => r.data),
 }

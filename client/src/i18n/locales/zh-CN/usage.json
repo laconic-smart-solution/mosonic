@@ -1,12 +1,40 @@
 {
-  "title": "用量",
-  "subtitle": "账户积分与生成活动",
+  "title": "用量与账单",
+  "subtitle": "积分、使用记录与套餐管理",
+  "tabs": {
+    "label": "账单分区",
+    "overview": "概览",
+    "topup": "充值",
+    "plans": "套餐"
+  },
   "planBanner": {
     "plan": "套餐",
     "creditsUsed": "已用 {{used}} / {{total}} 积分",
     "remaining": "剩余 {{count}}",
     "resetDate": "重置于 {{date}}",
-    "lowBalance": "积分余额不足 — 剩余不足 10%"
+    "lowBalance": "积分余额不足 — 剩余不足 10%",
+    "topUp": "充值积分",
+    "upgrade": "升级套餐"
+  },
+  "topupPage": {
+    "title": "充值积分",
+    "description": "选择积分包。启用 Payni 时将在新窗口完成支付。"
+  },
+  "plansPage": {
+    "title": "订阅套餐",
+    "description": "升级套餐或为当前账单周期续费。",
+    "loading": "正在加载套餐…",
+    "loadError": "无法加载套餐，请重试。",
+    "renewNote": "付费套餐按月续费。请在每个账单周期完成支付以保持套餐与积分。"
+  },
+  "upgrade": {
+    "currentPlan": "当前套餐",
+    "currentPlanBadge": "当前套餐",
+    "upgradeTo": "升级至 {{plan}}",
+    "renew": "续费本月",
+    "success": "您的套餐已更新为 {{plan}}。",
+    "error": "无法发起结账，请重试。",
+    "awaitingPayment": "请在 Payni 窗口完成支付，成功后套餐将自动更新。"
   },
   "summary": {
     "usedThisMonth": "本月已用积分",
@@ -26,7 +54,9 @@
     "operation": "类型",
     "provider": "提供商",
     "credits": "积分",
-    "empty": "该时段暂无活动记录"
+    "empty": "该时段暂无活动记录",
+    "refundOperation": "退款 — {{operation}}",
+    "refundProvider": "退款"
   },
   "range": {
     "month": "本月",

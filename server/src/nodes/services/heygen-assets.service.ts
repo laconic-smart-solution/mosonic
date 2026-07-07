@@ -84,8 +84,10 @@ export type HeygenSubmitPresenterParams = {
   avatarId: string;
   script: string;
   voiceId: string;
-  /** Target length in seconds; script is trimmed to fit (HeyGen has no duration API). */
+  /** Target length in seconds; used for logging only (HeyGen has no duration API for avatar mode). */
   durationSeconds?: number;
+  /** Voice speed multiplier (0.5–1.5). Values below 1 slow speech and lengthen the video. */
+  voiceSpeed?: number;
   orientation?: 'landscape' | 'portrait';
   expressiveness?: 'low' | 'medium' | 'high';
   motionPrompt?: string;
@@ -416,6 +418,11 @@ export class HeygenAssetsService {
         type: 'image',
         asset_id: params.backgroundAssetId.trim(),
       };
+    }
+
+    if (params.voiceSpeed != null && Number.isFinite(params.voiceSpeed)) {
+      const speed = Math.max(0.5, Math.min(1.5, params.voiceSpeed));
+      body.voice_settings = { speed };
     }
 
     const resp = await fetch(`${HEYGEN_BASE}/v3/videos`, {

@@ -8,23 +8,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer"
 import {
   Modal,
   ModalContent,
   ModalHeader,
   ModalTitle,
 } from "@/components/ui/modal"
-import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
-import { WorkflowNodeGuideSection } from "@/features/workflow/components/workflow-node-guide-section"
-import { backendTypeToCanvas } from "@/features/workflow/data/workflow-model"
 import {
   type OutputKey,
   cardTitle,
@@ -40,48 +29,36 @@ import {
 
 type WorkflowNodesLite = WorkflowNode[]
 
-type RerunSheetProps = {
+type RerunConfirmDialogProps = {
   openNodeId: string | null
   workflowNodes: WorkflowNodesLite
-  workflowId?: string
   globalRerunning: boolean
-  configDraft: Record<string, unknown>
-  onConfigChange: (next: Record<string, unknown>) => void
   onOpenChange: (open: boolean) => void
   onSubmit: (nodeId: string) => void
 }
 
-export function ContentDetailRerunSheet({
+export function ContentDetailRerunConfirmDialog({
   openNodeId,
   workflowNodes,
-  workflowId,
   globalRerunning,
-  configDraft,
-  onConfigChange,
   onOpenChange,
   onSubmit,
-}: RerunSheetProps) {
+}: RerunConfirmDialogProps) {
   const openNode = openNodeId
     ? workflowNodes.find((n) => n.nodeId === openNodeId)
     : undefined
   const openKey: OutputKey | undefined = openNode
     ? outputKeyForNodeType(openNode.type)
     : undefined
-  const canvasType = openNode ? backendTypeToCanvas(openNode.type) : ""
 
   return (
-    <Drawer
+    <AlertDialog
       open={!!openNodeId}
       onOpenChange={(open) => onOpenChange(open)}
-      direction="bottom"
     >
-      <DrawerContent
-        variant="panel"
-        showCloseButton
-        className="mx-auto max-h-[85vh] max-w-3xl overflow-y-auto rounded-t-2xl p-5"
-      >
-        <DrawerHeader className="text-left">
-          <DrawerTitle className="flex items-center gap-2.5 font-heading text-lg">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2.5">
             {openKey ? (
               <>
                 <span
@@ -94,50 +71,34 @@ export function ContentDetailRerunSheet({
                 </span>
                 Re-run {cardTitle(openKey)}
               </>
-            ) : openNode ? (
-              <span>Re-run node</span>
-            ) : null}
-          </DrawerTitle>
-          <DrawerDescription>
-            Adjust settings below and re-run. Output replaces this node only —
-            other nodes stay untouched.
-          </DrawerDescription>
-        </DrawerHeader>
-        {openNode && canvasType ? (
-          <div className="mt-3 max-h-[50vh] overflow-y-auto pr-1">
-            <WorkflowNodeGuideSection canvasType={canvasType} />
-            <div className="mt-3">
-              <WorkflowNodeConfigFields
-                canvasType={canvasType}
-                config={configDraft}
-                onChange={onConfigChange}
-                workflowId={workflowId}
-                nodeId={openNodeId ?? undefined}
-              />
-            </div>
-          </div>
-        ) : null}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            ) : (
+              "Re-run node"
+            )}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Re-run this step? Output replaces this node only — other nodes stay
+            untouched.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={globalRerunning}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
             disabled={!openNodeId || globalRerunning}
-            onClick={() => openNodeId && onSubmit(openNodeId)}
+            onClick={(event) => {
+              event.preventDefault()
+              if (openNodeId) onSubmit(openNodeId)
+            }}
           >
             Re-run node
-          </Button>
-        </div>
-      </DrawerContent>
-    </Drawer>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
+
+/** @deprecated Use ContentDetailRerunConfirmDialog */
+export const ContentDetailRerunSheet = ContentDetailRerunConfirmDialog
 
 type LightboxProps = {
   url: string | null

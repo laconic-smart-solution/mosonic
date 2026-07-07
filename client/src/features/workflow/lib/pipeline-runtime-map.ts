@@ -3,6 +3,7 @@ import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 const RUNTIME_STATUS_PRIORITY: Record<string, number> = {
   failed_final: 60,
   failed: 58,
+  waiting_review: 57,
   completed: 55,
   skipped: 53,
   running: 50,

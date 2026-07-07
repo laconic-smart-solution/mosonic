@@ -9,10 +9,12 @@ import { Cron } from '@nestjs/schedule';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
 import type { PlanRecord, UserPlanRecord } from '../domain/plans/plan.types';
+import type { IPlanPurchaseRepository } from '../repositories/interfaces/plan-purchase.repository.interface';
 import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
 import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
 import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
 import {
+  PLAN_PURCHASE_REPOSITORY,
   PLAN_REPOSITORY,
   USER_PLAN_REPOSITORY,
   USER_REPOSITORY,
@@ -30,6 +32,8 @@ export class PlanService implements OnModuleInit {
     @Inject(USER_PLAN_REPOSITORY)
     private readonly userPlans: IUserPlanRepository,
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(PLAN_PURCHASE_REPOSITORY)
+    private readonly planPurchases: IPlanPurchaseRepository,
     private readonly calculation: CreditCalculationService,
   ) {}
 
@@ -80,6 +84,23 @@ export class PlanService implements OnModuleInit {
       })),
     );
     return withCredits;
+  }
+
+  async listPublicPlans() {
+    const plans = await this.plans.findAllSortedByPrice();
+    const activePlans = plans.filter((plan) => plan.isActive);
+
+    return Promise.all(
+      activePlans.map(async (plan) => ({
+        planId: plan.planId,
+        name: plan.name,
+        priceThb: plan.priceThb,
+        priceUsd: plan.priceUsd,
+        creditsPerMonth: await this.getCreditsForPlan(plan),
+        description: plan.description ?? null,
+        features: plan.features ?? [],
+      })),
+    );
   }
 
   async createPlan(dto: CreatePlanDto) {
@@ -212,6 +233,25 @@ export class PlanService implements OnModuleInit {
     for (const up of activePlans) {
       const plan = planMap.get(up.planId);
       if (!plan) continue;
+
+      if (plan.priceThb > 0) {
+        const selfServe =
+          await this.planPurchases.hasPurchaseHistory(up.userId);
+        if (selfServe) {
+          const paid = await this.planPurchases.findActiveForUserAndPeriod(
+            up.userId,
+            billingPeriod,
+          );
+          if (!paid) {
+            await this.assignDefaultPlan(up.userId);
+            this.logger.log(
+              `Downgraded user ${up.userId} — no payment for billing period`,
+            );
+            continue;
+          }
+        }
+      }
+
       const credits = await this.getCreditsForPlan(plan);
       updates.push({
         id: up.id,

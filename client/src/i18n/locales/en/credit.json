@@ -29,10 +29,12 @@
     "success": "Added {{credits}} credits",
     "error": "Could not start payment. Please try again.",
     "loadError": "Could not load credit packages.",
+    "empty": "No credit packages are available right now.",
     "loading": "Loading packages…",
     "awaitingPayment": "Complete your payment in the Payni window.",
     "paymentWindowHint": "Finish payment in the Payni tab we opened. PayNow and bank transfer are available there.",
-    "balanceUpdatesAutomatically": "Your balance will update automatically when payment succeeds."
+    "balanceUpdatesAutomatically": "Your balance will update automatically when payment succeeds.",
+    "packageAriaLabel": "{{label}}, {{credits}} credits, ฿{{price}}"
   },
   "nodeType": {
     "keyword_planner": "Keyword planner",

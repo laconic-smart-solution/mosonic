@@ -23,10 +23,9 @@ import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';
 import {
-  CREDIT_PACKAGES,
+  PaymentService,
   type CreditPackage,
-  findCreditPackage,
-} from './lib/credit-packages';
+} from '../payment/payment.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
 import {
@@ -59,10 +58,20 @@ export class CreditService {
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly events: EventsService,
     private readonly payniService: PayniService,
+    private readonly paymentService: PaymentService,
   ) {}
 
-  getPackages(): ReadonlyArray<CreditPackage> {
-    return CREDIT_PACKAGES;
+  async getPackages(): Promise<CreditPackage[]> {
+    const plans = await this.paymentService.listTopupPlans({ activeOnly: true });
+    return plans.map((plan) => this.paymentService.toCreditPackage(plan));
+  }
+
+  private async resolvePackage(packageId: string): Promise<CreditPackage> {
+    const plan = await this.paymentService.getTopupPlan(packageId);
+    if (!plan || !plan.active) {
+      throw new BadRequestException(`Unknown credit package: ${packageId}`);
+    }
+    return this.paymentService.toCreditPackage(plan);
   }
 
   /**
@@ -77,10 +86,7 @@ export class CreditService {
       return { instant };
     }
 
-    const pkg = findCreditPackage(packageId);
-    if (!pkg) {
-      throw new BadRequestException(`Unknown credit package: ${packageId}`);
-    }
+    const pkg = await this.resolvePackage(packageId);
     if (pkg.priceThb <= 0) {
       throw new BadRequestException('Credit package has no price configured');
     }
@@ -106,20 +112,19 @@ export class CreditService {
     };
   }
 
-  /** Payni webhook: credit balance when payment succeeds (idempotent). */
-  async handlePaymentWebhook(dto: PaymentStatusDto): Promise<void> {
+  /** Payni webhook: credit balance when payment succeeds (idempotent). Returns true if handled. */
+  async handlePaymentWebhook(dto: PaymentStatusDto): Promise<boolean> {
     const transactionId = dto.transactionId?.trim();
     const rawStatus = dto.status?.trim().toUpperCase();
     if (!transactionId || !rawStatus) {
       this.logger.error('Invalid payment webhook payload');
-      return;
+      return false;
     }
 
     const purchase = await this.topupPurchases.findByTransactionId(transactionId);
 
     if (!purchase) {
-      this.logger.error(`Payment webhook: transaction ${transactionId} not found`);
-      return;
+      return false;
     }
 
     if (rawStatus === 'SUCCESS') {
@@ -127,13 +132,13 @@ export class CreditService {
         this.logger.warn(
           `Payment webhook: transaction ${transactionId} already credited; skipping`,
         );
-        return;
+        return true;
       }
       if (purchase.status !== 'pending') {
         this.logger.warn(
           `Payment webhook: transaction ${transactionId} status=${purchase.status}; skipping credit`,
         );
-        return;
+        return true;
       }
 
       await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'active');
@@ -147,15 +152,15 @@ export class CreditService {
         this.logger.error(
           `Payment webhook: no active plan for user ${purchase.userId}`,
         );
-        return;
+        return true;
       }
 
-      const pkg = findCreditPackage(purchase.packageId);
+      const pkg = await this.paymentService.getTopupPlan(purchase.packageId);
       await this.topups.create({
         userId: purchase.userId,
         packageId: purchase.packageId,
         credits: purchase.credits,
-        priceUsd: pkg?.priceUsd ?? 0,
+        priceUsd: pkg ? Number(pkg.priceUsd) : 0,
         source: 'self_serve',
       });
 
@@ -167,12 +172,15 @@ export class CreditService {
         title: 'Credits added',
         message: `${purchase.credits.toLocaleString()} credits were added to your balance.`,
       });
-      return;
+      return true;
     }
 
     if (rawStatus === 'CANCELLED' && purchase.status === 'pending') {
       await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'cancelled');
+      return true;
     }
+
+    return true;
   }
 
   /** Instant grant for dev mock mode or internal use. */
@@ -180,10 +188,7 @@ export class CreditService {
     userId: string,
     packageId: string,
   ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
-    const pkg = findCreditPackage(packageId);
-    if (!pkg) {
-      throw new BadRequestException(`Unknown credit package: ${packageId}`);
-    }
+    const pkg = await this.resolvePackage(packageId);
 
     const updated = await this.userPlans.adjustActiveCredits(userId, {
       creditsRemaining: pkg.credits,
@@ -396,6 +401,19 @@ export class CreditService {
 
     if (updated) {
       this.emitBalanceUpdated(updated);
+      const operation = args.nodeType.replace(/_/g, ' ');
+      this.emitCreditRefundNotification({
+        userId: args.userId,
+        credits: args.credits,
+        message: `${args.credits.toLocaleString()} credits were refunded after ${operation} did not complete.`,
+        data: {
+          pipelineId: args.pipelineRef,
+          contentId: args.contentRef,
+          nodeId: args.nodeId,
+          nodeType: args.nodeType,
+          credits: args.credits,
+        },
+      });
     }
   }
 
@@ -567,7 +585,19 @@ export class CreditService {
         creditsRemaining: total,
         clearLowBalanceNotified: true,
       });
-      if (updated) this.emitBalanceUpdated(updated);
+      if (updated) {
+        this.emitBalanceUpdated(updated);
+        this.emitCreditRefundNotification({
+          userId: args.userId,
+          credits: total,
+          message: `${total.toLocaleString()} credits were refunded for generation steps that did not run.`,
+          data: {
+            pipelineId: args.pipelineId,
+            credits: total,
+            itemCount: rows.length,
+          },
+        });
+      }
     } catch (err) {
       this.logger.warn(
         `Pipeline credit refund failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -651,6 +681,27 @@ export class CreditService {
         creditsRemaining: userPlan.creditsRemaining,
         creditsUsed: userPlan.creditsUsed,
         creditsPerMonth: userPlan.creditsPerMonth,
+      });
+    } catch {
+      // noop — credit layer must not break pipelines
+    }
+  }
+
+  private emitCreditRefundNotification(args: {
+    userId: string;
+    credits: number;
+    message: string;
+    data?: Record<string, unknown>;
+  }): void {
+    try {
+      this.events.emitUserNotification({
+        userId: args.userId,
+        sector: 'billing',
+        type: 'credit.refunded',
+        title: 'Credits refunded',
+        message: args.message,
+        data: args.data,
+        action: { label: 'View activity', href: '/usage' },
       });
     } catch {
       // noop — credit layer must not break pipelines

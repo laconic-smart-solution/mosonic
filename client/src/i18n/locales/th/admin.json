@@ -12,7 +12,8 @@
       "usage": "การใช้งาน",
       "cost": "ค่าใช้จ่าย (USD)",
       "content": "คอนเทนต์",
-      "apiUsage": "การใช้ API"
+      "apiUsage": "การใช้ API",
+      "faq": "FAQ"
     }
   },
   "dashboard": {
@@ -427,5 +428,57 @@
     "colCost": "ต้นทุน (USD)",
     "prev": "ก่อนหน้า",
     "next": "ถัดไป"
+  },
+  "faq": {
+    "title": "ฐานความรู้ FAQ",
+    "subtitle": "อัปโหลดเอกสาร ดู FAQ ที่สร้าง และถามคำถามผ่านผู้ช่วย",
+    "tabsLabel": "ส่วน FAQ",
+    "tabs": {
+      "documents": "เอกสาร",
+      "faqs": "FAQ ทั้งหมด"
+    },
+    "documentsHint": "อัปโหลด PDF, DOCX, TXT หรือ Markdown เพื่อสร้าง FAQ และจัดทำดัชนีเนื้อหา",
+    "upload": "อัปโหลดเอกสาร",
+    "uploading": "กำลังอัปโหลด…",
+    "uploadSuccess": "ประมวลผลเอกสารสำเร็จ",
+    "uploadError": "อัปโหลดเอกสารไม่สำเร็จ",
+    "download": "ดาวน์โหลด",
+    "downloadError": "ดาวน์โหลดเอกสารไม่สำเร็จ",
+    "documentDetail": "รายละเอียดเอกสาร",
+    "documentNotFound": "ไม่พบเอกสาร",
+    "generatedFaqs": "FAQ ที่สร้างแล้ว",
+    "searchFaqs": "ค้นหา FAQ",
+    "viewDocument": "ดูเอกสาร",
+    "emptyDocuments": "ยังไม่มีเอกสาร",
+    "emptyFaqs": "ไม่พบ FAQ",
+    "error": "ข้อผิดพลาด",
+    "columns": {
+      "filename": "ชื่อไฟล์",
+      "status": "สถานะ",
+      "faqCount": "FAQ",
+      "size": "ขนาด",
+      "uploadedBy": "อัปโหลดโดย",
+      "createdAt": "วันที่อัปโหลด",
+      "question": "คำถาม",
+      "answer": "คำตอบ",
+      "document": "เอกสาร"
+    },
+    "chat": {
+      "title": "ผู้ช่วย FAQ",
+      "subtitle": "ตอบจากเอกสารที่อัปโหลด",
+      "toggle": "เปิดผู้ช่วย FAQ",
+      "close": "ปิดผู้ช่วย FAQ",
+      "empty": "ถามคำถามเกี่ยวกับเอกสารของคุณ",
+      "placeholder": "พิมพ์คำถาม…",
+      "inputLabel": "คำถามของคุณ",
+      "send": "ส่งข้อความ",
+      "thinking": "กำลังคิด…",
+      "sources": "แหล่งอ้างอิง",
+      "error": "ไม่สามารถรับคำตอบได้",
+      "source": {
+        "llm": "คำตอบจาก AI",
+        "no_match": "ไม่พบคำตอบ"
+      }
+    }
   }
 }

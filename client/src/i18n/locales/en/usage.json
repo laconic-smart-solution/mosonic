@@ -1,12 +1,40 @@
 {
-  "title": "Usage",
-  "subtitle": "Credits and generation activity for your account",
+  "title": "Usage & billing",
+  "subtitle": "Credits, usage history, and plan management",
+  "tabs": {
+    "label": "Billing sections",
+    "overview": "Overview",
+    "topup": "Top up",
+    "plans": "Plans"
+  },
   "planBanner": {
     "plan": "Plan",
     "creditsUsed": "{{used}} / {{total}} credits used",
     "remaining": "{{count}} remaining",
     "resetDate": "Resets {{date}}",
-    "lowBalance": "Low credit balance — less than 10% remaining"
+    "lowBalance": "Low credit balance — less than 10% remaining",
+    "topUp": "Top up credits",
+    "upgrade": "Upgrade plan"
+  },
+  "topupPage": {
+    "title": "Top up credits",
+    "description": "Choose a credit package. Payment opens in a new window when Payni is enabled."
+  },
+  "plansPage": {
+    "title": "Subscription plans",
+    "description": "Upgrade your tier or renew your plan for the current billing period.",
+    "loading": "Loading plans…",
+    "loadError": "Could not load plans. Please try again.",
+    "renewNote": "Paid plans renew monthly. Complete payment each billing period to keep your tier and credits."
+  },
+  "upgrade": {
+    "currentPlan": "Current plan",
+    "currentPlanBadge": "Current plan",
+    "upgradeTo": "Upgrade to {{plan}}",
+    "renew": "Renew for this month",
+    "success": "Your plan is now {{plan}}.",
+    "error": "Could not start checkout. Please try again.",
+    "awaitingPayment": "Complete payment in the Payni window. Your plan updates automatically when payment succeeds."
   },
   "summary": {
     "usedThisMonth": "Credits used (MTD)",
@@ -26,7 +54,9 @@
     "operation": "Operation",
     "provider": "Provider",
     "credits": "Credits",
-    "empty": "No activity recorded for this period"
+    "empty": "No activity recorded for this period",
+    "refundOperation": "Refund — {{operation}}",
+    "refundProvider": "Refund"
   },
   "range": {
     "month": "This month",

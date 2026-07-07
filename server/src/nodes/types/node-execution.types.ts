@@ -34,6 +34,8 @@ export interface NodeExecutorInput {
     order: number;
     config: WorkflowNodeConfig;
     workflowRef?: string;
+    /** Per-node user instruction from pipeline node (incl. step-review regenerate). */
+    userPrompt?: string;
   };
   context: PipelineContext;
   intelligenceContext?: NodeExecutionInput['intelligenceContext'];
@@ -41,6 +43,8 @@ export interface NodeExecutorInput {
   totalNodes: number;
   /** When set, mirrors pipeline node events to `content_${contentId}` for content re-run UX. */
   contentId?: string;
+  /** When set, content socket events use this id (materialized pipeline node key). */
+  contentOutputNodeId?: string;
   /** App-local tenant id for cost attribution. */
   userId?: string;
   /** Rule id (stored as campaignRef on cost entries). */
@@ -49,6 +53,8 @@ export interface NodeExecutorInput {
   maxAttempts?: number;
   /** When true, final failure is reported by the queue worker instead. */
   suppressFailedFinalEmit?: boolean;
+  /** When true, node:completed is emitted by the caller (pipeline completion service). */
+  suppressCompletedEmit?: boolean;
 }
 
 export interface NodeExecutorOutput {
@@ -106,6 +112,8 @@ export interface NodeExecutionInput {
     bottomPerformers: IntelligencePerformanceHint[];
     pendingSuggestions: IntelligenceSuggestionHint[];
   };
+  /** Optional per-node instruction from pipeline execution (user prompt + review regenerate). */
+  nodeUserPrompt?: string;
 }
 
 /** Strongly typed input for {@link TextGenerationService.generateText}. */

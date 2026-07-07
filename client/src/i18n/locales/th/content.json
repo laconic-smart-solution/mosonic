@@ -35,6 +35,7 @@
     "emptyDefault": "รันเวิร์กโฟลว์เพื่อสร้างเนื้อหา หรือผ่อนตัวกรองสถานะ",
     "campaign": "แคมเปญ",
     "channels": "{{count}} ช่องทาง",
+    "variant": "ตัวแปร {{id}}",
     "outputs": "เอาต์พุต",
     "workflow": "เวิร์กโฟลว์",
     "pipeline": "ไปป์ไลน์",
@@ -140,7 +141,11 @@
     "nodeDone": "เสร็จ",
     "nodePending": "รอดำเนินการ",
     "generated": "สร้างแล้ว",
-    "rerun": "รันใหม่"
+    "rerun": "รันใหม่",
+    "running": "กำลังรัน",
+    "noOutputYet": "ยังไม่มีผลลัพธ์",
+    "seeMore": "ดูเพิ่มเติม",
+    "seeLess": "ดูน้อยลง"
   },
   "version": {
     "restore": "กู้คืน"

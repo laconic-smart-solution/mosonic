@@ -1,14 +1,24 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
+import { EventsModule } from '../events/events.module';
+import { PayniModule } from '../payni/payni.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { PlanController } from './plan.controller';
+import { PublicPlanController } from './public-plan.controller';
+import { PlanUpgradeService } from './plan-upgrade.service';
 import { PlanService } from './plan.service';
 
 @Module({
-  imports: [AuthModule, CreditModule, RepositoriesModule],
-  controllers: [PlanController],
-  providers: [PlanService],
-  exports: [PlanService],
+  imports: [
+    AuthModule,
+    forwardRef(() => CreditModule),
+    EventsModule,
+    PayniModule,
+    RepositoriesModule,
+  ],
+  controllers: [PlanController, PublicPlanController],
+  providers: [PlanService, PlanUpgradeService],
+  exports: [PlanService, PlanUpgradeService],
 })
 export class PlanModule {}

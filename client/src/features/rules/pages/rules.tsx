@@ -27,7 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ruleFlowNodeTypes,
 } from "@/features/rules/components/bubble-node"
-import { CreateRuleDialog } from "@/features/rules/components/create-rule-dialog"
+import { CreateRuleWizard } from "@/features/rules/components/create-rule-wizard"
 import { RuleDetailForm } from "@/features/rules/components/rule-detail-form"
 import { RuleDetailViewSkeleton } from "@/features/rules/components/rule-detail-view-skeleton"
 import { RuleExtractionProgress } from "@/features/rules/components/rule-extraction-progress"
@@ -115,6 +115,14 @@ export default function RulesPage() {
   )
   const [createDialogKey, setCreateDialogKey] = useState(0)
   const [viewMode, setViewMode] = useState<RuleViewMode>("tree")
+
+  useEffect(() => {
+    if (routeState.sourcePrompt?.trim()) {
+      setCreateDialogOpen(true)
+      setCreateDialogKey((k) => k + 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when navigated with sourcePrompt
+  }, [])
 
   const putRuleMutation = usePutRuleMutation()
   const flowTheme = useRuleFlowVisualTheme()
@@ -501,7 +509,7 @@ export default function RulesPage() {
         </div>
       </section>
 
-      <CreateRuleDialog
+      <CreateRuleWizard
         open={createDialogOpen}
         onOpenChange={(open) => {
           setCreateDialogOpen(open)

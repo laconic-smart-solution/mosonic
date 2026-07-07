@@ -50,39 +50,48 @@ function minimalRule(overrides?: Partial<Rule>): Rule {
 
 describe('buildIntelligenceSearchPrompt', () => {
   const rule = minimalRule();
+  const fixedNow = new Date('2026-06-25T12:00:00.000Z');
 
   it('includes brand and channels in trend prompt', () => {
-    const p = buildIntelligenceSearchPrompt('trend', rule, null);
+    const p = buildIntelligenceSearchPrompt('trend', rule, null, fixedNow);
     expect(p).toContain('Skincare');
     expect(p).toContain('instagram');
     expect(p).toContain('Women 25-40');
+    expect(p).toContain('2026-06-25');
+    expect(p).toContain('CURRENT DATE');
   });
 
   it('uses audience location in market prompt', () => {
-    const p = buildIntelligenceSearchPrompt('market', rule, null);
+    const p = buildIntelligenceSearchPrompt('market', rule, null, fixedNow);
     expect(p).toContain('Bangkok');
     expect(p).toContain('Singapore');
+    expect(p).toContain('past 7 days from today (2026-06-25)');
   });
 
   it('uses brand name in competitor prompt', () => {
-    const p = buildIntelligenceSearchPrompt('competitor', rule, null);
+    const p = buildIntelligenceSearchPrompt('competitor', rule, null, fixedNow);
     expect(p).toContain('Acme Co');
+    expect(p).toContain('as of 2026-06-25');
   });
 
   it('covers three areas in all prompt', () => {
-    const p = buildIntelligenceSearchPrompt('all', rule, null);
+    const p = buildIntelligenceSearchPrompt('all', rule, null, fixedNow);
     expect(p).toContain('TREND');
     expect(p).toContain('MARKET');
     expect(p).toContain('COMPETITOR');
+    expect(p).toContain('as of 2026-06-25');
   });
 
-  it('uses custom prompt verbatim for custom searchType', () => {
+  it('prepends temporal context to custom searchType prompt', () => {
     const p = buildIntelligenceSearchPrompt(
       'custom',
       rule,
       'Find TikTok trends for SPF',
+      fixedNow,
     );
-    expect(p).toBe('Find TikTok trends for SPF');
+    expect(p).toContain('Find TikTok trends for SPF');
+    expect(p).toContain('2026-06-25');
+    expect(p).toContain('CURRENT DATE');
   });
 });
 

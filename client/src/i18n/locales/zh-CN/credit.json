@@ -32,7 +32,8 @@
     "loading": "正在加载套餐…",
     "awaitingPayment": "请在 Payni 窗口中完成支付。",
     "paymentWindowHint": "请在我们打开的新标签页中完成 Payni 支付，支持 PayNow 和银行转账。",
-    "balanceUpdatesAutomatically": "支付成功后，余额将自动更新。"
+    "balanceUpdatesAutomatically": "支付成功后，余额将自动更新。",
+    "packageAriaLabel": "{{label}}，{{credits}} 积分，฿{{price}}"
   },
   "nodeType": {
     "keyword_planner": "关键词规划",

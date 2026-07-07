@@ -35,6 +35,7 @@
     "emptyDefault": "运行工作流生成内容，或放宽状态筛选。",
     "campaign": "活动",
     "channels": "{{count}} 个渠道",
+    "variant": "变体 {{id}}",
     "outputs": "输出",
     "workflow": "工作流",
     "pipeline": "流水线",
@@ -140,7 +141,11 @@
     "nodeDone": "完成",
     "nodePending": "待处理",
     "generated": "已生成",
-    "rerun": "重新运行"
+    "rerun": "重新运行",
+    "running": "运行中",
+    "noOutputYet": "暂无输出",
+    "seeMore": "查看更多",
+    "seeLess": "收起"
   },
   "version": {
     "restore": "恢复"

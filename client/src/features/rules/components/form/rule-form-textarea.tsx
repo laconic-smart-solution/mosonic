@@ -30,7 +30,7 @@ export function RuleFormTextarea({
         render={({ field }) => (
           <textarea
             rows={rows}
-            className={cn(ruleControlClassName, "resize-y", className)}
+            className={cn(ruleControlClassName, "max-h-48 resize-none overflow-y-auto", className)}
             value={String(field.value ?? "")}
             onChange={(event) => field.onChange(event.target.value)}
           />

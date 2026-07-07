@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { Check, ExternalLink, Loader2, Sparkles } from "lucide-react"
+import { ExternalLink, Loader2, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,7 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import {
+  TopupAwaitingPayment,
+  TopupPackagePicker,
+} from "@/features/credit/components/topup-package-picker"
 import {
   useCreditPackagesQuery,
   useCreditTopupMutation,
@@ -23,10 +26,6 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onToppedUp?: (creditsRemaining: number) => void
-}
-
-function formatThb(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 })
 }
 
 export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
@@ -118,15 +117,7 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
         </DialogHeader>
 
         {awaitingPayment ? (
-          <div
-            className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 px-4 py-8 text-center"
-            role="status"
-            aria-live="polite"
-          >
-            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-            <p className="text-sm font-medium text-foreground">{t("topup.paymentWindowHint")}</p>
-            <p className="text-xs text-muted-foreground">{t("topup.balanceUpdatesAutomatically")}</p>
-          </div>
+          <TopupAwaitingPayment />
         ) : packagesQuery.isLoading ? (
           <div
             className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"
@@ -139,44 +130,18 @@ export function TopupDialog({ open, onOpenChange, onToppedUp }: Props) {
           <p className="py-6 text-center text-sm text-destructive" role="alert">
             {t("topup.loadError")}
           </p>
+        ) : packages.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground" role="status">
+            {t("topup.empty")}
+          </p>
         ) : (
-          <div
-            role="radiogroup"
-            aria-label={t("topup.title")}
-            className="grid gap-3 sm:grid-cols-3"
-          >
-            {packages.map((pkg) => {
-              const selected = pkg.id === selectedId
-              return (
-                <button
-                  key={pkg.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setSelectedId(pkg.id)}
-                  className={cn(
-                    "relative flex flex-col items-start gap-1 rounded-2xl border p-4 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                    selected
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/50",
-                  )}
-                >
-                  {selected && (
-                    <span className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Check className="size-3" aria-hidden />
-                    </span>
-                  )}
-                  <span className="text-xs font-medium text-muted-foreground">{pkg.label}</span>
-                  <span className="font-heading text-xl font-semibold tabular-nums">
-                    {pkg.credits.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {t("topup.credits")} · ฿{formatThb(pkg.priceThb)}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <TopupPackagePicker
+            packages={packages}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            layout="compact"
+            disabled={topupMutation.isPending}
+          />
         )}
 
         <DialogFooter>

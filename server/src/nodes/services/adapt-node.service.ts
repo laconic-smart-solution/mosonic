@@ -12,6 +12,7 @@ import {
   enforceAdaptChannelLimits,
 } from './adapt-channel-guardrails.util';
 import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
+import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 import type {
   NodeExecutionInput,
   NodeExecutionResult,
@@ -70,6 +71,8 @@ export class AdaptNodeService {
     const system = [
       'You adapt marketing copy for a specific social channel.',
       'Preserve brand voice and factual content; change format and length for the platform.',
+      '',
+      formatGenerationTemporalContext(),
       '',
       `Channel: ${channelEntry.channel}`,
       `Content style: ${channelEntry.contentStyle || config.contentStyle || 'platform-native'}`,

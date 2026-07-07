@@ -20,7 +20,6 @@ import type {
   VideoJobProvider,
 } from '../nodes/services/video-generation.service';
 import { getVideoGenerationMode } from '../nodes/services/video-generation.service';
-import { PRESENTER_WORDS_PER_SECOND } from '../nodes/services/presenter-script.util';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
@@ -29,6 +28,7 @@ import {
 import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
 import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
+import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
@@ -48,6 +48,7 @@ export class MediaNodeCompletionService {
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly resolver: DependencyResolverService,
+    private readonly completion: PipelineNodeCompletionService,
     private readonly pipelineNodeRunner: PipelineNodeRunnerService,
     private readonly events: EventsService,
     private readonly costService: CostService,
@@ -98,8 +99,7 @@ export class MediaNodeCompletionService {
     payload: NodeJobPayload,
     meta: PresenterScriptMeta,
   ): Promise<void> {
-    const approxSeconds = Math.round(meta.wordCount / PRESENTER_WORDS_PER_SECOND);
-    const message = `Script ready: ${meta.wordCount} words, ~${approxSeconds}s (${meta.method})`;
+    const message = `Target ${meta.targetSeconds}s · script ${meta.wordCount}w · voice ${meta.voiceSpeed.toFixed(2)}x (${meta.method})`;
     try {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + PIPELINE_LOG_RETENTION_DAYS);
@@ -143,12 +143,6 @@ export class MediaNodeCompletionService {
     payload: NodeJobPayload,
     result: VideoCompleteResult,
   ): Promise<void> {
-    await this.pipelineRepo.updateNodeStatus(
-      payload.pipelineId,
-      payload.nodeId,
-      PipelineNodeExecutionStatus.Completed,
-      { video: result.video },
-    );
     await this.pipelineRepo.clearExternalJobId(
       payload.pipelineId,
       payload.nodeId,
@@ -161,20 +155,27 @@ export class MediaNodeCompletionService {
       ? this.pipelineRepo.getNode(pipeline, payload.nodeId)
       : undefined;
 
-    this.events.emitToPipeline(payload.pipelineId, 'node:completed', {
+    if (node?.reviewRegeneratePrompt?.trim()) {
+      await this.pipelineRepo.patchNode(payload.pipelineId, payload.nodeId, {
+        reviewRegeneratePrompt: null,
+      });
+    }
+
+    await this.completion.handleNodeSucceeded({
       pipelineId: payload.pipelineId,
       nodeId: payload.nodeId,
       nodeType: payload.nodeType,
       order: payload.order,
       totalNodes: payload.totalNodes,
+      lane: node?.lane ?? payload.lane,
       output: { video: result.video },
+      ruleRef: payload.ruleId,
     });
 
-    await this.resolver.onNodeCompleted(payload.pipelineId, payload.nodeId);
     await this.resolver.maybeFinalize(payload.pipelineId);
 
     this.logger.log(
-      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node?.lane ?? 'trunk'}`,
+      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node?.lane ?? 'trunk'} duration=${result.videoCost.videoSeconds}s`,
     );
   }
 

@@ -1,0 +1,158 @@
+{
+  "nav": {
+    "ariaLabel": "主导航",
+    "landing": "首页",
+    "create": "创作",
+    "pricing": "定价",
+    "features": "功能",
+    "howItWorks": "如何运作",
+    "about": "关于",
+    "menu": "菜单",
+    "openMenu": "打开菜单"
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "泰国打造，助力泰国增长",
+      "title": "一次播种，处处生长",
+      "subtitle": "策略输入，内容与发布输出",
+      "ctaStartFree": "免费开始",
+      "ctaGoToWorkspace": "进入工作区"
+    },
+    "problem": {
+      "eyebrow": "我们解决的问题",
+      "title": "大多数内容工具彼此孤立，而你的营销活动并非如此。",
+      "paragraph1": "数字营销如今需要持续产出内容——同时要覆盖信息流、电商平台和收件箱。手工操作无法规模化，而其他工具附带的 AI 写作或图像生成只能解决其中一个环节。",
+      "paragraph2": "缺失的是围绕内容的系统：一次定义策略、自动转化为适配各渠道的内容，并记录真实表现。Mosonic 正是这一系统，围绕泰国中小企业及其服务机构的真实工作方式而构建。"
+    },
+    "features": {
+      "eyebrow": "功能",
+      "title": "从策略到发布，一站式覆盖。",
+      "link": "查看完整功能说明 →",
+      "items": {
+        "plan": {
+          "eyebrow": "规划",
+          "title": "制定策略",
+          "description": "品牌调性、受众、目标与渠道——一次定义，每次生成自动继承。"
+        },
+        "create": {
+          "eyebrow": "创作",
+          "title": "生成全部内容",
+          "description": "文本、图片、视频与翻译，每批次一个提示词即可串联完成。"
+        },
+        "publish": {
+          "eyebrow": "发布",
+          "title": "全渠道投放",
+          "description": "文案与素材按平台自动适配，统一排期一键发布。"
+        },
+        "measure": {
+          "eyebrow": "衡量",
+          "title": "看清成效",
+          "description": "按需同步表现数据，按策略或按帖子汇总分析。"
+        }
+      }
+    },
+    "howItWorks": {
+      "eyebrow": "如何运作",
+      "title": "一套策略，七个阶段。第一步之后，其余全自动。",
+      "subtitle": "如同竹节生长，Mosonic 按固定阶段推进——每一步都承接上一步，不跳步、不留侥幸。",
+      "stages": {
+        "strategy": {
+          "label": "阶段 01",
+          "title": "制定策略",
+          "description": "一次性定义品牌调性、目标受众、目标与渠道，后续所有环节自动继承。"
+        },
+        "template": {
+          "label": "阶段 02",
+          "title": "搭建模板",
+          "description": "选择内容要经过的步骤——撰写、配图、翻译、动画——并在每次生成中复用。"
+        },
+        "run": {
+          "label": "阶段 03",
+          "title": "运行",
+          "description": "为本批次输入提示词，Mosonic 在后台按策略执行模板。"
+        },
+        "generate": {
+          "label": "阶段 04",
+          "title": "生成内容",
+          "description": "文案、图片、视频与翻译带版本返回，发布前可对比择优。"
+        },
+        "package": {
+          "label": "阶段 05",
+          "title": "按渠道打包",
+          "description": "文案与素材按平台自动重排——无需为每个信息流手动裁剪或改写。"
+        },
+        "publish": {
+          "label": "阶段 06",
+          "title": "发布",
+          "description": "一次操作即可按排期发布到所选全部渠道，无需重复处理。"
+        },
+        "track": {
+          "label": "阶段 07",
+          "title": "追踪结果",
+          "description": "表现数据按帖子与渠道回流，下一轮生成比上一轮更聪明。"
+        }
+      }
+    },
+    "cta": {
+      "eyebrow": "定价",
+      "title": "随业务成长的方案",
+      "subtitle": "从独立创始人到代理机构——免费起步，内容管线扩大时再升级。",
+      "button": "查看定价"
+    },
+    "about": {
+      "eyebrow": "关于 Mosonic",
+      "title": "为大规模交付而设计的编排平台。",
+      "paragraph1": "Mosonic Software Co., Ltd. 打造云端软件，将营销策略转化为可直接发布的全渠道内容——文案、图片、视频与发布——无需在多个割裂工具之间来回切换。",
+      "paragraph2": "我们总部位于泰国，面向泰国中小企业、增长团队与代理机构，提供企业级工作流，却不必承受企业级的复杂负担。",
+      "pillars": {
+        "local": {
+          "title": "泰国本土打造",
+          "description": "本地市场语境、语言与渠道是一等公民，而非事后补丁。"
+        },
+        "orchestration": {
+          "title": "策略驱动的 AI",
+          "description": "品牌规则驱动每一次生成，一套策略可支撑数百条产出。"
+        },
+        "ownership": {
+          "title": "知识产权归你所有",
+          "description": "我们编排领先的 AI 模型；你的活动、内容与数据始终由你掌控。"
+        }
+      },
+      "contact": {
+        "title": "企业与合作伙伴",
+        "description": "需要更高用量、SSO 或代理工作流？我们的团队可协助规划合适方案。",
+        "email": "hello@mosonic.co.th",
+        "cta": "联系我们"
+      }
+    }
+  },
+  "pricing": {
+    "eyebrow": "定价",
+    "title": "选择适合你内容管线的方案",
+    "subtitle": "免费起步，每月含额度；活动量增大时再升级。",
+    "perMonth": "/ 月",
+    "creditsPerMonth": "{{count}} 额度 / 月",
+    "free": "免费",
+    "getStarted": "开始使用",
+    "startFree": "开始使用",
+    "mostPopular": "热门",
+    "includesPrevious": "包含 {{plan}} 的全部功能，另加：",
+    "contactSales": "联系销售",
+    "upgradeTo": "升级到 {{plan}}",
+    "checkoutNote": "新账户默认免费方案。付费升级将在注册后开通——自助结账功能即将上线。",
+    "loadError": "无法加载方案，请刷新后重试。",
+    "loading": "正在加载方案…",
+    "empty": "当前暂无可用方案。"
+  },
+  "footer": {
+    "tagline": "为泰国中小企业及其服务机构打造的 AI 内容与发布平台",
+    "product": "产品",
+    "company": "公司",
+    "getStarted": "开始使用",
+    "features": "功能",
+    "contact": "联系",
+    "startFree": "免费开始",
+    "copyright": "© 2026 Mosonic 泰国制造",
+    "legal": "隐私 · 条款"
+  }
+}
