@@ -395,7 +395,7 @@ describe('UploadService', () => {
       ruleRef: 'rule-1',
       workflowRef: 'wf-1',
       userId: 'user-1',
-      channels: [mockChannel({ channel: 'twitter' })],
+      channels: [mockChannel({ channel: 'linkedin' })],
       resolvedOutputs: { text: 'hi' },
       status: UploadJobStatus.Pending,
       save,
@@ -405,7 +405,7 @@ describe('UploadService', () => {
     });
     mcpService.getConnectedAccounts.mockResolvedValue({
       accounts: [
-        { channel: 'twitter', accountId: 'acc_tw', connectedAt: new Date() },
+        { channel: 'linkedin', accountId: 'acc_li', connectedAt: new Date() },
       ],
     });
     mcpService.publishCreatePostBatch.mockResolvedValue({
@@ -418,7 +418,7 @@ describe('UploadService', () => {
       {
         publishNow: false,
         scheduledAt: future,
-        channels: [{ channel: 'twitter', included: true }],
+        channels: [{ channel: 'linkedin', included: true }],
       },
       { userId: 'user-1', role: 'CUSTOMER' as never },
     );
@@ -629,7 +629,7 @@ describe('UploadService', () => {
     mcpService.getConnectedAccounts.mockResolvedValue({
       accounts: [
         { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
-        { channel: 'twitter', accountId: 'acc_tw', connectedAt: new Date() },
+        { channel: 'linkedin', accountId: 'acc_li', connectedAt: new Date() },
       ],
     });
 
@@ -639,9 +639,9 @@ describe('UploadService', () => {
     });
 
     const keys = out.channels.map((c) => c.channel.toLowerCase()).sort();
-    expect(keys).toEqual(['instagram', 'twitter']);
-    const twitter = out.channels.find((c) => c.channel.toLowerCase() === 'twitter');
-    expect(twitter?.included).toBe(true);
+    expect(keys).toEqual(['instagram', 'linkedin']);
+    const linkedin = out.channels.find((c) => c.channel.toLowerCase() === 'linkedin');
+    expect(linkedin?.included).toBe(true);
   });
 
   it('publishUpload uses persisted included when channel is missing from request', async () => {
@@ -1075,14 +1075,14 @@ describe('UploadService', () => {
     it('preserves caption only when it differs from fresh automapped caption', () => {
       const previous = [
         mockChannel({
-          channel: 'twitter',
+          channel: 'instagram',
           caption: 'user wrote this',
           mediaUrl: null,
         }),
       ];
       const fresh = [
         mockChannel({
-          channel: 'twitter',
+          channel: 'instagram',
           caption: 'new auto from outputs',
           mediaUrl: null,
         }),

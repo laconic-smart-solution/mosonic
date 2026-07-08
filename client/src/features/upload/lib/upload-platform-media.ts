@@ -24,16 +24,6 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     maxCarousel: 9,
     displayName: "LinkedIn",
   },
-  twitter: {
-    tabs: ["single", "video"],
-    maxCarousel: 4,
-    displayName: "Twitter",
-  },
-  x: {
-    tabs: ["single", "video"],
-    maxCarousel: 4,
-    displayName: "Twitter",
-  },
   youtube: {
     tabs: ["video"],
     maxCarousel: 0,

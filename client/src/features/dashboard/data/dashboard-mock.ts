@@ -23,14 +23,14 @@ export const DB_SUGGESTIONS = [
     campaign: "BKK Café Launch",
   },
   {
-    text: "LINE OA has 2× higher open rate than X for this audience segment.",
+    text: "LINE OA has 2× higher open rate than other channels for this audience segment.",
     campaign: "All campaigns",
   },
 ] as const
 
 export const DB_RULES = [
-  { name: "Songkran Rule v2", channels: ["FB", "IG", "X"], lastUsed: "Today" },
+  { name: "Songkran Rule v2", channels: ["FB", "IG", "TT"], lastUsed: "Today" },
   { name: "BKK Café Brand", channels: ["IG", "LINE"], lastUsed: "2d ago" },
-  { name: "E-comm Default", channels: ["FB", "IG", "X", "LI"], lastUsed: "1w ago" },
+  { name: "E-comm Default", channels: ["FB", "IG", "TT", "LI"], lastUsed: "1w ago" },
   { name: "Formal Corporate", channels: ["LI", "FB"], lastUsed: "2w ago" },
 ] as const

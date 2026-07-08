@@ -53,10 +53,6 @@
       "label": "Facebook",
       "description": "用于 Meta 发布的页面和个人资料。"
     },
-    "twitter": {
-      "label": "Twitter",
-      "description": "通过 X 发布短文。"
-    },
     "instagram": {
       "label": "Instagram",
       "description": "动态、Reels 和视觉故事。"

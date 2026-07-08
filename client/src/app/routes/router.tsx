@@ -43,6 +43,8 @@ import {
   AdminContentDetailPage,
   AdminFaqPage,
   AdminFaqDocumentDetailPage,
+  SuspendedPage,
+  NotFoundPage,
 } from "../constants/lazyload"
 
 export const router = createBrowserRouter([
@@ -104,6 +106,10 @@ export const router = createBrowserRouter([
     element: <Navigate to="/login" replace />,
   },
   {
+    path: "/suspended",
+    element: <SuspendedPage />,
+  },
+  {
     element: <ProtectedLayout />,
     children: [
       {
@@ -162,5 +168,9 @@ export const router = createBrowserRouter([
         ],
       },
     ],
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />,
   },
 ])

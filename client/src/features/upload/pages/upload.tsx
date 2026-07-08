@@ -143,24 +143,16 @@ function toDatetimeLocalValue(iso: string | null | undefined) {
 const CANONICAL_UPLOAD_TAB_ORDER = [
   "Facebook",
   "Instagram",
-  "Twitter",
   "LinkedIn",
   "YouTube",
   "TikTok",
 ] as const
 
-function isTwitterFamilyKey(key: string): boolean {
-  return key === "twitter" || key === "x"
-}
-
 function uploadRowMatchesCanonicalTab(
   canonicalName: string,
   rowChannelKey: string
 ): boolean {
-  const tabKey = normalizeChannelKey(canonicalName)
-  const rowKey = rowChannelKey
-  if (isTwitterFamilyKey(tabKey) && isTwitterFamilyKey(rowKey)) return true
-  return tabKey === rowKey
+  return normalizeChannelKey(canonicalName) === rowChannelKey
 }
 
 /** Header tabs: only channels on this upload, canonical order then any extra rows. */
@@ -255,14 +247,11 @@ export default function UploadPage() {
     [upload?.channels]
   )
 
-  /** Zernio may return `x` while upload rows use `twitter`; treat as one connection. */
   const connectedChannelSet = useMemo(() => {
     const set = new Set<string>()
     for (const item of zernioAccountsQuery.data?.accounts ?? []) {
       set.add(item.channel.toLowerCase())
     }
-    if (set.has("x")) set.add("twitter")
-    if (set.has("twitter")) set.add("x")
     return set
   }, [zernioAccountsQuery.data?.accounts])
 

@@ -99,7 +99,7 @@ export class RuleExtractionService {
           '  summary        → short professional copy; use for LinkedIn or any B2B/professional context',
           '',
           'media — what asset to attach:',
-          '  image → attach image; use for visual platforms (instagram, facebook, tiktok, twitter)',
+          '  image → attach image; use for visual platforms (instagram, facebook, tiktok)',
           '  video → attach video; use ONLY when input explicitly mentions video content or a video campaign',
           '  null  → text only; default for linkedin unless input mentions visuals',
           '',
@@ -107,7 +107,6 @@ export class RuleExtractionService {
           'CHANNEL DECISION TABLE (use as defaults, override only if input explicitly states otherwise):',
           '  instagram → caption: translatedText if non-English audience, else text | media: image',
           '  facebook  → caption: translatedText if non-English audience, else text | media: image (video if input mentions video campaign)',
-          '  twitter   → caption: text                                              | media: image (null if no visual mentioned)',
           '  linkedin  → caption: summary                                           | media: null (image only if input explicitly mentions a visual post)',
           '  tiktok    → caption: translatedText if non-English audience, else text | media: video (image if input mentions photo carousel)',
           '  youtube   → caption: summary                                           | media: video',
@@ -156,7 +155,7 @@ export class RuleExtractionService {
               },
               channels: [
                 {
-                  channel: 'facebook | instagram | twitter | linkedin | youtube | tiktok',
+                  channel: 'facebook | instagram | linkedin | youtube | tiktok',
                   priority: 'high | medium | low',
                   contentStyle: 'string',
                   contentMapping: {

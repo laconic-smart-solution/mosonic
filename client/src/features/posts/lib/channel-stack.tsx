@@ -19,10 +19,6 @@ const CHANNEL_META: Record<
     initials: "Li",
     className: "bg-[#0A66C2] text-white shadow-sm",
   },
-  twitter: {
-    initials: "X",
-    className: "bg-neutral-900 text-white shadow-sm",
-  },
   youtube: {
     initials: "Yt",
     className: "bg-[#FF0000] text-white shadow-sm",

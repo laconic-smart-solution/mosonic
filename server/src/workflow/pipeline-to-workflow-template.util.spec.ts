@@ -192,7 +192,7 @@ describe('collapsePipelineToWorkflowTemplate', () => {
   });
 
   it('collapses heterogeneous per-lane templates and rebuilds branch edges', () => {
-    const lanes = ['facebook', 'instagram', 'linkedin', 'twitter'];
+    const lanes = ['facebook', 'instagram', 'linkedin', 'tiktok'];
     const nodes: PipelineNodeInput[] = [
       {
         nodeId: 'kw',
@@ -241,12 +241,12 @@ describe('collapsePipelineToWorkflowTemplate', () => {
         lane: 'linkedin',
       },
       {
-        nodeId: 'sum__twitter',
+        nodeId: 'sum__tiktok',
         type: WorkflowNodeType.Summarization,
         order: 7,
         isLocked: false,
         config: {},
-        lane: 'twitter',
+        lane: 'tiktok',
       },
       {
         nodeId: 'merge',
@@ -261,12 +261,12 @@ describe('collapsePipelineToWorkflowTemplate', () => {
       { from: 'text', to: 'adapt__facebook' },
       { from: 'text', to: 'img__instagram' },
       { from: 'text', to: 'adapt__linkedin' },
-      { from: 'text', to: 'sum__twitter' },
+      { from: 'text', to: 'sum__tiktok' },
       { from: 'adapt__linkedin', to: 'sum__linkedin' },
       { from: 'adapt__facebook', to: 'merge' },
       { from: 'img__instagram', to: 'merge' },
       { from: 'sum__linkedin', to: 'merge' },
-      { from: 'sum__twitter', to: 'merge' },
+      { from: 'sum__tiktok', to: 'merge' },
     ];
 
     const collapsed = collapsePipelineToWorkflowTemplate(nodes, {
@@ -303,7 +303,7 @@ describe('collapsePipelineToWorkflowTemplate', () => {
   });
 
   it('collapses single shared adapt with heterogeneous lane entries without adapt→adapt edges', () => {
-    const lanes = ['facebook', 'instagram', 'linkedin', 'twitter'];
+    const lanes = ['facebook', 'instagram', 'linkedin', 'tiktok'];
     const nodes: PipelineNodeInput[] = [
       {
         nodeId: 'text',
@@ -376,7 +376,7 @@ describe('collapsePipelineToWorkflowTemplate', () => {
   });
 
   it('treats a single materialized adapt as a shared lane template when graph has multiple lanes', () => {
-    const lanes = ['instagram', 'linkedin', 'facebook', 'twitter'];
+    const lanes = ['instagram', 'linkedin', 'facebook', 'tiktok'];
     const nodes: PipelineNodeInput[] = [
       {
         nodeId: 'text',

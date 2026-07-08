@@ -58,10 +58,6 @@
       "label": "Facebook",
       "description": "เพจและโปรไฟล์สำหรับการเผยแพร่บน Meta"
     },
-    "twitter": {
-      "label": "Twitter",
-      "description": "โพสต์สั้นผ่าน X"
-    },
     "instagram": {
       "label": "Instagram",
       "description": "ฟีด รีลส์ และสตอรี่ภาพ"

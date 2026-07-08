@@ -456,9 +456,6 @@ export class CreditService {
 
   socialUnlockNodeIds(channel: string): string[] {
     const key = channel.trim().toLowerCase();
-    if (key === 'twitter' || key === 'x') {
-      return ['social:twitter', 'social:x'];
-    }
     return [`social:${key}`];
   }
 

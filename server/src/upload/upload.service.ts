@@ -26,6 +26,7 @@ import type {
   ChannelPublishDto,
   PublishUploadDto,
 } from './dto/publish-upload.dto';
+import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
 import type { PatchUploadChannelBodyDto } from './dto/patch-upload-channel.dto';
 import type { UpdateUploadDto } from './dto/update-upload.dto';
 import type {
@@ -229,7 +230,7 @@ export class UploadService {
     const connectedKeys = new Set(
       (connected.accounts ?? [])
         .map((a) => a.channel?.trim().toLowerCase())
-        .filter(Boolean),
+        .filter((key): key is string => Boolean(key) && !isDeprecatedChannelId(key)),
     );
     if (connectedKeys.size === 0) return upload;
 

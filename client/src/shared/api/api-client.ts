@@ -68,6 +68,19 @@ function forceLogoutToLogin() {
   }
 }
 
+function isAccountSuspendedError(error: AxiosError): boolean {
+  if (error.response?.status !== 403) return false
+  const data = error.response?.data as { error?: string } | undefined
+  return data?.error === "AccountSuspended"
+}
+
+/** Banned users land on the dedicated suspended screen instead of the app. */
+function redirectToSuspended() {
+  if (!window.location.pathname.startsWith("/suspended")) {
+    window.location.href = "/suspended"
+  }
+}
+
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken
   if (token) {
@@ -82,6 +95,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error.response?.status
     const config = error.config as RetriableConfig | undefined
+
+    if (isAccountSuspendedError(error)) {
+      redirectToSuspended()
+      return Promise.reject(error)
+    }
 
     if (status !== 401 || !config) {
       if (status === 401) {

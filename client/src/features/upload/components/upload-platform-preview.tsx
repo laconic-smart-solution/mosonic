@@ -80,22 +80,6 @@ export function UploadPlatformPreview({
     )
   }
 
-  if (key === "twitter" || key === "x") {
-    return (
-      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
-        <div className="flex gap-2 px-3 pt-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1DA1F2] font-semibold text-white">
-            𝕏
-          </div>
-          <p className="whitespace-pre-wrap leading-relaxed text-foreground">
-            {caption}
-          </p>
-        </div>
-        <div className="p-3 pt-2">{media}</div>
-      </div>
-    )
-  }
-
   if (key === "youtube") {
     const title =
       youtubeTitle.trim() ||
