@@ -48,7 +48,22 @@ export function LoginForm() {
       if (!res.accessToken || !res.refreshToken) {
         throw new Error(t("signIn.tokenMissing"))
       }
-      setSession({ accessToken: res.accessToken, refreshToken: res.refreshToken })
+
+      const email =
+        (typeof res.email === "string" && res.email.trim()) ||
+        values.username.trim()
+      const otpVerified = res.otpVerified !== false
+
+      setSession({
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+        otpVerified: res.otpVerified ?? null,
+        pendingVerifyEmail: otpVerified ? null : email,
+      })
+
+      if (!otpVerified) {
+        return { needsVerification: true as const, email }
+      }
 
       const meResp = await me()
       const role = meResp?.auth?.localUser?.role ?? null
@@ -56,14 +71,27 @@ export function LoginForm() {
         accessToken: res.accessToken,
         refreshToken: res.refreshToken,
         role: role ?? undefined,
+        otpVerified: true,
+        pendingVerifyEmail: null,
       })
 
       const lu = meResp?.auth?.localUser
       if (lu && typeof lu === "object") {
         setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))
       }
+
+      return { needsVerification: false as const }
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (result.needsVerification) {
+        toast.info(t("signIn.verifyEmailRequired"))
+        navigate(
+          `/verify-otp?email=${encodeURIComponent(result.email)}`,
+          { replace: true },
+        )
+        return
+      }
+
       await refreshQueriesAfterLogin(queryClient)
       toast.success(t("signIn.loggedIn"))
       navigate("/dashboard", { replace: true })
