@@ -520,17 +520,22 @@ export default function UploadPage() {
   }, [channelTabs, channelRowByKey, liveStatusByChannel])
 
   const includeSwitchDisabledByKey = useMemo(() => {
+    const activeLocked =
+      activeRow?.status === "scheduled" ||
+      activeRow?.status === "published" ||
+      activeRow?.status === "publishing"
     const out: Record<string, boolean> = {}
     for (const t of channelTabs) {
       const key = t.channel.toLowerCase()
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
       out[key] =
+        activeLocked ||
         row?.status === "scheduled" ||
         row?.status === "published" ||
         row?.status === "publishing"
     }
     return out
-  }, [channelTabs, channelRowByKey, liveStatusByChannel])
+  }, [channelTabs, channelRowByKey, liveStatusByChannel, activeRow?.status])
 
   const eligibleGlobalCount = useMemo(() => {
     let count = 0
@@ -1191,6 +1196,11 @@ export default function UploadPage() {
             contentId={upload.contentRef}
             uploadId={uploadId}
             embedInUpload
+            lockGeneration={
+              activeRow?.status === "published" ||
+              activeRow?.status === "publishing" ||
+              activeRow?.status === "scheduled"
+            }
             generationChannelKeys={channelTabs.map((t) => t.channel)}
             onWorkflowLayersChange={handleWorkflowLayersChange}
             preview={
