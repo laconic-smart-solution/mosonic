@@ -19,6 +19,11 @@ server:
 
 payment:
   api-key: ${PAYMENT_API_KEY:change-me-shared-secret}
+  payni:
+    base-url: ${PAYNI_URL:}
+    app-id: ${PAYNI_APP_ID:}
+    api-secret: ${PAYNI_SECRET:}
+    currency-code: ${PAYNI_CURRENCY_CODE:THB}
 
 management:
   endpoints:
