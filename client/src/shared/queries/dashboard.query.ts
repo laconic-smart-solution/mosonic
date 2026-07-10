@@ -7,11 +7,11 @@ export const dashboardQueryKeys = {
 }
 
 export function useDashboardQuery() {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: dashboardQueryKeys.get,
     queryFn: () => dashboardService.get(),
-    enabled: !!token,
+    enabled: isAuthenticated,
     staleTime: 30_000,
     refetchInterval: 120_000,
     retry: false,

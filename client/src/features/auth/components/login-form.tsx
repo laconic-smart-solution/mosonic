@@ -26,7 +26,8 @@ export function LoginForm() {
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const setSession = useAuthStore((s) => s.setSession)
+  const establishSession = useAuthStore((s) => s.establishSession)
+  const setPendingVerification = useAuthStore((s) => s.setPendingVerification)
   const setUser = useUserStore((s) => s.setUser)
 
   const loginSchema = useMemo(() => createLoginSchema(tv), [tv])
@@ -45,32 +46,24 @@ export function LoginForm() {
         username: values.username.trim(),
         password: values.password,
       })
-      if (!res.accessToken || !res.refreshToken) {
-        throw new Error(t("signIn.tokenMissing"))
-      }
 
       const email =
         (typeof res.email === "string" && res.email.trim()) ||
         values.username.trim()
       const otpVerified = res.otpVerified !== false
 
-      setSession({
-        accessToken: res.accessToken,
-        refreshToken: res.refreshToken,
-        otpVerified: res.otpVerified ?? null,
-        pendingVerifyEmail: otpVerified ? null : email,
-      })
-
       if (!otpVerified) {
+        setPendingVerification(email)
         return { needsVerification: true as const, email }
       }
 
       const meResp = await me()
       const role = meResp?.auth?.localUser?.role ?? null
-      setSession({
-        accessToken: res.accessToken,
-        refreshToken: res.refreshToken,
-        role: role ?? undefined,
+      establishSession({
+        role:
+          role === "ADMIN" || role === "CUSTOMER"
+            ? role
+            : undefined,
         otpVerified: true,
         pendingVerifyEmail: null,
       })

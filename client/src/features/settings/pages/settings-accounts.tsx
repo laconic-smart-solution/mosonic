@@ -210,7 +210,7 @@ export default function SettingsAccountsPage() {
     return [
       ...base,
       {
-        userId: user?.userId ?? "",
+        userId: user?.id ?? "",
         channel: "rednote",
         accountId: rn.handle ?? "rednote",
         connectedAt: rn.lastVerifiedAt ?? new Date().toISOString(),

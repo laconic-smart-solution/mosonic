@@ -33,13 +33,7 @@ export class RedNoteGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   async handleConnection(client: AuthenticatedSocket) {
-    const token =
-      typeof client.handshake.auth?.token === 'string'
-        ? client.handshake.auth.token
-        : typeof client.handshake.headers?.authorization === 'string' &&
-            client.handshake.headers.authorization.startsWith('Bearer ')
-          ? client.handshake.headers.authorization.slice(7)
-          : undefined;
+    const token = this.wsAuth.resolveSocketAccessToken(client.handshake);
     try {
       const { userId } = await this.wsAuth.authenticateSocketToken(token);
       client.data.userId = userId;

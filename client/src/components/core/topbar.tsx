@@ -49,7 +49,6 @@ export function Topbar() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const user = useUserStore((s) => s.user)
-  const clearSession = useAuthStore((s) => s.clearSession)
   const clearUser = useUserStore((s) => s.clearUser)
 
   const displayName = user?.name?.trim() ? user.name.trim() : t("account")
@@ -66,7 +65,7 @@ export function Topbar() {
   function handleLogout() {
     disconnectSharedSocket()
     useNotificationStore.getState().clearAll()
-    clearSession()
+    void useAuthStore.getState().logout()
     clearUser()
     navigate("/login", { replace: true })
   }

@@ -69,8 +69,8 @@ export function RedNoteQrConnectDialog({
     setStatus("waiting")
     setSocketState("connecting")
 
-    const token = useAuthStore.getState().accessToken
-    if (!token) {
+    const isAuthenticated = useAuthStore.getState().isAuthenticated
+    if (!isAuthenticated) {
       setSocketState("error")
       onFailedRef.current("missing_auth_token")
       return
@@ -84,7 +84,6 @@ export function RedNoteQrConnectDialog({
     }
 
     const socket = io(`${baseUrl}/rednote`, {
-      auth: { token },
       transports: ["websocket", "polling"],
       withCredentials: true,
       forceNew: true,

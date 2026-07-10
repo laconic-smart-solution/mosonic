@@ -96,9 +96,8 @@ export function MarketingNavbar() {
   const { t } = useTranslation(["home", "common", "marketing"])
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const user = useUserStore((s) => s.user)
-  const clearSession = useAuthStore((s) => s.clearSession)
   const clearUser = useUserStore((s) => s.clearUser)
 
   const displayName = user?.name?.trim() ? user.name.trim() : t("home:userStrip.loading")
@@ -110,7 +109,7 @@ export function MarketingNavbar() {
         : t("home:userStrip.account")
 
   function handleLogout() {
-    clearSession()
+    void useAuthStore.getState().logout()
     clearUser()
     navigate("/login", { replace: true })
   }
@@ -167,7 +166,7 @@ export function MarketingNavbar() {
           />
           <ThemeToggle className="size-8 rounded-full hover:bg-foreground/5" />
 
-          {accessToken ? (
+          {isAuthenticated ? (
             <>
               <TopbarCreditBalance className="hidden rounded-full px-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:flex" />
               <span className="hidden max-w-[140px] truncate text-xs font-medium text-muted-foreground lg:inline">
@@ -271,7 +270,7 @@ export function MarketingNavbar() {
               />
             </div>
 
-            {accessToken ? (
+            {isAuthenticated ? (
               <>
                 <Separator />
                 <div className="space-y-3">
