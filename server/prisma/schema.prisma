@@ -169,6 +169,7 @@ enum PipelineLogStatus {
 
 enum SocialProvider {
   ZERNIO
+  REDNOTE
 }
 
 enum SocialAccountStatus {

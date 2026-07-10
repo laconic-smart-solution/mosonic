@@ -195,9 +195,9 @@ export class McpService {
     accounts: ConnectedAccountRecord[];
     unlockedChannels: string[];
   }> {
-    const accounts = (await this.usersService.getZernioConnectedAccounts(userId)).filter(
-      (a) => !isDeprecatedChannelId(a.channel),
-    );
+    const accounts = (
+      await this.usersService.getAllActiveConnectedAccounts(userId)
+    ).filter((a) => !isDeprecatedChannelId(a.channel));
     const unlockedChannels = (
       await this.creditService.listUnlockedSocialChannels(userId)
     ).filter((ch) => !isDeprecatedChannelId(ch));

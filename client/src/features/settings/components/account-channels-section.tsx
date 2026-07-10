@@ -19,6 +19,8 @@ type AccountChannelsSectionProps = {
   disconnectPending: boolean
   hideHeader?: boolean
   creditsEach?: number
+  /** Channel ids that need re-auth (e.g. RedNote session expired). */
+  needsReauthChannels?: string[]
 }
 
 export function AccountChannelsSection({
@@ -33,8 +35,12 @@ export function AccountChannelsSection({
   disconnectPending,
   hideHeader = false,
   creditsEach = 0,
+  needsReauthChannels = [],
 }: AccountChannelsSectionProps) {
   const { t } = useTranslation("settings")
+  const needsReauthSet = new Set(
+    needsReauthChannels.map((c) => c.trim().toLowerCase()),
+  )
 
   if (loading) {
     return (
@@ -78,6 +84,7 @@ export function AccountChannelsSection({
             def={def}
             connected={findConnectedForChannel(def, byChannel)}
             unlocked={isChannelUnlocked(def, unlockedChannels)}
+            needsReauth={needsReauthSet.has(def.apiKey.toLowerCase())}
             onUnlock={onUnlock}
             onConnect={onConnect}
             onDisconnect={onDisconnect}

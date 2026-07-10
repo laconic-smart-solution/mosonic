@@ -82,6 +82,9 @@
   "banner": {
     "notConnected": "Your {{platform}} account is not connected.",
     "connect": "Connect",
+    "needsReauth": "{{platform}} session expired. Reconnect in Settings.",
+    "reconnect": "Reconnect",
+    "manualVerify": "Published to {{platform}}, but confirmation was inconclusive — verify on the platform.",
     "failed": "Publishing failed. Please retry.",
     "retry": "Retry",
     "publishing": "Publishing to {{platform}}…",
@@ -97,6 +100,8 @@
     "postUpdated": "Post updated successfully",
     "savedChannel": "Saved for this channel",
     "connectAccount": "Connect this account in Settings first.",
+    "rednoteNeedsReauth": "RedNote session expired. Reconnect in Settings.",
+    "rednoteNoSchedule": "RedNote does not support scheduled publish yet. Publish now instead.",
     "assignCaption": "Assign caption text before publishing.",
     "publishing": "Publishing…",
     "scheduling": "Scheduling…",

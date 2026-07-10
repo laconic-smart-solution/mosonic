@@ -12,6 +12,7 @@ export const DISTRIBUTION_CHANNELS: DistributionChannel[] = [
   { id: 'linkedin', label: 'LinkedIn' },
   { id: 'youtube', label: 'YouTube' },
   { id: 'tiktok', label: 'TikTok' },
+  { id: 'rednote', label: 'RedNote' },
 ];
 
 /** Retired platforms — excluded from pickers and publishing. */

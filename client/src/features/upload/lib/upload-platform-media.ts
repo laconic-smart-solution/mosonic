@@ -34,6 +34,11 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     maxCarousel: 1,
     displayName: "TikTok",
   },
+  rednote: {
+    tabs: ["single", "multiple", "video"],
+    maxCarousel: 9,
+    displayName: "RedNote",
+  },
 }
 
 export function normalizeChannelKey(channel: string): string {

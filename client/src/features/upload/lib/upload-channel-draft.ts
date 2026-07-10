@@ -214,7 +214,7 @@ export function effectiveCaptionForDraft(
 
 export function channelRequiresMedia(channelKey: string): boolean {
   const key = normalizeChannelKey(channelKey)
-  return key === "youtube" || key === "tiktok"
+  return key === "youtube" || key === "tiktok" || key === "rednote"
 }
 
 /** Media URLs that would be used on publish (draft overrides persisted row). */
@@ -277,6 +277,20 @@ export function getChannelMediaValidationError(
 
   if (key === "youtube" && !urls.some((u) => isVideoUrl(u))) {
     return `${label} requires a video before publishing.`
+  }
+
+  if (key === "rednote") {
+    const videos = urls.filter((u) => isVideoUrl(u))
+    const images = urls.filter((u) => !isVideoUrl(u))
+    if (videos.length > 0 && images.length > 0) {
+      return "RedNote accepts either up to 9 images or a single video, not both."
+    }
+    if (videos.length > 1) {
+      return "RedNote accepts at most one video per note."
+    }
+    if (images.length > 9) {
+      return "RedNote accepts at most 9 images per note."
+    }
   }
 
   return null

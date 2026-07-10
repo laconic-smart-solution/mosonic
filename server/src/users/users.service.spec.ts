@@ -63,6 +63,9 @@ describe('UsersService Zernio accounts', () => {
     countActive: jest.fn(),
     hasAnyForUser: jest.fn(),
     hasAnyRows: jest.fn(),
+    findByUserProviderChannel: jest.fn(),
+    findAllActiveByProvider: jest.fn(),
+    updateStatusAndMetadata: jest.fn(),
   };
 
   const moduleRef = {} as ModuleRef;

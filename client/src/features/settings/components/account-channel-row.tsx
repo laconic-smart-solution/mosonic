@@ -12,6 +12,7 @@ type AccountChannelRowProps = {
   def: AccountChannelDef
   connected: ZernioConnectedAccount | undefined
   unlocked: boolean
+  needsReauth?: boolean
   onUnlock: (apiKey: string) => void
   onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
@@ -25,6 +26,7 @@ export function AccountChannelRow({
   def,
   connected,
   unlocked,
+  needsReauth = false,
   onUnlock,
   onConnect,
   onDisconnect,
@@ -35,12 +37,12 @@ export function AccountChannelRow({
 }: AccountChannelRowProps) {
   const { t } = useTranslation("settings")
   const Icon = def.icon
-  const isLinked = Boolean(connected)
-  const disconnectKey = connected?.channel.trim().toLowerCase() ?? ""
+  const isLinked = Boolean(connected) && !needsReauth
+  const disconnectKey = connected?.channel.trim().toLowerCase() ?? def.apiKey
   const label = t(`channels.${def.id}.label`)
   const description = t(`channels.${def.id}.description`)
   const unlockCostLabel =
-    !isLinked && !unlocked && creditsEach > 0
+    !isLinked && !unlocked && !needsReauth && creditsEach > 0
       ? t("channels.unlockCost", { count: formatCreditAmount(creditsEach) })
       : null
 
@@ -61,7 +63,11 @@ export function AccountChannelRow({
             <span className="text-[15px] font-semibold tracking-[-0.2px]" style={{ color: T.textPrimary }}>
               {label}
             </span>
-            {isLinked ? (
+            {needsReauth ? (
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                {t("rednote.needsReauth")}
+              </span>
+            ) : isLinked ? (
               <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 {t("channels.connected")}
               </span>
@@ -88,8 +94,26 @@ export function AccountChannelRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center justify-end sm:pl-4">
-        {isLinked ? (
+      <div className="flex shrink-0 items-center justify-end gap-2 sm:pl-4">
+        {needsReauth ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-w-[104px] gap-1.5"
+            style={{ borderColor: T.accentBorder }}
+            disabled={connectPending}
+            onClick={() => onConnect(def.apiKey)}
+            aria-label={t("channels.connectAria", { channel: label })}
+          >
+            {connectPending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Link2 className="size-3.5" aria-hidden />
+            )}
+            {t("channels.connect")}
+          </Button>
+        ) : isLinked ? (
           <Button
             type="button"
             variant="outline"

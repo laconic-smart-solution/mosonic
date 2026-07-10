@@ -8,8 +8,15 @@ import { ModuleRef } from '@nestjs/core';
 import { SocialProvider } from '@prisma/client';
 import { type SsoTokenClaims } from '../auth/auth.types';
 import {
+  REDNOTE_CHANNEL,
+  parseRedNoteMetadata,
+  rednoteExternalAccountId,
+  type RedNoteSessionMetadata,
+} from '../domain/users/rednote-metadata.types';
+import {
   toConnectedAccountRecord,
   type ConnectedAccountRecord,
+  type SocialAccountRecord,
 } from '../domain/users/social-account.types';
 import {
   UserRole,
@@ -28,6 +35,8 @@ import {
   normalizeChannelKey,
   normalizeZernioConnectedAccountsJson,
 } from './social-account-json.util';
+import { SocialAccountStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 export type { ConnectedAccountRecord };
 
@@ -350,6 +359,151 @@ export class UsersService {
       profileId,
       accounts,
     };
+  }
+
+  /** All ACTIVE social accounts across providers (Settings + publish routing). */
+  async getAllActiveConnectedAccounts(
+    userId: string,
+  ): Promise<ConnectedAccountRecord[]> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const rows = await this.socialAccounts.findActiveByUserId(userId);
+    if (rows.length > 0) {
+      return rows.map(toConnectedAccountRecord);
+    }
+    if (await this.socialAccounts.hasAnyForUser(userId)) {
+      return [];
+    }
+    return normalizeZernioConnectedAccountsJson(
+      user.zernioConnectedAccounts,
+      userId,
+    );
+  }
+
+  async getPublishAccounts(userId: string): Promise<SocialAccountRecord[]> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    return this.socialAccounts.findActiveByUserId(userId);
+  }
+
+  async findRedNoteAccount(userId: string): Promise<SocialAccountRecord | null> {
+    return this.socialAccounts.findActiveByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+  }
+
+  async findRedNoteAccountAnyStatus(
+    userId: string,
+  ): Promise<SocialAccountRecord | null> {
+    return this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+  }
+
+  async upsertRedNoteSession(
+    userId: string,
+    metadata: RedNoteSessionMetadata,
+  ): Promise<SocialAccountRecord> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const now = new Date();
+    return this.socialAccounts.upsertActive({
+      userId,
+      provider: SocialProvider.REDNOTE,
+      channel: REDNOTE_CHANNEL,
+      externalAccountId: rednoteExternalAccountId(userId),
+      username: metadata.rednoteUserHandle ?? null,
+      connectedAt: now,
+      lastSyncedAt: now,
+      metadata: metadata as unknown as Prisma.InputJsonValue,
+    });
+  }
+
+  async markRedNoteNeedsReauth(userId: string): Promise<void> {
+    const existing = await this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+    if (!existing) return;
+    const meta = parseRedNoteMetadata(existing.metadata);
+    const next: RedNoteSessionMetadata = {
+      sessionCookiesRef: meta?.sessionCookiesRef ?? '',
+      encryptedCookies: meta?.encryptedCookies ?? '',
+      sessionStatus: 'needs_reauth',
+      lastVerifiedAt: meta?.lastVerifiedAt ?? null,
+      lastQrScanAt: meta?.lastQrScanAt ?? null,
+      rednoteUserHandle: meta?.rednoteUserHandle,
+    };
+    await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status: SocialAccountStatus.ERROR,
+        metadata: next as unknown as Prisma.InputJsonValue,
+        disconnectedAt: new Date(),
+      },
+    );
+  }
+
+  async disconnectRedNote(userId: string): Promise<void> {
+    const existing = await this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+    if (!existing) return;
+    const meta = parseRedNoteMetadata(existing.metadata);
+    const next = meta
+      ? ({ ...meta, sessionStatus: 'expired' } satisfies RedNoteSessionMetadata)
+      : undefined;
+    await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status: SocialAccountStatus.DISCONNECTED,
+        ...(next
+          ? { metadata: next as unknown as Prisma.InputJsonValue }
+          : {}),
+        disconnectedAt: new Date(),
+      },
+    );
+  }
+
+  async updateRedNoteMetadata(
+    userId: string,
+    metadata: RedNoteSessionMetadata,
+    status: SocialAccountStatus = SocialAccountStatus.ACTIVE,
+  ): Promise<SocialAccountRecord> {
+    if (status === SocialAccountStatus.ACTIVE) {
+      return this.upsertRedNoteSession(userId, metadata);
+    }
+    const updated = await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status,
+        metadata: metadata as unknown as Prisma.InputJsonValue,
+        username: metadata.rednoteUserHandle ?? null,
+      },
+    );
+    if (!updated) {
+      throw new NotFoundException(`RedNote account for ${userId} not found`);
+    }
+    return updated;
   }
 
   /** Dual-write: keep legacy JSON in sync for rollback / admin tools. */

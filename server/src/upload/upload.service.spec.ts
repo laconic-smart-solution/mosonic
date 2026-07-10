@@ -34,6 +34,9 @@ describe('UploadService', () => {
     publishCreatePostBatch: jest.fn(),
     updatePost: jest.fn(),
   };
+  const redNoteService = {
+    publishAndWait: jest.fn(),
+  };
   const events = {
     emitToRoom: jest.fn(),
   };
@@ -52,6 +55,7 @@ describe('UploadService', () => {
   const service = new UploadService(
     uploadModel as never,
     mcpService as never,
+    redNoteService as never,
     events as never,
     postService as never,
     contentService as never,

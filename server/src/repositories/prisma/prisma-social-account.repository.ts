@@ -252,4 +252,60 @@ export class PrismaSocialAccountRepository implements ISocialAccountRepository {
     });
     return row != null;
   }
+
+  findByUserProviderChannel(
+    userId: string,
+    provider: SocialProvider,
+    channel: string,
+  ): Promise<SocialAccountRecord | null> {
+    return this.prisma.socialAccount.findUnique({
+      where: {
+        userId_provider_channel: { userId, provider, channel },
+      },
+    });
+  }
+
+  findAllActiveByProvider(
+    provider: SocialProvider,
+  ): Promise<SocialAccountRecord[]> {
+    return this.prisma.socialAccount.findMany({
+      where: { provider, status: SocialAccountStatus.ACTIVE },
+      orderBy: { updatedAt: 'asc' },
+    });
+  }
+
+  async updateStatusAndMetadata(
+    userId: string,
+    provider: SocialProvider,
+    channel: string,
+    data: {
+      status: SocialAccountStatus;
+      metadata?: Prisma.InputJsonValue;
+      username?: string | null;
+      disconnectedAt?: Date | null;
+      lastSyncedAt?: Date | null;
+    },
+  ): Promise<SocialAccountRecord | null> {
+    const existing = await this.findByUserProviderChannel(
+      userId,
+      provider,
+      channel,
+    );
+    if (!existing) return null;
+    return this.prisma.socialAccount.update({
+      where: { id: existing.id },
+      data: {
+        status: data.status,
+        ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),
+        ...(data.username !== undefined ? { username: data.username } : {}),
+        disconnectedAt:
+          data.disconnectedAt !== undefined
+            ? data.disconnectedAt
+            : data.status === SocialAccountStatus.ACTIVE
+              ? null
+              : new Date(),
+        lastSyncedAt: data.lastSyncedAt ?? new Date(),
+      },
+    });
+  }
 }

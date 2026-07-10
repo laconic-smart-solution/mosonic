@@ -138,6 +138,25 @@ export function UploadPlatformPreview({
     )
   }
 
+  if (key === "rednote") {
+    return (
+      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <div className="flex size-8 items-center justify-center rounded-full bg-[#ff2442] text-[10px] font-bold text-white">
+            小
+          </div>
+          <span className="font-medium">{label}</span>
+        </div>
+        {media}
+        <p className="px-3 py-2 whitespace-pre-wrap leading-relaxed">{caption}</p>
+        <p className="border-t px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+          Up to 9 images or 1 video. Publish confirmation is based on page scrape —
+          verify on RedNote if unsure.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-hidden rounded-xl border bg-card p-3 text-xs shadow-sm">
       <p className="mb-2 font-medium capitalize">{label}</p>

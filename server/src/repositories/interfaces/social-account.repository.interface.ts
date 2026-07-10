@@ -72,4 +72,27 @@ export interface ISocialAccountRepository {
 
   /** True if the social_accounts table has any rows at all. */
   hasAnyRows(): Promise<boolean>;
+
+  findByUserProviderChannel(
+    userId: string,
+    provider: SocialProvider,
+    channel: string,
+  ): Promise<SocialAccountRecord | null>;
+
+  findAllActiveByProvider(
+    provider: SocialProvider,
+  ): Promise<SocialAccountRecord[]>;
+
+  updateStatusAndMetadata(
+    userId: string,
+    provider: SocialProvider,
+    channel: string,
+    data: {
+      status: SocialAccountStatus;
+      metadata?: Prisma.InputJsonValue;
+      username?: string | null;
+      disconnectedAt?: Date | null;
+      lastSyncedAt?: Date | null;
+    },
+  ): Promise<SocialAccountRecord | null>;
 }
