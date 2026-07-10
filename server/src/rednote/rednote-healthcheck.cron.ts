@@ -40,13 +40,16 @@ export class RedNoteHealthcheckCron {
         (1000 * 60 * 60);
       if (hours < staleAfterHours) continue;
       try {
-        await this.adapter.checkHealth(account);
-        checked += 1;
+        const status = await this.adapter.checkHealth(account);
+        if (status === 'active') {
+          checked += 1;
+        } else {
+          await this.users.markRedNoteNeedsReauth(account.userId);
+        }
       } catch (err) {
         this.logger.warn(
           `RedNote health-check failed user=${account.userId}: ${err instanceof Error ? err.message : String(err)}`,
         );
-        await this.users.markRedNoteNeedsReauth(account.userId);
       }
     }
     if (checked > 0) {

@@ -36,6 +36,8 @@ describe('UploadService', () => {
   };
   const redNoteService = {
     publishAndWait: jest.fn(),
+    publishEnqueue: jest.fn().mockResolvedValue({ success: true, jobId: 'job-1' }),
+    getAccountStatus: jest.fn().mockResolvedValue({ connected: true }),
   };
   const events = {
     emitToRoom: jest.fn(),

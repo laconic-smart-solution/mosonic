@@ -28,6 +28,7 @@ import {
   isPostMetricsEligible,
   publishedChannelsFromPost,
 } from './post-analytics.util';
+import { isZernioRemotePostId } from './is-zernio-remote-post-id.util';
 import {
   PostStatus,
 } from './schemas/post.schema';
@@ -123,7 +124,7 @@ export class PostAnalyticsService {
       return null;
     }
     const zernioPostId = post.zernioPostId?.trim();
-    if (!zernioPostId) {
+    if (!zernioPostId || !isZernioRemotePostId(zernioPostId)) {
       return null;
     }
 
@@ -248,7 +249,7 @@ export class PostAnalyticsService {
     }
 
     const zernioPostId = post.zernioPostId?.trim();
-    if (!zernioPostId) {
+    if (!zernioPostId || !isZernioRemotePostId(zernioPostId)) {
       throw new BadRequestException('Post has no Zernio id.');
     }
 
@@ -331,7 +332,11 @@ export class PostAnalyticsService {
       channels: post.channels,
     });
     const zernioPostId = post.zernioPostId?.trim() ?? '';
-    if (!zernioPostId || channels.length === 0) {
+    if (
+      !zernioPostId ||
+      !isZernioRemotePostId(zernioPostId) ||
+      channels.length === 0
+    ) {
       return null;
     }
 

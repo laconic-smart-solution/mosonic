@@ -35,8 +35,8 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     displayName: "TikTok",
   },
   rednote: {
-    tabs: ["single", "multiple", "video"],
-    maxCarousel: 9,
+    tabs: ["video"],
+    maxCarousel: 0,
     displayName: "RedNote",
   },
 }
@@ -58,7 +58,10 @@ export function getPlatformMediaConfig(channel: string): PlatformMediaConfig {
 
 export function isVideoUrl(url: string | null | undefined): boolean {
   if (!url?.trim()) return false
-  return /\.(mp4|webm|mov)(\?|$)/i.test(url)
+  const u = url.trim()
+  if (/\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(u)) return true
+  if (/\/videos\//i.test(u)) return true
+  return false
 }
 
 export function mediaTabLabels(tab: MediaTabMode): string {

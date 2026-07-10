@@ -14,6 +14,7 @@ import {
   zernioMediaItemTypeFromMime,
   type ZernioPresignResult,
 } from './zernio-rest-media.util';
+import { resolveAbsoluteMediaUrlFromConfig } from '../../upload/resolve-absolute-media-url.util';
 
 function axiosErrorHint(err: unknown): string {
   if (!isAxiosError(err)) return '';
@@ -373,57 +374,8 @@ export class ZernioRestClient {
     return 'image';
   }
 
-  /**
-   * Ensures every media URL is absolute (https). Repairs values like `4001/api/file/...`
-   * where `http://192.168.x.x:` was stripped but FILE_SERVICE_URL still has the origin.
-   */
   private resolveAbsoluteMediaHref(raw: string): string {
-    const s = raw.trim();
-    if (!s) return '';
-    if (/^(https?:|blob:|data:)/i.test(s)) return s;
-    if (s.startsWith('//')) return `https:${s}`;
-
-    const fileBase = this.config.get<string>('FILE_SERVICE_URL')?.trim();
-    const publicBase =
-      this.config.get<string>('APP_URL')?.trim() ||
-      this.config.get<string>('PUBLIC_URL')?.trim() ||
-      '';
-
-    const portPathMatch = /^(\d{2,5})(\/api\/.+)$/i.exec(s);
-    if (portPathMatch?.[2] && fileBase) {
-      try {
-        const u = new URL(
-          fileBase.startsWith('http') ? fileBase : `http://${fileBase}`,
-        );
-        return `${u.origin}${portPathMatch[2]}`;
-      } catch {
-        /* fall through */
-      }
-    }
-
-    if (s.startsWith('/') && publicBase) {
-      return `${publicBase.replace(/\/+$/, '')}${s}`;
-    }
-
-    if (fileBase) {
-      try {
-        const base = fileBase.startsWith('http')
-          ? fileBase
-          : `http://${fileBase}`;
-        return new URL(s, base).href;
-      } catch {
-        try {
-          const base = fileBase.startsWith('http')
-            ? fileBase
-            : `http://${fileBase}`;
-          return new URL(s, new URL(base).origin).href;
-        } catch {
-          return s;
-        }
-      }
-    }
-
-    return s;
+    return resolveAbsoluteMediaUrlFromConfig(raw, this.config);
   }
 
   async updatePost(payload: {

@@ -44,6 +44,7 @@ describe('RedNoteBrowserService login selectors', () => {
     expect(browser.creatorLoggedInAvatarSelector()).toContain('user_avatar');
     expect(browser.videoUploadInputSelector()).toContain('.mp4');
     expect(browser.publishButtonHostSelector()).toBe('xhs-publish-btn');
+    expect(browser.publishSuccessTimeoutMs()).toBe(60_000);
     expect(browser.isCreatorCenterUrl('https://creator.xiaohongshu.com/publish/publish')).toBe(
       true,
     );
