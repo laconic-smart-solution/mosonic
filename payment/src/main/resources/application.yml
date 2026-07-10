@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: payment
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5432/mosonic_dev_db}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+server:
+  port: ${PAYMENT_PORT:8002}
+
+payment:
+  api-key: ${PAYMENT_API_KEY:change-me-shared-secret}
+  payni:
+    base-url: ${PAYNI_URL:}
+    app-id: ${PAYNI_APP_ID:}
+    api-secret: ${PAYNI_SECRET:}
+    currency-code: ${PAYNI_CURRENCY_CODE:THB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when_authorized
