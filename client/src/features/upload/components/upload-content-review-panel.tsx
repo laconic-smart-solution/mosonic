@@ -104,6 +104,11 @@ export type UploadContentReviewPanelProps = {
   generationChannelKeys?: string[]
   /** Default selected Generated contents filter tab. */
   generationDefaultKey?: GenerationLaneFilter
+  /**
+   * When true (e.g. active upload channel is published/publishing/scheduled),
+   * lock Re-run / Generate more / pipeline edits.
+   */
+  lockGeneration?: boolean
 }
 
 export function UploadContentReviewPanel({
@@ -114,6 +119,7 @@ export function UploadContentReviewPanel({
   onWorkflowLayersChange,
   generationChannelKeys,
   generationDefaultKey = "all",
+  lockGeneration = false,
 }: UploadContentReviewPanelProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -691,7 +697,7 @@ export function UploadContentReviewPanel({
     await uploadMediaForNode(nid, key, file)
   }
 
-  const blockPipeline = globalRerunning || isGeneratingMore
+  const blockPipeline = globalRerunning || isGeneratingMore || lockGeneration
 
   const approveDisabled =
     !approveEnabled || hasUnsavedChanges || approveLoading || blockPipeline
