@@ -80,22 +80,6 @@ export function UploadPlatformPreview({
     )
   }
 
-  if (key === "twitter" || key === "x") {
-    return (
-      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
-        <div className="flex gap-2 px-3 pt-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1DA1F2] font-semibold text-white">
-            𝕏
-          </div>
-          <p className="whitespace-pre-wrap leading-relaxed text-foreground">
-            {caption}
-          </p>
-        </div>
-        <div className="p-3 pt-2">{media}</div>
-      </div>
-    )
-  }
-
   if (key === "youtube") {
     const title =
       youtubeTitle.trim() ||
@@ -149,6 +133,25 @@ export function UploadPlatformPreview({
         </div>
         <p className="border-t border-border/60 px-3 py-2.5 whitespace-pre-wrap leading-relaxed text-foreground">
           {caption || " "}
+        </p>
+      </div>
+    )
+  }
+
+  if (key === "rednote") {
+    return (
+      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <div className="flex size-8 items-center justify-center rounded-full bg-[#ff2442] text-[10px] font-bold text-white">
+            小
+          </div>
+          <span className="font-medium">{label}</span>
+        </div>
+        {media}
+        <p className="px-3 py-2 whitespace-pre-wrap leading-relaxed">{caption}</p>
+        <p className="border-t px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+          Up to 9 images or 1 video. Publish confirmation is based on page scrape —
+          verify on RedNote if unsure.
         </p>
       </div>
     )

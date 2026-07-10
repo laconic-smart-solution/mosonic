@@ -43,9 +43,14 @@ enum PipelineStatus {
   paused
 }
 
-enum PipelineExecutionMode {
+enum PipelineDispatchMode {
   inline
   queue
+}
+
+enum PipelineUserExecutionMode {
+  auto
+  step
 }
 
 enum PipelineNodeExecutionStatus {
@@ -54,6 +59,7 @@ enum PipelineNodeExecutionStatus {
   completed
   failed
   skipped
+  waiting_review
 }
 
 enum ContentStatus {
@@ -112,6 +118,12 @@ enum CreditTopupPurchaseStatus {
   cancelled
 }
 
+enum PlanPurchaseStatus {
+  pending
+  active
+  cancelled
+}
+
 enum ServiceRateType {
   text
   image
@@ -155,6 +167,17 @@ enum PipelineLogStatus {
   failed
 }
 
+enum SocialProvider {
+  ZERNIO
+  REDNOTE
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
 model User {
   userId                 String   @id @default(uuid())
   authServerUserId       String   @unique
@@ -167,17 +190,45 @@ model User {
   status                 UserStatus @default(ACTIVE)
   lastLoginAt            DateTime?
   zernioProfileId        String?  @unique
+  /// @deprecated Prefer SocialAccount rows; kept for dual-write / rollback.
   zernioConnectedAccounts Json    @default("[]")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  userPlans UserPlan[]
+  userPlans      UserPlan[]
+  socialAccounts SocialAccount[]
 
   @@index([email])
   @@index([username])
   @@index([role])
   @@index([status])
   @@map("users")
+}
+
+model SocialAccount {
+  id                String              @id @default(uuid())
+  userId            String
+  provider          SocialProvider      @default(ZERNIO)
+  channel           String
+  externalAccountId String
+  displayName       String?
+  username          String?
+  avatarUrl         String?
+  status            SocialAccountStatus @default(ACTIVE)
+  metadata          Json?
+  connectedAt       DateTime            @default(now())
+  disconnectedAt    DateTime?
+  lastSyncedAt      DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, provider, channel])
+  @@index([userId, channel])
+  @@index([userId, status])
+  @@index([provider, externalAccountId])
+  @@map("social_accounts")
 }
 
 model Plan {
@@ -335,6 +386,25 @@ model CreditTopupPurchase {
   @@map("credit_topup_purchases")
 }
 
+model PlanPurchase {
+  planPurchaseId String              @id @default(uuid())
+  userId         String
+  planId         String
+  amount         Float
+  currencyCode   String              @default("THB")
+  billingPeriod  DateTime
+  transactionId  String              @unique
+  status         PlanPurchaseStatus  @default(pending)
+  purchaseDate   DateTime            @default(now())
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId, purchaseDate(sort: Desc)])
+  @@index([userId, billingPeriod])
+  @@index([status])
+  @@map("plan_purchases")
+}
+
 model Workflow {
   workflowId   String         @id @default(uuid())
   userId       String?
@@ -390,6 +460,7 @@ model Rule {
   channels         Json       @default("[]")
   contentGuidelines Json      @default("{}")
   originalInput    Json       @default("{}")
+  intake           Json?
   status           RuleStatus @default(active)
   versions         Json       @default("[]")
   approvalPolicy   Json       @default("[]")
@@ -417,7 +488,8 @@ model Pipeline {
   completedAt           DateTime?
   pausedNodeId          String?
   pausedLaneId          String?
-  executionMode         PipelineExecutionMode @default(inline)
+  dispatchMode          PipelineDispatchMode      @default(inline)
+  executionMode         PipelineUserExecutionMode @default(auto)
   graph                 Json                  @default("{}")
   ruleOverlay           Json?
   metadata              Json                  @default("{}")

@@ -87,7 +87,7 @@ describe('extractPostAnalyticsRows', () => {
     },
     platformAnalytics: [
       {
-        platform: 'twitter',
+        platform: 'instagram',
         syncStatus: 'synced',
         analytics: {
           impressions: 600,
@@ -115,12 +115,12 @@ describe('extractPostAnalyticsRows', () => {
 
   it('returns per-platform metrics without duplicating aggregate', () => {
     const out = extractPostAnalyticsRows(zernioFixture, [
-      'twitter',
+      'instagram',
       'facebook',
     ]);
     expect(out.synced).toHaveLength(2);
     expect(out.synced[0]).toMatchObject({
-      channel: 'twitter',
+      channel: 'instagram',
       metrics: { views: 600, likes: 6 },
     });
     expect(out.synced[1]).toMatchObject({

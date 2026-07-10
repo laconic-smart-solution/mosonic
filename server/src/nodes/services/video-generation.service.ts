@@ -20,7 +20,10 @@ import {
   heygenCallbackId,
   type HeygenVideoStatus,
 } from './heygen-assets.service';
-import { PRESENTER_WORDS_PER_SECOND } from './presenter-script.util';
+import {
+  computePresenterVoiceSpeed,
+  resolveHeygenWordsPerSecond,
+} from './presenter-script.util';
 import {
   ScriptDurationService,
   type ScriptFitMethod,
@@ -37,6 +40,8 @@ export type VideoJobProvider = 'sora' | 'heygen';
 export type PresenterScriptMeta = {
   wordCount: number;
   method: ScriptFitMethod;
+  targetSeconds: number;
+  voiceSpeed: number;
 };
 
 export interface VideoSubmitResult {
@@ -498,14 +503,22 @@ export class VideoGenerationService {
         presenter.durationSeconds,
       );
 
-    const approxSeconds = Math.round(wordCount / PRESENTER_WORDS_PER_SECOND);
+    const wps = resolveHeygenWordsPerSecond(
+      this.configService.get<string>('HEYGEN_WORDS_PER_SECOND'),
+    );
+    const voiceSpeed = computePresenterVoiceSpeed(
+      wordCount,
+      presenter.durationSeconds,
+      wps,
+    );
+    const approxSeconds = Math.round(wordCount / wps);
     this.logger.log(
-      `[VideoGen] presenter script: method=${method} words=${wordCount}`,
+      `[VideoGen] presenter script: target=${presenter.durationSeconds}s words=${wordCount} ~${approxSeconds}s speed=${voiceSpeed.toFixed(2)} method=${method}`,
     );
     await this.emitProcessing(
       input.pipelineId,
       input.nodeId,
-      `Script ready: ${wordCount} words, ~${approxSeconds}s (${method})`,
+      `Target ${presenter.durationSeconds}s · script ${wordCount}w · voice ${voiceSpeed.toFixed(2)}x (${method})`,
     );
 
     const { videoId } = await this.heygen.submitPresenterVideo({
@@ -513,6 +526,7 @@ export class VideoGenerationService {
       script,
       voiceId: presenter.voiceId,
       durationSeconds: presenter.durationSeconds,
+      voiceSpeed,
       orientation: presenter.orientation,
       expressiveness: presenter.expressiveness,
       motionPrompt: presenter.motionPrompt,
@@ -527,7 +541,12 @@ export class VideoGenerationService {
       estimatedSeconds: presenter.durationSeconds,
       normalized: normalizeVideoConfig(config),
       videoProvider: 'heygen',
-      presenterScriptMeta: { wordCount, method },
+      presenterScriptMeta: {
+        wordCount,
+        method,
+        targetSeconds: presenter.durationSeconds,
+        voiceSpeed,
+      },
     };
   }
 
@@ -578,16 +597,19 @@ export class VideoGenerationService {
       'video/mp4',
     );
 
-    const normalized = normalizeVideoConfig(input.config ?? {});
+    const config = (input.config ?? {}) as WorkflowNodeConfig;
+    const presenterDuration = normalizePresenterDurationSeconds(config.duration);
+    this.logger.log(
+      `[VideoGen] presenter complete: target=${presenterDuration}s heygen=${status.duration ?? 'unknown'}s`,
+    );
+
     return {
       video: storage.fileUrl,
       storage,
       videoCost: {
         model: 'heygen-presenter',
-        videoSeconds: status.duration ?? normalized.duration,
-        videoResolution: presenterResolutionLabel(
-          (input.config ?? {}) as WorkflowNodeConfig,
-        ),
+        videoSeconds: status.duration ?? presenterDuration,
+        videoResolution: presenterResolutionLabel(config),
       },
     };
   }

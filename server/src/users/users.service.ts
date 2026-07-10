@@ -5,28 +5,47 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { SocialProvider } from '@prisma/client';
 import { type SsoTokenClaims } from '../auth/auth.types';
+import {
+  REDNOTE_CHANNEL,
+  parseRedNoteMetadata,
+  rednoteExternalAccountId,
+  type RedNoteSessionMetadata,
+} from '../domain/users/rednote-metadata.types';
+import {
+  toConnectedAccountRecord,
+  type ConnectedAccountRecord,
+  type SocialAccountRecord,
+} from '../domain/users/social-account.types';
 import {
   UserRole,
   UserStatus,
   type UserRecord,
 } from '../domain/users/user.types';
 import { PlanService } from '../plan/plan.service';
+import type { ISocialAccountRepository } from '../repositories/interfaces/social-account.repository.interface';
 import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
 import { isUniqueViolation } from '../repositories/prisma/prisma.util';
-import { USER_REPOSITORY } from '../repositories/tokens';
+import {
+  SOCIAL_ACCOUNT_REPOSITORY,
+  USER_REPOSITORY,
+} from '../repositories/tokens';
+import {
+  normalizeChannelKey,
+  normalizeZernioConnectedAccountsJson,
+} from './social-account-json.util';
+import { SocialAccountStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
-export type ConnectedAccountRecord = {
-  userId: string;
-  channel: string;
-  accountId: string;
-  connectedAt: Date;
-};
+export type { ConnectedAccountRecord };
 
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(SOCIAL_ACCOUNT_REPOSITORY)
+    private readonly socialAccounts: ISocialAccountRepository,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -112,18 +131,24 @@ export class UsersService {
   }
 
   /**
-   * Users with at least one Zernio-connected social account (for monthly cost allocation).
+   * Users with at least one active social account (for monthly cost allocation).
+   * Prefers social_accounts table; falls back to legacy JSON only when the
+   * table has no rows at all (pre-migration).
    */
   async listUserIdsWithZernioConnectedAccounts(): Promise<
     Array<{ userId: string; accountCount: number }>
   > {
-    const rows = await this.users.listWithZernioAccounts();
+    const fromTable = await this.socialAccounts.countActiveByUserGrouped();
+    if (await this.socialAccounts.hasAnyRows()) {
+      return fromTable;
+    }
 
+    const rows = await this.users.listWithZernioAccounts();
     const out: Array<{ userId: string; accountCount: number }> = [];
     for (const row of rows) {
       const userId = typeof row.userId === 'string' ? row.userId : '';
       if (!userId) continue;
-      const count = this.normalizeConnectedAccounts(
+      const count = normalizeZernioConnectedAccountsJson(
         row.zernioConnectedAccounts,
         userId,
       ).length;
@@ -159,7 +184,11 @@ export class UsersService {
   }
 
   async clearZernioConnectedAccounts(userId: string): Promise<void> {
-    await this.replaceZernioConnectedAccounts(userId, []);
+    await this.socialAccounts.markAllDisconnectedForProvider(
+      userId,
+      SocialProvider.ZERNIO,
+    );
+    await this.replaceLegacyJsonAccounts(userId, []);
   }
 
   async findByAuthServerUserId(
@@ -182,7 +211,7 @@ export class UsersService {
     platform: string,
     accountId: string,
   ): Promise<void> {
-    const key = this.normalizeChannel(platform);
+    const key = normalizeChannelKey(platform);
     const normalizedAccountId = accountId.trim();
     if (!key) {
       throw new BadRequestException('platform is required');
@@ -195,19 +224,19 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
+
     const now = new Date();
-    const accounts = this.normalizeConnectedAccounts(
-      user.zernioConnectedAccounts,
+    await this.socialAccounts.upsertActive({
       userId,
-    );
-    const next = accounts.filter((acc) => acc.channel !== key);
-    next.push({
-      userId,
+      provider: SocialProvider.ZERNIO,
       channel: key,
-      accountId: normalizedAccountId,
+      externalAccountId: normalizedAccountId,
       connectedAt: now,
+      lastSyncedAt: now,
     });
-    await this.replaceZernioConnectedAccounts(userId, next);
+
+    const accounts = await this.getZernioConnectedAccounts(userId);
+    await this.replaceLegacyJsonAccounts(userId, accounts);
   }
 
   async syncZernioConnectedAccounts(
@@ -222,28 +251,36 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    const byChannel = new Map<string, ConnectedAccountRecord>();
-    for (const item of this.normalizeConnectedAccounts(
-      user.zernioConnectedAccounts,
-      userId,
-    )) {
-      byChannel.set(item.channel, item);
-    }
+
+    // Merge semantics (same as legacy JSON sync): upsert returned accounts,
+    // do not disconnect channels absent from this payload.
+    const now = new Date();
     for (const item of accounts) {
-      const channel = this.normalizeChannel(item.channel);
-      const accountId = item.accountId?.trim();
-      if (!channel || !accountId) continue;
-      byChannel.set(channel, {
+      const channel = normalizeChannelKey(item.channel);
+      const externalAccountId = item.accountId?.trim() ?? '';
+      if (!channel || !externalAccountId) continue;
+      await this.socialAccounts.upsertActive({
         userId,
+        provider: SocialProvider.ZERNIO,
         channel,
-        accountId,
-        connectedAt: item.connectedAt ?? new Date(),
+        externalAccountId,
+        connectedAt: item.connectedAt ?? now,
+        lastSyncedAt: now,
       });
     }
-    await this.replaceZernioConnectedAccounts(
+
+    const rows = await this.socialAccounts.findActiveByUserAndProvider(
       userId,
-      Array.from(byChannel.values()),
+      SocialProvider.ZERNIO,
     );
+    const connected =
+      rows.length > 0
+        ? rows.map(toConnectedAccountRecord)
+        : normalizeZernioConnectedAccountsJson(
+            user.zernioConnectedAccounts,
+            userId,
+          );
+    await this.replaceLegacyJsonAccounts(userId, connected);
   }
 
   async getZernioConnectedAccounts(
@@ -253,14 +290,32 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    return this.normalizeConnectedAccounts(user.zernioConnectedAccounts, userId);
+
+    const rows = await this.socialAccounts.findActiveByUserAndProvider(
+      userId,
+      SocialProvider.ZERNIO,
+    );
+    if (rows.length > 0) {
+      return rows.map(toConnectedAccountRecord);
+    }
+
+    // If the table already has rows for this user (e.g. all disconnected),
+    // do not resurrect stale JSON. Only fall back when never migrated.
+    if (await this.socialAccounts.hasAnyForUser(userId)) {
+      return [];
+    }
+
+    return normalizeZernioConnectedAccountsJson(
+      user.zernioConnectedAccounts,
+      userId,
+    );
   }
 
   async disconnectZernioConnectedAccount(
     userId: string,
     channel: string,
   ): Promise<void> {
-    const key = this.normalizeChannel(channel);
+    const key = normalizeChannelKey(channel);
     if (!key) {
       throw new BadRequestException('channel is required');
     }
@@ -268,11 +323,15 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    const next = this.normalizeConnectedAccounts(
-      user.zernioConnectedAccounts,
+
+    await this.socialAccounts.markDisconnected(
       userId,
-    ).filter((acc) => acc.channel !== key);
-    await this.replaceZernioConnectedAccounts(userId, next);
+      SocialProvider.ZERNIO,
+      key,
+    );
+
+    const remaining = await this.getZernioConnectedAccounts(userId);
+    await this.replaceLegacyJsonAccounts(userId, remaining);
   }
 
   async getZernioPublishContext(userId: string): Promise<{
@@ -289,10 +348,8 @@ export class UsersService {
         'Zernio profile missing; connect a social account first',
       );
     }
-    const normalized = this.normalizeConnectedAccounts(
-      user.zernioConnectedAccounts,
-      userId,
-    );
+
+    const normalized = await this.getZernioConnectedAccounts(userId);
     const accounts = normalized.reduce<Record<string, string>>((acc, item) => {
       acc[item.channel] = item.accountId;
       return acc;
@@ -304,7 +361,153 @@ export class UsersService {
     };
   }
 
-  private async replaceZernioConnectedAccounts(
+  /** All ACTIVE social accounts across providers (Settings + publish routing). */
+  async getAllActiveConnectedAccounts(
+    userId: string,
+  ): Promise<ConnectedAccountRecord[]> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const rows = await this.socialAccounts.findActiveByUserId(userId);
+    if (rows.length > 0) {
+      return rows.map(toConnectedAccountRecord);
+    }
+    if (await this.socialAccounts.hasAnyForUser(userId)) {
+      return [];
+    }
+    return normalizeZernioConnectedAccountsJson(
+      user.zernioConnectedAccounts,
+      userId,
+    );
+  }
+
+  async getPublishAccounts(userId: string): Promise<SocialAccountRecord[]> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    return this.socialAccounts.findActiveByUserId(userId);
+  }
+
+  async findRedNoteAccount(userId: string): Promise<SocialAccountRecord | null> {
+    return this.socialAccounts.findActiveByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+  }
+
+  async findRedNoteAccountAnyStatus(
+    userId: string,
+  ): Promise<SocialAccountRecord | null> {
+    return this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+  }
+
+  async upsertRedNoteSession(
+    userId: string,
+    metadata: RedNoteSessionMetadata,
+  ): Promise<SocialAccountRecord> {
+    const user = await this.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+    const now = new Date();
+    return this.socialAccounts.upsertActive({
+      userId,
+      provider: SocialProvider.REDNOTE,
+      channel: REDNOTE_CHANNEL,
+      externalAccountId: rednoteExternalAccountId(userId),
+      username: metadata.rednoteUserHandle ?? null,
+      connectedAt: now,
+      lastSyncedAt: now,
+      metadata: metadata as unknown as Prisma.InputJsonValue,
+    });
+  }
+
+  async markRedNoteNeedsReauth(userId: string): Promise<void> {
+    const existing = await this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+    if (!existing) return;
+    const meta = parseRedNoteMetadata(existing.metadata);
+    const next: RedNoteSessionMetadata = {
+      sessionCookiesRef: meta?.sessionCookiesRef ?? '',
+      encryptedCookies: meta?.encryptedCookies ?? '',
+      sessionStatus: 'needs_reauth',
+      lastVerifiedAt: meta?.lastVerifiedAt ?? null,
+      lastQrScanAt: meta?.lastQrScanAt ?? null,
+      rednoteUserHandle: meta?.rednoteUserHandle,
+    };
+    await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status: SocialAccountStatus.ERROR,
+        metadata: next as unknown as Prisma.InputJsonValue,
+        disconnectedAt: new Date(),
+      },
+    );
+  }
+
+  async disconnectRedNote(userId: string): Promise<void> {
+    const existing = await this.socialAccounts.findByUserProviderChannel(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+    );
+    if (!existing) return;
+    const meta = parseRedNoteMetadata(existing.metadata);
+    const next = meta
+      ? ({ ...meta, sessionStatus: 'expired' } satisfies RedNoteSessionMetadata)
+      : undefined;
+    await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status: SocialAccountStatus.DISCONNECTED,
+        ...(next
+          ? { metadata: next as unknown as Prisma.InputJsonValue }
+          : {}),
+        disconnectedAt: new Date(),
+      },
+    );
+  }
+
+  async updateRedNoteMetadata(
+    userId: string,
+    metadata: RedNoteSessionMetadata,
+    status: SocialAccountStatus = SocialAccountStatus.ACTIVE,
+  ): Promise<SocialAccountRecord> {
+    if (status === SocialAccountStatus.ACTIVE) {
+      return this.upsertRedNoteSession(userId, metadata);
+    }
+    const updated = await this.socialAccounts.updateStatusAndMetadata(
+      userId,
+      SocialProvider.REDNOTE,
+      REDNOTE_CHANNEL,
+      {
+        status,
+        metadata: metadata as unknown as Prisma.InputJsonValue,
+        username: metadata.rednoteUserHandle ?? null,
+      },
+    );
+    if (!updated) {
+      throw new NotFoundException(`RedNote account for ${userId} not found`);
+    }
+    return updated;
+  }
+
+  /** Dual-write: keep legacy JSON in sync for rollback / admin tools. */
+  private async replaceLegacyJsonAccounts(
     userId: string,
     accounts: ConnectedAccountRecord[],
   ): Promise<void> {
@@ -321,60 +524,4 @@ export class UsersService {
       throw new NotFoundException(`User ${userId} not found`);
     }
   }
-
-  private normalizeConnectedAccounts(
-    raw: unknown,
-    userId: string,
-  ): ConnectedAccountRecord[] {
-    if (Array.isArray(raw)) {
-      const normalized: ConnectedAccountRecord[] = [];
-      for (const item of raw) {
-        if (!item || typeof item !== 'object') continue;
-        const rec = item as {
-          userId?: string;
-          channel?: string;
-          accountId?: string;
-          connectedAt?: Date | string;
-        };
-        const channel = this.normalizeChannel(rec.channel ?? '');
-        const accountId = rec.accountId?.trim();
-        if (!channel || !accountId) continue;
-        normalized.push({
-          userId: rec.userId?.trim() || userId,
-          channel,
-          accountId,
-          connectedAt: this.toDate(rec.connectedAt),
-        });
-      }
-      return normalized;
-    }
-
-    if (raw && typeof raw === 'object') {
-      return Object.entries(raw as Record<string, unknown>)
-        .map(([channel, accountId]) => ({
-          userId,
-          channel: this.normalizeChannel(channel),
-          accountId:
-            typeof accountId === 'string' ? accountId.trim() : '',
-          connectedAt: new Date(),
-        }))
-        .filter((item) => Boolean(item.channel && item.accountId));
-    }
-
-    return [];
-  }
-
-  private normalizeChannel(input: string): string {
-    return input.trim().toLowerCase();
-  }
-
-  private toDate(value: Date | string | undefined): Date {
-    if (value instanceof Date) return value;
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) return parsed;
-    }
-    return new Date();
-  }
 }
-

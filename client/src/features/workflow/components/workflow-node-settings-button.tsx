@@ -28,7 +28,7 @@ export function WorkflowNodeSettingsButton({
           : "border-border bg-card text-muted-foreground hover:border-teal-300 hover:bg-teal-50/80 hover:text-teal-700 dark:hover:border-teal-500/60 dark:hover:bg-teal-950/40 dark:hover:text-teal-300",
       )}
       aria-label={t("aria.openNodeSettings")}
-      title={t("properties.title")}
+      title={t("properties.configuration")}
     >
       <Settings className="size-3.5" strokeWidth={2} />
     </button>

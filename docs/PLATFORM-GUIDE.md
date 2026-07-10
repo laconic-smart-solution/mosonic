@@ -28,7 +28,7 @@ For local development setup, see the [root README](../README.md).
 
 ### What Mosonic is
 
-Mosonic helps businesses produce marketing content — text, images, video, translations — and publish it to social channels (Facebook, Instagram, Twitter/X, LinkedIn) through an **orchestration layer** that controls tone, format, length, keywords, and validation.
+Mosonic helps businesses produce marketing content — text, images, video, translations — and publish it to social channels (Facebook, Instagram, LinkedIn, YouTube, TikTok) through an **orchestration layer** that controls tone, format, length, keywords, and validation.
 
 The platform does **not** train foundational language models. The proprietary value is in **how** user strategy and prompts are turned into precise, sequential AI instructions, with live progress, review, publishing, and performance feedback.
 
@@ -390,8 +390,9 @@ Gateway handlers: `join` / `leave` with `{ room }`.
 |---------|----------|-------------|-------|
 | Facebook | 63,206 | 1.91:1 | Yes |
 | Instagram | 2,200 | 1:1 or 4:5 | Yes (60s) |
-| Twitter/X | 280 | 16:9 | Yes (140s) |
 | LinkedIn | 3,000 | 1.91:1 | Yes |
+| YouTube | — | 16:9 | Yes |
+| TikTok | 2,200 | 9:16 | Yes (60s) |
 
 ### Analytics and feedback loop
 
@@ -746,7 +747,7 @@ Applying updates the rule for future content generation.
 
 **What you can do:**
 
-- Connect or disconnect Facebook, Instagram, Twitter/X, LinkedIn via Zernio OAuth.
+- Connect or disconnect Facebook, Instagram, LinkedIn, YouTube, and TikTok via Zernio OAuth.
 - Sync account list after connecting.
 
 Publishing and analytics depend on connected accounts.

@@ -56,7 +56,7 @@ import { ContentDetailNodeCard } from "@/features/content/components/content-det
 import {
   ContentDetailConfirmDialogs,
   ContentDetailImageLightbox,
-  ContentDetailRerunSheet,
+  ContentDetailRerunConfirmDialog,
 } from "@/features/content/components/content-detail/content-detail-overlays"
 import { ContentNewsSourceBanner } from "@/features/content/components/content-detail/content-news-source-banner"
 import { ContentDetailReviewHeader } from "@/features/content/components/content-detail/content-detail-review-header"
@@ -167,9 +167,6 @@ export function UploadContentReviewPanel({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const [rerunNodeId, setRerunNodeId] = useState<string | null>(null)
-  const [rerunConfigDraft, setRerunConfigDraft] = useState<
-    Record<string, unknown>
-  >({})
   const [runByNodeId, setRunByNodeId] = useState<
     Partial<Record<string, ReturnType<typeof emptyRunState>>>
   >({})
@@ -340,18 +337,6 @@ export function UploadContentReviewPanel({
       markDirty()
     },
     [markDirty]
-  )
-
-  const getNodeConfigById = useCallback(
-    (nodeId: string) => {
-      const n = workflowNodes.find((x) => x.nodeId === nodeId)
-      if (!n) return {}
-      return {
-        ...buildGenerateMoreDefaultConfig(n.type, ruleHint),
-        ...(n.config ?? {}),
-      }
-    },
-    [workflowNodes, ruleHint]
   )
 
   const setRunState = useCallback(
@@ -632,7 +617,6 @@ export function UploadContentReviewPanel({
   function openRerun(nodeId: string) {
     if (globalRerunning || isGeneratingMore) return
     setRerunNodeId(nodeId)
-    setRerunConfigDraft(getNodeConfigById(nodeId))
     setRunByNodeId((prev) => ({ ...prev, [nodeId]: emptyRunState() }))
   }
 
@@ -652,7 +636,6 @@ export function UploadContentReviewPanel({
     try {
       await contentService.rerunNode(contentId, {
         nodeId,
-        updatedConfig: rerunConfigDraft,
         previousOutputs: {
           keywords: editedOutputs.keywords,
           text: editedOutputs.text,
@@ -1204,13 +1187,10 @@ export function UploadContentReviewPanel({
           </div>
         )}
 
-        <ContentDetailRerunSheet
+        <ContentDetailRerunConfirmDialog
           openNodeId={rerunNodeId}
-          workflowNodes={workflowNodes}
-          workflowId={data?.workflowRef}
+          workflowNodes={generationNodes}
           globalRerunning={blockPipeline}
-          configDraft={rerunConfigDraft}
-          onConfigChange={setRerunConfigDraft}
           onOpenChange={(open) => {
             if (!open) setRerunNodeId(null)
           }}

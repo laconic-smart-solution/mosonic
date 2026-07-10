@@ -7,6 +7,7 @@ import {
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
 import { extractUsageFromAiMessage } from '../langchain-usage.util';
+import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 import type { NodeExecutionInput, NodeExecutionResult } from '../types/node-execution.types';
 
 type NormalizedKeywordPlannerConfig = {
@@ -92,6 +93,8 @@ export class KeywordPlannerService {
       'Prefer specific, intent-rich phrases over single generic words where appropriate.',
       'Return strict JSON only with this shape: {"keywords":["phrase one","phrase two",...]}',
       'No markdown, no code fences, no explanation outside the JSON.',
+      '',
+      formatGenerationTemporalContext(),
     ].join('\n');
 
     const humanParts = [

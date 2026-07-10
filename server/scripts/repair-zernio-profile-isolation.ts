@@ -130,6 +130,18 @@ async function main() {
             zernioConnectedAccounts: [],
           },
         });
+        await prisma.socialAccount.updateMany({
+          where: {
+            userId: user.userId,
+            provider: 'ZERNIO',
+            status: 'ACTIVE',
+          },
+          data: {
+            status: 'DISCONNECTED',
+            disconnectedAt: new Date(),
+            lastSyncedAt: new Date(),
+          },
+        });
         console.log(
           `Reassigned ${user.userId} → profile ${newProfileId}; cleared connected accounts`,
         );

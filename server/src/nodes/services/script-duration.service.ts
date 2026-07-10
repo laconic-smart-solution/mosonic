@@ -5,13 +5,18 @@ import { LlmService } from '../../llm/llm.service';
 import {
   calcWordBudget,
   countWords,
+  needsExpand,
   needsRewrite,
-  PRESENTER_WORDS_PER_SECOND,
+  resolveHeygenWordsPerSecond,
   sanitizeSpokenScript,
   simpleTrim,
 } from './presenter-script.util';
 
-export type ScriptFitMethod = 'unchanged' | 'rewritten' | 'trimmed';
+export type ScriptFitMethod =
+  | 'unchanged'
+  | 'rewritten'
+  | 'trimmed'
+  | 'expanded';
 
 export type ScriptFitResult = {
   script: string;
@@ -51,40 +56,62 @@ export class ScriptDurationService {
     private readonly config: ConfigService,
   ) {}
 
+  private heygenWps(): number {
+    return resolveHeygenWordsPerSecond(
+      this.config.get<string>('HEYGEN_WORDS_PER_SECOND'),
+    );
+  }
+
   /**
    * Returns a script that fits the target duration.
-   * Uses GPT rewrite when over threshold; falls back to simple trim on failure.
+   * Uses GPT rewrite when over threshold, expand when under, trim on failure.
    */
   async fitScriptToDuration(
     rawScript: string,
     durationSeconds: number,
   ): Promise<ScriptFitResult> {
-    const budget = calcWordBudget(durationSeconds);
-    const wordCount = countWords(rawScript);
+    const wps = this.heygenWps();
+    const budget = calcWordBudget(durationSeconds, wps);
+    const sanitized = sanitizeSpokenScript(rawScript.trim());
+    const wordCount = countWords(sanitized);
 
     this.logger.log(
-      `[ScriptDuration] raw=${wordCount}w budget=${budget}w duration=${durationSeconds}s`,
+      `[ScriptDuration] raw=${wordCount}w budget=${budget}w duration=${durationSeconds}s wps=${wps}`,
     );
 
-    if (!needsRewrite(rawScript, durationSeconds)) {
-      this.logger.log('[ScriptDuration] script fits — no rewrite needed');
-      const trimmed = sanitizeSpokenScript(rawScript.trim());
-      return {
-        script: trimmed,
-        wordCount: countWords(trimmed),
-        method: 'unchanged',
-      };
+    if (needsRewrite(sanitized, durationSeconds, wps)) {
+      return this.rewriteToFit(sanitized, durationSeconds, budget, wps);
     }
 
+    if (needsExpand(sanitized, durationSeconds, wps)) {
+      return this.expandToFit(sanitized, durationSeconds, budget, wps);
+    }
+
+    this.logger.log('[ScriptDuration] script fits — no rewrite needed');
+    return {
+      script: sanitized,
+      wordCount,
+      method: 'unchanged',
+    };
+  }
+
+  private async rewriteToFit(
+    script: string,
+    durationSeconds: number,
+    budget: number,
+    wps: number,
+  ): Promise<ScriptFitResult> {
+    const wordCount = countWords(script);
     this.logger.log(
       `[ScriptDuration] script too long (${wordCount}w > ${budget}w) — rewriting`,
     );
 
     try {
       const rewritten = await this.rewriteWithGpt(
-        rawScript,
+        script,
         durationSeconds,
         budget,
+        wps,
       );
       const rewrittenWords = countWords(rewritten);
       this.logger.log(`[ScriptDuration] rewritten to ${rewrittenWords}w`);
@@ -99,12 +126,50 @@ export class ScriptDurationService {
         `[ScriptDuration] GPT rewrite failed: ${message} — using simple trim`,
       );
       const trimmed = sanitizeSpokenScript(
-        simpleTrim(rawScript, durationSeconds),
+        simpleTrim(script, durationSeconds, wps),
       );
       return {
         script: trimmed,
         wordCount: countWords(trimmed),
         method: 'trimmed',
+      };
+    }
+  }
+
+  private async expandToFit(
+    script: string,
+    durationSeconds: number,
+    budget: number,
+    wps: number,
+  ): Promise<ScriptFitResult> {
+    const wordCount = countWords(script);
+    this.logger.log(
+      `[ScriptDuration] script too short (${wordCount}w < ${Math.floor(budget * 0.85)}w) — expanding`,
+    );
+
+    try {
+      const expanded = await this.expandWithGpt(
+        script,
+        durationSeconds,
+        budget,
+        wps,
+      );
+      const expandedWords = countWords(expanded);
+      this.logger.log(`[ScriptDuration] expanded to ${expandedWords}w`);
+      return {
+        script: expanded,
+        wordCount: expandedWords,
+        method: 'expanded',
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `[ScriptDuration] GPT expand failed: ${message} — keeping original script`,
+      );
+      return {
+        script,
+        wordCount,
+        method: 'unchanged',
       };
     }
   }
@@ -120,12 +185,13 @@ export class ScriptDurationService {
     originalScript: string,
     durationSeconds: number,
     wordBudget: number,
+    wps: number,
   ): Promise<string> {
     const prompt = [
       `Rewrite the text below into a ${durationSeconds}-second presenter video script — one person speaking directly to the camera.`,
       '',
       'LENGTH:',
-      `  - Target: ~${wordBudget} words (read aloud at ~${PRESENTER_WORDS_PER_SECOND} words/second)`,
+      `  - Target: ~${wordBudget} words (read aloud at ~${wps} words/second)`,
       `  - Hard maximum: ${wordBudget} words — do NOT exceed this`,
       '',
       'SPOKEN STYLE (critical):',
@@ -149,6 +215,52 @@ export class ScriptDurationService {
       originalScript.trim(),
     ].join('\n');
 
+    return this.invokeGptScript(prompt, durationSeconds, wordBudget, wps);
+  }
+
+  private async expandWithGpt(
+    originalScript: string,
+    durationSeconds: number,
+    wordBudget: number,
+    wps: number,
+  ): Promise<string> {
+    const prompt = [
+      `Expand the text below into a ${durationSeconds}-second presenter video script — one person speaking directly to the camera.`,
+      '',
+      'LENGTH:',
+      `  - Target: ~${wordBudget} words (read aloud at ~${wps} words/second)`,
+      `  - Aim for ${Math.floor(wordBudget * 0.9)}–${wordBudget} words`,
+      `  - Do NOT exceed ${wordBudget} words`,
+      '',
+      'SPOKEN STYLE (critical):',
+      '  - Write how a real person talks, not how a social post reads',
+      '  - Use short sentences, contractions, and a natural conversational rhythm',
+      '  - Sound warm and human — like explaining something to a friend',
+      '  - One continuous monologue; no lists, headings, labels, or stage directions',
+      '',
+      'EXPANSION RULES:',
+      '  - Keep the same core message, facts, and call-to-action',
+      '  - Add natural transitions, brief context, or a warmer intro/outro',
+      '  - Do NOT invent unrelated claims or contact details',
+      '  - Remove ALL hashtags, @mentions, URLs, and emoji',
+      '',
+      'OUTPUT:',
+      '  - Plain spoken text only — no titles, quotes, markdown, or explanations',
+      '  - Must end with a complete sentence',
+      '',
+      '=== ORIGINAL TEXT ===',
+      originalScript.trim(),
+    ].join('\n');
+
+    return this.invokeGptScript(prompt, durationSeconds, wordBudget, wps);
+  }
+
+  private async invokeGptScript(
+    prompt: string,
+    durationSeconds: number,
+    wordBudget: number,
+    wps: number,
+  ): Promise<string> {
     const model = this.llm.getChatModelForPlainText({
       model: this.rewriteModel(),
       temperature: 0.5,
@@ -174,7 +286,7 @@ export class ScriptDurationService {
       this.logger.warn(
         `[ScriptDuration] GPT returned ${words}w (over budget ${wordBudget}w) — hard trimming`,
       );
-      return simpleTrim(text, durationSeconds);
+      return simpleTrim(text, durationSeconds, wps);
     }
 
     return text;

@@ -81,7 +81,7 @@ describe('PostService', () => {
 
   it('deletePost hard-deletes scheduled post and resets upload channels to pending', async () => {
     const channel = {
-      channel: 'twitter',
+      channel: 'linkedin',
       status: UploadChannelStatus.Scheduled,
       scheduledAt: new Date(),
       publishedAt: null as Date | null,
@@ -102,7 +102,7 @@ describe('PostService', () => {
         status: PostStatus.Scheduled,
         zernioPostId: 'z-sched',
         uploadRef: 'upl-1',
-        channels: ['twitter'],
+        channels: ['linkedin'],
       }),
     });
     postModel.deleteOne.mockReturnValue({
@@ -212,7 +212,7 @@ describe('PostService', () => {
         postId: 'p-done',
         userId: 'u1',
         status: PostStatus.Cancelled,
-        channels: ['twitter'],
+        channels: ['linkedin'],
       }),
     });
 
@@ -262,7 +262,7 @@ describe('PostService', () => {
       status: PostStatus.Scheduled,
       zernioPostId: 'z-sched',
       uploadRef: 'upl-1',
-      channels: ['twitter'],
+      channels: ['linkedin'],
       scheduledAt: new Date('2030-01-01T00:00:00.000Z'),
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -270,7 +270,7 @@ describe('PostService', () => {
       uploadId: 'upl-1',
       channels: [
         {
-          channel: 'twitter',
+          channel: 'linkedin',
           status: UploadChannelStatus.Scheduled,
           scheduledAt: new Date('2030-01-01T00:00:00.000Z'),
           publishedAt: null as Date | null,

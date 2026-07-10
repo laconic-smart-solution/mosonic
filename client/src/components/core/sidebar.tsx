@@ -39,10 +39,11 @@ const NAV: NavItem[] = [
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
           d="M2 6.5L8 2l6 4.5V14H2V6.5z"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
           strokeLinejoin="round"
-          fill={active ? "#ffffff18" : "none"}
+          fill={active ? "currentColor" : "none"}
+          fillOpacity={active ? 0.12 : 0}
         />
       </svg>
     ),
@@ -59,7 +60,7 @@ const NAV: NavItem[] = [
           width="5"
           height="5"
           rx="1"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
         />
         <rect
@@ -68,7 +69,7 @@ const NAV: NavItem[] = [
           width="5"
           height="5"
           rx="1"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
         />
         <rect
@@ -77,7 +78,7 @@ const NAV: NavItem[] = [
           width="5"
           height="5"
           rx="1"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
         />
         <rect
@@ -86,9 +87,10 @@ const NAV: NavItem[] = [
           width="5"
           height="5"
           rx="1"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
-          fill={active ? "#ffffff30" : "none"}
+          fill={active ? "currentColor" : "none"}
+          fillOpacity={active ? 0.18 : 0}
         />
       </svg>
     ),
@@ -97,11 +99,11 @@ const NAV: NavItem[] = [
     id: "rules",
     labelKey: "nav.rules",
     path: "/rules",
-    icon: (active) => (
+    icon: () => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
           d="M3 4h10M3 8h7M3 12h5"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
         />
@@ -109,7 +111,7 @@ const NAV: NavItem[] = [
           cx="13"
           cy="11"
           r="2.5"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
         />
       </svg>
@@ -119,12 +121,11 @@ const NAV: NavItem[] = [
     id: "workflows",
     labelKey: "nav.workflows",
     path: "/workflows",
-    icon: (active) => (
+    icon: () => (
       <GitBranch
         className="size-4 shrink-0"
         strokeWidth={1.65}
         aria-hidden
-        color={active ? "#fff" : undefined}
       />
     ),
   },
@@ -132,12 +133,11 @@ const NAV: NavItem[] = [
     id: "pipelines",
     labelKey: "nav.pipelines",
     path: "/pipelines",
-    icon: (active) => (
+    icon: () => (
       <Play
         className="size-4 shrink-0"
         strokeWidth={1.65}
         aria-hidden
-        color={active ? "#fff" : undefined}
       />
     ),
   },
@@ -146,7 +146,7 @@ const NAV: NavItem[] = [
     labelKey: "nav.content",
     path: "/content",
     badgeColor: "#D97706",
-    icon: (active) => (
+    icon: () => (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <rect
           x="2"
@@ -154,12 +154,12 @@ const NAV: NavItem[] = [
           width="12"
           height="12"
           rx="2"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.4"
         />
         <path
           d="M5 6h6M5 9h4"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.3"
           strokeLinecap="round"
         />
@@ -170,12 +170,11 @@ const NAV: NavItem[] = [
     id: "posts",
     labelKey: "nav.posts",
     path: "/posts",
-    icon: (active) => (
+    icon: () => (
       <Megaphone
         className="size-4 shrink-0"
         strokeWidth={1.65}
         aria-hidden
-        color={active ? "#fff" : undefined}
       />
     ),
   },
@@ -183,12 +182,11 @@ const NAV: NavItem[] = [
     id: "usage",
     labelKey: "nav.usage",
     path: "/usage",
-    icon: (active) => (
+    icon: () => (
       <Wallet
         className="size-4 shrink-0"
         strokeWidth={1.65}
         aria-hidden
-        color={active ? "#fff" : undefined}
       />
     ),
   },
@@ -196,12 +194,11 @@ const NAV: NavItem[] = [
     id: "settings-accounts",
     labelKey: "nav.settingsAccounts",
     path: "/settings/accounts",
-    icon: (active) => (
+    icon: () => (
       <UserCog
         className="size-4 shrink-0"
         strokeWidth={1.65}
         aria-hidden
-        color={active ? "#fff" : undefined}
       />
     ),
   },
@@ -213,20 +210,21 @@ const NAV: NavItem[] = [
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <path
           d="M8 2l5 2v4c0 3-2.2 5.8-5 6-2.8-.2-5-3-5-6V4l5-2z"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.3"
           strokeLinejoin="round"
-          fill={active ? "#ffffff18" : "none"}
+          fill={active ? "currentColor" : "none"}
+          fillOpacity={active ? 0.12 : 0}
         />
         <path
           d="M8 6v4"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="1.2"
           strokeLinecap="round"
         />
         <path
           d="M8 11h0"
-          stroke={active ? "#fff" : "currentColor"}
+          stroke="currentColor"
           strokeWidth="2.2"
           strokeLinecap="round"
         />
@@ -299,14 +297,14 @@ export function SidebarPanel() {
             "group-data-[collapsible=icon]:justify-center"
           )}
         >
-          <div className="bg-primary-foreground/90 rounded-sm px-1">
+          <div className="rounded-sm px-1 dark:bg-sidebar-accent/40">
             <BrandLogo size="nav" className="size-[30px] shrink-0" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-white">
+            <div className="text-sm leading-tight font-bold tracking-[-0.3px] text-sidebar-accent-foreground">
               {t("appName")}
             </div>
-            <div className="text-[9px] font-semibold tracking-[1.2px] text-[#00A589] uppercase">
+            <div className="text-[9px] font-semibold tracking-[1.2px] text-sidebar-primary uppercase">
               {t("appTagline")}
             </div>
           </div>
@@ -315,7 +313,7 @@ export function SidebarPanel() {
 
       <SidebarContent className="px-2 py-2.5">
         <SidebarGroup className="p-0">
-          <SidebarGroupLabel className="px-2 text-[9px] font-bold tracking-wide text-[#3A3A55] uppercase">
+          <SidebarGroupLabel className="px-2 text-[9px] font-bold tracking-wide uppercase">
             {t("platform")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -336,16 +334,14 @@ export function SidebarPanel() {
                         />
                       }
                       className={cn(
-                        "relative gap-[9px] py-[7px] pr-2 pl-2 text-[13px] font-normal text-[#8888AA]",
-                        "data-active:!border-none data-active:!bg-[#1A1A2E] data-active:!text-white data-active:!shadow-none",
-                        "hover:!bg-white/5 hover:!text-white/90 data-active:font-semibold",
+                        "relative gap-[9px] py-[7px] pr-2 pl-2 text-[13px] text-sidebar-foreground",
                         active && "[&_svg]:opacity-100",
-                        !active && "[&_svg]:opacity-[0.65]"
+                        !active && "[&_svg]:opacity-70",
                       )}
                     >
                       {active ? (
                         <div
-                          className="absolute top-[20%] bottom-[20%] left-0 w-0.5 rounded-r-sm bg-[#00A589]"
+                          className="absolute top-[20%] bottom-[20%] left-0 w-0.5 rounded-r-sm bg-sidebar-primary"
                           aria-hidden
                         />
                       ) : null}

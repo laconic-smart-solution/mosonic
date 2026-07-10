@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
 import { parseJsonWithFenceOrThrow } from '../common/utils/json-parse.util';
 import { extractUsageFromAiMessage } from '../nodes/langchain-usage.util';
+import { formatGenerationTemporalContext } from '../nodes/services/generation-temporal-context.util';
+import { intakePurposeSystemHint } from './rule-intake-prompt.util';
+import type { RuleIntakeAnswers } from './rule-intake.types';
 import type { RuleStatus } from './schemas/rule.schema';
 
 export interface ExtractedRuleDraft {
@@ -60,7 +63,10 @@ export interface ExtractedRuleDraft {
 export class RuleExtractionService {
   constructor(private readonly llm: LlmService) {}
 
-  async extractRuleFromInput(rawInput: string): Promise<{
+  async extractRuleFromInput(
+    rawInput: string,
+    intake?: RuleIntakeAnswers,
+  ): Promise<{
     draft: ExtractedRuleDraft;
     usage?: { inputTokens?: number; outputTokens?: number };
   }> {
@@ -75,6 +81,15 @@ export class RuleExtractionService {
           'If a value is not found in the input, use a sensible realistic default — never return null or empty strings.',
           '(Exception: channel contentMapping.media may be null for text-only channels.)',
           '',
+          formatGenerationTemporalContext(),
+          '',
+          'CAMPAIGN DURATION RULES:',
+          '- If the user input omits campaign start/end dates, set startDate to today (UTC) and endDate to 90 days after startDate.',
+          '- Never default to a past calendar year when dates are omitted.',
+          '- If the user input explicitly specifies historical or past campaign dates, preserve them as given.',
+          '',
+          intakePurposeSystemHint(intake) || '',
+          '',
           // ── FIELD DEFINITIONS ──────────────────────────────────────────────
           'FIELD DEFINITIONS',
           '',
@@ -84,7 +99,7 @@ export class RuleExtractionService {
           '  summary        → short professional copy; use for LinkedIn or any B2B/professional context',
           '',
           'media — what asset to attach:',
-          '  image → attach image; use for visual platforms (instagram, facebook, tiktok, twitter)',
+          '  image → attach image; use for visual platforms (instagram, facebook, tiktok)',
           '  video → attach video; use ONLY when input explicitly mentions video content or a video campaign',
           '  null  → text only; default for linkedin unless input mentions visuals',
           '',
@@ -92,7 +107,6 @@ export class RuleExtractionService {
           'CHANNEL DECISION TABLE (use as defaults, override only if input explicitly states otherwise):',
           '  instagram → caption: translatedText if non-English audience, else text | media: image',
           '  facebook  → caption: translatedText if non-English audience, else text | media: image (video if input mentions video campaign)',
-          '  twitter   → caption: text                                              | media: image (null if no visual mentioned)',
           '  linkedin  → caption: summary                                           | media: null (image only if input explicitly mentions a visual post)',
           '  tiktok    → caption: translatedText if non-English audience, else text | media: video (image if input mentions photo carousel)',
           '  youtube   → caption: summary                                           | media: video',
@@ -141,7 +155,7 @@ export class RuleExtractionService {
               },
               channels: [
                 {
-                  channel: 'facebook | instagram | twitter | linkedin | youtube | tiktok',
+                  channel: 'facebook | instagram | linkedin | youtube | tiktok',
                   priority: 'high | medium | low',
                   contentStyle: 'string',
                   contentMapping: {
@@ -181,9 +195,11 @@ export class RuleExtractionService {
     const channels = Array.isArray(parsed.channels)
       ? parsed.channels.map((ch) => normalizeExtractedChannel(ch))
       : [];
+    const campaign = normalizeCampaignDuration(parsed.campaign, new Date());
     return {
       draft: {
         ...parsed,
+        campaign,
         channels,
         status: 'active' as RuleStatus,
       },
@@ -193,6 +209,55 @@ export class RuleExtractionService {
 }
 
 const CAPTIONS = new Set(['text', 'translatedText', 'summary']);
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function normalizeCampaignDuration(
+  campaign: ExtractedRuleDraft['campaign'] | undefined,
+  now: Date,
+): ExtractedRuleDraft['campaign'] {
+  const base = campaign ?? {
+    goals: [],
+    keywords: [],
+    hashtagStrategy: [],
+    contentFormats: [],
+    duration: { startDate: '', endDate: '' },
+    postingFrequency: 'weekly' as const,
+    customSchedule: [],
+  };
+  const start = parseIsoDate(base.duration?.startDate);
+  const end = parseIsoDate(base.duration?.endDate);
+  if (start && end) {
+    return {
+      ...base,
+      duration: {
+        startDate: toIsoDate(start),
+        endDate: toIsoDate(end),
+      },
+    };
+  }
+  const startDate = start ?? now;
+  const endDate =
+    end ??
+    new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  return {
+    ...base,
+    duration: {
+      startDate: toIsoDate(startDate),
+      endDate: toIsoDate(endDate),
+    },
+  };
+}
 
 function normalizeExtractedChannel(
   ch: ExtractedRuleDraft['channels'][0] & Record<string, unknown>,

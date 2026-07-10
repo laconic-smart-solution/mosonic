@@ -21,6 +21,11 @@ export interface IContentRepository {
     pipelineRef: string,
     auth: TenancyAuth,
   ): Promise<ContentRecord | null>;
+  /** Latest row for a pipeline + variant (null variant = control / default). */
+  findByPipelineAndVariant(
+    pipelineRef: string,
+    variantId: string | null,
+  ): Promise<ContentRecord | null>;
   create(data: Prisma.ContentCreateInput): Promise<ContentRecord>;
   findPage(
     query: ContentPageQueryDto,

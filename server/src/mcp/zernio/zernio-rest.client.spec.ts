@@ -66,7 +66,7 @@ describe('ZernioRestClient', () => {
       profileId: 'prof1',
       platforms: [
         {
-          platform: 'twitter',
+          platform: 'instagram',
           accountId: 'acc1',
           content: 'Hello',
           mediaUrl: 'https://files.example.com/a.png',
@@ -200,7 +200,7 @@ describe('ZernioRestClient', () => {
       profileId: 'prof1',
       platforms: [
         {
-          platform: 'twitter',
+          platform: 'instagram',
           accountId: 'acc1',
           content: 'Hello',
           mediaUrl: 'https://files.example.com/download/abc123',
@@ -232,7 +232,7 @@ describe('ZernioRestClient', () => {
       profileId: 'prof1',
       platforms: [
         {
-          platform: 'twitter',
+          platform: 'instagram',
           accountId: 'acc1',
           content: 'Hi',
           mediaUrl:

@@ -16,6 +16,7 @@ import {
   extractUsageFromAiMessage,
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
+import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 
 type NormalizedTranslationConfig = {
   provider?: LlmProvider;
@@ -60,6 +61,8 @@ function buildSystemPrompt(
     'You do not translate word for word.',
     'You transcreate — preserving meaning, emotion, and brand voice in the target language.',
     'The output must feel natural to a native speaker, not like a translation.',
+    '',
+    formatGenerationTemporalContext(),
     '',
     '=== BRAND CONTEXT ===',
     `Brand name: ${rule.brand.brandName}`,

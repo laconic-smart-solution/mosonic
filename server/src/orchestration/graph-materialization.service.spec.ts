@@ -42,7 +42,7 @@ describe('GraphMaterializationService', () => {
 
   it('materializes wizard_channels branch using explicit channel list', () => {
     const sparseRule = {
-      channels: [{ channel: 'twitter', priority: 'low', contentStyle: 'short' }],
+      channels: [{ channel: 'linkedin', priority: 'low', contentStyle: 'short' }],
     } as never;
 
     const nodes = [
@@ -535,7 +535,7 @@ describe('GraphMaterializationService', () => {
     ).toBe(false);
   });
 
-  it('materializes twitter lane templates when rule channel label is Twitter / X', () => {
+  it('excludes deprecated Twitter / X channels from rule_channels materialization', () => {
     const ruleFour = {
       channels: [
         { channel: 'Instagram', priority: 'high', contentStyle: 'visual' },
@@ -588,28 +588,9 @@ describe('GraphMaterializationService', () => {
       { from: 'sum_tw', to: 'merge' },
     ];
     const out = service.materialize(nodes, edges, ruleFour, 2);
-    expect(out.lanes).toContain('twitter');
-    expect(
-      out.nodes.some(
-        (n) =>
-          n.lane === 'twitter' &&
-          n.type === WorkflowNodeType.Adapt &&
-          n.nodeId === 'adapt_tw__twitter',
-      ),
-    ).toBe(true);
-    expect(
-      out.nodes.some(
-        (n) =>
-          n.lane === 'twitter' &&
-          n.type === WorkflowNodeType.Summarization &&
-          n.nodeId === 'sum_tw__twitter',
-      ),
-    ).toBe(true);
-    expect(
-      out.edges.some(
-        (e) => e.from === 'adapt_tw__twitter' && e.to === 'sum_tw__twitter',
-      ),
-    ).toBe(true);
+    expect(out.lanes).not.toContain('twitter');
+    expect(out.nodes.every((n) => n.lane !== 'twitter')).toBe(true);
+    expect(out.nodes.some((n) => n.nodeId.includes('twitter'))).toBe(false);
   });
 
   it('mergeWorkflowLaneIntoConfig adds laneId when missing', () => {

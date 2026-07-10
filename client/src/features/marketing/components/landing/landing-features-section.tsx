@@ -17,7 +17,8 @@ export function LandingFeaturesSection() {
 
   return (
     <motion.section
-      className="bg-background/78 py-20 backdrop-blur-[2px] sm:py-24"
+      id="features"
+      className="scroll-mt-20 bg-background/78 py-20 backdrop-blur-[2px] sm:py-24"
       variants={landingStaggerContainer}
       initial={reduceMotion ? false : "hidden"}
       whileInView={reduceMotion ? undefined : "show"}
@@ -68,7 +69,7 @@ export function LandingFeaturesSection() {
           variants={landingRevealUp}
         >
           <Link
-            to="/home"
+            to={{ pathname: "/", hash: "features" }}
             className="font-medium text-teal-600 underline-offset-4 hover:underline dark:text-teal-400"
           >
             {t("landing.features.link")}

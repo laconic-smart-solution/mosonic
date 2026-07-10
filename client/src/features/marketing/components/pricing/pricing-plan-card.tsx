@@ -96,7 +96,7 @@ export function PricingPlanCard({ plan, featured = false }: PricingPlanCardProps
       </div>
 
       <Link
-        to={isEnterprise ? "/about" : "/signup"}
+        to={isEnterprise ? "/#about" : "/signup"}
         className={cn(
           buttonVariants({ variant: featured ? "default" : "outline", size: "lg" }),
           "mt-8 w-full",

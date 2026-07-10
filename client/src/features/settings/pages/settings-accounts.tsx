@@ -18,6 +18,14 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits, parseApiError } from "@/shared/lib/api-error"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { usageQueryKeys } from "@/shared/queries/usage.query"
+import { RedNoteQrConnectDialog } from "@/features/settings/components/rednote-qr-connect-dialog"
+import {
+  useRedNoteAccountQuery,
+  useRedNoteConnectMutation,
+  useRedNoteDisconnectMutation,
+  useRedNoteUnlockMutation,
+  rednoteQueryKeys,
+} from "@/shared/queries/rednote.query"
 import {
   useDisconnectZernioAccountMutation,
   useSyncZernioAccountsMutation,
@@ -43,10 +51,16 @@ export default function SettingsAccountsPage() {
   const connectMutation = useZernioConnectMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
+  const rednoteAccountQuery = useRedNoteAccountQuery()
+  const rednoteUnlockMutation = useRedNoteUnlockMutation()
+  const rednoteConnectMutation = useRedNoteConnectMutation()
+  const rednoteDisconnectMutation = useRedNoteDisconnectMutation()
   const handledOAuthRef = useRef(false)
   const initialSyncRef = useRef(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingPlatform, setPendingPlatform] = useState<string | null>(null)
+  const [rednoteQrOpen, setRednoteQrOpen] = useState(false)
+  const [rednoteSocketRoom, setRednoteSocketRoom] = useState<string | null>(null)
 
   const creditsEach = connectionCreditQuery.data?.creditsEach ?? 0
   const creditsRemaining = connectionCreditQuery.data?.creditsRemaining ?? 0
@@ -107,6 +121,24 @@ export default function SettingsAccountsPage() {
 
   function confirmUnlock() {
     if (!pendingPlatform) return
+    if (pendingPlatform === "rednote") {
+      rednoteUnlockMutation.mutate(undefined, {
+        onSuccess: () => {
+          setConfirmOpen(false)
+          setPendingPlatform(null)
+          toast.success(t("oauth.unlockedToast"))
+        },
+        onError: (err) => {
+          if (isInsufficientCredits(err)) {
+            toastApiError(err, "settings:unlockConfirm.insufficientTitle")
+            void connectionCreditQuery.refetch()
+            return
+          }
+          toastApiError(err, "settings:oauth.unlockFailed")
+        },
+      })
+      return
+    }
     unlockMutation.mutate(pendingPlatform, {
       onSuccess: () => {
         setConfirmOpen(false)
@@ -125,6 +157,23 @@ export default function SettingsAccountsPage() {
   }
 
   function connect(platform: string) {
+    if (platform === "rednote") {
+      rednoteConnectMutation.mutate(undefined, {
+        onSuccess: ({ socketRoom }) => {
+          setRednoteSocketRoom(socketRoom)
+          setRednoteQrOpen(true)
+        },
+        onError: (err) => {
+          if (parseApiError(err).status === 403) {
+            toast.error(t("oauth.unlockRequired"))
+            void accountsQuery.refetch()
+            return
+          }
+          toastApiError(err, "settings:oauth.connectUrlFailed")
+        },
+      })
+      return
+    }
     connectMutation.mutate(platform, {
       onSuccess: ({ connectUrl }) => {
         window.location.href = connectUrl
@@ -141,11 +190,49 @@ export default function SettingsAccountsPage() {
   }
 
   function disconnect(channel: string) {
+    if (channel === "rednote") {
+      rednoteDisconnectMutation.mutate(undefined, {
+        onSuccess: () => toast.success(t("oauth.disconnected")),
+      })
+      return
+    }
     disconnectMutation.mutate(channel, {
       onSuccess: () => toast.success(t("oauth.disconnected")),
       onError: (err) => toastApiError(err, "settings:oauth.disconnectFailed"),
     })
   }
+
+  const mergedAccounts = (() => {
+    const base = accountsQuery.data?.accounts ?? []
+    const rn = rednoteAccountQuery.data
+    if (!rn?.connected && !rn?.needsReauth) return base
+    if (base.some((a) => a.channel.toLowerCase() === "rednote")) return base
+    return [
+      ...base,
+      {
+        userId: user?.userId ?? "",
+        channel: "rednote",
+        accountId: rn.handle ?? "rednote",
+        connectedAt: rn.lastVerifiedAt ?? new Date().toISOString(),
+      },
+    ]
+  })()
+
+  const unlockedWithRednote = (() => {
+    const base = accountsQuery.data?.unlockedChannels ?? []
+    if (
+      rednoteAccountQuery.data?.connected ||
+      rednoteAccountQuery.data?.needsReauth ||
+      base.includes("rednote")
+    ) {
+      return Array.from(new Set([...base, "rednote"]))
+    }
+    return base
+  })()
+
+  const needsReauthChannels = rednoteAccountQuery.data?.needsReauth
+    ? ["rednote"]
+    : []
 
   return (
     <PageShell>
@@ -196,15 +283,23 @@ export default function SettingsAccountsPage() {
               </div>
 
               <AccountChannelsSection
-                accounts={accountsQuery.data?.accounts}
-                unlockedChannels={accountsQuery.data?.unlockedChannels}
+                accounts={mergedAccounts}
+                unlockedChannels={unlockedWithRednote}
+                needsReauthChannels={needsReauthChannels}
                 loading={accountsQuery.isLoading}
                 onUnlock={requestUnlock}
                 onConnect={connect}
                 onDisconnect={disconnect}
-                unlockPending={unlockMutation.isPending}
-                connectPending={connectMutation.isPending}
-                disconnectPending={disconnectMutation.isPending}
+                unlockPending={
+                  unlockMutation.isPending || rednoteUnlockMutation.isPending
+                }
+                connectPending={
+                  connectMutation.isPending || rednoteConnectMutation.isPending
+                }
+                disconnectPending={
+                  disconnectMutation.isPending ||
+                  rednoteDisconnectMutation.isPending
+                }
                 creditsEach={creditsEach}
                 hideHeader
               />
@@ -224,7 +319,30 @@ export default function SettingsAccountsPage() {
         creditsRemaining={creditsRemaining}
         loading={connectionCreditQuery.isLoading}
         onConfirm={confirmUnlock}
-        isUnlocking={unlockMutation.isPending}
+        isUnlocking={
+          unlockMutation.isPending || rednoteUnlockMutation.isPending
+        }
+      />
+
+      <RedNoteQrConnectDialog
+        open={rednoteQrOpen}
+        onOpenChange={(open) => {
+          setRednoteQrOpen(open)
+          if (!open) setRednoteSocketRoom(null)
+        }}
+        socketRoom={rednoteSocketRoom}
+        onSuccess={() => {
+          toast.success(t("rednote.loginSuccess"))
+          void queryClient.invalidateQueries({
+            queryKey: rednoteQueryKeys.account,
+          })
+          void queryClient.invalidateQueries({
+            queryKey: zernioQueryKeys.accounts,
+          })
+        }}
+        onFailed={(reason) => {
+          toast.error(t("rednote.loginFailed", { reason }))
+        }}
       />
     </PageShell>
   )

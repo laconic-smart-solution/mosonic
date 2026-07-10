@@ -53,10 +53,6 @@
       "label": "Facebook",
       "description": "用于 Meta 发布的页面和个人资料。"
     },
-    "twitter": {
-      "label": "Twitter",
-      "description": "通过 X 发布短文。"
-    },
     "instagram": {
       "label": "Instagram",
       "description": "动态、Reels 和视觉故事。"
@@ -72,7 +68,24 @@
     "tiktok": {
       "label": "TikTok",
       "description": "竖屏视频和 TikTok 原生格式。"
+    },
+    "rednote": {
+      "label": "小红书",
+      "description": "通过扫码登录连接小红书笔记账号。"
     }
+  },
+  "rednote": {
+    "connectTitle": "连接小红书",
+    "connectDesc": "使用小红书 App 或微信扫描二维码以关联账号。",
+    "waitingQr": "正在获取二维码…",
+    "scanPrompt": "用小红书或微信扫码",
+    "socketError": "无法连接登录推送，请确认已登录后重试。",
+    "loginSuccess": "小红书已连接。",
+    "loginFailed": "小红书登录失败：{{reason}}",
+    "needsReauth": "会话已过期 — 请重新连接",
+    "healthCheck": "验证会话",
+    "healthOk": "会话有效。",
+    "healthFailed": "需要重新验证。"
   },
   "unlockConfirm": {
     "title": "解锁 {{channel}}",

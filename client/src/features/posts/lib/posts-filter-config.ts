@@ -5,7 +5,6 @@ export const VALID_CHANNELS = [
   "instagram",
   "facebook",
   "linkedin",
-  "twitter",
   "youtube",
   "tiktok",
 ] as const

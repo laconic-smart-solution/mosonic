@@ -35,6 +35,7 @@
     "emptyDefault": "Run a workflow to generate content, or relax the status filter.",
     "campaign": "Campaign",
     "channels": "{{count}} channels",
+    "variant": "Variant {{id}}",
     "outputs": "Outputs",
     "workflow": "Workflow",
     "pipeline": "Pipeline",
@@ -140,7 +141,11 @@
     "nodeDone": "done",
     "nodePending": "pending",
     "generated": "Generated",
-    "rerun": "Re-run"
+    "rerun": "Re-run",
+    "running": "Running",
+    "noOutputYet": "No output yet.",
+    "seeMore": "See more",
+    "seeLess": "See less"
   },
   "header": {
     "updated": "Updated {{date}}"

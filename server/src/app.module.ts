@@ -32,6 +32,7 @@ import { CampaignModule } from './campaign/campaign.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NewsTriggerModule } from './news-trigger/news-trigger.module';
+import { RedNoteModule } from './rednote/rednote.module';
 import {
   buildRedisConnectionOptions,
   redisEnvFromConfig,
@@ -66,6 +67,7 @@ import {
     IntegrationsModule,
     DashboardModule,
     McpModule,
+    RedNoteModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

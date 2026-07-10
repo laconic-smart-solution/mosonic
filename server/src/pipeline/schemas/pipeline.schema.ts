@@ -1,5 +1,6 @@
 import {
-  PipelineExecutionMode as PrismaPipelineExecutionMode,
+  PipelineDispatchMode as PrismaPipelineDispatchMode,
+  PipelineUserExecutionMode as PrismaPipelineUserExecutionMode,
   PipelineNodeExecutionStatus as PrismaPipelineNodeExecutionStatus,
   PipelineStatus as PrismaPipelineStatus,
 } from '@prisma/client';
@@ -24,19 +25,36 @@ export const PipelineNodeExecutionStatus = {
   Completed: PrismaPipelineNodeExecutionStatus.completed,
   Failed: PrismaPipelineNodeExecutionStatus.failed,
   Skipped: PrismaPipelineNodeExecutionStatus.skipped,
+  WaitingReview: PrismaPipelineNodeExecutionStatus.waiting_review,
 } as const;
 
 export type PipelineNodeExecutionStatus =
   (typeof PipelineNodeExecutionStatus)[keyof typeof PipelineNodeExecutionStatus];
 
-export const PipelineExecutionMode = {
-  ...PrismaPipelineExecutionMode,
-  Inline: PrismaPipelineExecutionMode.inline,
-  Queue: PrismaPipelineExecutionMode.queue,
+/** Infrastructure: inline vs queue worker dispatch */
+export const PipelineDispatchMode = {
+  ...PrismaPipelineDispatchMode,
+  Inline: PrismaPipelineDispatchMode.inline,
+  Queue: PrismaPipelineDispatchMode.queue,
 } as const;
 
-export type PipelineExecutionMode =
-  (typeof PipelineExecutionMode)[keyof typeof PipelineExecutionMode];
+export type PipelineDispatchMode =
+  (typeof PipelineDispatchMode)[keyof typeof PipelineDispatchMode];
+
+/** User review policy: auto vs step */
+export const PipelineUserExecutionMode = {
+  ...PrismaPipelineUserExecutionMode,
+  Auto: PrismaPipelineUserExecutionMode.auto,
+  Step: PrismaPipelineUserExecutionMode.step,
+} as const;
+
+export type PipelineUserExecutionMode =
+  (typeof PipelineUserExecutionMode)[keyof typeof PipelineUserExecutionMode];
+
+/** @deprecated Use PipelineDispatchMode */
+export const PipelineExecutionMode = PipelineDispatchMode;
+/** @deprecated Use PipelineDispatchMode */
+export type PipelineExecutionMode = PipelineDispatchMode;
 
 export interface PipelineNodeExecution {
   nodeId: string;
@@ -49,6 +67,8 @@ export interface PipelineNodeExecution {
   input: string;
   output: string | null;
   retryCount: number;
+  reviewRegenerateCount?: number;
+  reviewRegeneratePrompt?: string | null;
   executedAt: Date | null;
   lane: string | null;
   variantId: string | null;
@@ -84,6 +104,8 @@ export interface PipelineMetadata {
   scheduleId?: string;
   experimentId?: string;
   newsMeta: PipelineNewsMeta | null;
+  /** Workflow template node IDs selected for step-mode review. */
+  reviewNodeIds?: string[];
 }
 
 export interface PipelineCreditChargeEntry {
@@ -105,7 +127,8 @@ export interface Pipeline {
   completedAt: Date | null;
   pausedNodeId: string | null;
   pausedLaneId: string | null;
-  executionMode: PipelineExecutionMode;
+  dispatchMode: PipelineDispatchMode;
+  executionMode: PipelineUserExecutionMode;
   graph: PipelineGraphSnapshot;
   ruleOverlay: PipelineRuleOverlay | null;
   metadata: PipelineMetadata;

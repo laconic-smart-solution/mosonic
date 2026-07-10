@@ -43,6 +43,7 @@ export type ContentPageItem = {
   workflowRef: string
   ruleRef: string
   status: ContentStatus
+  variantId?: string | null
   createdAt: string
   updatedAt: string
   /** Merged userEdits over outputs (matches content detail). */

@@ -32,7 +32,8 @@
     "loading": "กำลังโหลดแพ็กเกจ…",
     "awaitingPayment": "กรุณาชำระเงินในหน้าต่าง Payni",
     "paymentWindowHint": "ชำระเงินในแท็บ Payni ที่เราเปิดให้ รองรับ PayNow และโอนเงินผ่านธนาคาร",
-    "balanceUpdatesAutomatically": "ยอดเครดิตจะอัปเดตอัตโนมัติเมื่อชำระเงินสำเร็จ"
+    "balanceUpdatesAutomatically": "ยอดเครดิตจะอัปเดตอัตโนมัติเมื่อชำระเงินสำเร็จ",
+    "packageAriaLabel": "{{label}}, {{credits}} เครดิต, ฿{{price}}"
   },
   "nodeType": {
     "keyword_planner": "วางแผนคีย์เวิร์ด",

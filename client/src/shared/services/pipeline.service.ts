@@ -6,6 +6,9 @@ import type {
   PipelinePageQueryPayload,
   PipelinePageResponse,
   PipelineStatsResponse,
+  NodeReviewPayload,
+  NodeReviewResponse,
+  ReviewRegenerateEstimateResponse,
   RetryNodePayload,
   RetryNodeResponse,
   SkipNodePayload,
@@ -47,6 +50,28 @@ export const pipelineService = {
     return response.data
   },
 
+  reviewNode: async (
+    pipelineId: string,
+    nodeId: string,
+    payload: NodeReviewPayload,
+  ): Promise<NodeReviewResponse> => {
+    const response = await apiClient.post(
+      `/pipeline/${pipelineId}/nodes/${nodeId}/review`,
+      payload,
+    )
+    return response.data
+  },
+
+  estimateReviewRegenerate: async (
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<ReviewRegenerateEstimateResponse> => {
+    const response = await apiClient.get(
+      `/pipeline/${pipelineId}/nodes/${nodeId}/review/estimate`,
+    )
+    return response.data
+  },
+
   getById: async (pipelineId: string): Promise<GetPipelineResponse> => {
     const response = await apiClient.get(`/pipeline/${pipelineId}`)
     return response.data
@@ -84,29 +109,6 @@ export const pipelineService = {
     payload: UpdatePipelineNamePayload,
   ): Promise<UpdatePipelineNameResponse> => {
     const response = await apiClient.patch(`/pipeline/${pipelineId}`, payload)
-    return response.data
-  },
-
-  replan: async (
-    pipelineId: string,
-    operations: Array<
-      | { op: "skip_node"; nodeId: string }
-      | { op: "retry_node"; nodeId: string }
-      | { op: "remove_pending_node"; nodeId: string }
-      | {
-          op: "insert_node"
-          afterNodeId: string
-          spec: {
-            type: string
-            lane?: string | null
-            config?: Record<string, unknown>
-          }
-        }
-    >,
-  ): Promise<{ success: boolean; nodeCount: number }> => {
-    const response = await apiClient.post(`/pipeline/${pipelineId}/replan`, {
-      operations,
-    })
     return response.data
   },
 }

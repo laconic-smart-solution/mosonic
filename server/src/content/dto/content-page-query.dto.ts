@@ -104,6 +104,7 @@ export class ContentPageItemDto {
   workflowRef!: string;
   ruleRef!: string;
   status!: ContentStatus;
+  variantId?: string | null;
   updatedAt!: string;
   createdAt!: string;
   /** Merged userEdits over outputs (same as content detail). */

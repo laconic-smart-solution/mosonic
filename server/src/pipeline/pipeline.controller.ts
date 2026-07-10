@@ -19,6 +19,7 @@ import {
   PipelinePageQueryDto,
   PipelinePageResponseDto,
 } from './dto/pipeline-page-query.dto';
+import { NodeReviewDto } from './dto/node-review.dto';
 import { EstimatePipelineDto } from './dto/estimate-pipeline.dto';
 import { ReplanPipelineDto } from './dto/replan-pipeline.dto';
 import { PipelineStatsQueryDto } from './dto/pipeline-stats-query.dto';
@@ -98,6 +99,8 @@ export class PipelineController {
       ruleId: dto.ruleId,
       contentPrompt: dto.contentPrompt,
       useLearnings: dto.useLearnings,
+      executionMode: dto.executionMode,
+      reviewNodeIds: dto.reviewNodeIds,
       auth,
     });
   }
@@ -181,6 +184,38 @@ export class PipelineController {
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.tryFinalizePipeline(pipelineId, auth);
+  }
+
+  @Get(':id/nodes/:nodeId/review/estimate')
+  estimateReviewRegenerate(
+    @Req() req: Request,
+    @Param('id') pipelineId: string,
+    @Param('nodeId') nodeId: string,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.estimateReviewRegenerate(
+      pipelineId,
+      nodeId,
+      auth,
+    );
+  }
+
+  @Post(':id/nodes/:nodeId/review')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  reviewNode(
+    @Req() req: Request,
+    @Param('id') pipelineId: string,
+    @Param('nodeId') nodeId: string,
+    @Body() dto: NodeReviewDto,
+  ): Promise<{ success: boolean; noop?: boolean }> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.pipelineService.reviewNode(pipelineId, nodeId, dto, auth);
   }
 
   @Get(':id')

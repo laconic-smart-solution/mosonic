@@ -9,10 +9,20 @@ import {
   landingRevealUp,
   landingStaggerContainer,
 } from "@/features/marketing/lib/landing-motion"
+import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { useAuthStore } from "@/shared/stores/auth.store"
 
 export function LandingHeroSection() {
   const { t } = useTranslation(["marketing", "common"])
   const reduceMotion = useReducedMotion()
+  const hydrated = useAuthStoreHydrated()
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const isLoggedIn = hydrated && Boolean(accessToken)
+
+  const ctaTo = isLoggedIn ? "/home" : "/signup"
+  const ctaLabel = isLoggedIn
+    ? t("marketing:landing.hero.ctaGoToWorkspace")
+    : t("marketing:landing.hero.ctaStartFree")
 
   return (
     <section className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-transparent">
@@ -53,20 +63,14 @@ export function LandingHeroSection() {
         </div>
 
         <motion.div
-          className="mt-10 flex flex-wrap items-center justify-center gap-3 sm:mt-12 sm:gap-4"
+          className="mt-10 flex justify-center sm:mt-12"
           variants={landingRevealUp}
         >
           <Link
-            to="/pricing"
+            to={ctaTo}
             className={cn(buttonVariants({ size: "lg" }), "shadow-sm")}
           >
-            {t("marketing:landing.hero.ctaPrimary")}
-          </Link>
-          <Link
-            to="/home"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-          >
-            {t("marketing:landing.hero.ctaSecondary")}
+            {ctaLabel}
           </Link>
         </motion.div>
       </motion.div>

@@ -17,7 +17,31 @@ import type {
   ContentUserEdits,
 } from '../../domain/content/content.types';
 import type { IContentRepository } from '../interfaces/content.repository.interface';
+import {
+  collectMediaFilterFields,
+  contentPageItemMatchesMediaFilters,
+} from '../../content/content-page-media-filter.util';
 import { mergeTenancyWhere } from './prisma.util';
+import {
+  dedupeContentIndexRows,
+  sortContentIndexRows,
+} from './content-page-dedupe.util';
+
+const PAGE_DOC_SELECT = {
+  contentId: true,
+  pipelineRef: true,
+  workflowRef: true,
+  ruleRef: true,
+  status: true,
+  variantId: true,
+  createdAt: true,
+  updatedAt: true,
+  outputs: true,
+  userEdits: true,
+  nodeOutputs: true,
+  nodeUserEdits: true,
+  laneOutputs: true,
+} as const;
 
 type PageDocLean = {
   contentId: string;
@@ -25,6 +49,7 @@ type PageDocLean = {
   workflowRef: string;
   ruleRef: string;
   status: ContentStatus;
+  variantId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   outputs: unknown;
@@ -68,6 +93,19 @@ export class PrismaContentRepository implements IContentRepository {
     });
   }
 
+  findByPipelineAndVariant(
+    pipelineRef: string,
+    variantId: string | null,
+  ): Promise<ContentRecord | null> {
+    return this.prisma.content.findFirst({
+      where: {
+        pipelineRef,
+        variantId: variantId ?? null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   create(data: Prisma.ContentCreateInput): Promise<ContentRecord> {
     return this.prisma.content.create({ data });
   }
@@ -88,17 +126,9 @@ export class PrismaContentRepository implements IContentRepository {
     if (query.filter?.pipelineRef) where.pipelineRef = query.filter.pipelineRef;
     if (query.filter?.status) where.status = query.filter.status;
 
-    const andClauses: Prisma.ContentWhereInput[] = [];
-    if (query.filter?.hasImage === true) {
-      andClauses.push(mediaFieldOrClause('image'));
-    }
-    if (query.filter?.hasVideo === true) {
-      andClauses.push(mediaFieldOrClause('video'));
-    }
-    if (query.filter?.hasSummary === true) {
-      andClauses.push(mediaFieldOrClause('summary'));
-    }
+    const mediaFilterFields = collectMediaFilterFields(query.filter);
 
+    const andClauses: Prisma.ContentWhereInput[] = [];
     const searchTrim = query.search?.trim();
     if (searchTrim) {
       andClauses.push({
@@ -114,33 +144,60 @@ export class PrismaContentRepository implements IContentRepository {
       where.AND = andClauses;
     }
 
-    const orderBy = { [sortBy]: sortOrder } as Prisma.ContentOrderByWithRelationInput;
+    const sortByField = sortBy === 'createdAt' ? 'createdAt' : 'updatedAt';
 
-    const [docs, total] = await Promise.all([
-      this.prisma.content.findMany({
-        where,
-        orderBy,
+    const indexRows = await this.prisma.content.findMany({
+      where,
+      select: {
+        contentId: true,
+        pipelineRef: true,
+        variantId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const deduped = sortContentIndexRows(
+      dedupeContentIndexRows(
+        indexRows.map((row) => ({
+          contentId: row.contentId,
+          pipelineRef: row.pipelineRef,
+          variantId: row.variantId ?? null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        })),
+      ),
+      sortByField,
+      sortOrder,
+    );
+
+    if (deduped.length === 0) {
+      return { data: [], total: 0 };
+    }
+
+    if (mediaFilterFields.length > 0) {
+      return this.findPageWithMediaFilters(
+        deduped,
+        mediaFilterFields,
         skip,
-        take: limit,
-        select: {
-          contentId: true,
-          pipelineRef: true,
-          workflowRef: true,
-          ruleRef: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-          outputs: true,
-          userEdits: true,
-          nodeOutputs: true,
-          nodeUserEdits: true,
-          laneOutputs: true,
-        },
-      }),
-      this.prisma.content.count({ where }),
-    ]);
+        limit,
+        auth,
+      );
+    }
 
-    const pageDocs = docs as PageDocLean[];
+    const pageSlice = deduped.slice(skip, skip + limit);
+    const pageIds = pageSlice.map((row) => row.contentId);
+
+    const docs = await this.prisma.content.findMany({
+      where: { contentId: { in: pageIds } },
+      select: PAGE_DOC_SELECT,
+    });
+
+    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const pageDocs = pageIds
+      .map((id) => docById.get(id))
+      .filter((doc): doc is PageDocLean => doc != null);
+
     const pipelineRefs = [
       ...new Set(pageDocs.map((d) => d.pipelineRef).filter(Boolean)),
     ];
@@ -148,7 +205,46 @@ export class PrismaContentRepository implements IContentRepository {
 
     return {
       data: pageDocs.map((doc) => this.toPageItem(doc, pipelineById)),
-      total,
+      total: deduped.length,
+    };
+  }
+
+  private async findPageWithMediaFilters(
+    deduped: Array<{
+      contentId: string;
+      pipelineRef: string;
+    }>,
+    mediaFilterFields: ReturnType<typeof collectMediaFilterFields>,
+    skip: number,
+    limit: number,
+    auth: TenancyAuth,
+  ): Promise<{ data: ContentPageItemDto[]; total: number }> {
+    const allIds = deduped.map((row) => row.contentId);
+
+    const docs = await this.prisma.content.findMany({
+      where: { contentId: { in: allIds } },
+      select: PAGE_DOC_SELECT,
+    });
+
+    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const pipelineRefs = [
+      ...new Set(docs.map((d) => d.pipelineRef).filter(Boolean)),
+    ];
+    const pipelineById = await this.loadPipelineNodes(pipelineRefs, auth);
+
+    const matchingItems: ContentPageItemDto[] = [];
+    for (const row of deduped) {
+      const doc = docById.get(row.contentId);
+      if (!doc) continue;
+      const item = this.toPageItem(doc, pipelineById);
+      if (contentPageItemMatchesMediaFilters(item, mediaFilterFields)) {
+        matchingItems.push(item);
+      }
+    }
+
+    return {
+      data: matchingItems.slice(skip, skip + limit),
+      total: matchingItems.length,
     };
   }
 
@@ -243,6 +339,7 @@ export class PrismaContentRepository implements IContentRepository {
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
       status: doc.status as SchemaContentStatus,
+      variantId: doc.variantId ?? null,
       createdAt: doc.createdAt.toISOString(),
       updatedAt: doc.updatedAt.toISOString(),
       outputs,
@@ -255,18 +352,33 @@ export class PrismaContentRepository implements IContentRepository {
     byStatus: Partial<Record<ContentStatus, number>>;
   }> {
     const where = mergeTenancyWhere({}, auth);
-    const rows = await this.prisma.content.groupBy({
-      by: ['status'],
+    const indexRows = await this.prisma.content.findMany({
       where,
-      _count: { _all: true },
+      select: {
+        contentId: true,
+        pipelineRef: true,
+        variantId: true,
+        createdAt: true,
+        updatedAt: true,
+        status: true,
+      },
     });
+    const deduped = dedupeContentIndexRows(
+      indexRows.map((row) => ({
+        contentId: row.contentId,
+        pipelineRef: row.pipelineRef,
+        variantId: row.variantId ?? null,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        status: row.status,
+      })),
+    );
     const byStatus: Partial<Record<ContentStatus, number>> = {};
-    let total = 0;
-    for (const row of rows) {
-      total += row._count._all;
-      byStatus[row.status] = row._count._all;
+    for (const row of deduped) {
+      if (!row.status) continue;
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
     }
-    return { total, byStatus };
+    return { total: deduped.length, byStatus };
   }
 
   async updateEditableState(
@@ -336,37 +448,4 @@ export class PrismaContentRepository implements IContentRepository {
     ]);
     return { rows, total };
   }
-}
-
-function mediaFieldOrClause(
-  field: 'image' | 'video' | 'summary',
-): Prisma.ContentWhereInput {
-  const nonEmpty = (path: string[]): Prisma.ContentWhereInput => ({
-    OR: [
-      {
-        outputs: {
-          path,
-          not: Prisma.DbNull,
-        },
-      },
-    ],
-  });
-  return {
-    OR: [
-      {
-        outputs: {
-          path: [field],
-          string_contains: ' ',
-        },
-      },
-      {
-        userEdits: {
-          path: [field],
-          string_contains: ' ',
-        },
-      },
-      nonEmpty(['outputs', field]),
-      nonEmpty(['userEdits', field]),
-    ],
-  };
 }

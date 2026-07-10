@@ -10,10 +10,17 @@ export const DISTRIBUTION_CHANNELS: DistributionChannel[] = [
   { id: 'instagram', label: 'Instagram' },
   { id: 'facebook', label: 'Facebook' },
   { id: 'linkedin', label: 'LinkedIn' },
-  { id: 'twitter', label: 'Twitter / X' },
   { id: 'youtube', label: 'YouTube' },
   { id: 'tiktok', label: 'TikTok' },
+  { id: 'rednote', label: 'RedNote' },
 ];
+
+/** Retired platforms — excluded from pickers and publishing. */
+export const DEPRECATED_CHANNEL_IDS = new Set(['twitter', 'x']);
+
+export function isDeprecatedChannelId(channel: string): boolean {
+  return DEPRECATED_CHANNEL_IDS.has(normalizeChannelId(channel));
+}
 
 const LABEL_BY_ID = new Map(
   DISTRIBUTION_CHANNELS.map((c) => [c.id, c.label] as const),
@@ -34,7 +41,7 @@ export function resolveDistributionChannelId(channel: string): string {
   if (LABEL_BY_ID.has(raw)) return raw;
   const fromLabel = ID_BY_LABEL.get(raw);
   if (fromLabel) return fromLabel;
-  if (raw.includes('twitter') || raw === 'x') return 'twitter';
+  if (isDeprecatedChannelId(raw) || raw.includes('twitter')) return '';
   return raw;
 }
 

@@ -22,6 +22,7 @@ import {
 import { ZernioMcpClient } from './zernio/zernio.mcp';
 import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
+import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
 
 @Injectable()
 export class McpService {
@@ -52,6 +53,10 @@ export class McpService {
     platform: string,
     userId: string,
   ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
+    const channel = platform.trim().toLowerCase();
+    if (isDeprecatedChannelId(channel)) {
+      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+    }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
       throw new BadRequestException(
@@ -64,7 +69,6 @@ export class McpService {
         SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       )) ?? 0;
     const config = await this.creditCalculation.getConfig();
-    const channel = platform.trim().toLowerCase();
     const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
       userId,
       channel,
@@ -80,6 +84,10 @@ export class McpService {
     platform: string,
     userId: string,
   ): Promise<{ connectUrl: string }> {
+    const channel = platform.trim().toLowerCase();
+    if (isDeprecatedChannelId(channel)) {
+      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+    }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
       throw new BadRequestException(
@@ -187,9 +195,12 @@ export class McpService {
     accounts: ConnectedAccountRecord[];
     unlockedChannels: string[];
   }> {
-    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    const unlockedChannels =
-      await this.creditService.listUnlockedSocialChannels(userId);
+    const accounts = (
+      await this.usersService.getAllActiveConnectedAccounts(userId)
+    ).filter((a) => !isDeprecatedChannelId(a.channel));
+    const unlockedChannels = (
+      await this.creditService.listUnlockedSocialChannels(userId)
+    ).filter((ch) => !isDeprecatedChannelId(ch));
     this.logger.log(
       `getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`,
     );
@@ -228,7 +239,6 @@ export class McpService {
     );
   }
 
-  /** Resolve stored row when UI uses `twitter` vs Zernio storing `x` (or vice versa). */
   private isChannelConnected(
     accounts: ConnectedAccountRecord[],
     platform: string,
@@ -241,11 +251,8 @@ export class McpService {
     requestChannel: string,
   ): ConnectedAccountRecord | undefined {
     const key = requestChannel.trim().toLowerCase();
-    const keys =
-      key === 'twitter' || key === 'x'
-        ? new Set<string>(['twitter', 'x'])
-        : new Set<string>([key]);
-    return accounts.find((a) => keys.has(a.channel));
+    if (isDeprecatedChannelId(key)) return undefined;
+    return accounts.find((a) => a.channel === key);
   }
 
   async publishCreatePostBatch(

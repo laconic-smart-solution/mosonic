@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   MessageCircleQuestion,
   Plug,
+  ShoppingBag,
   Users,
   Workflow,
 } from "lucide-react"
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils"
 import { AdminFaqChatbot } from "@/features/admin/components/admin-faq-chatbot"
 
 const NAV_ITEMS: {
-  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "usage" | "apiUsage" | "content" | "faq"
+  key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "topupPlans" | "usage" | "apiUsage" | "content" | "faq"
   href: string
   icon: LucideIcon
 }[] = [
@@ -30,6 +31,7 @@ const NAV_ITEMS: {
   { key: "credit", href: "/admin/credit", icon: Gauge },
   { key: "nodeCredits", href: "/admin/node-credits", icon: Workflow },
   { key: "plans", href: "/admin/plans", icon: CreditCard },
+  { key: "topupPlans", href: "/admin/topup-plans", icon: ShoppingBag },
   { key: "usage", href: "/admin/usage", icon: History },
   { key: "cost", href: "/admin/cost", icon: Coins },
   { key: "apiUsage", href: "/admin/api-usage", icon: Plug },

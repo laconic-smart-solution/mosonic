@@ -100,7 +100,7 @@ export const STATUS_COLOR: Record<RuleStatus, ChipColor> = {
   failed: "gray",
 }
 
-export const CHANNELS_ALL = ["facebook", "instagram", "x", "line", "linkedin", "youtube"] as const
+export const CHANNELS_ALL = ["facebook", "instagram", "line", "linkedin", "youtube"] as const
 
 export const RULE_DISTRIBUTION_CHANNEL_IDS = DISTRIBUTION_CHANNELS.map((c) => c.id)
 

@@ -25,6 +25,11 @@ export class PayniService {
     );
   }
 
+  /** Alias — Payni is used for both credit topups and plan checkout. */
+  isPayniEnabled(): boolean {
+    return this.isTopupEnabled();
+  }
+
   getCurrencyCode(): string {
     return this.config.get<string>('PAYNI_CURRENCY_CODE', 'THB').trim() || 'THB';
   }

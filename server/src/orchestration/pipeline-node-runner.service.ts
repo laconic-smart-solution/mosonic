@@ -11,6 +11,7 @@ import type { WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
 import type { NodeExecutorInput } from '../nodes/types/node-execution.types';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
+import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
 import {
   PipelineNodeExecutionStatus,
   PipelineStatus,
@@ -20,6 +21,7 @@ import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
 import { NodeExecutor } from './node-executor.service';
 import { isSharedTrunkFailure } from './lane-pause.util';
+import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
 
@@ -34,6 +36,7 @@ export class PipelineNodeRunnerService {
     private readonly pipelineRepo: IPipelineRepository,
     private readonly nodeExecutor: NodeExecutor,
     private readonly resolver: DependencyResolverService,
+    private readonly completion: PipelineNodeCompletionService,
     private readonly events: EventsService,
     @Inject(RULE_REPOSITORY)
     private readonly rules: IRuleRepository,
@@ -70,6 +73,28 @@ export class PipelineNodeRunnerService {
       throw new UnrecoverableError(msg);
     }
 
+    const existingOutput = parsePipelineNodeOutputString(node.output);
+    if (
+      !payload.forceRegenerate &&
+      existingOutput &&
+      (node.retryCount ?? 0) > 0
+    ) {
+      this.logger.log(
+        `[pipeline:${pipelineId}] crash-recovery skip AI ${nodeId} — reusing output`,
+      );
+      await this.completion.handleNodeSucceeded({
+        pipelineId,
+        nodeId,
+        nodeType: node.type as WorkflowNodeType,
+        order: payload.order,
+        totalNodes: payload.totalNodes,
+        lane: node.lane,
+        output: existingOutput,
+        ruleRef: payload.ruleId,
+      });
+      return;
+    }
+
     const rule = await this.rules.findById(payload.ruleId);
     if (!rule) {
       throw new UnrecoverableError(`Rule ${payload.ruleId} not found`);
@@ -103,6 +128,12 @@ export class PipelineNodeRunnerService {
       );
     }
 
+    const regenPrompt = node.reviewRegeneratePrompt?.trim();
+    const nodePrompt = node.userPrompt?.trim();
+    const effectiveContentPrompt = [payload.contentPrompt, nodePrompt, regenPrompt]
+      .filter(Boolean)
+      .join('\n\n');
+
     const executorInput: NodeExecutorInput = {
       node: {
         nodeId: node.nodeId,
@@ -113,7 +144,7 @@ export class PipelineNodeRunnerService {
       },
       context: {
         rule: executionRule,
-        contentPrompt: payload.contentPrompt,
+        contentPrompt: effectiveContentPrompt,
         previousOutputs,
       },
       pipelineId: payload.pipelineId,
@@ -122,21 +153,30 @@ export class PipelineNodeRunnerService {
       ruleId: payload.ruleId,
       maxAttempts: 1,
       suppressFailedFinalEmit: true,
+      suppressCompletedEmit: true,
       intelligenceContext,
     };
 
     try {
       const result = await this.nodeExecutor.execute(executorInput);
-      await this.pipelineRepo.updateNodeStatus(
-        payload.pipelineId,
-        payload.nodeId,
-        PipelineNodeExecutionStatus.Completed,
-        result.output,
-      );
+      if (regenPrompt) {
+        await this.pipelineRepo.patchNode(payload.pipelineId, payload.nodeId, {
+          reviewRegeneratePrompt: null,
+        });
+      }
       this.logger.log(
         `[pipeline:${pipelineId}] run completed ${nodeId} type=${nodeType} — scheduling downstream`,
       );
-      await this.resolver.onNodeCompleted(payload.pipelineId, payload.nodeId);
+      await this.completion.handleNodeSucceeded({
+        pipelineId,
+        nodeId,
+        nodeType: node.type as WorkflowNodeType,
+        order: payload.order,
+        totalNodes: payload.totalNodes,
+        lane: node.lane,
+        output: result.output,
+        ruleRef: payload.ruleId,
+      });
     } catch (err) {
       this.logger.error(
         `[pipeline:${pipelineId}] run failed ${nodeId} type=${nodeType}: ` +

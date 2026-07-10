@@ -18,6 +18,7 @@ import {
   extractUsageFromAiMessage,
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
+import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 
 type SummaryFormat = 'paragraph' | 'bullets' | 'tldr';
 
@@ -86,6 +87,8 @@ function buildSystemPrompt(
     'Summarize the provided content clearly and concisely.',
     'Preserve the core message, key points, and brand voice.',
     'Never add information that is not in the original content.',
+    '',
+    formatGenerationTemporalContext(),
     '',
     '=== BRAND CONTEXT ===',
     `Brand name: ${rule.brand.brandName}`,

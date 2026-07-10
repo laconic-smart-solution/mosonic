@@ -42,3 +42,15 @@ export function extractTokensFromAuthResponse(data: unknown): ExtractedTokens {
     refreshToken: typeof refreshToken === "string" ? refreshToken : undefined,
   }
 }
+
+/** SSO login/verify responses include `data.otpVerified` when email must be confirmed. */
+export function extractOtpVerifiedFromAuthResponse(
+  data: unknown,
+): boolean | undefined {
+  const raw =
+    pick(data, ["data", "data", "otpVerified"]) ??
+    pick(data, ["data", "otpVerified"]) ??
+    pick(data, ["otpVerified"])
+  if (typeof raw === "boolean") return raw
+  return undefined
+}

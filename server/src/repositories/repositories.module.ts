@@ -11,6 +11,7 @@ import {
   CREDIT_LEDGER_REPOSITORY,
   CREDIT_TOPUP_PURCHASE_REPOSITORY,
   CREDIT_TOPUP_REPOSITORY,
+  PLAN_PURCHASE_REPOSITORY,
   FIXED_COST_REPOSITORY,
   INTEGRATION_API_KEY_REPOSITORY,
   NEWS_TRIGGER_LOG_REPOSITORY,
@@ -26,6 +27,7 @@ import {
   UPLOAD_REPOSITORY,
   USER_PLAN_REPOSITORY,
   USER_REPOSITORY,
+  SOCIAL_ACCOUNT_REPOSITORY,
   WEBHOOK_DELIVERY_REPOSITORY,
   WEBHOOK_EVENT_REPOSITORY,
   WEBHOOK_SUBSCRIPTION_REPOSITORY,
@@ -42,6 +44,7 @@ import { PrismaCreditConfigRepository } from './prisma/prisma-credit-config.repo
 import { PrismaCreditLedgerRepository } from './prisma/prisma-credit-ledger.repository';
 import { PrismaCreditTopupPurchaseRepository } from './prisma/prisma-credit-topup-purchase.repository';
 import { PrismaCreditTopupRepository } from './prisma/prisma-credit-topup.repository';
+import { PrismaPlanPurchaseRepository } from './prisma/prisma-plan-purchase.repository';
 import { PrismaFixedCostRepository } from './prisma/prisma-fixed-cost.repository';
 import { PrismaIntegrationApiKeyRepository } from './prisma/prisma-integration-api-key.repository';
 import { PrismaNewsTriggerLogRepository } from './prisma/prisma-news-trigger-log.repository';
@@ -57,6 +60,7 @@ import { PrismaSyncLockRepository } from './prisma/prisma-sync-lock.repository';
 import { PrismaUploadRepository } from './prisma/prisma-upload.repository';
 import { PrismaUserPlanRepository } from './prisma/prisma-user-plan.repository';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
+import { PrismaSocialAccountRepository } from './prisma/prisma-social-account.repository';
 import { PrismaWebhookDeliveryRepository } from './prisma/prisma-webhook-delivery.repository';
 import { PrismaWebhookEventRepository } from './prisma/prisma-webhook-event.repository';
 import { PrismaWebhookSubscriptionRepository } from './prisma/prisma-webhook-subscription.repository';
@@ -65,6 +69,10 @@ import { PrismaWorkflowRepository } from './prisma/prisma-workflow.repository';
 
 const repositoryProviders = [
   { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
+  {
+    provide: SOCIAL_ACCOUNT_REPOSITORY,
+    useClass: PrismaSocialAccountRepository,
+  },
   { provide: PLAN_REPOSITORY, useClass: PrismaPlanRepository },
   { provide: USER_PLAN_REPOSITORY, useClass: PrismaUserPlanRepository },
   { provide: CREDIT_CONFIG_REPOSITORY, useClass: PrismaCreditConfigRepository },
@@ -79,6 +87,10 @@ const repositoryProviders = [
   {
     provide: CREDIT_TOPUP_PURCHASE_REPOSITORY,
     useClass: PrismaCreditTopupPurchaseRepository,
+  },
+  {
+    provide: PLAN_PURCHASE_REPOSITORY,
+    useClass: PrismaPlanPurchaseRepository,
   },
   { provide: WORKFLOW_REPOSITORY, useClass: PrismaWorkflowRepository },
   { provide: WORKFLOW_NODE_REPOSITORY, useClass: PrismaWorkflowNodeRepository },

@@ -23,6 +23,11 @@
   },
   "systemMessagesEnglish": "System messages from the server may appear in English.",
   "searchPlaceholder": "Search pages…",
+  "topbar": {
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "theme": "Theme"
+  },
   "search": {
     "ariaLabel": "Search pages and routes",
     "placeholder": "Search pages and routes…",
@@ -91,13 +96,10 @@
     "dashboard": "Dashboard",
     "rules": "Rules",
     "workflow": "Workflows",
-    "liveRun": "Live Run",
     "content": "Content",
     "upload": "Upload",
     "posts": "Posts",
     "analytics": "Analytics",
-    "logs": "Logs",
-    "components": "Components",
     "pipelines": "Pipelines",
     "cost": "Costs",
     "usage": "Usage",
@@ -159,6 +161,26 @@
     "validation": "Please check your input and try again.",
     "payloadTooLarge": "The file is too large.",
     "serviceUnavailable": "Service is temporarily unavailable. Please try again."
+  },
+  "errorPage": {
+    "supportEmail": "support@mosonic.com",
+    "suspended": {
+      "code": "403",
+      "badge": "Account suspended",
+      "title": "Your account has been suspended",
+      "description": "Access to Mosonic has been disabled for this account. If you believe this is a mistake, our support team is here to help you get back in.",
+      "primaryAction": "Contact support",
+      "secondaryAction": "Return to login",
+      "supportNote": "Mention this account when you reach out so we can resolve it faster."
+    },
+    "notFound": {
+      "code": "404",
+      "badge": "Page not found",
+      "title": "We can't find that page",
+      "description": "The page you're looking for may have been moved, renamed, or never existed. Let's get you back on track.",
+      "primaryAction": "Back to dashboard",
+      "secondaryAction": "Go back"
+    }
   },
   "pagination": {
     "page": "Page {{page}}",

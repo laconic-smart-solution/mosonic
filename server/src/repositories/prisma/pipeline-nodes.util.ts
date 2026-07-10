@@ -19,6 +19,8 @@ export type PipelineMetadata = {
   scheduleId?: string;
   experimentId?: string;
   newsMeta?: { title?: string; url?: string } | null;
+  /** Workflow template node IDs selected for step-mode review. */
+  reviewNodeIds?: string[];
 };
 
 export function parsePipelineMetadata(json: unknown): PipelineMetadata {
@@ -48,6 +50,17 @@ export function incrementNodeRetry(
 ): PipelineNodeExecution[] {
   return nodes.map((n) =>
     n.nodeId === nodeId ? { ...n, retryCount: (n.retryCount ?? 0) + 1 } : n,
+  );
+}
+
+export function incrementReviewRegenerate(
+  nodes: PipelineNodeExecution[],
+  nodeId: string,
+): PipelineNodeExecution[] {
+  return nodes.map((n) =>
+    n.nodeId === nodeId
+      ? { ...n, reviewRegenerateCount: (n.reviewRegenerateCount ?? 0) + 1 }
+      : n,
   );
 }
 

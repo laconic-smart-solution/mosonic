@@ -2,7 +2,7 @@ import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { usageService } from "@/shared/services/usage.service"
-import { onCreditBalanceUpdated } from "@/shared/socket/credit-events"
+import { onCreditBalanceUpdated, onPlanUpdated } from "@/shared/socket/credit-events"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { zernioQueryKeys } from "./zernio.query"
 
@@ -16,13 +16,21 @@ export const usageQueryKeys = {
 export function useCreditBalanceSocketRefresh() {
   const queryClient = useQueryClient()
   useEffect(() => {
-    return onCreditBalanceUpdated(() => {
+    const invalidate = () => {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
+      void queryClient.invalidateQueries({ queryKey: usageQueryKeys.currentPlan })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
       void queryClient.invalidateQueries({ queryKey: ["content"] })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
       void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
-    })
+      void queryClient.invalidateQueries({ queryKey: ["plans", "public"] })
+    }
+    const offBalance = onCreditBalanceUpdated(invalidate)
+    const offPlan = onPlanUpdated(invalidate)
+    return () => {
+      offBalance()
+      offPlan()
+    }
   }, [queryClient])
 }
 

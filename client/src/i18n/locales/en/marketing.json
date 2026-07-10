@@ -4,15 +4,19 @@
     "landing": "Home",
     "create": "Create",
     "pricing": "Pricing",
-    "about": "About"
+    "features": "Features",
+    "howItWorks": "How it works",
+    "about": "About",
+    "menu": "Menu",
+    "openMenu": "Open menu"
   },
   "landing": {
     "hero": {
       "eyebrow": "Built in Thailand, for Thai growth",
       "title": "Plant one idea. Grow content everywhere.",
       "subtitle": "Strategy in. Content and publishing out.",
-      "ctaPrimary": "Start free",
-      "ctaSecondary": "See how it works"
+      "ctaStartFree": "Start free",
+      "ctaGoToWorkspace": "Go to workspace"
     },
     "problem": {
       "eyebrow": "The problem we solve",
@@ -94,6 +98,32 @@
       "title": "Plans that grow with your business.",
       "subtitle": "From solo founders to agencies — start free, then scale when your content pipeline does.",
       "button": "View pricing"
+    },
+    "about": {
+      "eyebrow": "About Mosonic",
+      "title": "Orchestration for marketers who ship at scale.",
+      "paragraph1": "Mosonic Software Co., Ltd. builds cloud software that turns a campaign strategy into channel-ready content — text, images, video, and publishing — without juggling a dozen disconnected tools.",
+      "paragraph2": "We're based in Thailand and design for Thai SMEs, growth teams, and agencies that need enterprise-grade workflows without enterprise-grade complexity.",
+      "pillars": {
+        "local": {
+          "title": "Built in Thailand",
+          "description": "Local market context, languages, and channels are first-class — not an afterthought."
+        },
+        "orchestration": {
+          "title": "Strategy-first AI",
+          "description": "Your brand rules drive every generation run. One strategy fuels hundreds of outputs."
+        },
+        "ownership": {
+          "title": "Your IP stays yours",
+          "description": "We orchestrate leading AI models; your campaigns, content, and data remain under your control."
+        }
+      },
+      "contact": {
+        "title": "Enterprise & partnerships",
+        "description": "Need higher volume, SSO, or agency workflows? Our team can help you scope a plan.",
+        "email": "hello@mosonic.co.th",
+        "cta": "Contact us"
+      }
     }
   },
   "pricing": {
@@ -109,58 +139,10 @@
     "includesPrevious": "Everything in {{plan}}, PLUS:",
     "contactSales": "Contact sales",
     "upgradeTo": "Upgrade to {{plan}}",
-    "checkoutNote": "New accounts start on the Free plan. Paid upgrades are assigned after signup — self-serve checkout is coming soon.",
+    "checkoutNote": "New accounts start on the Free plan. Sign in to upgrade or renew at Usage → Plans.",
     "loadError": "Could not load plans. Please refresh and try again.",
     "loading": "Loading plans…",
-    "empty": "No plans available right now.",
-    "comparison": {
-      "eyebrow": "Features",
-      "title": "Everything you need to plan, create, and publish",
-      "subtitle": "Compare generation, workflow, publishing, and analytics across every plan.",
-      "unavailable": "Feature comparison is unavailable right now.",
-      "limited": "Limited",
-      "creditsValue": "{{count}} / mo",
-      "categories": {
-        "generation": {
-          "title": "Content generation",
-          "rows": {
-            "monthlyCredits": "Monthly credits",
-            "textGeneration": "Text generation",
-            "imageGeneration": "Image generation",
-            "videoGeneration": "Video generation",
-            "translation": "Translation",
-            "versionHistory": "Version history"
-          }
-        },
-        "workflow": {
-          "title": "Workflow & orchestration",
-          "rows": {
-            "workflowTemplates": "Workflow templates",
-            "multiNodePipelines": "Multi-node pipelines",
-            "nodeRerun": "Single-node re-run",
-            "liveGenerationLogs": "Live generation logs"
-          }
-        },
-        "publishing": {
-          "title": "Publishing",
-          "rows": {
-            "socialChannels": "Social channels",
-            "scheduledPublishing": "Scheduled publishing",
-            "channelPreviews": "Channel previews",
-            "multiChannelUpload": "Multi-channel upload"
-          }
-        },
-        "analytics": {
-          "title": "Analytics & support",
-          "rows": {
-            "usageDashboard": "Usage dashboard",
-            "campaignAnalytics": "Campaign analytics",
-            "ruleFeedback": "Rule improvement feedback",
-            "prioritySupport": "Priority support"
-          }
-        }
-      }
-    }
+    "empty": "No plans available right now."
   },
   "footer": {
     "tagline": "AI content and publishing built for Thai SMEs and the agencies that grow them.",

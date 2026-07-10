@@ -12,6 +12,7 @@ import { CreditConfigController } from './credit-config.controller';
 import { CreditConfigService } from './credit-config.service';
 import { CreditTopupController } from './credit-topup.controller';
 import { PaymentWebhookController } from './payment-webhook.controller';
+import { PaymentWebhookService } from './payment-webhook.service';
 import { ContentCreditUsageService } from './content-credit-usage.service';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
@@ -22,8 +23,10 @@ import { AuthModule } from '../auth/auth.module';
 import { CostModule } from '../cost/cost.module';
 import { EventsModule } from '../events/events.module';
 import { PayniModule } from '../payni/payni.module';
+import { PaymentModule } from '../payment/payment.module';
+import { PlanModule } from '../plan/plan.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 const DEFAULT_FIXED_COSTS = [
   { name: 'Infrastructure', amountUsd: 500 },
@@ -48,6 +51,8 @@ const DEFAULT_SERVICE_RATES = [
     CostModule,
     EventsModule,
     PayniModule,
+    PaymentModule,
+    forwardRef(() => PlanModule),
     RepositoriesModule,
   ],
   controllers: [
@@ -63,6 +68,7 @@ const DEFAULT_SERVICE_RATES = [
     CreditService,
     ContentCreditUsageService,
     FixedCostService,
+    PaymentWebhookService,
     ServiceRateService,
     NodeCreditPriceService,
   ],
