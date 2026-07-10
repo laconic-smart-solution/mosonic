@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Browser, ElementHandle, Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
-import { RedNoteSessionInvalidError } from './errors/rednote.errors';
+import {
+  RedNoteSelectorMismatchError,
+  RedNoteSessionInvalidError,
+} from './errors/rednote.errors';
 
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -30,9 +33,9 @@ export class RedNoteBrowserService {
         '--disable-gpu',
         '--disable-blink-features=AutomationControlled',
         '--lang=zh-CN,zh',
-        '--window-size=1440,900',
+        '--window-size=1600,1000',
       ],
-      defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 2 },
+      defaultViewport: { width: 1600, height: 1000, deviceScaleFactor: 1 },
     });
   }
 
@@ -173,8 +176,17 @@ export class RedNoteBrowserService {
   publishButtonHostSelector(): string {
     return (
       this.config.get<string>('REDNOTE_PUBLISH_BUTTON_SELECTOR')?.trim() ||
-      'xhs-publish-btn'
+      'button.ce-btn.bg-red, xhs-publish-btn, button.ce-btn'
     );
+  }
+
+  /** Ordered candidates for the red "发布" control (live creator UI). */
+  publishButtonSelectors(): string[] {
+    const raw = this.publishButtonHostSelector();
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   videoProcessingTimeoutMs(): number {
@@ -738,54 +750,94 @@ export class RedNoteBrowserService {
   }
 
   /**
-   * Clicks the publish control inside <xhs-publish-btn> (open shadow root) or
-   * falls back to clicking the host element bounding box.
+   * Clicks the red "发布" button. Prefers `button.ce-btn.bg-red`, then
+   * `<xhs-publish-btn>` shadow DOM, then any button whose text is 发布.
+   * Scrolls into view so a clipped footer button is still clickable.
    */
   async clickPublishButton(page: Page): Promise<boolean> {
-    const hostSel = this.publishButtonHostSelector();
-    // Wait until the host exists and the inner button is not disabled.
-    try {
-      await page.waitForFunction(
-        (selector) => {
-          const host = document.querySelector(selector);
-          if (!host) return false;
-          const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
-            .shadowRoot;
-          const btn = root
-            ? (root.querySelector('button, [role="button"]') as HTMLButtonElement | null)
-            : (host as HTMLButtonElement);
-          if (!btn) return false;
-          if (btn.disabled) return false;
-          if (btn.getAttribute('aria-disabled') === 'true') return false;
-          const cls = btn.className?.toString?.() ?? '';
-          if (/\bdisabled\b/i.test(cls)) return false;
-          return true;
-        },
-        { timeout: 30_000, polling: 400 },
-        hostSel,
-      );
-    } catch {
-      // Fall through and attempt click anyway — some builds omit disabled attrs.
+    const selectors = this.publishButtonSelectors();
+    const deadline = Date.now() + 30_000;
+
+    while (Date.now() < deadline) {
+      // 1) Known CSS selectors
+      for (const sel of selectors) {
+        const handle = await page.$(sel);
+        if (!handle) continue;
+
+        const clicked = await this.clickPublishCandidate(page, handle, sel);
+        if (clicked) return true;
+      }
+
+      // 2) Text match: button containing 发布
+      const byText = await page.evaluateHandle(() => {
+        const buttons = Array.from(
+          document.querySelectorAll('button, [role="button"]'),
+        );
+        return (
+          buttons.find((el) => {
+            const t = (el.textContent ?? '').replace(/\s+/g, '');
+            return t === '发布' || t.includes('发布');
+          }) ?? null
+        );
+      });
+      const el = byText.asElement();
+      if (el) {
+        const clicked = await this.clickPublishCandidate(page, el, 'text:发布');
+        if (clicked) return true;
+      }
+
+      await new Promise((r) => setTimeout(r, 400));
     }
+    return false;
+  }
 
-    const clicked = await page.evaluate((selector) => {
-      const host = document.querySelector(selector);
-      if (!host) return false;
-      const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
-        .shadowRoot;
-      const target = root
-        ? root.querySelector('button, [role="button"]')
-        : host;
-      if (!target || !(target instanceof HTMLElement)) return false;
-      target.click();
+  private async clickPublishCandidate(
+    page: Page,
+    handle: ElementHandle,
+    label: string,
+  ): Promise<boolean> {
+    try {
+      // Shadow host: click inner button when present
+      const clickedShadow = await handle.evaluate((host) => {
+        const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
+          .shadowRoot;
+        if (!root) return false;
+        const btn = root.querySelector(
+          'button, [role="button"]',
+        ) as HTMLButtonElement | null;
+        if (!btn || btn.disabled) return false;
+        btn.scrollIntoView({ block: 'center', inline: 'center' });
+        btn.click();
+        return true;
+      });
+      if (clickedShadow) {
+        this.logger.debug(`Clicked publish via shadow (${label})`);
+        return true;
+      }
+
+      const enabled = await handle.evaluate((node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const btn = node as HTMLButtonElement;
+        if (btn.disabled) return false;
+        if (btn.getAttribute('aria-disabled') === 'true') return false;
+        const cls = btn.className?.toString?.() ?? '';
+        if (/\bdisabled\b/i.test(cls) && !/\bbg-red\b/i.test(cls)) return false;
+        node.scrollIntoView({ block: 'center', inline: 'center' });
+        return true;
+      });
+      if (!enabled) return false;
+
+      await handle.click({ delay: 40 });
+      this.logger.debug(`Clicked publish via host (${label})`);
       return true;
-    }, hostSel);
-    if (clicked) return true;
-
-    const host = await page.$(hostSel);
-    if (!host) return false;
-    await host.click();
-    return true;
+    } catch (err) {
+      this.logger.debug(
+        `Publish click candidate failed (${label}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return false;
+    }
   }
 
   async waitForTitleInput(page: Page, timeoutMs: number): Promise<boolean> {
@@ -801,8 +853,8 @@ export class RedNoteBrowserService {
   }
 
   /**
-   * After video upload the creator UI re-renders the edit form. Wait until title,
-   * body editor, and publish button are all present and stable before filling.
+   * After video upload the creator UI re-renders the edit form. Wait until title
+   * and body editor are present and stable (publish button may be off-screen).
    */
   async waitForPublishFormReady(
     page: Page,
@@ -810,8 +862,8 @@ export class RedNoteBrowserService {
   ): Promise<boolean> {
     const titleSel = this.titleInputSelector();
     const bodySel = this.bodyEditorSelector();
-    const publishSel = this.publishButtonHostSelector();
     const deadline = Date.now() + timeoutMs;
+    let lastBodyKey = '';
 
     while (Date.now() < deadline) {
       try {
@@ -823,33 +875,45 @@ export class RedNoteBrowserService {
           visible: true,
           timeout: Math.min(5_000, Math.max(500, deadline - Date.now())),
         });
-        await page.waitForSelector(publishSel, {
-          visible: true,
-          timeout: Math.min(5_000, Math.max(500, deadline - Date.now())),
-        });
 
         // Let SPA finish re-rendering after video processing completes.
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 2000));
 
-        const stillReady = await page.evaluate(
+        const snapshot = await page.evaluate(
           (sels) => {
             const title = document.querySelector(sels.title);
             const body = document.querySelector(sels.body);
-            const publish = document.querySelector(sels.publish);
-            if (!title || !body || !publish) return false;
-            const titleOk =
-              title instanceof HTMLElement &&
-              title.getBoundingClientRect().height > 0;
-            const bodyOk =
-              body instanceof HTMLElement &&
-              body.getBoundingClientRect().height > 0;
-            return titleOk && bodyOk;
+            if (!title || !body) return null;
+            if (!(title instanceof HTMLElement) || !(body instanceof HTMLElement)) {
+              return null;
+            }
+            const titleRect = title.getBoundingClientRect();
+            const bodyRect = body.getBoundingClientRect();
+            if (titleRect.height <= 0 || bodyRect.height <= 0) return null;
+            // TipTap must be editable
+            if (
+              body.getAttribute('contenteditable') !== 'true' &&
+              !(body as HTMLElement).isContentEditable
+            ) {
+              return null;
+            }
+            return `${titleRect.top}:${bodyRect.top}:${body.outerHTML.length}`;
           },
-          { title: titleSel, body: bodySel, publish: publishSel },
+          { title: titleSel, body: bodySel },
         );
-        if (stillReady) return true;
+
+        if (!snapshot) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+
+        // Require two consecutive identical layouts so we don't fill mid-remount.
+        if (snapshot === lastBodyKey) {
+          return true;
+        }
+        lastBodyKey = snapshot;
       } catch {
-        // keep polling until deadline
+        lastBodyKey = '';
       }
       await new Promise((r) => setTimeout(r, 500));
     }
@@ -889,17 +953,20 @@ export class RedNoteBrowserService {
   async fillTitle(page: Page, title: string): Promise<void> {
     const sel = this.titleInputSelector();
     await page.waitForSelector(sel, { visible: true, timeout: 15_000 });
+    const el = await page.$(sel);
+    if (el) {
+      await el.evaluate((node) =>
+        (node as HTMLElement).scrollIntoView({ block: 'center' }),
+      );
+    }
     await page.click(sel);
-    await page.evaluate((selector) => {
-      const el = document.querySelector(selector) as HTMLInputElement | null;
-      if (!el) return;
-      el.focus();
-      el.value = '';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }, sel);
+    // Clear via keyboard so React/controlled inputs stay in sync.
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
     if (title.trim()) {
-      await page.type(sel, title, { delay: 20 });
+      await page.type(sel, title, { delay: 25 });
     }
   }
 
@@ -908,29 +975,73 @@ export class RedNoteBrowserService {
     const text = caption.trim();
     if (!text) return;
     await page.waitForSelector(sel, { visible: true, timeout: 15_000 });
+    const el = await page.$(sel);
+    if (el) {
+      await el.evaluate((node) =>
+        (node as HTMLElement).scrollIntoView({ block: 'center' }),
+      );
+    }
     await page.click(sel);
-    await page.evaluate(
-      (selector, body) => {
-        const el = document.querySelector(selector) as HTMLElement | null;
-        if (!el) return;
-        el.focus();
-        if (el.isContentEditable) {
-          el.textContent = '';
-          el.dispatchEvent(
-            new InputEvent('input', { bubbles: true, inputType: 'deleteContent' }),
-          );
-          el.textContent = body;
-          el.dispatchEvent(
-            new InputEvent('input', { bubbles: true, inputType: 'insertText' }),
-          );
-          return;
-        }
-        document.execCommand('selectAll', false);
-        document.execCommand('insertText', false, body);
-      },
-      sel,
-      text,
-    );
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Backspace');
+    // TipTap listens to beforeinput/insertText better than setting textContent.
+    await page.keyboard.type(text, { delay: 8 });
+  }
+
+  /** Returns true when the TipTap body contains a non-trivial amount of text. */
+  async readBodyText(page: Page): Promise<string> {
+    const sel = this.bodyEditorSelector();
+    return page.evaluate((selector) => {
+      const el = document.querySelector(selector) as HTMLElement | null;
+      return (el?.innerText ?? el?.textContent ?? '').trim();
+    }, sel);
+  }
+
+  /**
+   * Fill title + caption, then verify caption stuck. If the SPA remounted the
+   * editor (common after video processing), wait and fill again.
+   */
+  async fillPublishFieldsWithRetry(
+    page: Page,
+    title: string,
+    caption: string,
+  ): Promise<void> {
+    const expected = caption.trim();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.fillTitle(page, title);
+      await this.fillBody(page, caption);
+      await new Promise((r) => setTimeout(r, 1000));
+
+      if (!expected) return;
+      const actual = await this.readBodyText(page);
+      const matched =
+        actual.length >= Math.min(20, expected.length) &&
+        (actual.includes(expected.slice(0, 20)) ||
+          expected.includes(actual.slice(0, 20)));
+      if (matched) {
+        this.logger.debug(
+          `RedNote caption filled on attempt=${attempt} len=${actual.length}`,
+        );
+        return;
+      }
+
+      this.logger.warn(
+        `RedNote caption missing after fill attempt=${attempt} (got len=${actual.length}); waiting for re-render`,
+      );
+      await this.waitForPublishFormReady(page, 30_000);
+    }
+
+    const finalText = await this.readBodyText(page);
+    if (
+      expected &&
+      finalText.length < Math.min(10, expected.length)
+    ) {
+      throw new RedNoteSelectorMismatchError(
+        'Could not fill RedNote caption — editor remounted or selectors changed',
+      );
+    }
   }
 
   /**
