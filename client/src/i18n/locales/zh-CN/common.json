@@ -162,6 +162,26 @@
     "payloadTooLarge": "文件过大。",
     "serviceUnavailable": "服务暂时不可用，请稍后重试。"
   },
+  "errorPage": {
+    "supportEmail": "support@mosonic.com",
+    "suspended": {
+      "code": "403",
+      "badge": "账户已被停用",
+      "title": "您的账户已被停用",
+      "description": "此账户对 Mosonic 的访问已被禁用。如果您认为这是误操作，我们的支持团队很乐意帮助您恢复访问。",
+      "primaryAction": "联系支持",
+      "secondaryAction": "返回登录",
+      "supportNote": "联系我们时请提及此账户，以便我们更快为您处理。"
+    },
+    "notFound": {
+      "code": "404",
+      "badge": "页面未找到",
+      "title": "找不到该页面",
+      "description": "您要找的页面可能已被移动、重命名或从未存在。让我们帮您回到正轨。",
+      "primaryAction": "返回仪表板",
+      "secondaryAction": "返回上一页"
+    }
+  },
   "pagination": {
     "page": "第 {{page}} 页",
     "of": "共 {{total}}",

@@ -3,7 +3,10 @@ import axios from "axios"
 import { appConfig } from "@/app/config/app-config"
 import apiClient from "@/shared/api/api-client"
 import { getApiErrorMessage } from "@/shared/lib/api-error"
-import { extractTokensFromAuthResponse } from "@/shared/lib/extract-auth-tokens"
+import {
+  extractOtpVerifiedFromAuthResponse,
+  extractTokensFromAuthResponse,
+} from "@/shared/lib/extract-auth-tokens"
 
 function pick(obj: unknown, path: string[]): unknown {
   let cur: unknown = obj
@@ -63,7 +66,8 @@ export async function verifyOtp(body: { email: string; otp: string }) {
     pick(data, ["data", "userId"]) ??
     pick(data, ["userId"])
   const userId = userIdRaw != null ? String(userIdRaw) : undefined
-  return { raw: data, accessToken, refreshToken, email, userId }
+  const otpVerified = extractOtpVerifiedFromAuthResponse(data) ?? true
+  return { raw: data, accessToken, refreshToken, email, userId, otpVerified }
 }
 
 export async function changePassword(

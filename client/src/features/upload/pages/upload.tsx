@@ -66,6 +66,7 @@ import {
   useGetUploadQuery,
   useUpdateUploadMutation,
 } from "@/shared/queries/upload.query"
+import { useRedNoteAccountQuery } from "@/shared/queries/rednote.query"
 import { useZernioAccountsQuery } from "@/shared/queries/zernio.query"
 import {
   joinUploadRoom,
@@ -143,24 +144,16 @@ function toDatetimeLocalValue(iso: string | null | undefined) {
 const CANONICAL_UPLOAD_TAB_ORDER = [
   "Facebook",
   "Instagram",
-  "Twitter",
   "LinkedIn",
   "YouTube",
   "TikTok",
 ] as const
 
-function isTwitterFamilyKey(key: string): boolean {
-  return key === "twitter" || key === "x"
-}
-
 function uploadRowMatchesCanonicalTab(
   canonicalName: string,
   rowChannelKey: string
 ): boolean {
-  const tabKey = normalizeChannelKey(canonicalName)
-  const rowKey = rowChannelKey
-  if (isTwitterFamilyKey(tabKey) && isTwitterFamilyKey(rowKey)) return true
-  return tabKey === rowKey
+  return normalizeChannelKey(canonicalName) === rowChannelKey
 }
 
 /** Header tabs: only channels on this upload, canonical order then any extra rows. */
@@ -196,6 +189,7 @@ export default function UploadPage() {
   const contentQuery = useGetContentQuery(upload?.contentRef)
   const totalCreditsUsed = contentQuery.data?.creditUsage?.totalCredits ?? 0
   const zernioAccountsQuery = useZernioAccountsQuery(Boolean(uploadId))
+  const rednoteAccountQuery = useRedNoteAccountQuery(Boolean(uploadId))
   const publishMutation = usePublishUploadMutation()
   const patchMutation = usePatchUploadChannelMutation()
   const updateMutation = useUpdateUploadMutation()
@@ -255,16 +249,19 @@ export default function UploadPage() {
     [upload?.channels]
   )
 
-  /** Zernio may return `x` while upload rows use `twitter`; treat as one connection. */
   const connectedChannelSet = useMemo(() => {
     const set = new Set<string>()
     for (const item of zernioAccountsQuery.data?.accounts ?? []) {
       set.add(item.channel.toLowerCase())
     }
-    if (set.has("x")) set.add("twitter")
-    if (set.has("twitter")) set.add("x")
+    const rn = rednoteAccountQuery.data
+    if (rn?.connected && !rn.needsReauth) {
+      set.add("rednote")
+    }
     return set
-  }, [zernioAccountsQuery.data?.accounts])
+  }, [zernioAccountsQuery.data?.accounts, rednoteAccountQuery.data])
+
+  const rednoteNeedsReauth = Boolean(rednoteAccountQuery.data?.needsReauth)
 
   const activeKey = useMemo(() => {
     const tabKeys = new Set(channelTabs.map((t) => t.channel.toLowerCase()))
@@ -749,15 +746,38 @@ export default function UploadPage() {
 
   const bannerVariant = useMemo(() => {
     if (!activeRow || !mediaCfg) return "hidden" as const
+    const isRednote = activeKey === "rednote"
+    if (isRednote && rednoteNeedsReauth) return "needs_reauth" as const
     const connected = connectedChannelSet.has(activeKey)
     if (!connected && activeRow.status === "pending")
       return "not_connected" as const
-    if (activeRow.status === "failed") return "failed" as const
+    if (
+      activeRow.status === "published" &&
+      (activeRow.failureReason ?? "").toLowerCase().includes("inconclusive")
+    ) {
+      return "manual_verify" as const
+    }
+    if (activeRow.status === "failed") {
+      if (
+        isRednote &&
+        (activeRow.failureReason ?? "").toLowerCase().includes("session") &&
+        (rednoteNeedsReauth || !connectedChannelSet.has("rednote"))
+      ) {
+        return "needs_reauth" as const
+      }
+      return "failed" as const
+    }
     if (activeRow.status === "publishing") return "publishing" as const
     if (activeRow.status === "published") return "published" as const
     if (activeRow.status === "scheduled") return "scheduled" as const
     return "hidden" as const
-  }, [activeRow, activeKey, connectedChannelSet, mediaCfg])
+  }, [
+    activeRow,
+    activeKey,
+    connectedChannelSet,
+    mediaCfg,
+    rednoteNeedsReauth,
+  ])
 
   function saveActiveChannel() {
     if (!uploadId || !upload || !activeRow) return
@@ -864,6 +884,14 @@ export default function UploadPage() {
 
   async function publishActiveNow(isSchedule: boolean) {
     if (!uploadId || !upload || !activeRow) return
+    if (activeKey === "rednote" && rednoteNeedsReauth) {
+      toast.error(i18n.t("upload:toast.rednoteNeedsReauth"))
+      return
+    }
+    if (activeKey === "rednote" && isSchedule) {
+      toast.error(i18n.t("upload:toast.rednoteNoSchedule"))
+      return
+    }
     if (!connectedChannelSet.has(activeKey)) {
       toast.error(i18n.t("upload:toast.connectAccount"))
       return
@@ -976,6 +1004,14 @@ export default function UploadPage() {
 
     for (const ch of includedChannels) {
       const key = ch.channel.toLowerCase()
+      if (key === "rednote" && rednoteNeedsReauth) {
+        toast.error(i18n.t("upload:toast.rednoteNeedsReauth"))
+        return
+      }
+      if (key === "rednote" && !pubNow) {
+        toast.error(i18n.t("upload:toast.rednoteNoSchedule"))
+        return
+      }
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
       if (!row) continue
       const draft =
@@ -1060,7 +1096,11 @@ export default function UploadPage() {
     )
   }
 
-  if (uploadQuery.isLoading || zernioAccountsQuery.isLoading) {
+  if (
+    uploadQuery.isLoading ||
+    zernioAccountsQuery.isLoading ||
+    rednoteAccountQuery.isLoading
+  ) {
     return (
       <PageShell>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1203,8 +1243,13 @@ export default function UploadPage() {
                     variant={bannerVariant}
                     publishedAt={activeRow.publishedAt}
                     scheduledAt={activeRow.scheduledAt}
+                    failureReason={activeRow.failureReason}
                     onConnect={() => navigate("/settings/accounts")}
-                    onRetry={retryActiveChannel}
+                    onRetry={
+                      bannerVariant === "needs_reauth"
+                        ? () => navigate("/settings/accounts")
+                        : retryActiveChannel
+                    }
                   />
                 ) : null}
 
@@ -1218,7 +1263,8 @@ export default function UploadPage() {
 
                     {activeRow &&
                     mediaCfg &&
-                    bannerVariant !== "not_connected" ? (
+                    bannerVariant !== "not_connected" &&
+                    bannerVariant !== "needs_reauth" ? (
                       <div className="relative">
                         <div
                           ref={channelSchedulePopoverAnchorRef}
@@ -1427,8 +1473,13 @@ export default function UploadPage() {
           bannerVariant={bannerVariant}
           publishedAt={activeRow.publishedAt}
           scheduledAt={activeRow.scheduledAt}
+          failureReason={activeRow.failureReason}
           onConnect={() => navigate("/settings/accounts")}
-          onRetry={retryActiveChannel}
+          onRetry={
+            bannerVariant === "needs_reauth"
+              ? () => navigate("/settings/accounts")
+              : retryActiveChannel
+          }
         />
       ) : null}
     </DndContext>

@@ -5,6 +5,7 @@ export { UserRole, UserStatus };
 
 export type UserRecord = PrismaUser;
 
+/** @deprecated Prefer SocialAccount / ConnectedAccountRecord. */
 export type ZernioConnectedAccountJson = {
   channel: string;
   accountId: string;

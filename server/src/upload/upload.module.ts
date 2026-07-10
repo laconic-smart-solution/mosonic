@@ -5,6 +5,7 @@ import { ContentModule } from '../content/content.module';
 import { EventsModule } from '../events/events.module';
 import { McpModule } from '../mcp/mcp.module';
 import { PostModule } from '../post/post.module';
+import { RedNoteModule } from '../rednote/rednote.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UsersModule } from '../users/users.module';
 import { UploadController } from './upload.controller';
@@ -19,6 +20,7 @@ import { UploadService } from './upload.service';
     EventsModule,
     UsersModule,
     McpModule,
+    RedNoteModule,
     RepositoriesModule,
     forwardRef(() => ContentModule),
     PostModule,

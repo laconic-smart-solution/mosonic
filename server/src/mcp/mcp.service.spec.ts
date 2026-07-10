@@ -207,21 +207,6 @@ describe('McpService', () => {
     );
   });
 
-  it('disconnectAccount resolves twitter when stored as x', async () => {
-    usersService.getZernioConnectedAccounts.mockResolvedValue([
-      { channel: 'x', accountId: 'acc_x', connectedAt: new Date() },
-    ]);
-    zernioRest.deleteAccount.mockResolvedValue(undefined);
-
-    await service.disconnectAccount('u1', 'twitter');
-
-    expect(zernioRest.deleteAccount).toHaveBeenCalledWith('acc_x');
-    expect(usersService.disconnectZernioConnectedAccount).toHaveBeenCalledWith(
-      'u1',
-      'x',
-    );
-  });
-
   it('disconnectAccount throws when channel is not connected', async () => {
     usersService.getZernioConnectedAccounts.mockResolvedValue([]);
 

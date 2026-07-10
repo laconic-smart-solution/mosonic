@@ -58,10 +58,6 @@
       "label": "Facebook",
       "description": "เพจและโปรไฟล์สำหรับการเผยแพร่บน Meta"
     },
-    "twitter": {
-      "label": "Twitter",
-      "description": "โพสต์สั้นผ่าน X"
-    },
     "instagram": {
       "label": "Instagram",
       "description": "ฟีด รีลส์ และสตอรี่ภาพ"
@@ -77,7 +73,24 @@
     "tiktok": {
       "label": "TikTok",
       "description": "วิดีโอแนวตั้งและรูปแบบเฉพาะ TikTok"
+    },
+    "rednote": {
+      "label": "RedNote",
+      "description": "โน้ต Xiaohongshu ผ่านการสแกน QR"
     }
+  },
+  "rednote": {
+    "connectTitle": "เชื่อมต่อ RedNote",
+    "connectDesc": "สแกน QR ด้วยแอป RedNote / Xiaohongshu หรือ WeChat เพื่อเชื่อมบัญชี",
+    "waitingQr": "กำลังรอ QR…",
+    "scanPrompt": "สแกนด้วย RedNote หรือ WeChat",
+    "socketError": "เชื่อมต่อสตรีมเข้าสู่ระบบไม่ได้ — ตรวจสอบว่าคุณลงชื่อเข้าใช้แล้วแล้วลองใหม่",
+    "loginSuccess": "เชื่อมต่อ RedNote แล้ว",
+    "loginFailed": "เข้าสู่ระบบ RedNote ไม่สำเร็จ: {{reason}}",
+    "needsReauth": "เซสชันหมดอายุ — เชื่อมต่อใหม่",
+    "healthCheck": "ตรวจสอบเซสชัน",
+    "healthOk": "เซสชันใช้งานได้",
+    "healthFailed": "ต้องยืนยันตัวตนใหม่"
   },
   "unlockConfirm": {
     "title": "ปลดล็อก {{channel}}",

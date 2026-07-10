@@ -24,16 +24,6 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     maxCarousel: 9,
     displayName: "LinkedIn",
   },
-  twitter: {
-    tabs: ["single", "video"],
-    maxCarousel: 4,
-    displayName: "Twitter",
-  },
-  x: {
-    tabs: ["single", "video"],
-    maxCarousel: 4,
-    displayName: "Twitter",
-  },
   youtube: {
     tabs: ["video"],
     maxCarousel: 0,
@@ -43,6 +33,11 @@ const PLATFORM: Record<string, PlatformMediaConfig> = {
     tabs: ["single", "video"],
     maxCarousel: 1,
     displayName: "TikTok",
+  },
+  rednote: {
+    tabs: ["single", "multiple", "video"],
+    maxCarousel: 9,
+    displayName: "RedNote",
   },
 }
 

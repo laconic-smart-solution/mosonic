@@ -41,7 +41,7 @@
   },
   "channels": {
     "sectionTitle": "Publishing channels",
-    "sectionDesc": "Facebook, Instagram, YouTube, LinkedIn, and TikTok. Unlock only the networks you use; they are shared with Upload and scheduling.",
+    "sectionDesc": "Facebook, Instagram, YouTube, LinkedIn, TikTok, and RedNote. Unlock only the networks you use; they are shared with Upload and scheduling.",
     "connected": "Connected",
     "unlocked": "Unlocked",
     "notConnected": "Not connected",
@@ -58,10 +58,6 @@
       "label": "Facebook",
       "description": "Pages and profiles for Meta publishing."
     },
-    "twitter": {
-      "label": "Twitter",
-      "description": "Short-form posts via X."
-    },
     "instagram": {
       "label": "Instagram",
       "description": "Feed, reels, and visual stories."
@@ -77,7 +73,25 @@
     "tiktok": {
       "label": "TikTok",
       "description": "Vertical video and TikTok-native formats."
+    },
+    "rednote": {
+      "label": "RedNote",
+      "description": "Xiaohongshu notes via QR session login."
     }
+  },
+  "rednote": {
+    "connectTitle": "Connect RedNote",
+    "connectDesc": "Scan the QR code with the RedNote / Xiaohongshu app or WeChat to link your account.",
+    "waitingQr": "Waiting for QR code…",
+    "scanPrompt": "Scan with RedNote or WeChat",
+    "socketError": "Could not connect to the login stream. Check that you are signed in and try again.",
+    "loginSuccess": "RedNote connected.",
+    "loginFailed": "RedNote login failed: {{reason}}",
+    "loginInProgress": "A RedNote login is already running — opening the QR dialog again.",
+    "needsReauth": "Session expired — reconnect",
+    "healthCheck": "Verify session",
+    "healthOk": "Session is active.",
+    "healthFailed": "Session needs re-authentication."
   },
   "unlockConfirm": {
     "title": "Unlock {{channel}}",

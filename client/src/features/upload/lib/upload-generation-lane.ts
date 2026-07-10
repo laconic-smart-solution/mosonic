@@ -18,11 +18,7 @@ export function laneSuffixFromNodeId(nodeId: string): string | null {
 }
 
 export function lanesMatch(a: string, b: string): boolean {
-  const na = normalizeChannelKey(a)
-  const nb = normalizeChannelKey(b)
-  if (na === nb) return true
-  const twitterFamily = new Set(["twitter", "x"])
-  return twitterFamily.has(na) && twitterFamily.has(nb)
+  return normalizeChannelKey(a) === normalizeChannelKey(b)
 }
 
 /** Lane id for a generation card (pipeline lane, config.laneId, or materialized id suffix). */
