@@ -1,5 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
+import { SocialAccountStatus } from '@prisma/client';
 import type { SocialAccountRecord } from '../../domain/users/social-account.types';
 import type {
   PublishContext,
@@ -34,7 +35,10 @@ export class RedNoteAdapter implements SocialProviderAdapter {
 
   async getContext(account: SocialAccountRecord): Promise<PublishContext> {
     const meta = parseRedNoteMetadata(account.metadata);
-    if (!meta || meta.sessionStatus !== 'active') {
+    if (!meta?.encryptedCookies) {
+      throw new RedNoteSessionInvalidError();
+    }
+    if (account.status !== 'ACTIVE') {
       throw new RedNoteSessionInvalidError();
     }
     return {
@@ -83,7 +87,10 @@ export class RedNoteAdapter implements SocialProviderAdapter {
     account: SocialAccountRecord,
   ): Promise<'active' | 'needs_reauth'> {
     const meta = parseRedNoteMetadata(account.metadata);
-    if (!meta?.encryptedCookies || meta.sessionStatus !== 'active') {
+    if (
+      !meta?.encryptedCookies ||
+      account.status !== SocialAccountStatus.ACTIVE
+    ) {
       return 'needs_reauth';
     }
     const browser = await this.browserService.launch();
@@ -98,12 +105,9 @@ export class RedNoteAdapter implements SocialProviderAdapter {
       } catch {
         return 'needs_reauth';
       }
-      await page.setCookie(...cookies);
-      await page.goto(this.browserService.publishUrl(), {
-        waitUntil: 'domcontentloaded',
-        timeout: 45_000,
-      });
-      const ok = await this.browserService.isLoggedIn(page);
+      await this.browserService.applyStoredCookies(page, cookies);
+      await this.browserService.openCreatorPublishPage(page);
+      const ok = await this.browserService.waitForCreatorLoggedIn(page, 20_000);
       if (ok) {
         await this.users.upsertRedNoteSession(account.userId, {
           ...meta,
@@ -112,7 +116,6 @@ export class RedNoteAdapter implements SocialProviderAdapter {
         });
         return 'active';
       }
-      await this.users.markRedNoteNeedsReauth(account.userId);
       return 'needs_reauth';
     } finally {
       await browser.close().catch(() => undefined);

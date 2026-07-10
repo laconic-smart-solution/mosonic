@@ -232,6 +232,19 @@ export function effectiveMediaUrlsForPublish(
         mediaUrls: row.mediaUrls ?? [],
       }
 
+  const key = normalizeChannelKey(channelKey)
+  const videoOnly =
+    getPlatformMediaConfig(channelKey).tabs.length === 1 &&
+    getPlatformMediaConfig(channelKey).tabs[0] === "video"
+
+  if (videoOnly) {
+    const fromDraft = draftToMediaStorage(
+      { ...draft, mediaTab: "video" },
+      channelKey,
+    )
+    if (fromDraft.mediaUrls.length > 0) return fromDraft.mediaUrls
+  }
+
   const urls = (
     stored.mediaUrls?.length
       ? stored.mediaUrls
@@ -242,9 +255,23 @@ export function effectiveMediaUrlsForPublish(
     .map((u) => u?.trim())
     .filter(Boolean) as string[]
 
-  if (urls.length > 0) return urls
+  if (urls.length > 0) {
+    if (key === "rednote") {
+      const videos = urls.filter((u) => isVideoUrl(u))
+      if (videos.length > 0) return [videos[0]!]
+    } else {
+      return urls
+    }
+  }
 
   const laneMedia = resolveLaneMediaForChannel(channelKey, resolved, layers)
+  if (key === "rednote" || key === "youtube") {
+    const laneVideo = laneMedia.video?.trim()
+    if (laneVideo) return [laneVideo]
+    const trunkVideo = resolved.video?.trim()
+    return trunkVideo ? [trunkVideo] : []
+  }
+
   const laneUrl = (laneMedia.video ?? laneMedia.image ?? "").trim()
   if (laneUrl) return [laneUrl]
 
@@ -279,18 +306,8 @@ export function getChannelMediaValidationError(
     return `${label} requires a video before publishing.`
   }
 
-  if (key === "rednote") {
-    const videos = urls.filter((u) => isVideoUrl(u))
-    const images = urls.filter((u) => !isVideoUrl(u))
-    if (videos.length > 0 && images.length > 0) {
-      return "RedNote accepts either up to 9 images or a single video, not both."
-    }
-    if (videos.length > 1) {
-      return "RedNote accepts at most one video per note."
-    }
-    if (images.length > 9) {
-      return "RedNote accepts at most 9 images per note."
-    }
+  if (key === "rednote" && !urls.some((u) => isVideoUrl(u))) {
+    return `${label} requires a video before publishing.`
   }
 
   return null

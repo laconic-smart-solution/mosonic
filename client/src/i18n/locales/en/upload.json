@@ -101,6 +101,7 @@
     "savedChannel": "Saved for this channel",
     "connectAccount": "Connect this account in Settings first.",
     "rednoteNeedsReauth": "RedNote session expired. Reconnect in Settings.",
+    "rednotePublishSessionFailed": "RedNote publish failed — creator session could not be verified. Retry, or reconnect in Settings if this persists.",
     "rednoteNoSchedule": "RedNote does not support scheduled publish yet. Publish now instead.",
     "assignCaption": "Assign caption text before publishing.",
     "publishing": "Publishing…",

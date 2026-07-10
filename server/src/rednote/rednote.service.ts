@@ -25,6 +25,10 @@ import type { PublishResult } from '../social/social-publish.types';
 import { UsersService } from '../users/users.service';
 import { RedNoteAdapter } from './adapters/rednote.adapter';
 import {
+  isRedNoteSessionInvalidError,
+  RedNoteSessionInvalidError,
+} from './errors/rednote.errors';
+import {
   REDNOTE_LOGIN_QUEUE,
   REDNOTE_PUBLISH_QUEUE,
   rednoteLoginJobId,
@@ -187,10 +191,12 @@ export class RedNoteService {
     const meta = parseRedNoteMetadata(account.metadata);
     const needsReauth =
       account.status === SocialAccountStatus.ERROR ||
-      meta?.sessionStatus === 'needs_reauth' ||
       meta?.sessionStatus === 'expired';
     return {
-      connected: account.status === SocialAccountStatus.ACTIVE && !needsReauth,
+      connected:
+        account.status === SocialAccountStatus.ACTIVE &&
+        !needsReauth &&
+        Boolean(meta?.encryptedCookies),
       status: account.status,
       sessionStatus: meta?.sessionStatus ?? null,
       lastVerifiedAt: meta?.lastVerifiedAt ?? null,
@@ -220,10 +226,10 @@ export class RedNoteService {
   }
 
   /**
-   * Enqueue RedNote publish and wait for the browser job to finish.
-   * Unconfirmed publishes return needsManualVerification — callers must not auto-retry.
+   * Enqueue RedNote publish (non-blocking). Completion is reported via
+   * {@link UploadService.finalizeRedNotePublishOutcome}.
    */
-  async publishAndWait(payload: {
+  async publishEnqueue(payload: {
     userId: string;
     postId: string;
     uploadId?: string;
@@ -236,7 +242,7 @@ export class RedNoteService {
       throw new NotFoundException('RedNote is not connected');
     }
     const context = await this.adapter.getContext(account);
-    const enqueued = await this.adapter.publish(context, {
+    return await this.adapter.publish(context, {
       userId: payload.userId,
       postId: payload.postId,
       uploadId: payload.uploadId,
@@ -245,6 +251,21 @@ export class RedNoteService {
       mediaUrls: payload.mediaUrls,
       scheduledAt: payload.scheduledAt,
     });
+  }
+
+  /**
+   * Enqueue RedNote publish and wait for the browser job to finish.
+   * Unconfirmed publishes return needsManualVerification — callers must not auto-retry.
+   */
+  async publishAndWait(payload: {
+    userId: string;
+    postId: string;
+    uploadId?: string;
+    caption: string;
+    mediaUrls: string[];
+    scheduledAt?: string | null;
+  }): Promise<PublishResult> {
+    const enqueued = await this.publishEnqueue(payload);
 
     if (!enqueued.jobId) {
       return enqueued;
@@ -258,11 +279,18 @@ export class RedNoteService {
     try {
       const job = await this.publishQueue.getJob(enqueued.jobId);
       if (!job) return enqueued;
-      const result = (await job.waitUntilFinished(
-        events,
-        180_000,
-      )) as PublishResult;
-      return result ?? enqueued;
+      try {
+        const result = (await job.waitUntilFinished(
+          events,
+          Number(this.config.get('REDNOTE_PUBLISH_WAIT_MS') ?? 300_000),
+        )) as PublishResult;
+        return result ?? enqueued;
+      } catch (err) {
+        if (isRedNoteSessionInvalidError(err)) {
+          throw new RedNoteSessionInvalidError();
+        }
+        throw err;
+      }
     } finally {
       await events.close().catch(() => undefined);
     }

@@ -150,7 +150,7 @@ export function UploadPlatformPreview({
         {media}
         <p className="px-3 py-2 whitespace-pre-wrap leading-relaxed">{caption}</p>
         <p className="border-t px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-          Up to 9 images or 1 video. Publish confirmation is based on page scrape —
+          Video only (like TikTok). Publish confirmation is based on page scrape —
           verify on RedNote if unsure.
         </p>
       </div>

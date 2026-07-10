@@ -35,6 +35,7 @@ import {
 } from '../upload/upload-record.util';
 import { recomputeUploadJobStatus } from '../upload/upload-status.util';
 import { PostAnalyticsService } from './post-analytics.service';
+import { isZernioRemotePostId } from './is-zernio-remote-post-id.util';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { PostListSort } from './dto/post-list-sort.enum';
 import type { PatchPostDto } from './dto/patch-post.dto';
@@ -432,8 +433,9 @@ export class PostService {
       return analytics ? { ...local, analytics } : local;
     }
     const zid = String(local['zernioPostId'] ?? '').trim();
-    const remote =
-      zid.length > 0 ? await this.mcpService.getZernioPost(zid) : null;
+    const remote = isZernioRemotePostId(zid)
+      ? await this.mcpService.getZernioPost(zid)
+      : null;
     return analytics ? { local, remote, analytics } : { local, remote };
   }
 
@@ -475,7 +477,7 @@ export class PostService {
       );
     }
     const zid = post.zernioPostId?.trim();
-    if (!zid) {
+    if (!zid || !isZernioRemotePostId(zid)) {
       throw new BadRequestException(
         'Post has no remote id; editing is not supported.',
       );

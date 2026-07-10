@@ -501,6 +501,48 @@ describe('PostService', () => {
     }
   });
 
+  it('getPostDetail skips Zernio hydrate for RedNote synthetic post ids', async () => {
+    postModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        postId: 'p-rn',
+        zernioPostId: 'rednote:8894601f-7de7-4113-84aa-425e7384d66a',
+        userId: 'u1',
+        uploadRef: 'upl-rn',
+        channels: ['rednote'],
+        status: PostStatus.Published,
+        toObject: () => ({
+          postId: 'p-rn',
+          zernioPostId: 'rednote:8894601f-7de7-4113-84aa-425e7384d66a',
+          userId: 'u1',
+          uploadRef: 'upl-rn',
+          channels: ['rednote'],
+          status: PostStatus.Published,
+        }),
+      }),
+    });
+    uploadModel.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      }),
+    });
+
+    const detail = await service().getPostDetail(
+      'p-rn',
+      { userId: 'u1', role: 'CUSTOMER' as never },
+      'zernio',
+    );
+
+    expect(mcpService.getZernioPost).not.toHaveBeenCalled();
+    if ('local' in detail) {
+      expect(detail.local['postId']).toBe('p-rn');
+      expect(detail.remote).toBeNull();
+    } else {
+      throw new Error('expected hydrated shape');
+    }
+  });
+
   it('getPostDetail attaches mediaItems and detailCaption from upload', async () => {
     postModel.findOne.mockReturnValue({
       exec: jest.fn().mockResolvedValue({

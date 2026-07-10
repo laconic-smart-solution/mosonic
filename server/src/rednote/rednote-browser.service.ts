@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Browser, ElementHandle, Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
+import { RedNoteSessionInvalidError } from './errors/rednote.errors';
 
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -158,7 +159,7 @@ export class RedNoteBrowserService {
   titleInputSelector(): string {
     return (
       this.config.get<string>('REDNOTE_TITLE_INPUT_SELECTOR')?.trim() ||
-      '.edit-container input.d-text[placeholder*="title"], .edit-container input.d-text'
+      '.edit-container input.d-text, input.d-text[placeholder*="title"], input.d-text[placeholder*="标题"]'
     );
   }
 
@@ -181,6 +182,13 @@ export class RedNoteBrowserService {
       this.config.get('REDNOTE_VIDEO_PROCESS_TIMEOUT_MS') ?? 120_000,
     );
     return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
+  }
+
+  publishSuccessTimeoutMs(): number {
+    const raw = Number(
+      this.config.get('REDNOTE_PUBLISH_SUCCESS_TIMEOUT_MS') ?? 60_000,
+    );
+    return Number.isFinite(raw) && raw > 0 ? raw : 60_000;
   }
 
   isCreatorCenterUrl(url: string): boolean {
@@ -631,12 +639,135 @@ export class RedNoteBrowserService {
     }
   }
 
+  normalizeSessionCookies(
+    cookies: import('puppeteer').CookieParam[],
+  ): import('puppeteer').CookieParam[] {
+    return cookies.map((c) => ({
+      ...c,
+      domain:
+        c.domain && c.domain.length > 0 ? c.domain : '.xiaohongshu.com',
+      path: c.path ?? '/',
+    }));
+  }
+
+  /** Seed cookies on the main site domain before opening creator center. */
+  async applyStoredCookies(
+    page: Page,
+    cookies: import('puppeteer').CookieParam[],
+  ): Promise<void> {
+    const normalized = this.normalizeSessionCookies(cookies);
+    await page.goto('https://www.xiaohongshu.com/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    });
+    if (normalized.length > 0) {
+      await page.setCookie(...normalized);
+    }
+  }
+
+  async openCreatorPublishPage(page: Page): Promise<void> {
+    const publishUrl = this.publishUrl();
+    const creatorOrigin = (() => {
+      try {
+        return new URL(publishUrl).origin;
+      } catch {
+        return 'https://creator.xiaohongshu.com';
+      }
+    })();
+
+    // Warm up creator SSO — explore cookies alone may not auth the publish app.
+    await page.goto(`${creatorOrigin}/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    });
+    await new Promise((r) => setTimeout(r, 1500));
+    await page.goto(publishUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+  }
+
+  async waitForCreatorLoggedIn(
+    page: Page,
+    timeoutMs = 20_000,
+  ): Promise<boolean> {
+    const sel = this.creatorLoggedInAvatarSelector();
+    try {
+      await page.waitForSelector(sel, { visible: true, timeout: timeoutMs });
+      return true;
+    } catch {
+      return this.isCreatorLoggedIn(page);
+    }
+  }
+
+  /**
+   * Confirms creator session via avatar. Does not mutate account status — callers
+   * decide whether to mark needs_reauth (publish failures should not).
+   */
+  async assertCreatorSession(page: Page): Promise<void> {
+    if (await this.waitForCreatorLoggedIn(page, 20_000)) return;
+
+    const url = page.url();
+    if (/\/login/i.test(url)) {
+      throw new RedNoteSessionInvalidError();
+    }
+
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
+    if (await this.waitForCreatorLoggedIn(page, 15_000)) return;
+
+    throw new RedNoteSessionInvalidError(
+      'Could not verify RedNote creator session for publish',
+    );
+  }
+
+  async findVideoUploadInput(
+    page: Page,
+  ): Promise<ElementHandle<HTMLInputElement> | null> {
+    const selectors = [
+      this.videoUploadInputSelector(),
+      '.drag-over input.upload-input[type="file"]',
+      'input.upload-input[accept*="mp4"]',
+      'input.upload-input[accept*="video"]',
+      'input.upload-input',
+      'input[type="file"]',
+    ];
+    return (await this.findFirst(
+      page,
+      selectors,
+    )) as ElementHandle<HTMLInputElement> | null;
+  }
+
   /**
    * Clicks the publish control inside <xhs-publish-btn> (open shadow root) or
    * falls back to clicking the host element bounding box.
    */
   async clickPublishButton(page: Page): Promise<boolean> {
     const hostSel = this.publishButtonHostSelector();
+    // Wait until the host exists and the inner button is not disabled.
+    try {
+      await page.waitForFunction(
+        (selector) => {
+          const host = document.querySelector(selector);
+          if (!host) return false;
+          const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
+            .shadowRoot;
+          const btn = root
+            ? (root.querySelector('button, [role="button"]') as HTMLButtonElement | null)
+            : (host as HTMLButtonElement);
+          if (!btn) return false;
+          if (btn.disabled) return false;
+          if (btn.getAttribute('aria-disabled') === 'true') return false;
+          const cls = btn.className?.toString?.() ?? '';
+          if (/\bdisabled\b/i.test(cls)) return false;
+          return true;
+        },
+        { timeout: 30_000, polling: 400 },
+        hostSel,
+      );
+    } catch {
+      // Fall through and attempt click anyway — some builds omit disabled attrs.
+    }
+
     const clicked = await page.evaluate((selector) => {
       const host = document.querySelector(selector);
       if (!host) return false;
@@ -669,12 +800,103 @@ export class RedNoteBrowserService {
     }
   }
 
+  /**
+   * After video upload the creator UI re-renders the edit form. Wait until title,
+   * body editor, and publish button are all present and stable before filling.
+   */
+  async waitForPublishFormReady(
+    page: Page,
+    timeoutMs: number,
+  ): Promise<boolean> {
+    const titleSel = this.titleInputSelector();
+    const bodySel = this.bodyEditorSelector();
+    const publishSel = this.publishButtonHostSelector();
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        await page.waitForSelector(titleSel, {
+          visible: true,
+          timeout: Math.min(5_000, Math.max(500, deadline - Date.now())),
+        });
+        await page.waitForSelector(bodySel, {
+          visible: true,
+          timeout: Math.min(5_000, Math.max(500, deadline - Date.now())),
+        });
+        await page.waitForSelector(publishSel, {
+          visible: true,
+          timeout: Math.min(5_000, Math.max(500, deadline - Date.now())),
+        });
+
+        // Let SPA finish re-rendering after video processing completes.
+        await new Promise((r) => setTimeout(r, 1500));
+
+        const stillReady = await page.evaluate(
+          (sels) => {
+            const title = document.querySelector(sels.title);
+            const body = document.querySelector(sels.body);
+            const publish = document.querySelector(sels.publish);
+            if (!title || !body || !publish) return false;
+            const titleOk =
+              title instanceof HTMLElement &&
+              title.getBoundingClientRect().height > 0;
+            const bodyOk =
+              body instanceof HTMLElement &&
+              body.getBoundingClientRect().height > 0;
+            return titleOk && bodyOk;
+          },
+          { title: titleSel, body: bodySel, publish: publishSel },
+        );
+        if (stillReady) return true;
+      } catch {
+        // keep polling until deadline
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  }
+
+  /**
+   * Confirms publish by waiting for the creator "Published successfully" page
+   * (EN or ZH). Returns true only when that confirmation UI is visible.
+   */
+  async waitForPublishSuccessConfirmation(
+    page: Page,
+    timeoutMs: number,
+  ): Promise<{ confirmed: boolean; pageUrl: string }> {
+    const phrases = [
+      'Published successfully',
+      '发布成功',
+      '发布成功了',
+      'Return immediately',
+      '立即返回',
+    ];
+    try {
+      await page.waitForFunction(
+        (needles: string[]) => {
+          const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ');
+          return needles.some((n) => text.includes(n));
+        },
+        { timeout: timeoutMs, polling: 500 },
+        phrases,
+      );
+      return { confirmed: true, pageUrl: page.url() };
+    } catch {
+      return { confirmed: false, pageUrl: page.url() };
+    }
+  }
+
   async fillTitle(page: Page, title: string): Promise<void> {
     const sel = this.titleInputSelector();
+    await page.waitForSelector(sel, { visible: true, timeout: 15_000 });
     await page.click(sel);
     await page.evaluate((selector) => {
       const el = document.querySelector(selector) as HTMLInputElement | null;
-      if (el) el.value = '';
+      if (!el) return;
+      el.focus();
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
     }, sel);
     if (title.trim()) {
       await page.type(sel, title, { delay: 20 });
@@ -683,9 +905,32 @@ export class RedNoteBrowserService {
 
   async fillBody(page: Page, caption: string): Promise<void> {
     const sel = this.bodyEditorSelector();
+    const text = caption.trim();
+    if (!text) return;
+    await page.waitForSelector(sel, { visible: true, timeout: 15_000 });
     await page.click(sel);
-    if (!caption.trim()) return;
-    await page.type(sel, caption, { delay: 15 });
+    await page.evaluate(
+      (selector, body) => {
+        const el = document.querySelector(selector) as HTMLElement | null;
+        if (!el) return;
+        el.focus();
+        if (el.isContentEditable) {
+          el.textContent = '';
+          el.dispatchEvent(
+            new InputEvent('input', { bubbles: true, inputType: 'deleteContent' }),
+          );
+          el.textContent = body;
+          el.dispatchEvent(
+            new InputEvent('input', { bubbles: true, inputType: 'insertText' }),
+          );
+          return;
+        }
+        document.execCommand('selectAll', false);
+        document.execCommand('insertText', false, body);
+      },
+      sel,
+      text,
+    );
   }
 
   /**

@@ -51,6 +51,7 @@ import {
   mediaTabLabels,
   normalizeChannelKey,
 } from "@/features/upload/lib/upload-platform-media"
+import { isRedNoteSessionFailureMessage } from "@/features/upload/lib/rednote-upload-status"
 import { toastApiError } from "@/shared/lib/toast-error"
 import {
   buildGlobalPublishRequest,
@@ -374,14 +375,22 @@ export default function UploadPage() {
       onUploadFailed((payload) => {
         if (payload.uploadId !== uploadId) return
         const k = payload.channel.toLowerCase()
+        const message = payload.message ?? "Failed"
         setLiveStatusByChannel((prev) => ({
           ...prev,
           [k]: mergeChannelUpdate(k, prev[k], uploadRef.current, {
             channel: payload.channel,
             status: "failed",
-            failureReason: payload.message ?? "Failed",
+            failureReason: message,
           }),
         }))
+        if (k === "rednote") {
+          toast.error(
+            isRedNoteSessionFailureMessage(message)
+              ? i18n.t("upload:toast.rednotePublishSessionFailed")
+              : message,
+          )
+        }
       }),
       onUploadScheduled((payload) => {
         if (payload.uploadId !== uploadId) return
@@ -760,7 +769,7 @@ export default function UploadPage() {
     if (activeRow.status === "failed") {
       if (
         isRednote &&
-        (activeRow.failureReason ?? "").toLowerCase().includes("session") &&
+        isRedNoteSessionFailureMessage(activeRow.failureReason) &&
         (rednoteNeedsReauth || !connectedChannelSet.has("rednote"))
       ) {
         return "needs_reauth" as const

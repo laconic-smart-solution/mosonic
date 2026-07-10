@@ -139,7 +139,9 @@ export function UploadStatusBanner({
         )}
       >
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
-        <span className="min-w-0 flex-1">Publishing failed. Please retry.</span>
+        <span className="min-w-0 flex-1">
+          {failureReason?.trim() || "Publishing failed. Please retry."}
+        </span>
         {showActions ? (
           <Button
             type="button"
