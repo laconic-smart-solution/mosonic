@@ -27,6 +27,7 @@ import {
   UPLOAD_REPOSITORY,
   USER_PLAN_REPOSITORY,
   USER_REPOSITORY,
+  SOCIAL_ACCOUNT_REPOSITORY,
   WEBHOOK_DELIVERY_REPOSITORY,
   WEBHOOK_EVENT_REPOSITORY,
   WEBHOOK_SUBSCRIPTION_REPOSITORY,
@@ -59,6 +60,7 @@ import { PrismaSyncLockRepository } from './prisma/prisma-sync-lock.repository';
 import { PrismaUploadRepository } from './prisma/prisma-upload.repository';
 import { PrismaUserPlanRepository } from './prisma/prisma-user-plan.repository';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
+import { PrismaSocialAccountRepository } from './prisma/prisma-social-account.repository';
 import { PrismaWebhookDeliveryRepository } from './prisma/prisma-webhook-delivery.repository';
 import { PrismaWebhookEventRepository } from './prisma/prisma-webhook-event.repository';
 import { PrismaWebhookSubscriptionRepository } from './prisma/prisma-webhook-subscription.repository';
@@ -67,6 +69,10 @@ import { PrismaWorkflowRepository } from './prisma/prisma-workflow.repository';
 
 const repositoryProviders = [
   { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
+  {
+    provide: SOCIAL_ACCOUNT_REPOSITORY,
+    useClass: PrismaSocialAccountRepository,
+  },
   { provide: PLAN_REPOSITORY, useClass: PrismaPlanRepository },
   { provide: USER_PLAN_REPOSITORY, useClass: PrismaUserPlanRepository },
   { provide: CREDIT_CONFIG_REPOSITORY, useClass: PrismaCreditConfigRepository },
