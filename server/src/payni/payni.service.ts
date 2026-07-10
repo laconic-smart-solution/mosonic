@@ -32,6 +32,17 @@ export class PayniService {
     return this.isTopupEnabled();
   }
 
+  /**
+   * Currency for local purchase records / request body.
+   * Payni's default currency is configured on the Java payment service;
+   * Nest keeps a simple default for callers that need a code before redirect.
+   */
+  getCurrencyCode(): string {
+    return (
+      this.config.get<string>('PAYNI_CURRENCY_CODE', 'THB').trim() || 'THB'
+    );
+  }
+
   async createPayment(args: {
     amount: number;
     currencyCode?: string;
