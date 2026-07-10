@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthCookieService } from './auth-cookie.service';
 import { SsoClientService } from './sso-client.service';
@@ -7,6 +7,7 @@ import { AdminGuard } from './admin.guard';
 import { WsAuthService } from './ws-auth.service';
 import { UsersModule } from '../users/users.module';
 
+@Global()
 @Module({
   imports: [UsersModule],
   controllers: [AuthController],
