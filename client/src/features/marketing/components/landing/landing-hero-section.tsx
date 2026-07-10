@@ -16,8 +16,8 @@ export function LandingHeroSection() {
   const { t } = useTranslation(["marketing", "common"])
   const reduceMotion = useReducedMotion()
   const hydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const isLoggedIn = hydrated && Boolean(accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const isLoggedIn = hydrated && isAuthenticated
 
   const ctaTo = isLoggedIn ? "/home" : "/signup"
   const ctaLabel = isLoggedIn

@@ -27,7 +27,7 @@ export function ErrorScreen({ variant }: ErrorScreenProps) {
 
   const handleLogout = () => {
     useUserStore.getState().clearUser()
-    useAuthStore.getState().clearSession()
+    void useAuthStore.getState().logout()
     navigate("/login", { replace: true })
   }
 

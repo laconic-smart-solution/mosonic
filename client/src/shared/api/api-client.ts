@@ -1,7 +1,6 @@
 import { appConfig } from "@/app/config/app-config"
 import axios, {
   AxiosError,
-  AxiosHeaders,
   type InternalAxiosRequestConfig,
 } from "axios"
 
@@ -16,6 +15,7 @@ const apiClient = axios.create({
 
 type RetriableConfig = InternalAxiosRequestConfig & {
   _retryAfterRefresh?: boolean
+  skipAuthRefresh?: boolean
 }
 
 function authPathBypass(config: InternalAxiosRequestConfig | undefined): boolean {
@@ -23,6 +23,7 @@ function authPathBypass(config: InternalAxiosRequestConfig | undefined): boolean
   return (
     url.includes("/auth/login") ||
     url.includes("/auth/refresh") ||
+    url.includes("/auth/logout") ||
     url.includes("/auth/signup") ||
     url.includes("/auth/resend-otp") ||
     url.includes("/auth/verify-otp") ||
@@ -30,23 +31,15 @@ function authPathBypass(config: InternalAxiosRequestConfig | undefined): boolean
   )
 }
 
-let refreshInFlight: Promise<string | null> | null = null
+let refreshInFlight: Promise<boolean> | null = null
 
-async function refreshTokensAndPersist(): Promise<string | null> {
+async function refreshSessionOnce(): Promise<boolean> {
   refreshInFlight ??= (async () => {
     try {
-      const refreshToken = useAuthStore.getState().refreshToken
-      if (!refreshToken) return null
-      const tokens = await authService.refreshWithRefreshToken(refreshToken)
-      const role = useAuthStore.getState().role
-      useAuthStore.getState().setSession({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        role: role ?? undefined,
-      })
-      return tokens.accessToken
+      await authService.refresh()
+      return true
     } catch {
-      return null
+      return false
     } finally {
       refreshInFlight = null
     }
@@ -55,11 +48,15 @@ async function refreshTokensAndPersist(): Promise<string | null> {
   return refreshInFlight
 }
 
-function forceLogoutToLogin() {
-  const { accessToken, refreshToken } = useAuthStore.getState()
-  const hadSession = Boolean(accessToken || refreshToken)
+async function forceLogoutToLogin() {
+  const hadSession = useAuthStore.getState().isAuthenticated
   useUserStore.getState().clearUser()
   useAuthStore.getState().clearSession()
+  try {
+    await authService.logout()
+  } catch {
+    // Best-effort cookie clear.
+  }
   if (!hadSession) {
     return
   }
@@ -81,15 +78,6 @@ function redirectToSuspended() {
   }
 }
 
-apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) {
-    config.headers = config.headers ?? {}
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -102,37 +90,25 @@ apiClient.interceptors.response.use(
     }
 
     if (status !== 401 || !config) {
-      if (status === 401) {
-        if (!authPathBypass(config)) {
-          useUserStore.getState().clearUser()
-          useAuthStore.getState().clearSession()
-        }
-      }
       return Promise.reject(error)
     }
 
-    if (authPathBypass(config)) {
-      useUserStore.getState().clearUser()
-      useAuthStore.getState().clearSession()
+    if (config.skipAuthRefresh || authPathBypass(config)) {
       return Promise.reject(error)
     }
 
     if (config._retryAfterRefresh) {
-      forceLogoutToLogin()
+      await forceLogoutToLogin()
       return Promise.reject(error)
     }
 
-    const newAccess = await refreshTokensAndPersist()
-    if (!newAccess) {
-      forceLogoutToLogin()
+    const refreshed = await refreshSessionOnce()
+    if (!refreshed) {
+      await forceLogoutToLogin()
       return Promise.reject(error)
     }
 
     config._retryAfterRefresh = true
-    const headers = AxiosHeaders.from(config.headers ?? {})
-    headers.set("Authorization", `Bearer ${newAccess}`)
-    config.headers = headers
-
     return apiClient.request(config)
   },
 )

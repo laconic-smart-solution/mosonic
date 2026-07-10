@@ -56,8 +56,8 @@ export default function HomePage() {
   )
   useSessionBootstrap()
   const authHydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const isAuthenticated = authHydrated && Boolean(accessToken)
+  const sessionReady = useAuthStore((s) => s.isAuthenticated)
+  const isAuthenticated = authHydrated && sessionReady
   const generationCostsQuery = useGenerationCreditCostsQuery(isAuthenticated)
   const [prompt, setPrompt] = useState("")
   const [focused, setFocused] = useState(false)

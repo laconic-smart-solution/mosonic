@@ -10,9 +10,7 @@ import FormInputText from "@/components/common/form/form-input-text"
 import { Button } from "@/components/ui/button"
 import { Form } from "@/components/ui/form"
 import { changePassword, setAuthFormApiError } from "@/features/auth/api/auth-flow-api"
-import { AuthAlertInline } from "@/features/auth/components/auth-alert-inline"
 import { AuthFormRootError } from "@/features/auth/components/auth-form-root-error"
-import { AuthInlineLink } from "@/features/auth/components/auth-link-footer"
 import {
   createResetPasswordSchema,
   type ResetPasswordFormValues,
@@ -20,11 +18,7 @@ import {
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
-type ResetPasswordFormProps = {
-  accessToken: string
-}
-
-export function ResetPasswordForm({ accessToken }: ResetPasswordFormProps) {
+export function ResetPasswordForm() {
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
@@ -43,10 +37,7 @@ export function ResetPasswordForm({ accessToken }: ResetPasswordFormProps) {
 
   const mutation = useMutation({
     mutationFn: async (values: ResetPasswordFormValues) => {
-      if (!accessToken) {
-        throw new Error(t("resetPassword.invalidPasswords"))
-      }
-      await changePassword(values.newPassword, accessToken)
+      await changePassword(values.newPassword)
     },
     onSuccess: () => {
       clearUser()
@@ -64,53 +55,37 @@ export function ResetPasswordForm({ accessToken }: ResetPasswordFormProps) {
     mutation.mutate(values)
   }
 
-  const tokenMissing = !accessToken
-
   return (
-    <>
-      {tokenMissing ? (
-        <AuthAlertInline className="mb-5">
-          {t("resetPassword.missingToken")}{" "}
-          <AuthInlineLink to="/forgot-password">
-            {t("resetPassword.forgotPasswordLink")}
-          </AuthInlineLink>{" "}
-          {t("resetPassword.verifyAgain")}
-        </AuthAlertInline>
-      ) : null}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <FormInputText
+          form={form}
+          name="newPassword"
+          type="password"
+          label={t("resetPassword.newPassword")}
+          autoComplete="new-password"
+          required
+        />
+        <FormInputText
+          form={form}
+          name="confirmPassword"
+          type="password"
+          label={t("resetPassword.confirmPassword")}
+          autoComplete="new-password"
+          required
+        />
+        <p className="text-muted-foreground text-xs">{t("resetPassword.hint")}</p>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-          <FormInputText
-            form={form}
-            name="newPassword"
-            type="password"
-            label={t("resetPassword.newPassword")}
-            autoComplete="new-password"
-            disabled={tokenMissing}
-            required
-          />
-          <FormInputText
-            form={form}
-            name="confirmPassword"
-            type="password"
-            label={t("resetPassword.confirmPassword")}
-            autoComplete="new-password"
-            disabled={tokenMissing}
-            required
-          />
-          <p className="text-muted-foreground text-xs">{t("resetPassword.hint")}</p>
+        <AuthFormRootError message={form.formState.errors.root?.message} />
 
-          <AuthFormRootError message={form.formState.errors.root?.message} />
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={tokenMissing || mutation.isPending}
-          >
-            {mutation.isPending ? t("resetPassword.submitting") : t("resetPassword.submit")}
-          </Button>
-        </form>
-      </Form>
-    </>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending ? t("resetPassword.submitting") : t("resetPassword.submit")}
+        </Button>
+      </form>
+    </Form>
   )
 }

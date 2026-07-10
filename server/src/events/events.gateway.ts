@@ -39,10 +39,7 @@ export class EventsGateway
   }
 
   async handleConnection(client: AuthenticatedSocket) {
-    const token =
-      typeof client.handshake.auth?.token === 'string'
-        ? client.handshake.auth.token
-        : undefined;
+    const token = this.wsAuth.resolveSocketAccessToken(client.handshake);
 
     try {
       const { userId } = await this.wsAuth.authenticateSocketToken(token);
