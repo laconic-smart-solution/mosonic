@@ -232,8 +232,7 @@ export class RedNotePublishProcessor extends WorkerHost {
     );
 
     const title = deriveRedNoteTitle(caption);
-    await this.browserService.fillTitle(page, title);
-    await this.browserService.fillBody(page, caption);
+    await this.browserService.fillPublishFieldsWithRetry(page, title, caption);
     // Brief settle so TipTap/React commit values before publish click.
     await sleep(800);
   }
