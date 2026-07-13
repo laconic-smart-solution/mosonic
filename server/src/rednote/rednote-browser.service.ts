@@ -23,7 +23,7 @@ export class RedNoteBrowserService {
     const headlessEnv = this.config.get<string>('REDNOTE_HEADLESS')?.trim();
     const headless =
       headlessEnv === 'false' || headlessEnv === '0' ? false : true;
-    return puppeteer.launch({
+    const browser = await puppeteer.launch({
       headless,
       ...(executablePath ? { executablePath } : {}),
       args: [
@@ -37,6 +37,18 @@ export class RedNoteBrowserService {
       ],
       defaultViewport: { width: 1600, height: 1000, deviceScaleFactor: 1 },
     });
+
+    // Deny geolocation so Chrome's "Know your location" bar doesn't block the UI.
+    const ctx = browser.defaultBrowserContext();
+    for (const origin of [
+      'https://creator.rednote.com',
+      'https://creator.xiaohongshu.com',
+      'https://www.xiaohongshu.com',
+      'https://www.rednote.com',
+    ]) {
+      await ctx.overridePermissions(origin, []).catch(() => undefined);
+    }
+    return browser;
   }
 
   /** Prepare page so Xiaohongshu is less likely to serve a bot/empty shell. */
@@ -162,7 +174,7 @@ export class RedNoteBrowserService {
   titleInputSelector(): string {
     return (
       this.config.get<string>('REDNOTE_TITLE_INPUT_SELECTOR')?.trim() ||
-      '.edit-container input.d-text, input.d-text[placeholder*="title"], input.d-text[placeholder*="标题"]'
+      '.edit-container input.d-text, input.d-text[placeholder*="title"], input.d-text[placeholder*="标题"], input.d-text[type="text"]'
     );
   }
 
@@ -176,7 +188,7 @@ export class RedNoteBrowserService {
   publishButtonHostSelector(): string {
     return (
       this.config.get<string>('REDNOTE_PUBLISH_BUTTON_SELECTOR')?.trim() ||
-      'button.ce-btn.bg-red, xhs-publish-btn, button.ce-btn'
+      'xhs-publish-btn, button.ce-btn.bg-red, button.ce-btn'
     );
   }
 
@@ -191,9 +203,9 @@ export class RedNoteBrowserService {
 
   videoProcessingTimeoutMs(): number {
     const raw = Number(
-      this.config.get('REDNOTE_VIDEO_PROCESS_TIMEOUT_MS') ?? 120_000,
+      this.config.get('REDNOTE_VIDEO_PROCESS_TIMEOUT_MS') ?? 180_000,
     );
-    return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
+    return Number.isFinite(raw) && raw > 0 ? raw : 180_000;
   }
 
   publishSuccessTimeoutMs(): number {
@@ -750,45 +762,760 @@ export class RedNoteBrowserService {
   }
 
   /**
-   * Clicks the red "发布" button. Prefers `button.ce-btn.bg-red`, then
-   * `<xhs-publish-btn>` shadow DOM, then any button whose text is 发布.
-   * Scrolls into view so a clipped footer button is still clickable.
+   * Creator layout clips the footer "发布" button unless zoomed out (~50%).
+   * RedNote's own page doesn't scroll that footer into view.
    */
-  async clickPublishButton(page: Page): Promise<boolean> {
-    const selectors = this.publishButtonSelectors();
-    const deadline = Date.now() + 30_000;
+  async applyPublishPageZoom(page: Page, zoom = 0.5): Promise<void> {
+    const z = Number.isFinite(zoom) && zoom > 0.2 && zoom <= 1 ? zoom : 0.5;
+    await page.evaluate((scale) => {
+      document.documentElement.style.zoom = String(scale);
+      document.body.style.zoom = String(scale);
+    }, z);
+    this.logger.log(`RedNote: set page zoom=${z} so publish button fits in view`);
+  }
+
+  /**
+   * Wait until creator finishes video/cover upload AND `<xhs-publish-btn>`
+   * submit is enabled. Inner button lives in a *closed* shadow root — pierce
+   * via Puppeteer `>>>` / CDP (page.evaluate cannot see closed shadow).
+   */
+  async waitUntilVideoReadyForPublish(
+    page: Page,
+    timeoutMs: number,
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    let lastLog = 0;
 
     while (Date.now() < deadline) {
-      // 1) Known CSS selectors
-      for (const sel of selectors) {
-        const handle = await page.$(sel);
-        if (!handle) continue;
+      const lightStatus = await page.evaluate(() => {
+        const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ');
+        const uploading =
+          text.includes('视频上传中') ||
+          text.includes('视频处理中') ||
+          text.includes('封面上传中') ||
+          text.includes('上传中…') ||
+          text.includes('上传中...') ||
+          /video uploading/i.test(text) ||
+          /processing video/i.test(text) ||
+          /cover uploading/i.test(text);
 
-        const clicked = await this.clickPublishCandidate(page, handle, sel);
-        if (clicked) return true;
-      }
+        const loadingEl = document.querySelector(
+          '.cover-plugin-preview .loading',
+        ) as HTMLElement | null;
+        const coverBusy = Boolean(
+          loadingEl && loadingEl.style?.display !== 'none',
+        );
 
-      // 2) Text match: button containing 发布
-      const byText = await page.evaluateHandle(() => {
-        const buttons = Array.from(
-          document.querySelectorAll('button, [role="button"]'),
-        );
-        return (
-          buttons.find((el) => {
-            const t = (el.textContent ?? '').replace(/\s+/g, '');
-            return t === '发布' || t.includes('发布');
-          }) ?? null
-        );
+        const host = document.querySelector('xhs-publish-btn');
+        const submitDisabledAttr = host?.getAttribute('submit-disabled');
+        const hostDisabled = submitDisabledAttr === 'true';
+
+        return {
+          uploading: uploading || coverBusy,
+          hasHost: Boolean(host),
+          hostDisabled,
+          submitDisabledAttr: submitDisabledAttr ?? null,
+          openShadow: Boolean(
+            (host as HTMLElement & { shadowRoot?: ShadowRoot | null } | null)
+              ?.shadowRoot,
+          ),
+        };
       });
-      const el = byText.asElement();
-      if (el) {
-        const clicked = await this.clickPublishCandidate(page, el, 'text:发布');
-        if (clicked) return true;
+
+      const target = await this.resolvePublishSubmitButton(page);
+      const pierceEnabled = Boolean(target?.enabled);
+      if (target?.handle) {
+        await target.handle.dispose().catch(() => undefined);
       }
 
-      await new Promise((r) => setTimeout(r, 400));
+      const ready =
+        !lightStatus.uploading &&
+        lightStatus.hasHost &&
+        !lightStatus.hostDisabled &&
+        pierceEnabled;
+
+      if (ready) {
+        await new Promise((r) => setTimeout(r, 800));
+        const stillOk = await this.isPublishSubmitReady(page);
+        if (stillOk) {
+          this.logger.log(
+            `RedNote: video ready and publish enabled (host=${lightStatus.hasHost} via=${target?.via ?? 'unknown'} openShadow=${lightStatus.openShadow})`,
+          );
+          return true;
+        }
+      }
+
+      if (Date.now() - lastLog > 5_000) {
+        lastLog = Date.now();
+        this.logger.log(
+          `RedNote: waiting for video/publish ready uploading=${lightStatus.uploading} host=${lightStatus.hasHost} hostDisabled=${lightStatus.hostDisabled} attr=${lightStatus.submitDisabledAttr} pierceFound=${Boolean(target)} pierceEnabled=${pierceEnabled} via=${target?.via ?? 'none'} openShadow=${lightStatus.openShadow}`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, 1000));
     }
     return false;
+  }
+
+  /** True when host is enabled and pierced 发布 button is clickable. */
+  private async isPublishSubmitReady(page: Page): Promise<boolean> {
+    const hostOk = await page.evaluate(() => {
+      const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ');
+      if (
+        text.includes('视频上传中') ||
+        text.includes('视频处理中') ||
+        text.includes('封面上传中')
+      ) {
+        return false;
+      }
+      const host = document.querySelector('xhs-publish-btn');
+      if (!host) return false;
+      return host.getAttribute('submit-disabled') !== 'true';
+    });
+    if (!hostOk) return false;
+
+    const target = await this.resolvePublishSubmitButton(page);
+    if (target?.handle) {
+      await target.handle.dispose().catch(() => undefined);
+    }
+    return Boolean(target?.enabled);
+  }
+
+  /**
+   * Resolve the real 发布 button inside closed/open shadow.
+   * Order: pierce selectors → host-scoped pierce → CDP closed-shadow walk.
+   */
+  private async resolvePublishSubmitButton(page: Page): Promise<{
+    handle: ElementHandle<Element> | null;
+    enabled: boolean;
+    via: string;
+    backendNodeId?: number;
+  } | null> {
+    const fromPierce = await this.findPiercedPublishSubmitButton(page);
+    if (fromPierce) {
+      try {
+        const enabled = await fromPierce.evaluate((el) => {
+          const btn = el as HTMLButtonElement;
+          const cls = btn.className?.toString?.() ?? '';
+          return (
+            !btn.disabled &&
+            btn.getAttribute('aria-disabled') !== 'true' &&
+            !/\bdisabled\b/i.test(cls)
+          );
+        });
+        return { handle: fromPierce, enabled, via: 'pierce' };
+      } catch (err) {
+        await fromPierce.dispose().catch(() => undefined);
+        this.logger.debug(
+          `RedNote: pierce handle evaluate failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    const fromCdp = await this.findPublishButtonViaCdp(page);
+    if (fromCdp) {
+      return {
+        handle: fromCdp.handle,
+        enabled: fromCdp.enabled,
+        via: 'cdp',
+        backendNodeId: fromCdp.backendNodeId,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Puppeteer pierce / deep combinator. Closed shadow often needs CDP instead;
+   * keep this as the fast path when it works.
+   */
+  private async findPiercedPublishSubmitButton(
+    page: Page,
+  ): Promise<ElementHandle<Element> | null> {
+    const pierceQueries = [
+      'xhs-publish-btn >>> .publish-page-publish-btn button.ce-btn.bg-red',
+      'xhs-publish-btn >>> button.ce-btn.bg-red',
+      '::-p-pierce(.publish-page-publish-btn button.ce-btn.bg-red)',
+      '::-p-pierce(button.ce-btn.bg-red)',
+      'xhs-publish-btn >>> button.bg-red',
+      'xhs-publish-btn >>> button.ce-btn',
+      'xhs-publish-btn >>> button',
+      'button.ce-btn.bg-red',
+    ];
+
+    for (const sel of pierceQueries) {
+      try {
+        const handles = await page.$$(sel);
+        let matched: ElementHandle<Element> | null = null;
+        for (const handle of handles) {
+          if (matched) {
+            await handle.dispose().catch(() => undefined);
+            continue;
+          }
+          const meta = await handle.evaluate((el) => {
+            const t = (el.textContent ?? '').replace(/\s+/g, '');
+            const cls = (el as HTMLElement).className?.toString?.() ?? '';
+            return { t, cls };
+          });
+          const isPublish =
+            meta.t === '发布' ||
+            (meta.t.includes('发布') &&
+              !meta.t.includes('发布笔记') &&
+              !meta.t.includes('暂存'));
+          const looksRed = /\bbg-red\b/.test(meta.cls);
+          if (
+            isPublish ||
+            (looksRed && meta.t.length > 0 && meta.t.length <= 6)
+          ) {
+            matched = handle;
+          } else {
+            await handle.dispose().catch(() => undefined);
+          }
+        }
+        if (matched) return matched;
+      } catch (err) {
+        this.logger.debug(
+          `RedNote: pierce selector failed (${sel}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    // Host-scoped pierce (sometimes works when page.$$ deep combinator does not).
+    try {
+      const host = await page.$('xhs-publish-btn');
+      if (host) {
+        for (const sel of [
+          '>>> .publish-page-publish-btn button.ce-btn.bg-red',
+          '>>> button.ce-btn.bg-red',
+          '>>> button.bg-red',
+          '>>> button',
+        ]) {
+          try {
+            const btn = await host.$(sel);
+            if (!btn) continue;
+            const text = await btn.evaluate((el) =>
+              (el.textContent ?? '').replace(/\s+/g, ''),
+            );
+            if (
+              text === '发布' ||
+              (text.includes('发布') && !text.includes('暂存'))
+            ) {
+              await host.dispose().catch(() => undefined);
+              return btn;
+            }
+            await btn.dispose().catch(() => undefined);
+          } catch (err) {
+            this.logger.debug(
+              `RedNote: host pierce failed (${sel}): ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        await host.dispose().catch(() => undefined);
+      }
+    } catch (err) {
+      this.logger.debug(
+        `RedNote: host pierce setup failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Closed shadow fallback: CDP describeNode(pierce) → shadowRoots → querySelector.
+   * Prefer backendNodeId (stable across CDP sessions) over nodeId.
+   */
+  private async findPublishButtonViaCdp(page: Page): Promise<{
+    handle: ElementHandle<Element> | null;
+    backendNodeId: number;
+    enabled: boolean;
+  } | null> {
+    const client = await page.createCDPSession();
+    try {
+      await client.send('DOM.enable').catch(() => undefined);
+      const { root } = await client.send('DOM.getDocument', {
+        depth: 0,
+        pierce: true,
+      });
+      const { nodeId: hostId } = await client.send('DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector: 'xhs-publish-btn',
+      });
+      if (!hostId) {
+        this.logger.debug('RedNote CDP: xhs-publish-btn not found');
+        return null;
+      }
+
+      const { node: hostNode } = await client.send('DOM.describeNode', {
+        nodeId: hostId,
+        depth: 3,
+        pierce: true,
+      });
+      const shadowRoots = hostNode.shadowRoots ?? [];
+      if (!shadowRoots.length) {
+        this.logger.debug(
+          'RedNote CDP: host has no shadowRoots even with pierce=true',
+        );
+        return null;
+      }
+
+      const selectors = [
+        '.publish-page-publish-btn button.ce-btn.bg-red',
+        '.publish-page-publish-btn button.bg-red',
+        'button.ce-btn.bg-red',
+        'button.bg-red',
+      ];
+
+      for (const sr of shadowRoots) {
+        const shadowNodeId = sr.nodeId;
+        if (!shadowNodeId) continue;
+
+        for (const selector of selectors) {
+          const { nodeId: btnId } = await client.send('DOM.querySelector', {
+            nodeId: shadowNodeId,
+            selector,
+          });
+          if (!btnId) continue;
+
+          const { object } = await client.send('DOM.resolveNode', {
+            nodeId: btnId,
+          });
+          if (!object.objectId) continue;
+
+          const { result } = await client.send('Runtime.callFunctionOn', {
+            objectId: object.objectId,
+            functionDeclaration: `function () {
+              const t = (this.textContent || '').replace(/\\s+/g, '');
+              const cls = (this.className && this.className.toString)
+                ? this.className.toString()
+                : String(this.className || '');
+              const disabled =
+                Boolean(this.disabled) ||
+                this.getAttribute('aria-disabled') === 'true' ||
+                /\\bdisabled\\b/i.test(cls);
+              return { t: t, disabled: disabled, cls: cls };
+            }`,
+            returnByValue: true,
+          });
+          const meta = result.value as {
+            t: string;
+            disabled: boolean;
+            cls: string;
+          };
+          const isPublish =
+            meta.t === '发布' ||
+            (meta.t.includes('发布') &&
+              !meta.t.includes('发布笔记') &&
+              !meta.t.includes('暂存'));
+          if (!isPublish && !/\bbg-red\b/.test(meta.cls)) {
+            continue;
+          }
+          if (!isPublish && meta.t.includes('暂存')) {
+            continue;
+          }
+
+          const { node } = await client.send('DOM.describeNode', {
+            nodeId: btnId,
+          });
+          const backendNodeId = node.backendNodeId;
+          if (!backendNodeId) continue;
+
+          let handle: ElementHandle<Element> | null = null;
+          try {
+            const adopt = (
+              page as Page & {
+                adoptBackendNodeId?: (
+                  id: number,
+                ) => Promise<ElementHandle<Element>>;
+              }
+            ).adoptBackendNodeId;
+            if (typeof adopt === 'function') {
+              handle = await adopt.call(page, backendNodeId);
+            }
+          } catch (err) {
+            this.logger.debug(
+              `RedNote CDP: adoptBackendNodeId failed: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+
+          this.logger.debug(
+            `RedNote CDP: found publish button text=${meta.t} disabled=${meta.disabled} handle=${Boolean(handle)} backend=${backendNodeId}`,
+          );
+          return {
+            handle,
+            backendNodeId,
+            enabled: !meta.disabled,
+          };
+        }
+      }
+
+      this.logger.debug('RedNote CDP: no 发布 button inside shadowRoots');
+      return null;
+    } catch (err) {
+      this.logger.warn(
+        `RedNote CDP pierce failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    } finally {
+      await client.detach().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Click publish via CDP in a single session (find + click). Required for
+   * closed shadow when ElementHandle pierce fails.
+   */
+  private async clickPublishButtonViaCdp(page: Page): Promise<boolean> {
+    const client = await page.createCDPSession();
+    try {
+      await client.send('DOM.enable').catch(() => undefined);
+      const { root } = await client.send('DOM.getDocument', {
+        depth: 0,
+        pierce: true,
+      });
+      const { nodeId: hostId } = await client.send('DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector: 'xhs-publish-btn',
+      });
+      if (!hostId) return false;
+
+      const { node: hostNode } = await client.send('DOM.describeNode', {
+        nodeId: hostId,
+        depth: 3,
+        pierce: true,
+      });
+      const shadowRoots = hostNode.shadowRoots ?? [];
+      const selectors = [
+        '.publish-page-publish-btn button.ce-btn.bg-red',
+        '.publish-page-publish-btn button.bg-red',
+        'button.ce-btn.bg-red',
+        'button.bg-red',
+      ];
+
+      for (const sr of shadowRoots) {
+        if (!sr.nodeId) continue;
+        for (const selector of selectors) {
+          const { nodeId: btnId } = await client.send('DOM.querySelector', {
+            nodeId: sr.nodeId,
+            selector,
+          });
+          if (!btnId) continue;
+
+          const { object } = await client.send('DOM.resolveNode', {
+            nodeId: btnId,
+          });
+          if (!object.objectId) continue;
+
+          const { result } = await client.send('Runtime.callFunctionOn', {
+            objectId: object.objectId,
+            functionDeclaration: `function () {
+              const t = (this.textContent || '').replace(/\\s+/g, '');
+              return t;
+            }`,
+            returnByValue: true,
+          });
+          const text = String(result.value ?? '');
+          if (
+            text !== '发布' &&
+            !(text.includes('发布') && !text.includes('暂存'))
+          ) {
+            continue;
+          }
+
+          await client
+            .send('DOM.scrollIntoViewIfNeeded', { nodeId: btnId })
+            .catch(() => undefined);
+
+          await client.send('Runtime.callFunctionOn', {
+            objectId: object.objectId,
+            functionDeclaration: `function () {
+              this.focus && this.focus();
+              this.click && this.click();
+            }`,
+            returnByValue: true,
+          });
+
+          try {
+            const { model } = await client.send('DOM.getBoxModel', {
+              nodeId: btnId,
+            });
+            if (model?.content?.length >= 8) {
+              const c = model.content;
+              const x = (c[0]! + c[2]! + c[4]! + c[6]!) / 4;
+              const y = (c[1]! + c[3]! + c[5]! + c[7]!) / 4;
+              await page.mouse.click(x, y, { delay: 40 });
+            }
+          } catch {
+            /* Runtime.click may suffice */
+          }
+
+          this.logger.debug('RedNote CDP: clicked 发布 in same session');
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      this.logger.debug(
+        `RedNote CDP find+click failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return false;
+    } finally {
+      await client.detach().catch(() => undefined);
+    }
+  }
+
+  /** Click a DOM node by stable backendNodeId (closed-shadow safe). */
+  private async clickCdpBackendNode(
+    page: Page,
+    backendNodeId: number,
+  ): Promise<boolean> {
+    const client = await page.createCDPSession();
+    try {
+      await client.send('DOM.enable').catch(() => undefined);
+      const { object } = await client.send('DOM.resolveNode', {
+        backendNodeId,
+      });
+      if (!object.objectId) return false;
+
+      await client.send('Runtime.callFunctionOn', {
+        objectId: object.objectId,
+        functionDeclaration: `function () {
+          this.scrollIntoView && this.scrollIntoView({ block: 'center', inline: 'center' });
+          this.focus && this.focus();
+          this.click && this.click();
+        }`,
+        returnByValue: true,
+      });
+
+      try {
+        const { model } = await client.send('DOM.getBoxModel', {
+          backendNodeId,
+        });
+        if (model?.content?.length >= 8) {
+          const c = model.content;
+          const x = (c[0]! + c[2]! + c[4]! + c[6]!) / 4;
+          const y = (c[1]! + c[3]! + c[5]! + c[7]!) / 4;
+          await page.mouse.click(x, y, { delay: 40 });
+        }
+      } catch {
+        /* Runtime click may be enough */
+      }
+      return true;
+    } catch (err) {
+      this.logger.debug(
+        `RedNote CDP backend click failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return false;
+    } finally {
+      await client.detach().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Clicks 发布 inside `<xhs-publish-btn>` (closed shadow via pierce/CDP).
+   * Zooms to ~50% first (RedNote clips the footer at 100% and won't scroll).
+   */
+  async clickPublishButton(page: Page): Promise<boolean> {
+    this.logger.log(
+      'RedNote: preparing to click publish (zoom → wait upload → pierce/CDP click)',
+    );
+
+    await this.applyPublishPageZoom(page, 0.5);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const videoReady = await this.waitUntilVideoReadyForPublish(
+      page,
+      this.videoProcessingTimeoutMs(),
+    );
+    if (!videoReady) {
+      this.logger.warn(
+        'RedNote: timed out waiting for video upload / enabled publish button',
+      );
+      return false;
+    }
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const hostDisabled = await page.evaluate(() => {
+        const host = document.querySelector('xhs-publish-btn');
+        return host?.getAttribute('submit-disabled') === 'true';
+      });
+      if (hostDisabled) {
+        this.logger.debug('RedNote: publish host still submit-disabled; retrying');
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      const target = await this.resolvePublishSubmitButton(page);
+      if (!target || !target.enabled) {
+        if (target?.handle) {
+          await target.handle.dispose().catch(() => undefined);
+        }
+        this.logger.debug(
+          `RedNote: publish target missing/disabled via=${target?.via ?? 'none'}; retrying`,
+        );
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      try {
+        let clicked = false;
+
+        if (target.handle) {
+          await target.handle.evaluate((el) => {
+            el.scrollIntoView({ block: 'center', inline: 'center' });
+          });
+          try {
+            await target.handle.click({ delay: 40 });
+            clicked = true;
+          } catch (err) {
+            this.logger.debug(
+              `RedNote: ElementHandle.click failed: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+          try {
+            const box = await target.handle.boundingBox();
+            if (box && box.width > 2 && box.height > 2) {
+              await page.mouse.click(
+                box.x + box.width / 2,
+                box.y + box.height / 2,
+                { delay: 40 },
+              );
+              clicked = true;
+            }
+          } catch {
+            /* continue */
+          }
+          await target.handle.evaluate((node) => {
+            const el = node as HTMLElement;
+            const opts: MouseEventInit = {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              view: window,
+              buttons: 1,
+            };
+            el.focus?.();
+            el.dispatchEvent(new PointerEvent('pointerdown', opts));
+            el.dispatchEvent(new MouseEvent('mousedown', opts));
+            el.dispatchEvent(new PointerEvent('pointerup', opts));
+            el.dispatchEvent(new MouseEvent('mouseup', opts));
+            el.dispatchEvent(new MouseEvent('click', opts));
+            (el as HTMLButtonElement).click?.();
+          });
+          clicked = true;
+          await target.handle.dispose().catch(() => undefined);
+        }
+
+        if (!clicked && target.backendNodeId != null) {
+          clicked = await this.clickCdpBackendNode(page, target.backendNodeId);
+        }
+
+        if (!clicked) {
+          // Last resort: re-query + click inside one CDP session.
+          clicked = await this.clickPublishButtonViaCdp(page);
+        }
+
+        if (!clicked) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+
+        this.logger.log(
+          `RedNote: publish clicked after video ready (${target.via}/xhs-publish-btn)`,
+        );
+        return true;
+      } catch (err) {
+        if (target.handle) {
+          await target.handle.dispose().catch(() => undefined);
+        }
+        this.logger.debug(
+          `RedNote: publish click attempt failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    this.logger.warn('RedNote: publish button not clicked within timeout');
+    return false;
+  }
+
+  private async findPublishButtonByText(
+    page: Page,
+  ): Promise<ElementHandle<Element> | null> {
+    const handle = await page.evaluateHandle(() => {
+      const buttons = Array.from(
+        document.querySelectorAll('button, [role="button"]'),
+      );
+      return (
+        buttons.find((el) => {
+          const t = (el.textContent ?? '').replace(/\s+/g, '');
+          return t === '发布';
+        }) ??
+        buttons.find((el) => {
+          const t = (el.textContent ?? '').replace(/\s+/g, '');
+          return t.includes('发布') && !t.includes('发布笔记');
+        }) ??
+        null
+      );
+    });
+    const el = handle.asElement();
+    return el ? (el as ElementHandle<Element>) : null;
+  }
+
+  private async mouseClickElement(
+    page: Page,
+    handle: ElementHandle,
+    label: string,
+  ): Promise<boolean> {
+    try {
+      // Prefer DOM click — button is often clipped by RedNote overflow.
+      await handle.evaluate((node) => {
+        const btn = node as HTMLElement;
+        const opts: MouseEventInit = {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          buttons: 1,
+        };
+        btn.dispatchEvent(new MouseEvent('pointerdown', opts));
+        btn.dispatchEvent(new MouseEvent('mousedown', opts));
+        btn.dispatchEvent(new MouseEvent('pointerup', opts));
+        btn.dispatchEvent(new MouseEvent('mouseup', opts));
+        btn.dispatchEvent(new MouseEvent('click', opts));
+        btn.click();
+      });
+      this.logger.debug(`RedNote DOM-click ${label}`);
+      return true;
+    } catch (err) {
+      this.logger.warn(
+        `RedNote click failed (${label}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return false;
+    }
   }
 
   private async clickPublishCandidate(
@@ -797,7 +1524,6 @@ export class RedNoteBrowserService {
     label: string,
   ): Promise<boolean> {
     try {
-      // Shadow host: click inner button when present
       const clickedShadow = await handle.evaluate((host) => {
         const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
           .shadowRoot;
@@ -806,7 +1532,6 @@ export class RedNoteBrowserService {
           'button, [role="button"]',
         ) as HTMLButtonElement | null;
         if (!btn || btn.disabled) return false;
-        btn.scrollIntoView({ block: 'center', inline: 'center' });
         btn.click();
         return true;
       });
@@ -815,21 +1540,7 @@ export class RedNoteBrowserService {
         return true;
       }
 
-      const enabled = await handle.evaluate((node) => {
-        if (!(node instanceof HTMLElement)) return false;
-        const btn = node as HTMLButtonElement;
-        if (btn.disabled) return false;
-        if (btn.getAttribute('aria-disabled') === 'true') return false;
-        const cls = btn.className?.toString?.() ?? '';
-        if (/\bdisabled\b/i.test(cls) && !/\bbg-red\b/i.test(cls)) return false;
-        node.scrollIntoView({ block: 'center', inline: 'center' });
-        return true;
-      });
-      if (!enabled) return false;
-
-      await handle.click({ delay: 40 });
-      this.logger.debug(`Clicked publish via host (${label})`);
-      return true;
+      return await this.mouseClickElement(page, handle, label);
     } catch (err) {
       this.logger.debug(
         `Publish click candidate failed (${label}): ${
@@ -952,6 +1663,7 @@ export class RedNoteBrowserService {
 
   async fillTitle(page: Page, title: string): Promise<void> {
     const sel = this.titleInputSelector();
+    const value = title.trim();
     await page.waitForSelector(sel, { visible: true, timeout: 15_000 });
     const el = await page.$(sel);
     if (el) {
@@ -959,14 +1671,58 @@ export class RedNoteBrowserService {
         (node as HTMLElement).scrollIntoView({ block: 'center' }),
       );
     }
+
+    // React controlled <input>: set via native value setter + input/change.
+    await page.evaluate(
+      (selector, next) => {
+        const input = document.querySelector(selector) as HTMLInputElement | null;
+        if (!input) return;
+        input.focus();
+        const proto = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          'value',
+        );
+        proto?.set?.call(input, next);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(
+          new InputEvent('input', {
+            bubbles: true,
+            data: next,
+            inputType: 'insertText',
+          }),
+        );
+      },
+      sel,
+      value,
+    );
+
+    // Nudge React: blur → focus (same idea as a page re-render).
+    await page.evaluate((selector) => {
+      const input = document.querySelector(selector) as HTMLInputElement | null;
+      input?.blur();
+    }, sel);
+    await new Promise((r) => setTimeout(r, 200));
     await page.click(sel);
-    // Clear via keyboard so React/controlled inputs stay in sync.
-    await page.keyboard.down('Control');
-    await page.keyboard.press('KeyA');
-    await page.keyboard.up('Control');
-    await page.keyboard.press('Backspace');
-    if (title.trim()) {
-      await page.type(sel, title, { delay: 25 });
+
+    const actual = await page.evaluate((selector) => {
+      const input = document.querySelector(selector) as HTMLInputElement | null;
+      return (input?.value ?? '').trim();
+    }, sel);
+
+    if (value && actual !== value) {
+      // Fallback: keyboard type after clear
+      await page.click(sel);
+      await page.keyboard.down('Control');
+      await page.keyboard.press('KeyA');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Backspace');
+      const cdp = await page.createCDPSession();
+      try {
+        await cdp.send('Input.insertText', { text: value });
+      } finally {
+        await cdp.detach().catch(() => undefined);
+      }
     }
   }
 
@@ -981,13 +1737,56 @@ export class RedNoteBrowserService {
         (node as HTMLElement).scrollIntoView({ block: 'center' }),
       );
     }
+
     await page.click(sel);
+    await new Promise((r) => setTimeout(r, 150));
+
+    // Clear existing TipTap content
     await page.keyboard.down('Control');
     await page.keyboard.press('KeyA');
     await page.keyboard.up('Control');
     await page.keyboard.press('Backspace');
-    // TipTap listens to beforeinput/insertText better than setting textContent.
-    await page.keyboard.type(text, { delay: 8 });
+    await new Promise((r) => setTimeout(r, 100));
+
+    // CDP insertText fires beforeinput/input that TipTap/ProseMirror handles.
+    const cdp = await page.createCDPSession();
+    try {
+      await cdp.send('Input.insertText', { text });
+    } finally {
+      await cdp.detach().catch(() => undefined);
+    }
+
+    // Fallback if still empty: execCommand insertText
+    const afterCdp = await this.readBodyText(page);
+    if (afterCdp.length < Math.min(10, text.length)) {
+      await page.evaluate(
+        (selector, body) => {
+          const editor = document.querySelector(selector) as HTMLElement | null;
+          if (!editor) return;
+          editor.focus();
+          document.execCommand('selectAll', false);
+          document.execCommand('delete', false);
+          document.execCommand('insertText', false, body);
+          editor.dispatchEvent(
+            new InputEvent('input', {
+              bubbles: true,
+              data: body,
+              inputType: 'insertText',
+            }),
+          );
+        },
+        sel,
+        text,
+      );
+    }
+
+    // Blur/focus nudge so creator SPA commits editor state (like a re-render).
+    await page.evaluate((selector) => {
+      const editor = document.querySelector(selector) as HTMLElement | null;
+      editor?.blur();
+    }, sel);
+    await new Promise((r) => setTimeout(r, 250));
+    await page.click(sel);
   }
 
   /** Returns true when the TipTap body contains a non-trivial amount of text. */
@@ -999,8 +1798,16 @@ export class RedNoteBrowserService {
     }, sel);
   }
 
+  async readTitleText(page: Page): Promise<string> {
+    const sel = this.titleInputSelector();
+    return page.evaluate((selector) => {
+      const el = document.querySelector(selector) as HTMLInputElement | null;
+      return (el?.value ?? '').trim();
+    }, sel);
+  }
+
   /**
-   * Fill title + caption, then verify caption stuck. If the SPA remounted the
+   * Fill title + caption, then verify both stuck. If the SPA remounted the
    * editor (common after video processing), wait and fill again.
    */
   async fillPublishFieldsWithRetry(
@@ -1008,38 +1815,58 @@ export class RedNoteBrowserService {
     title: string,
     caption: string,
   ): Promise<void> {
-    const expected = caption.trim();
+    const expectedBody = caption.trim();
+    const expectedTitle = title.trim();
+
     for (let attempt = 1; attempt <= 3; attempt++) {
+      // Click title then body to force editor mount/activation.
+      try {
+        await page.click(this.titleInputSelector());
+        await new Promise((r) => setTimeout(r, 200));
+        await page.click(this.bodyEditorSelector());
+        await new Promise((r) => setTimeout(r, 200));
+      } catch {
+        /* ignore */
+      }
+
       await this.fillTitle(page, title);
       await this.fillBody(page, caption);
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 800));
 
-      if (!expected) return;
-      const actual = await this.readBodyText(page);
-      const matched =
-        actual.length >= Math.min(20, expected.length) &&
-        (actual.includes(expected.slice(0, 20)) ||
-          expected.includes(actual.slice(0, 20)));
-      if (matched) {
+      const actualBody = await this.readBodyText(page);
+      const actualTitle = await this.readTitleText(page);
+
+      const bodyOk =
+        !expectedBody ||
+        (actualBody.length >= Math.min(12, expectedBody.length) &&
+          (actualBody.includes(expectedBody.slice(0, 16)) ||
+            expectedBody.includes(actualBody.slice(0, 16))));
+      const titleOk =
+        !expectedTitle ||
+        actualTitle.length > 0 ||
+        actualTitle === expectedTitle;
+
+      if (bodyOk && titleOk) {
         this.logger.debug(
-          `RedNote caption filled on attempt=${attempt} len=${actual.length}`,
+          `RedNote fields filled attempt=${attempt} titleLen=${actualTitle.length} bodyLen=${actualBody.length}`,
         );
         return;
       }
 
       this.logger.warn(
-        `RedNote caption missing after fill attempt=${attempt} (got len=${actual.length}); waiting for re-render`,
+        `RedNote fields missing after fill attempt=${attempt} (titleLen=${actualTitle.length} bodyLen=${actualBody.length}); waiting for re-render`,
       );
       await this.waitForPublishFormReady(page, 30_000);
     }
 
-    const finalText = await this.readBodyText(page);
+    const finalBody = await this.readBodyText(page);
+    const finalTitle = await this.readTitleText(page);
     if (
-      expected &&
-      finalText.length < Math.min(10, expected.length)
+      (expectedBody && finalBody.length < Math.min(10, expectedBody.length)) ||
+      (expectedTitle && !finalTitle)
     ) {
       throw new RedNoteSelectorMismatchError(
-        'Could not fill RedNote caption — editor remounted or selectors changed',
+        'Could not fill RedNote title/caption — editor remounted or selectors changed',
       );
     }
   }

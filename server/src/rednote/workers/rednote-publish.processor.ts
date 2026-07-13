@@ -28,15 +28,13 @@ import {
 import { RedNoteLockService } from '../rednote-lock.service';
 import { resolveAbsoluteMediaUrlFromConfig } from '../../upload/resolve-absolute-media-url.util';
 import { UploadService } from '../../upload/upload.service';
+import {
+  sanitizeRedNoteCaption,
+  sanitizeRedNoteTitle,
+} from '../sanitize-rednote-text.util';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function deriveRedNoteTitle(caption: string): string {
-  const firstLine = caption.trim().split(/\r?\n/)[0]?.trim() ?? '';
-  const compact = firstLine || caption.trim();
-  return compact.slice(0, 20);
 }
 
 @Processor(REDNOTE_PUBLISH_QUEUE, {
@@ -128,8 +126,8 @@ export class RedNotePublishProcessor extends WorkerHost {
 
       const publishClicked = await this.browserService.clickPublishButton(page);
       if (!publishClicked) {
-        throw new RedNoteSelectorMismatchError(
-          'Could not locate RedNote publish button',
+        throw new RedNoteUploadTimeoutError(
+          'RedNote publish button was not clickable — wait for video upload to finish, or UI selectors changed',
         );
       }
 
@@ -231,10 +229,20 @@ export class RedNotePublishProcessor extends WorkerHost {
       `RedNote edit form ready in ${Date.now() - uploadStarted}ms`,
     );
 
-    const title = deriveRedNoteTitle(caption);
-    await this.browserService.fillPublishFieldsWithRetry(page, title, caption);
-    // Brief settle so TipTap/React commit values before publish click.
-    await sleep(800);
+    const safeCaption = sanitizeRedNoteCaption(caption);
+    const title = sanitizeRedNoteTitle(safeCaption || caption);
+    if (safeCaption !== caption.trim()) {
+      this.logger.warn(
+        'RedNote caption sanitized (removed special symbols from topics/hashtags)',
+      );
+    }
+    await this.browserService.fillPublishFieldsWithRetry(
+      page,
+      title,
+      safeCaption,
+    );
+    // Settle so TipTap/React enable the publish button after field commits.
+    await sleep(1500);
   }
 
   private async downloadVideoToTmp(url: string): Promise<string> {
