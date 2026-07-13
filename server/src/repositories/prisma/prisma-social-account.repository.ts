@@ -73,10 +73,16 @@ export class PrismaSocialAccountRepository implements ISocialAccountRepository {
       },
       update: {
         externalAccountId: input.externalAccountId,
-        displayName: input.displayName ?? null,
-        username: input.username ?? null,
-        avatarUrl: input.avatarUrl ?? null,
-        metadata: input.metadata ?? undefined,
+        // Only overwrite profile fields when callers pass them; omit keeps
+        // existing username/displayName (e.g. OAuth name + later id-only sync).
+        ...(input.displayName !== undefined
+          ? { displayName: input.displayName }
+          : {}),
+        ...(input.username !== undefined ? { username: input.username } : {}),
+        ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+        ...(input.metadata !== undefined
+          ? { metadata: input.metadata ?? undefined }
+          : {}),
         status: SocialAccountStatus.ACTIVE,
         disconnectedAt: null,
         connectedAt,

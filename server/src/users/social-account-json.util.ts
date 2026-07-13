@@ -30,15 +30,21 @@ export function normalizeZernioConnectedAccountsJson(
         channel?: string;
         accountId?: string;
         connectedAt?: Date | string;
+        username?: string | null;
+        displayName?: string | null;
       };
       const channel = normalizeChannelKey(rec.channel ?? '');
       const accountId = rec.accountId?.trim();
       if (!channel || !accountId) continue;
+      const username = rec.username?.trim() || undefined;
+      const displayName = rec.displayName?.trim() || undefined;
       normalized.push({
         userId: rec.userId?.trim() || userId,
         channel,
         accountId,
         connectedAt: toConnectedAtDate(rec.connectedAt),
+        ...(username ? { username } : {}),
+        ...(displayName ? { displayName } : {}),
       });
     }
     return normalized;

@@ -121,6 +121,7 @@
       "partialSync": "部分平台同步失败，请重试刷新。",
       "unavailable": "此帖子暂无分析数据。",
       "afterPublish": "帖子发布后将在此显示分析数据。",
+      "rednoteUnsupported": "RedNote 不支持分析数据。指标仅适用于通过 Zernio 连接的渠道。",
       "refresh": "刷新指标",
       "syncSuccess": "分析数据已更新",
       "chartTitle": "各渠道表现",

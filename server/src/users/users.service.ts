@@ -210,6 +210,7 @@ export class UsersService {
     userId: string,
     platform: string,
     accountId: string,
+    profile?: { username?: string | null; displayName?: string | null },
   ): Promise<void> {
     const key = normalizeChannelKey(platform);
     const normalizedAccountId = accountId.trim();
@@ -225,12 +226,17 @@ export class UsersService {
       throw new NotFoundException(`User ${userId} not found`);
     }
 
+    const username = profile?.username?.trim() || undefined;
+    const displayName = profile?.displayName?.trim() || undefined;
+
     const now = new Date();
     await this.socialAccounts.upsertActive({
       userId,
       provider: SocialProvider.ZERNIO,
       channel: key,
       externalAccountId: normalizedAccountId,
+      ...(username !== undefined ? { username } : {}),
+      ...(displayName !== undefined ? { displayName } : {}),
       connectedAt: now,
       lastSyncedAt: now,
     });
@@ -245,6 +251,8 @@ export class UsersService {
       channel: string;
       accountId: string;
       connectedAt?: Date;
+      username?: string | null;
+      displayName?: string | null;
     }>,
   ): Promise<void> {
     const user = await this.findByUserId(userId);
@@ -259,11 +267,15 @@ export class UsersService {
       const channel = normalizeChannelKey(item.channel);
       const externalAccountId = item.accountId?.trim() ?? '';
       if (!channel || !externalAccountId) continue;
+      const username = item.username?.trim() || undefined;
+      const displayName = item.displayName?.trim() || undefined;
       await this.socialAccounts.upsertActive({
         userId,
         provider: SocialProvider.ZERNIO,
         channel,
         externalAccountId,
+        ...(username !== undefined ? { username } : {}),
+        ...(displayName !== undefined ? { displayName } : {}),
         connectedAt: item.connectedAt ?? now,
         lastSyncedAt: now,
       });
@@ -417,12 +429,15 @@ export class UsersService {
       throw new NotFoundException(`User ${userId} not found`);
     }
     const now = new Date();
+    const handle = metadata.rednoteUserHandle?.trim() || undefined;
     return this.socialAccounts.upsertActive({
       userId,
       provider: SocialProvider.REDNOTE,
       channel: REDNOTE_CHANNEL,
       externalAccountId: rednoteExternalAccountId(userId),
-      username: metadata.rednoteUserHandle ?? null,
+      ...(handle
+        ? { username: handle, displayName: handle }
+        : {}),
       connectedAt: now,
       lastSyncedAt: now,
       metadata: metadata as unknown as Prisma.InputJsonValue,
@@ -513,10 +528,12 @@ export class UsersService {
   ): Promise<void> {
     const updated = await this.users.update(userId, {
       zernioConnectedAccounts: accounts.map(
-        ({ channel, accountId, connectedAt }) => ({
+        ({ channel, accountId, connectedAt, username, displayName }) => ({
           channel,
           accountId,
           connectedAt,
+          ...(username ? { username } : {}),
+          ...(displayName ? { displayName } : {}),
         }),
       ),
     });

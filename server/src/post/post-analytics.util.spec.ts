@@ -1,6 +1,7 @@
 import {
   publishedChannelsFromPost,
   isPostMetricsEligible,
+  supportsAnalyticsChannel,
 } from './post-analytics.util';
 import {
   PlatformPostStatus,
@@ -24,5 +25,19 @@ describe('post-analytics.util', () => {
       ],
     });
     expect(channels).toEqual(['instagram']);
+  });
+
+  it('publishedChannelsFromPost excludes rednote', () => {
+    expect(
+      publishedChannelsFromPost({
+        status: PostStatus.Published,
+        channels: ['rednote', 'instagram', 'RedNote'],
+      }),
+    ).toEqual(['instagram']);
+  });
+
+  it('supportsAnalyticsChannel is false for rednote', () => {
+    expect(supportsAnalyticsChannel('rednote')).toBe(false);
+    expect(supportsAnalyticsChannel('instagram')).toBe(true);
   });
 });

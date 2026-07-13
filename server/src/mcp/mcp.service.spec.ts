@@ -120,8 +120,13 @@ describe('McpService', () => {
     } as never);
     zernio.listAccounts.mockResolvedValue([
       { platform: 'Instagram', account_id: 'acc_1' },
-      { channel: 'instagram', accountId: 'acc_2' },
-      { platform: 'facebook', id: 'fb_1' },
+      {
+        channel: 'instagram',
+        accountId: 'acc_2',
+        username: 'ig_user',
+        displayName: 'IG Name',
+      },
+      { platform: 'facebook', id: 'fb_1', name: 'Page One' },
       { platform: '', account_id: 'bad' },
     ]);
 
@@ -133,10 +138,13 @@ describe('McpService', () => {
         expect.objectContaining({
           channel: 'instagram',
           accountId: 'acc_2',
+          username: 'ig_user',
+          displayName: 'IG Name',
         }),
         expect.objectContaining({
           channel: 'facebook',
           accountId: 'fb_1',
+          displayName: 'Page One',
         }),
       ]),
     );

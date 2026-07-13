@@ -495,6 +495,12 @@ export default function UploadPage() {
     })
   }, [activeKey, activeRow?.scheduledAt, activeRow?.status])
 
+  useEffect(() => {
+    if (activeKey === "rednote") {
+      setShowChannelSchedule(false)
+    }
+  }, [activeKey])
+
   const activeDraft =
     draftsByChannel[activeKey] ??
     (activeRow ? createEmptyDraft() : createEmptyDraft())
@@ -1010,9 +1016,31 @@ export default function UploadPage() {
       pubNow,
       globalScheduledLocal
     )
+    // RedNote is publish-now only — drop it from schedule-all so other
+    // channels can still be scheduled.
+    if (!pubNow) {
+      const hadRednote = body.channels.some(
+        (c) => c.included && c.channel.toLowerCase() === "rednote"
+      )
+      body.channels = body.channels.map((c) =>
+        c.channel.toLowerCase() === "rednote"
+          ? { ...c, included: false }
+          : c
+      )
+      if (hadRednote) {
+        toast.message(i18n.t("upload:toast.rednoteScheduleSkipped"))
+      }
+    }
     const includedChannels = body.channels.filter((c) => c.included)
     if (includedChannels.length === 0) {
-      toast.error(i18n.t("upload:toast.noEligibleChannels"))
+      toast.error(
+        !pubNow &&
+          Object.entries(includedByKey).some(
+            ([k, on]) => on && k === "rednote" && connectedChannelSet.has("rednote")
+          )
+          ? i18n.t("upload:toast.rednoteNoSchedule")
+          : i18n.t("upload:toast.noEligibleChannels")
+      )
       return
     }
 
@@ -1020,10 +1048,6 @@ export default function UploadPage() {
       const key = ch.channel.toLowerCase()
       if (key === "rednote" && rednoteNeedsReauth) {
         toast.error(i18n.t("upload:toast.rednoteNeedsReauth"))
-        return
-      }
-      if (key === "rednote" && !pubNow) {
-        toast.error(i18n.t("upload:toast.rednoteNoSchedule"))
         return
       }
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
@@ -1294,6 +1318,7 @@ export default function UploadPage() {
                           scope="channel"
                           platformLabel={mediaCfg.displayName}
                           serverStatus={activeRow.status}
+                          scheduleSupported={activeKey !== "rednote"}
                           schedulePopoverOpen={showChannelSchedule}
                           schedulePopoverAnchorRef={
                             channelSchedulePopoverAnchorRef

@@ -37,7 +37,15 @@ const EMPTY_TOTALS: PostMetricTotals = {
   engagement: 0,
 }
 
-export function publishedChannelsForAnalytics(post: PostRecord): string[] {
+/** Channels with no Mosonic metrics path (browser publish, no Zernio id). */
+const ANALYTICS_UNSUPPORTED_CHANNELS = new Set(["rednote"])
+
+export function supportsAnalyticsChannel(channel: string): boolean {
+  const key = channel.trim().toLowerCase()
+  return Boolean(key) && !ANALYTICS_UNSUPPORTED_CHANNELS.has(key)
+}
+
+function publishedChannelKeys(post: PostRecord): string[] {
   if (post.status === "published") {
     return [
       ...new Set(
@@ -60,9 +68,23 @@ export function publishedChannelsForAnalytics(post: PostRecord): string[] {
   return []
 }
 
+export function publishedChannelsForAnalytics(post: PostRecord): string[] {
+  return publishedChannelKeys(post).filter(supportsAnalyticsChannel)
+}
+
+/** True when metrics UI/sync apply (at least one Zernio-backed published channel). */
 export function isAnalyticsEligible(post: PostRecord | null | undefined): boolean {
   if (!post) return false
-  return post.status === "published" || post.status === "partial"
+  return publishedChannelsForAnalytics(post).length > 0
+}
+
+/** Published/partial but only RedNote (or other unsupported) channels. */
+export function isAnalyticsUnsupportedOnly(
+  post: PostRecord | null | undefined,
+): boolean {
+  if (!post) return false
+  const keys = publishedChannelKeys(post)
+  return keys.length > 0 && publishedChannelsForAnalytics(post).length === 0
 }
 
 function metricsToTotals(

@@ -74,7 +74,8 @@
     "publishedNoAction": "เผยแพร่แล้ว — ไม่ต้องดำเนินการเพิ่ม",
     "scheduledEditable": "กำหนดเวลาแล้ว — แก้ไขด้านล่างแล้วกดบันทึกเพื่ออัปเดต",
     "publishingInProgress": "กำลังเผยแพร่…",
-    "editScheduled": "แก้ไขโพสต์ที่กำหนดเวลา"
+    "editScheduled": "แก้ไขโพสต์ที่กำหนดเวลา",
+    "rednotePublishOnly": "RedNote รองรับเฉพาะเผยแพร่ทันที — ไม่รองรับการกำหนดเวลา"
   },
   "banner": {
     "notConnected": "บัญชี {{platform}} ของคุณยังไม่ได้เชื่อม",
@@ -99,7 +100,8 @@
     "connectAccount": "เชื่อมบัญชีนี้ในการตั้งค่าก่อน",
     "rednoteNeedsReauth": "เซสชัน RedNote หมดอายุ — เชื่อมต่อใหม่ในการตั้งค่า",
     "rednotePublishSessionFailed": "เผยแพร่ RedNote ล้มเหลว — ไม่สามารถยืนยันเซสชันหน้า creator ได้ ลองใหม่ หรือเชื่อมต่อใหม่ในการตั้งค่าหากยังไม่สำเร็จ",
-    "rednoteNoSchedule": "RedNote ยังไม่รองรับการกำหนดเวลา — เผยแพร่ทันทีแทน",
+    "rednoteNoSchedule": "RedNote รองรับเฉพาะเผยแพร่ทันที — ไม่รองรับการกำหนดเวลา",
+    "rednoteScheduleSkipped": "ข้าม RedNote แล้ว — รองรับเฉพาะเผยแพร่ทันที",
     "assignCaption": "กำหนดข้อความคำบรรยายก่อนเผยแพร่",
     "publishing": "กำลังเผยแพร่…",
     "scheduling": "กำลังกำหนดเวลา…",
