@@ -75,8 +75,8 @@ if "%SKIP_BUILD%"=="0" (
   )
 ) else (
   echo [INFO] Skipping build ^(--skip-build^).
-  if not exist "dist\main.js" (
-    echo [ERROR] dist\main.js not found. Run without --skip-build first.
+  if not exist "dist\src\main.js" (
+    echo [ERROR] dist\src\main.js not found. Run without --skip-build first.
     exit /b 1
   )
 )
@@ -101,7 +101,7 @@ set "PORT=!PORT:"=!"
 if /i "!ORCHESTRATION_USE_QUEUE!"=="true" (
   if /i "!RUN_WORKERS_IN_API!"=="false" (
     echo [INFO] Starting BullMQ worker process ^(RUN_WORKERS_IN_API=false^)...
-    start "Mosonic Worker" /min /d "%~dp0" cmd /c "set NODE_ENV=production&& node dist/worker/main.js"
+    start "Mosonic Worker" /min /d "%~dp0" cmd /c "set NODE_ENV=production&& node dist/src/worker/main.js"
   )
 )
 
@@ -109,7 +109,7 @@ echo [INFO] Starting API on port !PORT! ^(NODE_ENV=production^)...
 echo [INFO] Press Ctrl+C to stop.
 echo.
 
-node dist/main.js
+node dist/src/main.js
 set "EXIT_CODE=!errorlevel!"
 
 if not "!EXIT_CODE!"=="0" (
