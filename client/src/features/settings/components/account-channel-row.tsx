@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { formatCreditAmount } from "@/components/core/credit-usage-badge"
 import { Button } from "@/components/ui/button"
 import type { AccountChannelDef } from "@/features/settings/constants/account-channels"
+import { formatConnectedAccountLabel } from "@/features/settings/lib/connected-account-label"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
@@ -40,7 +41,9 @@ export function AccountChannelRow({
   const isLinked = Boolean(connected) && !needsReauth
   const disconnectKey = connected?.channel.trim().toLowerCase() ?? def.apiKey
   const label = t(`channels.${def.id}.label`)
-  const description = t(`channels.${def.id}.description`)
+  const platformDescription = t(`channels.${def.id}.description`)
+  const connectedLabel =
+    isLinked && connected ? formatConnectedAccountLabel(connected) : null
   const unlockCostLabel =
     !isLinked && !unlocked && !needsReauth && creditsEach > 0
       ? t("channels.unlockCost", { count: formatCreditAmount(creditsEach) })
@@ -79,17 +82,20 @@ export function AccountChannelRow({
               <span className="text-xs text-muted-foreground">{t("channels.notConnected")}</span>
             )}
           </div>
-          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
+          {connectedLabel ? (
+            <p
+              className="mt-1 text-[13px] font-medium leading-snug tracking-[-0.1px]"
+              style={{ color: T.textPrimary }}
+            >
+              {connectedLabel}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+              {platformDescription}
+            </p>
+          )}
           {unlockCostLabel ? (
             <p className="mt-1 text-[11px] text-muted-foreground">{unlockCostLabel}</p>
-          ) : null}
-          {isLinked && connected ? (
-            <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-              <span className="font-sans text-[10px] font-medium uppercase tracking-wide text-foreground/50">
-                {t("channels.accountId")}
-              </span>{" "}
-              <span className="break-all text-foreground/80">{connected.accountId}</span>
-            </p>
           ) : null}
         </div>
       </div>

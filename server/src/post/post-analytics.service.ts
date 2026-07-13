@@ -27,6 +27,7 @@ import { postPlatformResults } from '../upload/upload-record.util';
 import {
   isPostMetricsEligible,
   publishedChannelsFromPost,
+  supportsAnalyticsChannel,
 } from './post-analytics.util';
 import { isZernioRemotePostId } from './is-zernio-remote-post-id.util';
 import {
@@ -250,7 +251,17 @@ export class PostAnalyticsService {
 
     const zernioPostId = post.zernioPostId?.trim();
     if (!zernioPostId || !isZernioRemotePostId(zernioPostId)) {
-      throw new BadRequestException('Post has no Zernio id.');
+      const looksLikeRedNote =
+        /^rednote:/i.test(zernioPostId ?? '') ||
+        /xiaohongshu|rednote\.com/i.test(zernioPostId ?? '') ||
+        (post.channels ?? []).some(
+          (c) => c.trim().toLowerCase() === 'rednote',
+        );
+      throw new BadRequestException(
+        looksLikeRedNote
+          ? 'RedNote does not support analytics.'
+          : 'Post has no Zernio id.',
+      );
     }
 
     await this.ensureForPost(post);
@@ -262,7 +273,7 @@ export class PostAnalyticsService {
     });
     if (channels.length === 0) {
       throw new BadRequestException(
-        'No published channels to sync analytics for.',
+        'No analytics-supported channels on this post. RedNote does not support analytics.',
       );
     }
 
@@ -415,7 +426,8 @@ export class PostAnalyticsService {
       for (const row of platformMetrics) {
         if (
           row.syncStatus === PlatformMetricSyncStatus.Synced &&
-          row.metrics
+          row.metrics &&
+          supportsAnalyticsChannel(row.platform)
         ) {
           out.push({
             postId: doc.postId,
@@ -475,7 +487,8 @@ export class PostAnalyticsService {
       for (const row of platformMetrics) {
         if (
           row.syncStatus === PlatformMetricSyncStatus.Synced &&
-          row.metrics
+          row.metrics &&
+          supportsAnalyticsChannel(row.platform)
         ) {
           out.push({
             postId: doc.postId,
@@ -543,6 +556,17 @@ export class PostAnalyticsService {
       );
 
       for (const post of posts) {
+        if (!isZernioRemotePostId(post.zernioPostId)) {
+          continue;
+        }
+        const channels = publishedChannelsFromPost({
+          status: post.status as PostStatus,
+          platformResults: postPlatformResults(post),
+          channels: post.channels,
+        });
+        if (channels.length === 0) {
+          continue;
+        }
         try {
           await this.syncFromZernio(post.postId);
         } catch (err: unknown) {

@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { me } = await import("@/features/admin/api/auth-api")
       const { mapLocalUserToUser } = await import("@/shared/lib/map-local-user")
-      const meResp = await me({ skipAuthRefresh: true })
+      const meResp = await me()
       const lu = meResp?.auth?.localUser
       const role =
         lu?.role === "ADMIN" || lu?.role === "CUSTOMER" ? lu.role : null

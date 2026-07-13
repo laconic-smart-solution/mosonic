@@ -991,7 +991,7 @@ export class UploadService {
       if (!body.publishNow) {
         w.row.status = UploadChannelStatus.Failed;
         w.row.failureReason =
-          'RedNote scheduled publish is not supported yet. Publish now instead.';
+          'RedNote supports publish now only — scheduling is not available.';
         w.row.retryCount = (w.row.retryCount ?? 0) + 1;
         this.emitUploadEvent(publishUploadId, 'upload:failed', {
           uploadId: publishUploadId,

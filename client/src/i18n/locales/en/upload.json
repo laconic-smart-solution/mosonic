@@ -77,7 +77,8 @@
     "editScheduled": "Edit scheduled post",
     "whenToPublish": "When to publish",
     "confirm": "Confirm",
-    "channelPublishing": "{{platform}} publishing"
+    "channelPublishing": "{{platform}} publishing",
+    "rednotePublishOnly": "RedNote supports publish now only — scheduling is not available."
   },
   "banner": {
     "notConnected": "Your {{platform}} account is not connected.",
@@ -102,7 +103,8 @@
     "connectAccount": "Connect this account in Settings first.",
     "rednoteNeedsReauth": "RedNote session expired. Reconnect in Settings.",
     "rednotePublishSessionFailed": "RedNote publish failed — creator session could not be verified. Retry, or reconnect in Settings if this persists.",
-    "rednoteNoSchedule": "RedNote does not support scheduled publish yet. Publish now instead.",
+    "rednoteNoSchedule": "RedNote supports publish now only — scheduling is not available.",
+    "rednoteScheduleSkipped": "RedNote was skipped — it supports publish now only.",
     "assignCaption": "Assign caption text before publishing.",
     "publishing": "Publishing…",
     "scheduling": "Scheduling…",

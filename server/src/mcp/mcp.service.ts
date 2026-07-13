@@ -162,10 +162,12 @@ export class McpService {
       );
     }
 
+    const username = query.username?.trim() || undefined;
     await this.usersService.setZernioConnectedAccount(
       userId,
       platform,
       accountId,
+      username ? { username } : undefined,
     );
 
     try {
@@ -177,7 +179,7 @@ export class McpService {
       );
     }
     this.logger.log(
-      `Zernio OAuth saved ${platform} for user ${userId} (${query.username ?? ''})`,
+      `Zernio OAuth saved ${platform} for user ${userId} (${username ?? ''})`,
     );
   }
 
@@ -439,11 +441,27 @@ export class McpService {
         'id',
       ])?.trim();
       if (!channel || !accountId) continue;
+      const username = this.readFirstString(record, [
+        'username',
+        'userName',
+        'handle',
+        'screenName',
+        'screen_name',
+      ]);
+      const displayName = this.readFirstString(record, [
+        'displayName',
+        'display_name',
+        'name',
+        'fullName',
+        'full_name',
+      ]);
       byChannel.set(channel, {
         userId,
         channel,
         accountId,
         connectedAt: new Date(),
+        ...(username ? { username } : {}),
+        ...(displayName ? { displayName } : {}),
       });
     }
     return Array.from(byChannel.values());

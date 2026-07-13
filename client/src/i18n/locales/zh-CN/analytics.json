@@ -35,7 +35,7 @@
     "likes": "点赞",
     "comments": "评论",
     "engagement": "互动",
-    "emptyHint": "使用 Zernio ID 发布内容后同步以生成分析数据。",
+    "emptyHint": "使用 Zernio ID 发布内容后同步以生成分析数据。RedNote 帖子不包含在内。",
     "best": "最佳：",
     "viewDetails": "查看详情",
     "syncing": "同步中…",
