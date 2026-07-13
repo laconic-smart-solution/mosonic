@@ -43,8 +43,8 @@ describe('RedNoteBrowserService login selectors', () => {
   it('defaults creator publish selectors', () => {
     expect(browser.creatorLoggedInAvatarSelector()).toContain('user_avatar');
     expect(browser.videoUploadInputSelector()).toContain('.mp4');
-    expect(browser.publishButtonHostSelector()).toContain('ce-btn');
-    expect(browser.publishButtonSelectors()[0]).toBe('button.ce-btn.bg-red');
+    expect(browser.publishButtonHostSelector()).toContain('xhs-publish-btn');
+    expect(browser.publishButtonSelectors()[0]).toBe('xhs-publish-btn');
     expect(browser.publishSuccessTimeoutMs()).toBe(60_000);
     expect(
       browser.isCreatorCenterUrl(
