@@ -623,6 +623,9 @@ export default function WorkflowPage() {
         runtime[node.nodeId] = {
           status: normalizedStatus,
           ...(node.lane ? { lane: node.lane } : {}),
+          ...(typeof node.lastError === "string" && node.lastError.trim()
+            ? { errorMessage: node.lastError }
+            : {}),
           ...merged,
         }
         if (node.status === "completed" || node.status === "skipped") {

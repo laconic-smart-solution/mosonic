@@ -247,7 +247,13 @@ export class PrismaPipelineRepository implements IPipelineRepository {
 
   resetNodeToPending(pipelineId: string, nodeId: string): Promise<void> {
     return this.mutateNode(pipelineId, nodeId, (nodes) =>
-      updatePipelineNode(nodes, nodeId, { status: 'pending' }),
+      updatePipelineNode(nodes, nodeId, {
+        status: 'pending',
+        output: null,
+        lastError: null,
+        executedAt: null,
+        externalJobId: null,
+      }),
     );
   }
 

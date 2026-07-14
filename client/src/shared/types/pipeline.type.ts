@@ -137,6 +137,7 @@ export type PipelineNodeSnapshot = {
   lane?: string | null
   status: PipelineNodeRuntimeStatus
   output: Record<string, unknown> | null
+  lastError?: string | null
   retryCount: number
   reviewRegenerateCount?: number
   executedAt: string | null

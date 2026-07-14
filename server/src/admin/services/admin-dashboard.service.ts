@@ -29,7 +29,8 @@ function ruleChannelNames(rule: { channels: unknown }): string[] {
 export class AdminDashboardService {
   constructor(
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
-    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     @Inject(CONTENT_REPOSITORY) private readonly content: IContentRepository,
     @Inject(COST_ENTRY_REPOSITORY)
     private readonly costEntries: ICostEntryRepository,
@@ -83,10 +84,7 @@ export class AdminDashboardService {
 
     const users = await this.users.findCreatedSince(from);
 
-    return this.groupByDay(
-      users as unknown as { [k: string]: unknown }[],
-      'createdAt',
-    );
+    return this.groupByDay(users, 'createdAt');
   }
 
   async getPipelineChart(days = 30) {
@@ -102,23 +100,19 @@ export class AdminDashboardService {
       'asc',
     );
 
-    return this.groupByDay(
-      pipelines as unknown as { [k: string]: unknown }[],
-      'startedAt',
-    );
+    return this.groupByDay(pipelines, 'startedAt');
   }
 
   async getCostChart(days = 30) {
     const from = new Date();
     from.setDate(from.getDate() - days);
 
-    const entries = await this.costEntries.findInCreatedAtRange(from, new Date());
-
-    return this.groupSumByDay(
-      entries as unknown as { [k: string]: unknown }[],
-      'createdAt',
-      'costUsd',
+    const entries = await this.costEntries.findInCreatedAtRange(
+      from,
+      new Date(),
     );
+
+    return this.groupSumByDay(entries, 'createdAt', 'costUsd');
   }
 
   async getNodeTypeBreakdown() {
@@ -128,10 +122,7 @@ export class AdminDashboardService {
       createdAt: { gte: mStart },
     });
 
-    const grouped = new Map<
-      string,
-      { count: number; totalCost: number }
-    >();
+    const grouped = new Map<string, { count: number; totalCost: number }>();
     for (const row of entries) {
       const key = row.nodeType ?? 'unknown';
       const cur = grouped.get(key) ?? { count: 0, totalCost: 0 };
@@ -177,13 +168,9 @@ export class AdminDashboardService {
     }
     durations.sort((a, b) => a - b);
     const p50 =
-      durations.length > 0
-        ? durations[Math.floor(durations.length * 0.5)]!
-        : 0;
+      durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
     const p95 =
-      durations.length > 0
-        ? durations[Math.floor(durations.length * 0.95)]!
-        : 0;
+      durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
     return {
       total: pipelines.length,
       completed,
@@ -205,9 +192,7 @@ export class AdminDashboardService {
     const ruleRefs = [
       ...new Set(contents.map((c) => c.ruleRef).filter(Boolean)),
     ];
-    const rules = ruleRefs.length
-      ? await this.rules.findByIds(ruleRefs)
-      : [];
+    const rules = ruleRefs.length ? await this.rules.findByIds(ruleRefs) : [];
     const ruleChannelMap = new Map(
       rules.map((r) => [r.ruleId, ruleChannelNames(r)]),
     );
@@ -232,7 +217,7 @@ export class AdminDashboardService {
     return docs.reduce<Record<string, number>>((acc, doc) => {
       const raw = doc[dateField];
       if (!(raw instanceof Date) && typeof raw !== 'string') return acc;
-      const day = new Date(raw as string | Date).toISOString().slice(0, 10);
+      const day = new Date(raw).toISOString().slice(0, 10);
       acc[day] = (acc[day] ?? 0) + 1;
       return acc;
     }, {});
@@ -246,7 +231,7 @@ export class AdminDashboardService {
     return docs.reduce<Record<string, number>>((acc, doc) => {
       const raw = doc[dateField];
       if (!(raw instanceof Date) && typeof raw !== 'string') return acc;
-      const day = new Date(raw as string | Date).toISOString().slice(0, 10);
+      const day = new Date(raw).toISOString().slice(0, 10);
       const v = doc[valueField];
       acc[day] = (acc[day] ?? 0) + (typeof v === 'number' ? v : 0);
       return acc;

@@ -73,6 +73,18 @@ export class PipelineNodeRunnerService {
       throw new UnrecoverableError(msg);
     }
 
+    // Skip/complete can race a delayed BullMQ retry after user action; do not re-run.
+    if (
+      !payload.forceRegenerate &&
+      (node.status === PipelineNodeExecutionStatus.Skipped ||
+        node.status === PipelineNodeExecutionStatus.Completed)
+    ) {
+      this.logger.warn(
+        `[pipeline:${pipelineId}] run abort ${nodeId} — already ${node.status}`,
+      );
+      return;
+    }
+
     const existingOutput = parsePipelineNodeOutputString(node.output);
     if (
       !payload.forceRegenerate &&
@@ -234,13 +246,20 @@ export class PipelineNodeRunnerService {
       return;
     }
 
+    const priorNode = this.pipelineRepo.getNode(pipeline, nodeId);
+    const priorLastError = priorNode?.lastError?.trim() || '';
+    const friendly =
+      priorLastError || this.nodeExecutor.getFriendlyError(error);
+
     await this.pipelineRepo.updateNodeStatus(
       pipelineId,
       nodeId,
       PipelineNodeExecutionStatus.Failed,
     );
-    const failedNode = this.pipelineRepo.getNode(pipeline, nodeId);
-    const laneId = failedNode?.lane ?? null;
+    if (!priorLastError) {
+      await this.pipelineRepo.setNodeLastError(pipelineId, nodeId, friendly);
+    }
+    const laneId = priorNode?.lane ?? null;
     const laneScopedContinue =
       this.laneScopedPause &&
       laneId &&
@@ -266,7 +285,7 @@ export class PipelineNodeRunnerService {
       pipelineId,
       nodeId,
       nodeType,
-      message: this.nodeExecutor.getFriendlyError(error),
+      message: friendly,
     });
     if (!laneScopedContinue) {
       this.events.emitToPipeline(pipelineId, 'pipeline:paused', {

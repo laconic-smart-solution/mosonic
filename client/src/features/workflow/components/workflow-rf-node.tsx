@@ -332,16 +332,22 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
               <div className="flex gap-1">
                 <button
                   type="button"
-                  onClick={() => data.onRetry?.()}
-                  className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-red)] border-[var(--nt-red-border)] bg-[var(--nt-red-bg)]"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    data.onRetry?.()
+                  }}
+                  className="nopan nodrag cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-red)] border-[var(--nt-red-border)] bg-[var(--nt-red-bg)]"
                 >
                   {t("rfNode.retry")}
                 </button>
                 {data.onSkip ? (
                   <button
                     type="button"
-                    onClick={() => data.onSkip?.()}
-                    className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-amber)] border-[var(--nt-amber-border)] bg-[var(--nt-amber-bg)]"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      data.onSkip?.()
+                    }}
+                    className="nopan nodrag cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-[var(--nt-amber)] border-[var(--nt-amber-border)] bg-[var(--nt-amber-bg)]"
                   >
                     {t("rfNode.skip")}
                   </button>

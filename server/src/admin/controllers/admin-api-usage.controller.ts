@@ -68,10 +68,6 @@ export class AdminApiUsageController {
   ) {
     const provider = parseProvider(providerParam);
     const userId = (req.auth!.localUser as User).userId;
-    return this.apiUsage.updatePrepaid(
-      provider,
-      body.prepaidCreditUsd,
-      userId,
-    );
+    return this.apiUsage.updatePrepaid(provider, body.prepaidCreditUsd, userId);
   }
 }

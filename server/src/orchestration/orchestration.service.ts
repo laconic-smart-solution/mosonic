@@ -648,7 +648,12 @@ export class OrchestrationService {
     }
 
     if (pipeline.dispatchMode === PipelineDispatchMode.Queue) {
-      if (pipeline.status !== PipelineStatus.Paused) {
+      const isPaused = pipeline.status === PipelineStatus.Paused;
+      const isLanePaused =
+        pipeline.status === PipelineStatus.Running &&
+        pipeline.pausedNodeId === nodeId;
+
+      if (!isPaused && !isLanePaused) {
         throw new BadRequestException('Pipeline is not paused');
       }
       if (pipeline.pausedNodeId && pipeline.pausedNodeId !== nodeId) {
@@ -656,11 +661,13 @@ export class OrchestrationService {
           'Retry the paused node that failed before continuing',
         );
       }
+      await this.resolver.removeQueuedJobsForNode(pipelineId, nodeId);
       await this.pipelineRepo.resetNodeToPending(pipelineId, nodeId);
       await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Running, {
         pausedNodeId: null,
+        pausedLaneId: null,
       });
-      await this.resolver.enqueueReadyNodes(pipelineId);
+      await this.resolver.enqueueNodeForUserRetry(pipelineId, nodeId);
       return;
     }
 
@@ -1200,6 +1207,7 @@ export class OrchestrationService {
       lane: string | null;
       status: string;
       output: Record<string, unknown> | null;
+      lastError: string | null;
       retryCount: number;
       reviewRegenerateCount: number;
       executedAt: Date | null;
@@ -1251,6 +1259,7 @@ export class OrchestrationService {
         lane: node.lane ?? null,
         status: node.status,
         output: parsePipelineNodeOutputString(node.output),
+        lastError: node.lastError ?? null,
         retryCount: node.retryCount,
         reviewRegenerateCount: node.reviewRegenerateCount ?? 0,
         executedAt: node.executedAt ? new Date(node.executedAt) : null,

@@ -545,6 +545,18 @@ export class DependencyResolverService {
     }
   }
 
+  async enqueueNodeForUserRetry(
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<void> {
+    const pipeline = await this.pipelineRepo.findById(pipelineId);
+    if (!pipeline) return;
+    await this.enqueueNode(pipeline, nodeId, {
+      forceRegenerate: true,
+      useReplayJobId: true,
+    });
+  }
+
   private async countQueuedJobsForPipeline(pipelineId: string): Promise<number> {
     const prefix = pipelineJobIdPrefix(pipelineId);
     let count = 0;
