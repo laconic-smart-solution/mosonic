@@ -402,7 +402,8 @@
     "retryFailed": "无法重试。请重试。",
     "skipFailed": "无法跳过。请重试。",
     "describeWorkflow": "请描述要生成的工作流。",
-    "pipelineStopped": "流水线已停止"
+    "pipelineStopped": "流水线已停止",
+    "pipelineStoppedKeptProgress": "流水线已停止 — 已完成的步骤已保存为草稿"
   },
   "processing": {
     "generating": "生成中...",

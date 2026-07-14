@@ -1866,9 +1866,16 @@ export default function WorkflowPage() {
         pipelineId={pipelineId}
         open={stopPipelineDialogOpen}
         onOpenChange={setStopPipelineDialogOpen}
-        onStopped={() => {
+        onStopped={(result) => {
           resetPipelineProcessingState()
-          toast.success(t("toasts.pipelineStopped"))
+          toast.success(
+            result?.keptProgress
+              ? t("toasts.pipelineStoppedKeptProgress")
+              : t("toasts.pipelineStopped"),
+          )
+          if (result?.contentId) {
+            void runningPipelineQuery.refetch()
+          }
         }}
         onError={(message) => toast.error(message)}
       />

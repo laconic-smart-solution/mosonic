@@ -14,7 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
 import {
@@ -104,17 +103,13 @@ export function TopbarSearch({
         ref={triggerRef}
         type="button"
         className={cn(
-          "cursor-pointer rounded-lg border text-left outline-none transition-shadow",
-          "hover:opacity-95 focus-visible:ring-2 focus-visible:ring-[#00A589]/25",
+          "cursor-pointer rounded-lg border border-border bg-muted text-left outline-none transition-colors",
+          "hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring/40",
           compact
             ? "flex size-9 shrink-0 items-center justify-center p-0"
             : "flex w-full max-w-full items-center gap-2 px-3 py-1.5 sm:w-[min(280px,100%)]",
           className,
         )}
-        style={{
-          background: "#EDF2F7",
-          borderColor: T.surfaceBorder,
-        }}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={t("search.ariaLabel")}
@@ -124,39 +119,29 @@ export function TopbarSearch({
           height="13"
           viewBox="0 0 13 13"
           fill="none"
-          className="shrink-0"
+          className="shrink-0 text-muted-foreground"
           aria-hidden
         >
           <circle
             cx="5.5"
             cy="5.5"
             r="4"
-            stroke={T.textMuted}
+            stroke="currentColor"
             strokeWidth="1.4"
           />
           <path
             d="M9 9l2.5 2.5"
-            stroke={T.textMuted}
+            stroke="currentColor"
             strokeWidth="1.4"
             strokeLinecap="round"
           />
         </svg>
         {!compact ? (
           <>
-            <span
-              className="min-w-0 flex-1 truncate text-xs"
-              style={{ color: T.textMuted }}
-            >
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {t("search.placeholder")}
             </span>
-            <kbd
-              className="hidden rounded border px-1.5 py-0.5 font-mono text-[9px] sm:inline"
-              style={{
-                color: T.textMuted,
-                background: "#E8E6E0",
-                borderColor: "#D8D5CE",
-              }}
-            >
+            <kbd className="hidden rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground sm:inline">
               ⌘K
             </kbd>
           </>
@@ -165,14 +150,14 @@ export function TopbarSearch({
       <PopoverContent
         align={compact ? "end" : "center"}
         sideOffset={6}
-        className="w-[min(420px,calc(100vw-2rem))] gap-0 p-0"
+        className="w-[min(420px,calc(100vw-2rem))] gap-0 border-border bg-popover p-0 text-popover-foreground"
         style={
           popoverMinWidth != null ? { minWidth: popoverMinWidth } : undefined
         }
       >
         <Command
           shouldFilter={false}
-          className="max-h-[min(420px,70vh)] rounded-2xl border-0 bg-popover shadow-none"
+          className="max-h-[min(420px,70vh)] rounded-2xl border-0 bg-transparent shadow-none"
         >
           <CommandInput
             placeholder={t("search.placeholder")}
@@ -193,7 +178,7 @@ export function TopbarSearch({
                     onSelect={() => go(r.path)}
                     className="flex flex-col items-start gap-0.5 py-2"
                   >
-                    <span className="font-medium">{r.title}</span>
+                    <span className="font-medium text-foreground">{r.title}</span>
                     <span className="text-xs text-muted-foreground">
                       {r.subtitle}
                     </span>

@@ -102,57 +102,58 @@ export function UploadPlatformPreview({
     )
   }
 
-  if (key === "tiktok") {
-    const tiktokMedia = (
+  if (key === "tiktok" || key === "rednote") {
+    const isRednote = key === "rednote"
+    const phoneMedia = (
       <UploadPreviewMedia
         mediaTab={mediaTab}
         imageUrls={imageUrls}
         videoUrl={videoUrl}
         variant={variant}
-        className={cn(!isDialog && "h-full min-h-[140px]")}
+        fillFrame={false}
       />
     )
 
     return (
       <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border bg-zinc-950 px-3 py-2 text-white">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-teal-400 via-pink-500 to-rose-600 text-[10px] font-bold text-white shadow-sm">
-            ♪
-          </div>
+        <div
+          className={cn(
+            "flex items-center gap-2 border-b border-border px-3 py-2",
+            isRednote ? "bg-card text-foreground" : "bg-zinc-950 text-white",
+          )}
+        >
+          {isRednote ? (
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ff2442] text-[10px] font-bold text-white">
+              小
+            </div>
+          ) : (
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-teal-400 via-pink-500 to-rose-600 text-[10px] font-bold text-white shadow-sm">
+              ♪
+            </div>
+          )}
           <span className="font-medium">{label}</span>
         </div>
         <div className="flex justify-center bg-muted/25 p-3">
           <div
             className={cn(
-              "relative w-full max-w-[220px] overflow-hidden rounded-xl border border-border/70 bg-black shadow-inner",
-              isDialog ? "aspect-9/16 max-h-[min(480px,60vh)]" : "aspect-9/16 max-h-[min(340px,52vh)]",
+              "relative w-full max-w-[220px] flex justify-center items-center overflow-hidden rounded-xl border border-border/70 bg-black shadow-inner",
+              isDialog
+                ? "aspect-9/16 max-h-[min(480px,60vh)]"
+                : "aspect-9/16 max-h-[min(340px,52vh)]",
             )}
           >
-            {tiktokMedia}
+            {phoneMedia}
           </div>
         </div>
         <p className="border-t border-border/60 px-3 py-2.5 whitespace-pre-wrap leading-relaxed text-foreground">
           {caption || " "}
         </p>
-      </div>
-    )
-  }
-
-  if (key === "rednote") {
-    return (
-      <div className="overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
-        <div className="flex items-center gap-2 border-b px-3 py-2">
-          <div className="flex size-8 items-center justify-center rounded-full bg-[#ff2442] text-[10px] font-bold text-white">
-            小
-          </div>
-          <span className="font-medium">{label}</span>
-        </div>
-        {media}
-        <p className="px-3 py-2 whitespace-pre-wrap leading-relaxed">{caption}</p>
-        <p className="border-t px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-          Video only (like TikTok). Publish confirmation is based on page scrape —
-          verify on RedNote if unsure.
-        </p>
+        {isRednote ? (
+          <p className="border-t px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+            Video only (like TikTok). Publish confirmation is based on page scrape —
+            verify on RedNote if unsure.
+          </p>
+        ) : null}
       </div>
     )
   }

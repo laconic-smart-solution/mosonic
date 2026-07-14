@@ -813,42 +813,98 @@ export class OrchestrationService {
     if (pipeline.dispatchMode !== PipelineDispatchMode.Queue) {
       throw new BadRequestException('Skip is only supported for queue pipelines');
     }
-    if (pipeline.status !== PipelineStatus.Paused) {
-      throw new BadRequestException('Pipeline is not paused');
+    if (
+      pipeline.status !== PipelineStatus.Paused &&
+      pipeline.status !== PipelineStatus.Running
+    ) {
+      throw new BadRequestException('Pipeline is not active');
     }
 
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
     if (!node) {
       throw new NotFoundException(`Node ${nodeId} not found in pipeline`);
     }
+    if (
+      node.status === PipelineNodeExecutionStatus.Completed ||
+      node.status === PipelineNodeExecutionStatus.Skipped
+    ) {
+      throw new BadRequestException('Node already finished');
+    }
 
+    const isPaused = pipeline.status === PipelineStatus.Paused;
+    const canForceSkipWhileRunning =
+      pipeline.status === PipelineStatus.Running &&
+      (node.status === PipelineNodeExecutionStatus.Running ||
+        node.status === PipelineNodeExecutionStatus.Failed);
+    const canSkipWhilePaused =
+      isPaused &&
+      (node.status === PipelineNodeExecutionStatus.Failed ||
+        node.status === PipelineNodeExecutionStatus.Running ||
+        node.status === PipelineNodeExecutionStatus.WaitingReview ||
+        pipeline.pausedNodeId === nodeId);
+
+    if (!canForceSkipWhileRunning && !canSkipWhilePaused) {
+      throw new BadRequestException(
+        'Node cannot be skipped in its current state',
+      );
+    }
+
+    await this.resolver.removeQueuedJobsForNode(pipelineId, nodeId);
+    if (node.externalJobId) {
+      await this.pipelineRepo.clearExternalJobId(pipelineId, nodeId);
+    }
     await this.pipelineRepo.markNodeSkipped(pipelineId, nodeId);
     await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Running, {
       pausedNodeId: null,
+      pausedLaneId: null,
     });
     await this.resolver.onNodeCompleted(pipelineId, nodeId);
     await this.resolver.maybeFinalize(pipelineId);
   }
 
-  async finalizePipeline(pipelineId: string): Promise<void> {
+  async finalizePipeline(
+    pipelineId: string,
+  ): Promise<{ contentId: string; uploadId: string } | null> {
     const pipeline = await this.pipelineRepo.findById(pipelineId);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
     if (pipeline.status === PipelineStatus.Completed) {
-      return;
+      const auth: TenancyAuth = {
+        userId: pipeline.userId ?? '',
+        role: UserRole.CUSTOMER,
+      };
+      const existing = await this.resolvePipelineArtifacts(pipelineId, auth);
+      if (existing.contentId && existing.uploadId) {
+        return {
+          contentId: existing.contentId,
+          uploadId: existing.uploadId,
+        };
+      }
+      return null;
     }
 
     const claimed = await this.pipelineRepo.claimPipelineFinalization(pipelineId);
     if (!claimed) {
       const fresh = await this.pipelineRepo.findById(pipelineId);
       if (fresh?.status === PipelineStatus.Completed) {
-        return;
+        const auth: TenancyAuth = {
+          userId: fresh.userId ?? '',
+          role: UserRole.CUSTOMER,
+        };
+        const existing = await this.resolvePipelineArtifacts(pipelineId, auth);
+        if (existing.contentId && existing.uploadId) {
+          return {
+            contentId: existing.contentId,
+            uploadId: existing.uploadId,
+          };
+        }
+        return null;
       }
       this.logger.warn(
         `[pipeline:${pipelineId}] finalizePipeline claim failed — status=${fresh?.status ?? 'missing'}`,
       );
-      return;
+      return null;
     }
 
     const rule = await this.rules.findById(pipeline.ruleRef);
@@ -919,6 +975,8 @@ export class OrchestrationService {
           contentId: primaryContentId,
         });
       }
+
+      return { contentId: primaryContentId, uploadId: primaryUploadId };
     } catch (error) {
       this.logger.error(
         `Pipeline finalization failed for ${pipelineId}`,
@@ -937,6 +995,7 @@ export class OrchestrationService {
         pipelineId,
         message,
       });
+      return null;
     }
   }
 
@@ -1202,7 +1261,12 @@ export class OrchestrationService {
   async cancelPipeline(
     pipelineId: string,
     auth: TenancyAuth,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{
+    success: boolean;
+    keptProgress: boolean;
+    contentId?: string;
+    uploadId?: string;
+  }> {
     const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
@@ -1216,10 +1280,48 @@ export class OrchestrationService {
 
     await this.resolver.removeQueuedJobsForPipeline(pipelineId);
 
+    let hasCompleted = false;
     for (const node of parsePipelineNodes(pipeline.nodes)) {
-      if (node.status === PipelineNodeExecutionStatus.Pending) {
-        await this.pipelineRepo.markNodeSkipped(pipelineId, node.nodeId);
+      if (node.status === PipelineNodeExecutionStatus.Completed) {
+        hasCompleted = true;
+        continue;
       }
+      if (node.status === PipelineNodeExecutionStatus.Skipped) {
+        continue;
+      }
+      if (node.externalJobId) {
+        await this.pipelineRepo.clearExternalJobId(pipelineId, node.nodeId);
+      }
+      await this.pipelineRepo.markNodeSkipped(pipelineId, node.nodeId);
+    }
+
+    const paused = this.pausedPipelines.get(pipelineId);
+    if (paused) {
+      this.pausedPipelines.delete(pipelineId);
+      paused.resolve();
+    }
+
+    if (hasCompleted) {
+      await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Running, {
+        pausedNodeId: null,
+        pausedLaneId: null,
+      });
+      const finalized = await this.finalizePipeline(pipelineId);
+      if (finalized) {
+        return {
+          success: true,
+          keptProgress: true,
+          contentId: finalized.contentId,
+          uploadId: finalized.uploadId,
+        };
+      }
+      const artifacts = await this.resolvePipelineArtifacts(pipelineId, auth);
+      return {
+        success: true,
+        keptProgress: Boolean(artifacts.contentId),
+        contentId: artifacts.contentId,
+        uploadId: artifacts.uploadId,
+      };
     }
 
     await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Failed, {
@@ -1230,18 +1332,12 @@ export class OrchestrationService {
 
     await this.reconcilePipelineCredits(pipelineId);
 
-    const paused = this.pausedPipelines.get(pipelineId);
-    if (paused) {
-      this.pausedPipelines.delete(pipelineId);
-      paused.resolve();
-    }
-
     this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
       pipelineId,
       message: 'Pipeline stopped',
       reason: 'cancelled',
     });
-    return { success: true };
+    return { success: true, keptProgress: false };
   }
 
   async resumeLane(

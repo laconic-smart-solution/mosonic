@@ -99,7 +99,14 @@ export const pipelineService = {
     return response.data
   },
 
-  cancel: async (pipelineId: string): Promise<{ success: boolean }> => {
+  cancel: async (
+    pipelineId: string,
+  ): Promise<{
+    success: boolean
+    keptProgress: boolean
+    contentId?: string
+    uploadId?: string
+  }> => {
     const response = await apiClient.post(`/pipeline/${pipelineId}/cancel`)
     return response.data
   },

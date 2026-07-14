@@ -16,7 +16,11 @@ type Props = {
   pipelineId: string | undefined
   open: boolean
   onOpenChange: (open: boolean) => void
-  onStopped?: () => void
+  onStopped?: (result?: {
+    keptProgress: boolean
+    contentId?: string
+    uploadId?: string
+  }) => void
   onError?: (message: string) => void
 }
 
@@ -34,10 +38,14 @@ export function PipelineStopConfirmDialog({
   function handleConfirm() {
     if (!pipelineId) return
     cancelMutation.mutate(pipelineId, {
-      onSuccess: async () => {
+      onSuccess: async (data) => {
         await queryClient.invalidateQueries({ queryKey: ["pipeline"] })
         onOpenChange(false)
-        onStopped?.()
+        onStopped?.({
+          keptProgress: Boolean(data?.keptProgress),
+          contentId: data?.contentId,
+          uploadId: data?.uploadId,
+        })
       },
       onError: (err) => {
         const message =
