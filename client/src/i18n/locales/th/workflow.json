@@ -402,7 +402,8 @@
     "retryFailed": "ลองใหม่ไม่ได้ ลองอีกครั้ง",
     "skipFailed": "ข้ามไม่ได้ ลองอีกครั้ง",
     "describeWorkflow": "กรุณาอธิบายเวิร์กโฟลว์ที่ต้องการสร้าง",
-    "pipelineStopped": "หยุดไปป์ไลน์แล้ว"
+    "pipelineStopped": "หยุดไปป์ไลน์แล้ว",
+    "pipelineStoppedKeptProgress": "หยุดไปป์ไลน์แล้ว — บันทึกขั้นตอนที่เสร็จแล้วเป็นฉบับร่าง"
   },
   "processing": {
     "generating": "กำลังสร้าง...",

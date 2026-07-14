@@ -15,14 +15,15 @@
     "emptyTitle": "No pipelines found",
     "emptyDescription": "Try a different status tile or clear filters to see more runs.",
     "pageOf": "Page {{page}} of {{total}}",
-    "toastStopped": "Pipeline stopped"
+    "toastStopped": "Pipeline stopped",
+    "toastStoppedKeptProgress": "Pipeline stopped — finished steps were saved as a draft"
   },
   "stopDialog": {
     "title": "Stop this pipeline?",
-    "description": "Generation will stop. Steps still running may finish briefly, but no new steps will start. This cannot be undone.",
+    "description": "Generation will stop. Finished steps are kept as a draft, and credits for steps that did not finish are refunded. This cannot be undone.",
     "keepRunning": "Keep running",
     "stopping": "Stopping…",
-    "stop": "Stop pipeline",
+    "stop": "Stop & keep progress",
     "error": "Could not stop the pipeline."
   },
   "toolbar": {

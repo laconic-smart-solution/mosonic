@@ -13,6 +13,7 @@ import {
   QUEUES,
   videoCheckJobId,
   videoPollIntervalMs,
+  videoPollWallTimeoutMs,
 } from '../types/queue.constants';
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 
@@ -46,9 +47,20 @@ export class VideoCheckProcessor extends WorkerHost {
       `[video:check] pipeline=${pipelineId} node=${nodeId} attempt=${checkCount}`,
     );
 
-    if (checkCount >= POLL_CONFIG.video.maxChecks) {
+    const submittedAtMs = Date.parse(payload.submittedAt ?? '');
+    const elapsedMs = Number.isFinite(submittedAtMs)
+      ? Date.now() - submittedAtMs
+      : 0;
+    const wallTimeoutMs = videoPollWallTimeoutMs(videoProvider);
+    const timedOutByChecks = checkCount >= POLL_CONFIG.video.maxChecks;
+    const timedOutByWall =
+      Number.isFinite(submittedAtMs) && elapsedMs >= wallTimeoutMs;
+
+    if (timedOutByChecks || timedOutByWall) {
       this.logger.warn(
-        `[video:check] timed out after ${checkCount} checks pipeline=${pipelineId}`,
+        `[video:check] timed out pipeline=${pipelineId} node=${nodeId} ` +
+          `checks=${checkCount} elapsedMs=${elapsedMs} ` +
+          `reason=${timedOutByWall ? 'wall_clock' : 'max_checks'}`,
       );
       await this.completion.failVideoNode(
         payload,

@@ -15,14 +15,15 @@
     "emptyTitle": "未找到流水线",
     "emptyDescription": "尝试其他状态标签或清除筛选以查看更多运行。",
     "pageOf": "第 {{page}} 页，共 {{total}} 页",
-    "toastStopped": "流水线已停止"
+    "toastStopped": "流水线已停止",
+    "toastStoppedKeptProgress": "流水线已停止 — 已完成的步骤已保存为草稿"
   },
   "stopDialog": {
     "title": "停止此流水线？",
-    "description": "生成将停止。仍在运行的步骤可能短暂完成，但不会启动新步骤。此操作无法撤销。",
+    "description": "生成将停止。已完成的步骤会保存为草稿，未完成步骤的积分将退还。此操作无法撤销。",
     "keepRunning": "继续运行",
     "stopping": "正在停止…",
-    "stop": "停止流水线",
+    "stop": "停止并保留进度",
     "error": "无法停止流水线。"
   },
   "toolbar": {

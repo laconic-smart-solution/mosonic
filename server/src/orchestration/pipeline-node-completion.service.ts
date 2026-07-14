@@ -6,6 +6,7 @@ import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
+  PipelineStatus,
 } from '../pipeline/schemas/pipeline.schema';
 import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
 import { DependencyResolverService } from './dependency-resolver.service';
@@ -39,6 +40,26 @@ export class PipelineNodeCompletionService {
     if (!pipeline) {
       this.logger.warn(
         `handleNodeSucceeded: pipeline ${ctx.pipelineId} not found`,
+      );
+      return;
+    }
+    if (
+      pipeline.status === PipelineStatus.Completed ||
+      pipeline.status === PipelineStatus.Failed
+    ) {
+      this.logger.warn(
+        `handleNodeSucceeded: ignoring late success pipeline=${ctx.pipelineId} status=${pipeline.status}`,
+      );
+      return;
+    }
+
+    const existing = this.pipelineRepo.getNode(pipeline, ctx.nodeId);
+    if (
+      existing?.status === PipelineNodeExecutionStatus.Skipped ||
+      existing?.status === PipelineNodeExecutionStatus.Completed
+    ) {
+      this.logger.warn(
+        `handleNodeSucceeded: ignoring late success node=${ctx.nodeId} status=${existing.status}`,
       );
       return;
     }

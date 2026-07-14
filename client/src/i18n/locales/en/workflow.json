@@ -407,7 +407,8 @@
     "retryFailed": "Could not retry. Please try again.",
     "skipFailed": "Could not skip. Please try again.",
     "describeWorkflow": "Please describe what workflow should be generated.",
-    "pipelineStopped": "Pipeline stopped"
+    "pipelineStopped": "Pipeline stopped",
+    "pipelineStoppedKeptProgress": "Pipeline stopped — finished steps were saved as a draft"
   },
   "processing": {
     "generating": "Generating...",
