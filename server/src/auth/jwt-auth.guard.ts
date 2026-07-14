@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { type Request } from 'express';
+import { AuthCookieService } from './auth-cookie.service';
 import { type SsoTokenClaims } from './auth.types';
 import { UsersService } from '../users/users.service';
 import { UserStatus } from '../domain/users/user.types';
@@ -29,6 +30,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly config: ConfigService,
     private readonly users: UsersService,
+    private readonly cookies: AuthCookieService,
   ) {
     if (envFlagTrue(this.config.get<string>('SSO_AUTH_DISABLED'))) {
       this.jwks = null;
@@ -109,10 +111,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const header = req.headers['authorization'];
-    const token = this.extractBearer(header);
+    const token =
+      this.extractBearer(header) ?? this.cookies.readAccessToken(req);
     if (!token) {
-      this.logger.warn(`[${route}] Missing Bearer token`);
-      throw new UnauthorizedException('Missing Bearer token');
+      this.logger.warn(`[${route}] Missing access token (Bearer or cookie)`);
+      throw new UnauthorizedException('Missing access token');
     }
 
     let claims: SsoTokenClaims;

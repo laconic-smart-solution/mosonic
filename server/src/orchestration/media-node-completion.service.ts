@@ -24,6 +24,7 @@ import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
   PipelineNodeExecutionStatus,
+  PipelineStatus,
 } from '../pipeline/schemas/pipeline.schema';
 import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
 import { RULE_REPOSITORY } from '../repositories/tokens';
@@ -143,6 +144,34 @@ export class MediaNodeCompletionService {
     payload: NodeJobPayload,
     result: VideoCompleteResult,
   ): Promise<void> {
+    const pipeline = await this.pipelineRepo.findById(payload.pipelineId);
+    if (!pipeline) {
+      this.logger.warn(
+        `completeVideoNode: pipeline ${payload.pipelineId} not found`,
+      );
+      return;
+    }
+    if (
+      pipeline.status === PipelineStatus.Completed ||
+      pipeline.status === PipelineStatus.Failed
+    ) {
+      this.logger.warn(
+        `completeVideoNode: ignoring late completion pipeline=${payload.pipelineId} status=${pipeline.status}`,
+      );
+      return;
+    }
+    const node = this.pipelineRepo.getNode(pipeline, payload.nodeId);
+    if (
+      !node ||
+      node.status === PipelineNodeExecutionStatus.Skipped ||
+      node.status === PipelineNodeExecutionStatus.Completed
+    ) {
+      this.logger.warn(
+        `completeVideoNode: ignoring late completion node=${payload.nodeId} status=${node?.status ?? 'missing'}`,
+      );
+      return;
+    }
+
     await this.pipelineRepo.clearExternalJobId(
       payload.pipelineId,
       payload.nodeId,
@@ -150,12 +179,7 @@ export class MediaNodeCompletionService {
 
     await this.recordVideoCost(payload, result);
 
-    const pipeline = await this.pipelineRepo.findById(payload.pipelineId);
-    const node = pipeline
-      ? this.pipelineRepo.getNode(pipeline, payload.nodeId)
-      : undefined;
-
-    if (node?.reviewRegeneratePrompt?.trim()) {
+    if (node.reviewRegeneratePrompt?.trim()) {
       await this.pipelineRepo.patchNode(payload.pipelineId, payload.nodeId, {
         reviewRegeneratePrompt: null,
       });
@@ -167,7 +191,7 @@ export class MediaNodeCompletionService {
       nodeType: payload.nodeType,
       order: payload.order,
       totalNodes: payload.totalNodes,
-      lane: node?.lane ?? payload.lane,
+      lane: node.lane ?? payload.lane,
       output: { video: result.video },
       ruleRef: payload.ruleId,
     });
@@ -175,7 +199,7 @@ export class MediaNodeCompletionService {
     await this.resolver.maybeFinalize(payload.pipelineId);
 
     this.logger.log(
-      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node?.lane ?? 'trunk'} duration=${result.videoCost.videoSeconds}s`,
+      `Video node completed pipeline=${payload.pipelineId} node=${payload.nodeId} lane=${node.lane ?? 'trunk'} duration=${result.videoCost.videoSeconds}s`,
     );
   }
 
@@ -185,26 +209,46 @@ export class MediaNodeCompletionService {
     context?: VideoFailureContext,
   ): Promise<void> {
     const pipeline = await this.pipelineRepo.findById(payload.pipelineId);
-    const node = pipeline
-      ? this.pipelineRepo.getNode(pipeline, payload.nodeId)
-      : undefined;
-    const nodeConfig = (node?.config ?? {}) as WorkflowNodeConfig;
+    if (!pipeline) {
+      return;
+    }
+    if (
+      pipeline.status === PipelineStatus.Completed ||
+      pipeline.status === PipelineStatus.Failed
+    ) {
+      this.logger.warn(
+        `failVideoNode: ignoring late failure pipeline=${payload.pipelineId} status=${pipeline.status}`,
+      );
+      return;
+    }
+    const node = this.pipelineRepo.getNode(pipeline, payload.nodeId);
+    if (
+      !node ||
+      node.status === PipelineNodeExecutionStatus.Skipped ||
+      node.status === PipelineNodeExecutionStatus.Completed
+    ) {
+      this.logger.warn(
+        `failVideoNode: ignoring late failure node=${payload.nodeId} status=${node?.status ?? 'missing'}`,
+      );
+      return;
+    }
+    const nodeConfig = (node.config ?? {}) as WorkflowNodeConfig;
     const mode = getVideoGenerationMode(nodeConfig);
     const videoProvider =
       context?.videoProvider ??
       (mode === 'presenter' ? 'heygen' : 'sora');
 
-    const logMessage = this.formatVideoFailureMessage(error, videoProvider);
+    const logMessage = this.formatVideoFailureMessage(error, videoProvider, context?.stage);
     const errorDetail = {
       pipelineId: payload.pipelineId,
       workflowId: payload.workflowId,
       ruleId: payload.ruleId,
       nodeId: payload.nodeId,
-      lane: payload.lane ?? node?.lane ?? null,
+      lane: payload.lane ?? node.lane ?? null,
       stage: context?.stage ?? 'unknown',
       mode,
       videoProvider,
-      externalJobId: node?.externalJobId ?? null,
+      externalJobId: node.externalJobId ?? null,
       message: error.message,
     };
 
@@ -231,7 +275,7 @@ export class MediaNodeCompletionService {
         level: LogLevel.Error,
         status: PipelineLogStatus.Failed,
         message: logMessage,
-        retryCount: node?.retryCount ?? 0,
+        retryCount: node.retryCount ?? 0,
         expiresAt,
       });
       this.events.emitToPipeline(payload.pipelineId, 'pipeline:log', {
@@ -267,10 +311,17 @@ export class MediaNodeCompletionService {
   private formatVideoFailureMessage(
     error: Error,
     videoProvider: VideoJobProvider,
+    stage?: VideoFailureContext['stage'],
   ): string {
     const label =
       videoProvider === 'heygen' ? 'Presenter video' : 'Cinematic video';
     const raw = error.message?.trim();
+    if (stage === 'timeout') {
+      return (
+        raw ||
+        `${label} timed out. Please retry or skip to keep finished steps.`
+      );
+    }
     if (!raw) {
       return `${label} generation failed. Please retry or skip.`;
     }

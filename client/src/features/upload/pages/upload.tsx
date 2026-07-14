@@ -51,6 +51,7 @@ import {
   mediaTabLabels,
   normalizeChannelKey,
 } from "@/features/upload/lib/upload-platform-media"
+import { isRedNoteSessionFailureMessage } from "@/features/upload/lib/rednote-upload-status"
 import { toastApiError } from "@/shared/lib/toast-error"
 import {
   buildGlobalPublishRequest,
@@ -374,14 +375,22 @@ export default function UploadPage() {
       onUploadFailed((payload) => {
         if (payload.uploadId !== uploadId) return
         const k = payload.channel.toLowerCase()
+        const message = payload.message ?? "Failed"
         setLiveStatusByChannel((prev) => ({
           ...prev,
           [k]: mergeChannelUpdate(k, prev[k], uploadRef.current, {
             channel: payload.channel,
             status: "failed",
-            failureReason: payload.message ?? "Failed",
+            failureReason: message,
           }),
         }))
+        if (k === "rednote") {
+          toast.error(
+            isRedNoteSessionFailureMessage(message)
+              ? i18n.t("upload:toast.rednotePublishSessionFailed")
+              : message,
+          )
+        }
       }),
       onUploadScheduled((payload) => {
         if (payload.uploadId !== uploadId) return
@@ -486,6 +495,12 @@ export default function UploadPage() {
     })
   }, [activeKey, activeRow?.scheduledAt, activeRow?.status])
 
+  useEffect(() => {
+    if (activeKey === "rednote") {
+      setShowChannelSchedule(false)
+    }
+  }, [activeKey])
+
   const activeDraft =
     draftsByChannel[activeKey] ??
     (activeRow ? createEmptyDraft() : createEmptyDraft())
@@ -520,17 +535,22 @@ export default function UploadPage() {
   }, [channelTabs, channelRowByKey, liveStatusByChannel])
 
   const includeSwitchDisabledByKey = useMemo(() => {
+    const activeLocked =
+      activeRow?.status === "scheduled" ||
+      activeRow?.status === "published" ||
+      activeRow?.status === "publishing"
     const out: Record<string, boolean> = {}
     for (const t of channelTabs) {
       const key = t.channel.toLowerCase()
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
       out[key] =
+        activeLocked ||
         row?.status === "scheduled" ||
         row?.status === "published" ||
         row?.status === "publishing"
     }
     return out
-  }, [channelTabs, channelRowByKey, liveStatusByChannel])
+  }, [channelTabs, channelRowByKey, liveStatusByChannel, activeRow?.status])
 
   const eligibleGlobalCount = useMemo(() => {
     let count = 0
@@ -760,7 +780,7 @@ export default function UploadPage() {
     if (activeRow.status === "failed") {
       if (
         isRednote &&
-        (activeRow.failureReason ?? "").toLowerCase().includes("session") &&
+        isRedNoteSessionFailureMessage(activeRow.failureReason) &&
         (rednoteNeedsReauth || !connectedChannelSet.has("rednote"))
       ) {
         return "needs_reauth" as const
@@ -996,9 +1016,31 @@ export default function UploadPage() {
       pubNow,
       globalScheduledLocal
     )
+    // RedNote is publish-now only — drop it from schedule-all so other
+    // channels can still be scheduled.
+    if (!pubNow) {
+      const hadRednote = body.channels.some(
+        (c) => c.included && c.channel.toLowerCase() === "rednote"
+      )
+      body.channels = body.channels.map((c) =>
+        c.channel.toLowerCase() === "rednote"
+          ? { ...c, included: false }
+          : c
+      )
+      if (hadRednote) {
+        toast.message(i18n.t("upload:toast.rednoteScheduleSkipped"))
+      }
+    }
     const includedChannels = body.channels.filter((c) => c.included)
     if (includedChannels.length === 0) {
-      toast.error(i18n.t("upload:toast.noEligibleChannels"))
+      toast.error(
+        !pubNow &&
+          Object.entries(includedByKey).some(
+            ([k, on]) => on && k === "rednote" && connectedChannelSet.has("rednote")
+          )
+          ? i18n.t("upload:toast.rednoteNoSchedule")
+          : i18n.t("upload:toast.noEligibleChannels")
+      )
       return
     }
 
@@ -1006,10 +1048,6 @@ export default function UploadPage() {
       const key = ch.channel.toLowerCase()
       if (key === "rednote" && rednoteNeedsReauth) {
         toast.error(i18n.t("upload:toast.rednoteNeedsReauth"))
-        return
-      }
-      if (key === "rednote" && !pubNow) {
-        toast.error(i18n.t("upload:toast.rednoteNoSchedule"))
         return
       }
       const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
@@ -1191,6 +1229,11 @@ export default function UploadPage() {
             contentId={upload.contentRef}
             uploadId={uploadId}
             embedInUpload
+            lockGeneration={
+              activeRow?.status === "published" ||
+              activeRow?.status === "publishing" ||
+              activeRow?.status === "scheduled"
+            }
             generationChannelKeys={channelTabs.map((t) => t.channel)}
             onWorkflowLayersChange={handleWorkflowLayersChange}
             preview={
@@ -1275,6 +1318,7 @@ export default function UploadPage() {
                           scope="channel"
                           platformLabel={mediaCfg.displayName}
                           serverStatus={activeRow.status}
+                          scheduleSupported={activeKey !== "rednote"}
                           schedulePopoverOpen={showChannelSchedule}
                           schedulePopoverAnchorRef={
                             channelSchedulePopoverAnchorRef

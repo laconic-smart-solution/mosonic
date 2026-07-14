@@ -7,7 +7,7 @@ type SocketHandler = (...args: unknown[]) => void
 type JoinAck = { ok?: boolean; room?: string; error?: string }
 
 let socketInstance: Socket | null = null
-let connectedToken: string | null = null
+let connectedForAuth = false
 const joinedRooms = new Set<string>()
 const eventRegistry = new Map<string, Set<SocketHandler>>()
 
@@ -68,7 +68,7 @@ function destroySocketInstance(): void {
 
 /**
  * Subscribe to a Socket.IO event on the shared connection.
- * Handlers survive socket recreation (token refresh / reconnect).
+ * Handlers survive socket recreation (session refresh / reconnect).
  */
 export function subscribeSocketEvent(
   event: string,
@@ -98,22 +98,21 @@ export function subscribeSocketEvent(
 
 /**
  * Single shared Socket.IO connection for the app.
- * Passes JWT via handshake.auth so the server can join `user:{userId}`.
+ * Auth is via HttpOnly access cookie (withCredentials); server reads the cookie.
  */
 export function getSharedSocket(): Socket {
-  const token = useAuthStore.getState().accessToken?.trim() ?? null
+  const isAuthenticated = useAuthStore.getState().isAuthenticated
 
-  if (socketInstance && connectedToken === token) {
+  if (socketInstance && connectedForAuth === isAuthenticated) {
     return socketInstance
   }
 
   destroySocketInstance()
 
-  connectedToken = token
+  connectedForAuth = isAuthenticated
   socketInstance = io(appConfig.apiBaseUrl, {
     withCredentials: true,
     transports: ["websocket", "polling"],
-    auth: token ? { token } : {},
   })
   attachSocketLifecycle(socketInstance)
   attachRegistryToSocket(socketInstance)
@@ -162,5 +161,5 @@ export function leaveSocketRoom(room: string): void {
 export function disconnectSharedSocket(): void {
   joinedRooms.clear()
   destroySocketInstance()
-  connectedToken = null
+  connectedForAuth = false
 }

@@ -602,10 +602,23 @@ export class WebhookService {
     const platform = String(account?.platform ?? '').trim();
     const accountId = String(account?._id ?? account?.id ?? '').trim();
     if (!platform || !accountId) return;
+    const username =
+      typeof account?.username === 'string' ? account.username.trim() : '';
+    const displayNameRaw =
+      typeof account?.displayName === 'string'
+        ? account.displayName
+        : typeof account?.name === 'string'
+          ? account.name
+          : '';
+    const displayName = displayNameRaw.trim();
     await this.usersService.setZernioConnectedAccount(
       user.userId,
       platform,
       accountId,
+      {
+        ...(username ? { username } : {}),
+        ...(displayName ? { displayName } : {}),
+      },
     );
   }
 

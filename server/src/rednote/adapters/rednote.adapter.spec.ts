@@ -45,10 +45,11 @@ describe('RedNoteAdapter.getContext', () => {
     ).rejects.toBeInstanceOf(RedNoteSessionInvalidError);
   });
 
-  it('throws when sessionStatus is needs_reauth', async () => {
+  it('throws when account is not active', async () => {
     await expect(
       adapter.getContext({
         ...baseAccount,
+        status: SocialAccountStatus.ERROR,
         metadata: {
           sessionCookiesRef: 'rnck_abc',
           encryptedCookies: 'cipher',

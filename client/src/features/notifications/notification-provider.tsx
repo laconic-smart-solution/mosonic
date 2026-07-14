@@ -14,14 +14,14 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 
 export function NotificationProvider() {
   const hydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   useEffect(() => {
     attachNotificationVisibilityListener()
   }, [])
 
   useEffect(() => {
-    if (!hydrated || !accessToken) {
+    if (!hydrated || !isAuthenticated) {
       disconnectSharedSocket()
       return
     }
@@ -34,7 +34,7 @@ export function NotificationProvider() {
     return () => {
       cleanup()
     }
-  }, [hydrated, accessToken])
+  }, [hydrated, isAuthenticated])
 
   return null
 }

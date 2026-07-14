@@ -20,6 +20,8 @@ type UploadPublishControlsProps = {
   platformLabel: string
   serverStatus?: UploadChannelStatus
   eligibleCount?: number
+  /** When false, only publish-now is shown (e.g. RedNote). Default true. */
+  scheduleSupported?: boolean
   schedulePopoverOpen: boolean
   schedulePopoverAnchorRef: RefObject<Element | null>
   scheduledLocal: string
@@ -36,6 +38,7 @@ export function UploadPublishControls({
   platformLabel,
   serverStatus = "pending",
   eligibleCount = 0,
+  scheduleSupported = true,
   schedulePopoverOpen,
   schedulePopoverAnchorRef,
   scheduledLocal,
@@ -68,17 +71,17 @@ export function UploadPublishControls({
     : t("upload:publish.channelPublishing", { platform: platformLabel })
 
   useEffect(() => {
-    if (!canAct && schedulePopoverOpen) {
+    if ((!canAct || !scheduleSupported) && schedulePopoverOpen) {
       onScheduleOpenChange(false)
     }
-  }, [canAct, schedulePopoverOpen, onScheduleOpenChange])
+  }, [canAct, scheduleSupported, schedulePopoverOpen, onScheduleOpenChange])
 
   function handlePopoverOpenChange(open: boolean) {
     if (!open) {
       onScheduleOpenChange(false)
       return
     }
-    if (canAct) {
+    if (canAct && scheduleSupported) {
       onScheduleOpenChange(true)
     }
   }
@@ -110,88 +113,96 @@ export function UploadPublishControls({
               {publishLabel}
             </Button>
 
-            <Popover
-              modal={false}
-              open={schedulePopoverOpen}
-              onOpenChange={handlePopoverOpenChange}
-            >
-              <PopoverTrigger
-                disabled={!canAct || publishPending}
-                render={
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={schedulePopoverOpen ? "secondary" : "outline"}
-                    className={cn(
-                      "h-9 border-[#185FA5] px-4 text-[#185FA5] hover:bg-[#E6F1FB] dark:hover:bg-[#185FA5]/10",
-                      schedulePopoverOpen && "border-[#185FA5] bg-[#E6F1FB]"
-                    )}
-                    aria-expanded={schedulePopoverOpen}
-                    aria-haspopup="dialog"
-                  >
-                    <CalendarClock className="mr-1 size-3.5" />
-                    {scheduleLabel}
-                  </Button>
-                }
-              />
-              <PopoverContent
-                anchor={schedulePopoverAnchorRef}
-                positionMethod="fixed"
-                align="end"
-                side="bottom"
-                sideOffset={8}
-                collisionPadding={12}
-                className="z-70 w-[min(340px,calc(100vw-1.75rem))] gap-4 p-4"
+            {scheduleSupported ? (
+              <Popover
+                modal={false}
+                open={schedulePopoverOpen}
+                onOpenChange={handlePopoverOpenChange}
               >
-                <PopoverHeader className="space-y-0.5 pb-1">
-                  <PopoverTitle className="text-base">
-                    {isGlobal
-                      ? t("upload:publish.scheduleAllChannels")
-                      : t("upload:publish.schedulePublication")}
-                  </PopoverTitle>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {isGlobal
-                      ? `${eligibleCount} channel${eligibleCount === 1 ? "" : "s"}`
-                      : platformLabel}
-                  </p>
-                </PopoverHeader>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                    {t("upload:publish.whenToPublish")}
-                  </p>
-                  <Input
-                    type="datetime-local"
-                    value={scheduledLocal}
-                    onChange={(e) => onScheduleChange(e.target.value)}
-                    className="h-11 w-full min-w-0 text-sm"
-                  />
-                </div>
-                <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={publishPending}
-                    className="h-10"
-                    onClick={() => onScheduleOpenChange(false)}
-                  >
-                    {t("common:actions.cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-10 min-w-21 border-[#185FA5] bg-[#E6F1FB] text-[#042C53] hover:bg-[#B5D4F4]"
-                    disabled={publishPending}
-                    onClick={() => void onConfirmSchedule()}
-                  >
-                    {t("upload:publish.confirm")}
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                <PopoverTrigger
+                  disabled={!canAct || publishPending}
+                  render={
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={schedulePopoverOpen ? "secondary" : "outline"}
+                      className={cn(
+                        "h-9 border-[#185FA5] px-4 text-[#185FA5] hover:bg-[#E6F1FB] dark:hover:bg-[#185FA5]/10",
+                        schedulePopoverOpen && "border-[#185FA5] bg-[#E6F1FB]"
+                      )}
+                      aria-expanded={schedulePopoverOpen}
+                      aria-haspopup="dialog"
+                    >
+                      <CalendarClock className="mr-1 size-3.5" />
+                      {scheduleLabel}
+                    </Button>
+                  }
+                />
+                <PopoverContent
+                  anchor={schedulePopoverAnchorRef}
+                  positionMethod="fixed"
+                  align="end"
+                  side="bottom"
+                  sideOffset={8}
+                  collisionPadding={12}
+                  className="z-70 w-[min(340px,calc(100vw-1.75rem))] gap-4 p-4"
+                >
+                  <PopoverHeader className="space-y-0.5 pb-1">
+                    <PopoverTitle className="text-base">
+                      {isGlobal
+                        ? t("upload:publish.scheduleAllChannels")
+                        : t("upload:publish.schedulePublication")}
+                    </PopoverTitle>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {isGlobal
+                        ? `${eligibleCount} channel${eligibleCount === 1 ? "" : "s"}`
+                        : platformLabel}
+                    </p>
+                  </PopoverHeader>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                      {t("upload:publish.whenToPublish")}
+                    </p>
+                    <Input
+                      type="datetime-local"
+                      value={scheduledLocal}
+                      onChange={(e) => onScheduleChange(e.target.value)}
+                      className="h-11 w-full min-w-0 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={publishPending}
+                      className="h-10"
+                      onClick={() => onScheduleOpenChange(false)}
+                    >
+                      {t("common:actions.cancel")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-10 min-w-21 border-[#185FA5] bg-[#E6F1FB] text-[#042C53] hover:bg-[#B5D4F4]"
+                      disabled={publishPending}
+                      onClick={() => void onConfirmSchedule()}
+                    >
+                      {t("upload:publish.confirm")}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : null}
           </div>
         ) : null}
       </div>
+
+      {!isGlobal && !scheduleSupported && canAct ? (
+        <p className="text-[11px] text-muted-foreground">
+          {t("upload:publish.rednotePublishOnly")}
+        </p>
+      ) : null}
 
       {!isGlobal && (locked || isScheduled) ? (
         <div className="flex items-start gap-2 rounded-md border border-border/40 bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground">

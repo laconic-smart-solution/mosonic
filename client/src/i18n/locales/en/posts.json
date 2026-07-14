@@ -129,6 +129,7 @@
       "partialSync": "Some platforms could not be synced. Try refreshing again.",
       "unavailable": "Analytics are not available for this post.",
       "afterPublish": "Analytics appear here after the post is published.",
+      "rednoteUnsupported": "RedNote does not support analytics. Metrics are only available for Zernio-connected channels.",
       "refresh": "Refresh metrics",
       "syncSuccess": "Analytics updated",
       "syncFailed": "Could not refresh analytics.",

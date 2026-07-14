@@ -6,6 +6,37 @@ export class RedNoteSessionInvalidError extends Error {
   }
 }
 
+/** BullMQ / serialized errors lose `instanceof` — match by code, name, or message. */
+export function isRedNoteSessionInvalidError(err: unknown): boolean {
+  if (err instanceof RedNoteSessionInvalidError) return true;
+  if (!err || typeof err !== 'object') {
+    if (typeof err === 'string') {
+      return isRedNoteSessionInvalidMessage(err);
+    }
+    return false;
+  }
+  const e = err as { name?: string; code?: string; message?: string };
+  if (e.code === 'REDNOTE_SESSION_INVALID') return true;
+  if (e.name === 'RedNoteSessionInvalidError') return true;
+  return isRedNoteSessionInvalidMessage(e.message);
+}
+
+export function isRedNoteSessionInvalidMessage(
+  message: string | null | undefined,
+): boolean {
+  const m = (message ?? '').toLowerCase();
+  if (!m.includes('session')) return false;
+  return (
+    m.includes('invalid') ||
+    m.includes('re-auth') ||
+    m.includes('reconnect') ||
+    m.includes('expired') ||
+    m.includes('not detected') ||
+    m.includes('could not verify') ||
+    m.includes('creator session')
+  );
+}
+
 export class RedNoteConcurrentPublishError extends Error {
   readonly code = 'REDNOTE_CONCURRENT_PUBLISH' as const;
   constructor(message = 'Another RedNote publish is in progress for this account') {
@@ -35,6 +66,17 @@ export class RedNoteUploadTimeoutError extends Error {
   constructor(message = 'RedNote media upload timed out') {
     super(message);
     this.name = 'RedNoteUploadTimeoutError';
+  }
+}
+
+/** Publish button was clicked but the success confirmation page never appeared. */
+export class RedNotePublishUnconfirmedError extends Error {
+  readonly code = 'REDNOTE_PUBLISH_UNCONFIRMED' as const;
+  constructor(
+    message = 'RedNote publish was not confirmed — success page did not appear',
+  ) {
+    super(message);
+    this.name = 'RedNotePublishUnconfirmedError';
   }
 }
 

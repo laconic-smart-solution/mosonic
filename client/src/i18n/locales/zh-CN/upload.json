@@ -74,7 +74,8 @@
     "publishedNoAction": "已发布 — 无需进一步操作",
     "scheduledEditable": "已定时 — 在下方编辑后点击保存以更新",
     "publishingInProgress": "正在发布…",
-    "editScheduled": "编辑定时帖子"
+    "editScheduled": "编辑定时帖子",
+    "rednotePublishOnly": "RedNote 仅支持立即发布，不支持定时发布。"
   },
   "banner": {
     "notConnected": "您的 {{platform}} 账户未连接。",
@@ -98,7 +99,9 @@
     "savedChannel": "已保存此渠道",
     "connectAccount": "请先在设置中连接此账户。",
     "rednoteNeedsReauth": "RedNote 会话已过期，请在设置中重新连接。",
-    "rednoteNoSchedule": "RedNote 暂不支持定时发布，请立即发布。",
+    "rednotePublishSessionFailed": "RedNote 发布失败 — 无法验证创作者中心会话。请重试，若仍失败请在设置中重新连接。",
+    "rednoteNoSchedule": "RedNote 仅支持立即发布，不支持定时发布。",
+    "rednoteScheduleSkipped": "已跳过 RedNote — 该渠道仅支持立即发布。",
     "assignCaption": "发布前请指定文案。",
     "publishing": "正在发布…",
     "scheduling": "正在定时…",

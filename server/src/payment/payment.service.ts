@@ -81,6 +81,26 @@ export class PaymentService {
     );
   }
 
+  /**
+   * Create a Payni hosted checkout via the Java payment service.
+   * Payni credentials live on the payment service, not Nest.
+   */
+  async createRedirectPayment(args: {
+    amount: number;
+    currencyCode?: string;
+  }): Promise<{ transactionId: string; redirectUrl: string }> {
+    const body: { amount: number; currencyCode?: string } = {
+      amount: args.amount,
+    };
+    if (args.currencyCode?.trim()) {
+      body.currencyCode = args.currencyCode.trim();
+    }
+    return this.client.postJson<{ transactionId: string; redirectUrl: string }>(
+      '/api/v1/payments/redirect',
+      body,
+    );
+  }
+
   toCreditPackage(plan: TopupPlanRecord): CreditPackage {
     return {
       id: plan.code,

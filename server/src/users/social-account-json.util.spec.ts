@@ -15,6 +15,8 @@ describe('social-account-json.util', () => {
           channel: 'Instagram',
           accountId: 'acc_1',
           connectedAt: '2026-01-02T00:00:00.000Z',
+          username: 'ig_user',
+          displayName: 'IG Name',
         },
         { channel: '', accountId: 'x' },
       ],
@@ -25,6 +27,8 @@ describe('social-account-json.util', () => {
         userId: 'u1',
         channel: 'instagram',
         accountId: 'acc_1',
+        username: 'ig_user',
+        displayName: 'IG Name',
       }),
     ]);
   });

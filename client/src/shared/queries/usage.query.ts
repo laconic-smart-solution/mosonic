@@ -35,11 +35,11 @@ export function useCreditBalanceSocketRefresh() {
 }
 
 export function useUsageSummaryQuery() {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: usageQueryKeys.summary,
     queryFn: () => usageService.getSummary(),
-    enabled: !!token,
+    enabled: isAuthenticated,
     staleTime: 30_000,
     refetchInterval: 60_000,
   })
@@ -51,21 +51,21 @@ export function useUsageHistoryQuery(params?: {
   page?: number
   limit?: number
 }) {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: usageQueryKeys.history(params ?? {}),
     queryFn: () => usageService.getHistory(params),
-    enabled: !!token,
+    enabled: isAuthenticated,
     staleTime: 30_000,
   })
 }
 
 export function useCurrentPlanQuery() {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: usageQueryKeys.currentPlan,
     queryFn: () => usageService.getCurrentPlan(),
-    enabled: !!token,
+    enabled: isAuthenticated,
     staleTime: 30_000,
   })
 }

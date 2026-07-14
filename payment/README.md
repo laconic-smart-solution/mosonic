@@ -1,6 +1,6 @@
 # Payment service
 
-Spring Boot microservice for **credit topup plan** catalog. Nest proxies all calls with a shared API key; the browser never talks to this service directly.
+Spring Boot microservice for the **credit topup plan** catalog and **Payni checkout** proxy. Nest proxies all calls with a shared API key; the browser never talks to this service directly.
 
 ## Stack
 
@@ -12,7 +12,7 @@ Spring Boot microservice for **credit topup plan** catalog. Nest proxies all cal
 
 ```bash
 cp .env.example .env
-# Set DATABASE_URL (JDBC), PAYMENT_API_KEY (same as server)
+# Set DATABASE_URL (JDBC), PAYMENT_API_KEY (same as server), and PAYNI_* credentials
 ./mvnw spring-boot:run
 ```
 
@@ -27,6 +27,10 @@ Default port: **8002**
 | `DATABASE_PASSWORD` | DB password |
 | `PAYMENT_API_KEY` | Shared secret with Nest `PAYMENT_API_KEY` |
 | `PAYMENT_PORT` | HTTP port (default 8002) |
+| `PAYNI_URL` | Payni API base URL |
+| `PAYNI_APP_ID` | Payni application UUID |
+| `PAYNI_SECRET` | Payni API secret |
+| `PAYNI_CURRENCY_CODE` | Default currency (default `THB`) |
 
 ## API
 
@@ -39,15 +43,18 @@ All `/api/v1/*` routes require header `X-Payment-API-Key`.
 | POST | `/api/v1/topup-plans` | Create plan |
 | PUT | `/api/v1/topup-plans/{code}` | Update plan |
 | PATCH | `/api/v1/topup-plans/{code}/active` | Enable/disable |
+| POST | `/api/v1/payments/redirect` | Create Payni hosted checkout (`amount`, optional `currencyCode`) |
 
 Health: `GET /actuator/health` (no API key)
 
 ## Flow
 
 ```
-Client → Nest (JWT) → Payment (API key) → PostgreSQL
+Client → Nest (JWT) → Payment (API key) → PostgreSQL (catalog)
+                     ↘ Payment → Payni (create redirect)
+Payni webhook → Nest /webhook/payment-status (fulfillment stays in Nest)
 ```
 
-User topup still grants credits in Nest; Payment only owns the **plan catalog** (credits, prices, labels).
+Nest owns purchase records and credit/plan fulfillment. This service owns the plan catalog and Payni credentials for redirect creation.
 
 On first startup, if `topup_plans` is empty, default packages (starter / growth / scale) are seeded automatically.

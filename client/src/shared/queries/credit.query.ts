@@ -13,21 +13,21 @@ export const creditQueryKeys = {
 }
 
 export function useCreditPackagesQuery(enabled = true) {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: creditQueryKeys.packages,
     queryFn: () => creditService.getPackages(),
-    enabled: enabled && !!token,
+    enabled: enabled && isAuthenticated,
     staleTime: 5 * 60_000,
   })
 }
 
 export function useGenerationCreditCostsQuery(enabled = true) {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: creditQueryKeys.generationCosts,
     queryFn: () => creditService.getGenerationCosts(),
-    enabled: enabled && !!token,
+    enabled: enabled && isAuthenticated,
     staleTime: 60_000,
   })
 }

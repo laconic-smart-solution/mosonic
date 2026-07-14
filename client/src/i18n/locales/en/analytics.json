@@ -35,7 +35,7 @@
     "likes": "Likes",
     "comments": "Comments",
     "engagement": "Eng.",
-    "emptyHint": "Publish content with Zernio IDs, then sync to generate analytics.",
+    "emptyHint": "Publish content with Zernio IDs, then sync to generate analytics. RedNote posts are not included.",
     "best": "Best:",
     "viewDetails": "View details",
     "syncing": "Syncing…",

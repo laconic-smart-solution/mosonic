@@ -2,22 +2,26 @@ import { useEffect, useState } from "react"
 
 import { useAuthStore } from "@/shared/stores/auth.store"
 
-/** Wait for persisted access/refresh tokens to load before auth redirects. */
+let hydrateStarted = false
+
+/**
+ * Kick off cookie-session hydrate once, and report when auth state is ready
+ * for route guards.
+ */
 export function useAuthStoreHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() =>
-    typeof useAuthStore.persist?.hasHydrated === "function"
-      ? useAuthStore.persist.hasHydrated()
-      : true,
-  )
+  const isHydrated = useAuthStore((s) => s.isHydrated)
+  const hydrate = useAuthStore((s) => s.hydrate)
+  const [started, setStarted] = useState(hydrateStarted)
 
   useEffect(() => {
-    const unsub = useAuthStore.persist?.onFinishHydration?.(() =>
-      setHydrated(true),
-    )
-    return () => {
-      unsub?.()
+    if (hydrateStarted) {
+      setStarted(true)
+      return
     }
-  }, [])
+    hydrateStarted = true
+    setStarted(true)
+    void hydrate()
+  }, [hydrate])
 
-  return hydrated
+  return started && isHydrated
 }

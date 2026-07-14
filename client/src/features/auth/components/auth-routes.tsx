@@ -10,7 +10,7 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 export function GuestOnlyRoute({ children }: { children: ReactNode }) {
   const hydrated = useAuthStoreHydrated()
   const location = useLocation()
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const otpVerified = useAuthStore((s) => s.otpVerified)
   const pendingVerifyEmail = useAuthStore((s) => s.pendingVerifyEmail)
 
@@ -18,7 +18,7 @@ export function GuestOnlyRoute({ children }: { children: ReactNode }) {
     return <Loader />
   }
 
-  if (accessToken) {
+  if (isAuthenticated) {
     if (needsEmailVerification(otpVerified)) {
       if (location.pathname.startsWith("/verify-otp")) {
         return <>{children}</>
@@ -28,13 +28,20 @@ export function GuestOnlyRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/dashboard" replace />
   }
 
+  // Mid OTP (no cookies yet) — keep guest pages except bounce to verify-otp when needed.
+  if (pendingVerifyEmail && needsEmailVerification(otpVerified)) {
+    if (location.pathname.startsWith("/verify-otp")) {
+      return <>{children}</>
+    }
+  }
+
   return <>{children}</>
 }
 
-/** Requires Bearer session; renders nested routes via `<Outlet />`. */
+/** Requires cookie session; renders nested routes via `<Outlet />`. */
 export function ProtectedLayout() {
   const hydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const otpVerified = useAuthStore((s) => s.otpVerified)
   const pendingVerifyEmail = useAuthStore((s) => s.pendingVerifyEmail)
 
@@ -42,7 +49,10 @@ export function ProtectedLayout() {
     return <Loader />
   }
 
-  if (!accessToken) {
+  if (!isAuthenticated) {
+    if (pendingVerifyEmail && needsEmailVerification(otpVerified)) {
+      return <Navigate to={verifyOtpPath(pendingVerifyEmail)} replace />
+    }
     return <Navigate to="/login" replace />
   }
 
@@ -55,10 +65,10 @@ export function ProtectedLayout() {
 
 /** Requires ADMIN role (use inside already-protected layout). */
 export function AdminRoute({ children }: { children: ReactNode }) {
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const role = useAuthStore((s) => s.role)
 
-  if (!accessToken) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 

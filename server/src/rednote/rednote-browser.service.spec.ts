@@ -43,13 +43,17 @@ describe('RedNoteBrowserService login selectors', () => {
   it('defaults creator publish selectors', () => {
     expect(browser.creatorLoggedInAvatarSelector()).toContain('user_avatar');
     expect(browser.videoUploadInputSelector()).toContain('.mp4');
-    expect(browser.publishButtonHostSelector()).toBe('xhs-publish-btn');
-    expect(browser.isCreatorCenterUrl('https://creator.xiaohongshu.com/publish/publish')).toBe(
-      true,
-    );
-    expect(browser.isCreatorCenterUrl('https://creator.rednote.com/publish/publish')).toBe(
-      true,
-    );
+    expect(browser.publishButtonHostSelector()).toContain('xhs-publish-btn');
+    expect(browser.publishButtonSelectors()[0]).toBe('xhs-publish-btn');
+    expect(browser.publishSuccessTimeoutMs()).toBe(60_000);
+    expect(
+      browser.isCreatorCenterUrl(
+        'https://creator.xiaohongshu.com/publish/publish',
+      ),
+    ).toBe(true);
+    expect(
+      browser.isCreatorCenterUrl('https://creator.rednote.com/publish/publish'),
+    ).toBe(true);
   });
 
   it('isCreatorLoggedIn checks avatar selector', async () => {

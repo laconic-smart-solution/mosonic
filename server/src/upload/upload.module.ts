@@ -20,7 +20,7 @@ import { UploadService } from './upload.service';
     EventsModule,
     UsersModule,
     McpModule,
-    RedNoteModule,
+    forwardRef(() => RedNoteModule),
     RepositoriesModule,
     forwardRef(() => ContentModule),
     PostModule,

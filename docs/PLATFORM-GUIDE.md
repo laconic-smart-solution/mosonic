@@ -255,7 +255,7 @@ A separate **worker** entry (`WorkerModule`) can run Bull processors without the
 - **`CUSTOMER`** (default): queries filtered to the authenticated user’s `userId`.
 - **`ADMIN`**: no `userId` filter; can see all tenants including legacy rows without `userId`.
 
-Authentication uses Bearer JWT from SSO. `JwtAuthGuard` upserts a local user on each request. `AdminGuard` requires `localUser.role === 'ADMIN'`.
+Authentication uses HttpOnly cookies set by the Nest BFF after SSO login (SPA never sees tokens). `JwtAuthGuard` accepts Bearer or the access cookie, then upserts a local user on each request. `AdminGuard` requires `localUser.role === 'ADMIN'`.
 
 ### Pipeline execution modes
 

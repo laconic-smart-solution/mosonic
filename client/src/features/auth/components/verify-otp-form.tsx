@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
-import FormInputText from "@/components/common/form/form-input-text"
 import { Button } from "@/components/ui/button"
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
@@ -38,14 +37,14 @@ type VerifyOtpFormProps = {
 
 export function VerifyOtpForm({
   defaultEmail = "",
-  emailLocked = false,
+  emailLocked: _emailLocked = false,
   isForgotPasswordFlow = false,
 }: VerifyOtpFormProps) {
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const setSession = useAuthStore((s) => s.setSession)
+  const establishSession = useAuthStore((s) => s.establishSession)
   const setUser = useUserStore((s) => s.setUser)
 
   const verifyOtpSchema = useMemo(() => createVerifyOtpSchema(tv), [tv])
@@ -87,32 +86,26 @@ export function VerifyOtpForm({
 
   const verifyMutation = useMutation({
     mutationFn: async (values: VerifyOtpFormValues) => {
-      const res = await verifyOtp({ email: values.email.trim(), otp: values.code })
-      if (!res.accessToken) {
-        throw new Error(t("verifyOtp.tokenMissing"))
+      const res = await verifyOtp({
+        email: values.email.trim(),
+        otp: values.code,
+      })
+      if (res.otpVerified === false) {
+        throw new Error(t("verifyOtp.failed"))
       }
       return { res, email: values.email.trim() }
     },
-    onSuccess: async ({ res, email }) => {
+    onSuccess: async ({ email }) => {
       if (isForgotPasswordFlow) {
+        // Cookies are set by Nest; reset-password uses the access cookie.
         navigate(
-          `/reset-password?email=${encodeURIComponent(email)}&token=${encodeURIComponent(res.accessToken!)}`,
+          `/reset-password?email=${encodeURIComponent(email)}`,
           { replace: true },
         )
         return
       }
 
-      if (!res.refreshToken || !res.accessToken) {
-        form.setError("root", { message: t("verifyOtp.noRefreshToken") })
-        return
-      }
-
-      const accessToken = res.accessToken
-      const refreshToken = res.refreshToken
-
-      setSession({
-        accessToken,
-        refreshToken,
+      establishSession({
         otpVerified: true,
         pendingVerifyEmail: null,
       })
@@ -120,19 +113,20 @@ export function VerifyOtpForm({
       try {
         const meResp = await me()
         const role = meResp?.auth?.localUser?.role ?? null
-        setSession({
-          accessToken,
-          refreshToken,
-          role: role ?? undefined,
+        establishSession({
+          role:
+            role === "ADMIN" || role === "CUSTOMER" ? role : undefined,
           otpVerified: true,
           pendingVerifyEmail: null,
         })
         const lu = meResp?.auth?.localUser
         if (lu && typeof lu === "object") {
-          setUser(mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]))
+          setUser(
+            mapLocalUserToUser(lu as Parameters<typeof mapLocalUserToUser>[0]),
+          )
         }
       } catch {
-        // session still has tokens; user can refresh profile later
+        // Cookie session exists; profile can load later.
       }
 
       toast.success(t("verifyOtp.emailVerified"))
@@ -178,17 +172,6 @@ export function VerifyOtpForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        {/* <FormInputText
-          form={form}
-          name="email"
-          type="email"
-          label={t("verifyOtp.email")}
-          autoComplete="email"
-          disabled={emailLocked}
-          className={emailLocked ? "bg-muted/50 text-muted-foreground" : undefined}
-          required
-        /> */}
-
         <FormField
           control={form.control}
           name="code"

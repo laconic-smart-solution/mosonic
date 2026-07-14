@@ -27,7 +27,12 @@ import {
 } from '../workflow/workflow-graph.util';
 import { isNodeBlockedByLanePause } from './lane-pause.util';
 import { OrchestrationService } from './orchestration.service';
-import { QUEUES, videoCheckJobId } from './types/queue.constants';
+import {
+  POLL_CONFIG,
+  QUEUES,
+  videoCheckJobId,
+  videoPollWallTimeoutMs,
+} from './types/queue.constants';
 import type { MediaCheckJobPayload } from './types/media-check-job.payload';
 import {
   type NodeJobPayload,
@@ -200,6 +205,12 @@ export class DependencyResolverService {
     const config = (node.config ?? {}) as WorkflowNodeConfig;
     const isPresenter = getVideoGenerationMode(config) === 'presenter';
     const videoProvider = isPresenter ? 'heygen' : 'sora';
+    const startedAtMs = node.executedAt
+      ? new Date(node.executedAt).getTime()
+      : Date.now();
+    const wallTimeoutMs = videoPollWallTimeoutMs(videoProvider);
+    const elapsedMs = Date.now() - startedAtMs;
+    const timedOut = Number.isFinite(startedAtMs) && elapsedMs >= wallTimeoutMs;
     const payload: MediaCheckJobPayload = {
       pipelineId: pipeline.pipelineId,
       workflowId: pipeline.workflowRef,
@@ -212,8 +223,11 @@ export class DependencyResolverService {
       contentPrompt: pipeline.contentPrompt,
       lane: node.lane ?? null,
       externalJobId: node.externalJobId!.trim(),
-      checkCount: 0,
-      submittedAt: new Date().toISOString(),
+      // Force timeout path when wall clock already exceeded (avoids infinite recover loops).
+      checkCount: timedOut ? POLL_CONFIG.video.maxChecks : 0,
+      submittedAt: new Date(
+        Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+      ).toISOString(),
       videoProvider,
       normalized: isPresenter ? undefined : normalizeVideoConfig(config),
     };
@@ -233,7 +247,8 @@ export class DependencyResolverService {
     });
     this.logger.warn(
       `[pipeline:${pipeline.pipelineId}] recovered orphaned video poll node=${node.nodeId} ` +
-        `externalJobId=${node.externalJobId}`,
+        `externalJobId=${node.externalJobId}` +
+        (timedOut ? ' (wall timeout — will pause for retry/skip)' : ''),
     );
   }
 
@@ -491,6 +506,39 @@ export class DependencyResolverService {
             'pipelineId' in job.data &&
             (job.data as NodeJobPayload).pipelineId === pipelineId)
         ) {
+          await job.remove();
+        }
+      }
+    }
+  }
+
+  /** Remove waiting/delayed jobs for a single node (force-skip / cancel mid-run). */
+  async removeQueuedJobsForNode(
+    pipelineId: string,
+    nodeId: string,
+  ): Promise<void> {
+    const queues = [
+      this.pipelineNodesQueue,
+      this.videoGenerateQueue,
+      this.videoCheckQueue,
+      this.legacyPipelineVideoQueue,
+    ];
+    for (const queue of queues) {
+      const [waiting, delayed] = await Promise.all([
+        queue.getJobs(['waiting']),
+        queue.getJobs(['delayed']),
+      ]);
+      for (const job of [...waiting, ...delayed]) {
+        const data = job.data as NodeJobPayload | undefined;
+        const matchesData =
+          data &&
+          data.pipelineId === pipelineId &&
+          data.nodeId === nodeId;
+        const matchesId =
+          typeof job.id === 'string' &&
+          (job.id.startsWith(`${pipelineId}__${nodeId}`) ||
+            job.id.includes(`__${nodeId}__`));
+        if (matchesData || matchesId) {
           await job.remove();
         }
       }

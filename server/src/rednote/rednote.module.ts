@@ -1,9 +1,10 @@
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UsersModule } from '../users/users.module';
+import { UploadModule } from '../upload/upload.module';
 import { RedNoteAdapter } from './adapters/rednote.adapter';
 import { RedNoteCookieCryptoService } from './crypto/rednote-cookie-crypto.service';
 import { RedNoteBrowserService } from './rednote-browser.service';
@@ -27,6 +28,7 @@ const runWorkersInApi = process.env.RUN_WORKERS_IN_API !== 'false';
     AuthModule,
     CreditModule,
     RepositoriesModule,
+    forwardRef(() => UploadModule),
     BullModule.registerQueue(
       { name: REDNOTE_LOGIN_QUEUE },
       { name: REDNOTE_PUBLISH_QUEUE },

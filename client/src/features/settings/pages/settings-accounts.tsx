@@ -206,13 +206,28 @@ export default function SettingsAccountsPage() {
     const base = accountsQuery.data?.accounts ?? []
     const rn = rednoteAccountQuery.data
     if (!rn?.connected && !rn?.needsReauth) return base
-    if (base.some((a) => a.channel.toLowerCase() === "rednote")) return base
+    const handle = rn.handle?.trim() || null
+    const idx = base.findIndex((a) => a.channel.toLowerCase() === "rednote")
+    if (idx >= 0) {
+      if (!handle) return base
+      const existing = base[idx]
+      if (existing.username || existing.displayName) return base
+      const next = [...base]
+      next[idx] = {
+        ...existing,
+        username: handle,
+        displayName: handle,
+      }
+      return next
+    }
     return [
       ...base,
       {
-        userId: user?.userId ?? "",
+        userId: user?.id ?? "",
         channel: "rednote",
-        accountId: rn.handle ?? "rednote",
+        accountId: handle ?? "rednote",
+        username: handle,
+        displayName: handle,
         connectedAt: rn.lastVerifiedAt ?? new Date().toISOString(),
       },
     ]
@@ -243,7 +258,7 @@ export default function SettingsAccountsPage() {
           <AccountUserProfileCard user={user} loading={hydrated && !user} />
 
           <div className="flex min-w-0 flex-col gap-6">
-            <section className={panelClass}>
+            {/* <section className={panelClass}>
               <div className="border-b border-border px-5 py-4">
                 <h2 className="font-heading text-[17px] tracking-tight text-foreground">
                   {t("language.sectionTitle")}
@@ -253,7 +268,7 @@ export default function SettingsAccountsPage() {
               <div className="p-5">
                 <LanguageSwitcher size="default" />
               </div>
-            </section>
+            </section> */}
 
             <Alert className="border-dashed bg-muted/30">
               <Info className="size-4 text-muted-foreground" aria-hidden />

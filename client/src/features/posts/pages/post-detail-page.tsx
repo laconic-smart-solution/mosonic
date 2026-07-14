@@ -48,7 +48,7 @@ import { PostDetailMediaGallery } from "@/features/posts/components/post-detail-
 
 import { ChannelStack } from "@/features/posts/lib/channel-stack"
 
-import { isAnalyticsEligible } from "@/features/posts/lib/post-detail-analytics.util"
+import { isAnalyticsEligible, isAnalyticsUnsupportedOnly } from "@/features/posts/lib/post-detail-analytics.util"
 
 import {
 
@@ -252,6 +252,7 @@ export default function PostDetailPage() {
   const publishable = !!local && isPostPublishable(local)
 
   const analyticsEligible = isAnalyticsEligible(local)
+  const analyticsUnsupportedOnly = isAnalyticsUnsupportedOnly(local)
 
   useSetBreadcrumbLabel(
     local?.youtubeTitlePreview?.trim() ||
@@ -981,7 +982,9 @@ export default function PostDetailPage() {
 
                       <CardDescription>
 
-                        {t("detail.analytics.afterPublish")}
+                        {analyticsUnsupportedOnly
+                          ? t("detail.analytics.rednoteUnsupported")
+                          : t("detail.analytics.afterPublish")}
 
                       </CardDescription>
 

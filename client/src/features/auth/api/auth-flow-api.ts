@@ -1,21 +1,5 @@
-import axios from "axios"
-
-import { appConfig } from "@/app/config/app-config"
 import apiClient from "@/shared/api/api-client"
 import { getApiErrorMessage } from "@/shared/lib/api-error"
-import {
-  extractOtpVerifiedFromAuthResponse,
-  extractTokensFromAuthResponse,
-} from "@/shared/lib/extract-auth-tokens"
-
-function pick(obj: unknown, path: string[]): unknown {
-  let cur: unknown = obj
-  for (const key of path) {
-    if (cur == null || typeof cur !== "object") return undefined
-    cur = (cur as Record<string, unknown>)[key]
-  }
-  return cur
-}
 
 export function authFlowErrorMessage(err: unknown, fallback: string): string {
   return getApiErrorMessage(err, fallback)
@@ -42,6 +26,12 @@ export type SignupBody = {
   phoneNumber?: string
 }
 
+export type AuthSessionResponse = {
+  email: string | null
+  userId: string | null
+  otpVerified: boolean
+}
+
 export async function signup(body: SignupBody): Promise<unknown> {
   const res = await apiClient.post("/auth/signup", body)
   return res.data
@@ -52,37 +42,16 @@ export async function resendOtp(email: string): Promise<unknown> {
   return res.data
 }
 
-/** Verify OTP; response shape matches normalized login/refresh from the SSO proxy. */
-export async function verifyOtp(body: { email: string; otp: string }) {
-  const res = await apiClient.post("/auth/verify-otp", body)
-  const data = res.data
-  const { accessToken, refreshToken } = extractTokensFromAuthResponse(data)
-  const email =
-    (pick(data, ["data", "data", "email"]) as string | undefined) ??
-    (pick(data, ["data", "email"]) as string | undefined) ??
-    (pick(data, ["email"]) as string | undefined)
-  const userIdRaw =
-    pick(data, ["data", "data", "userId"]) ??
-    pick(data, ["data", "userId"]) ??
-    pick(data, ["userId"])
-  const userId = userIdRaw != null ? String(userIdRaw) : undefined
-  const otpVerified = extractOtpVerifiedFromAuthResponse(data) ?? true
-  return { raw: data, accessToken, refreshToken, email, userId, otpVerified }
+/** Verify OTP; Nest sets HttpOnly cookies when verification succeeds. */
+export async function verifyOtp(body: {
+  email: string
+  otp: string
+}): Promise<AuthSessionResponse> {
+  const res = await apiClient.post<AuthSessionResponse>("/auth/verify-otp", body)
+  return res.data
 }
 
-export async function changePassword(
-  newPassword: string,
-  accessToken: string,
-): Promise<void> {
-  await axios.post(
-    `${appConfig.apiBaseUrl}/auth/change-password`,
-    { newPassword },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      withCredentials: true,
-    },
-  )
+/** Change password using the access cookie; Nest clears cookies afterward. */
+export async function changePassword(newPassword: string): Promise<void> {
+  await apiClient.post("/auth/change-password", { newPassword })
 }

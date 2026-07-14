@@ -36,17 +36,17 @@ export const postsQueryKeys = {
 }
 
 export function usePostsStatsQuery() {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return useQuery({
     queryKey: postsQueryKeys.stats(),
     queryFn: async () => assertPostsStatsPayload(await postService.stats()),
-    enabled: !!token,
+    enabled: isAuthenticated,
     retry: false,
   })
 }
 
 export function usePostsListQuery(params: PostsListQueryParams) {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const page = params.page ?? 1
   const limit = params.limit ?? 20
   const stable = { ...params, page, limit }
@@ -54,7 +54,7 @@ export function usePostsListQuery(params: PostsListQueryParams) {
   return useQuery({
     queryKey: postsQueryKeys.list(stable),
     queryFn: () => postService.list(stable),
-    enabled: !!token,
+    enabled: isAuthenticated,
     retry: false,
   })
 }
@@ -63,7 +63,7 @@ export function usePostDetailQuery(
   postId: string | undefined,
   opts?: { hydrateZernio?: boolean; enabled?: boolean },
 ) {
-  const token = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const hydrate = Boolean(opts?.hydrateZernio)
   return useQuery({
     queryKey: postsQueryKeys.detail(postId, hydrate),
@@ -71,7 +71,7 @@ export function usePostDetailQuery(
       postService.getById(postId!, {
         hydrate: hydrate ? "zernio" : undefined,
       }),
-    enabled: !!token && !!postId && (opts?.enabled ?? true),
+    enabled: isAuthenticated && !!postId && (opts?.enabled ?? true),
     retry: false,
   })
 }

@@ -220,6 +220,19 @@ export class PipelineNodeRunnerService {
     if (!pipeline) {
       return;
     }
+    if (
+      pipeline.status === PipelineStatus.Completed ||
+      pipeline.status === PipelineStatus.Failed
+    ) {
+      return;
+    }
+    const existing = this.pipelineRepo.getNode(pipeline, nodeId);
+    if (
+      existing?.status === PipelineNodeExecutionStatus.Skipped ||
+      existing?.status === PipelineNodeExecutionStatus.Completed
+    ) {
+      return;
+    }
 
     await this.pipelineRepo.updateNodeStatus(
       pipelineId,
