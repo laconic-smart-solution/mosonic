@@ -5,7 +5,6 @@ import { useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { LanguageSwitcher } from "@/components/language-switcher"
 import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AccountChannelsSection } from "@/features/settings/components/account-channels-section"
@@ -36,8 +35,6 @@ import {
   zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
 import { useUserStore } from "@/shared/stores/user.store"
-
-const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
 export default function SettingsAccountsPage() {
   const { t } = useTranslation("settings")
