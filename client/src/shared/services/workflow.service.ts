@@ -32,6 +32,15 @@ export const workflowService = {
     return response.data
   },
 
+  applyDefaultStructure: async (
+    ruleId: string,
+  ): Promise<GenerateWorkflowResponse> => {
+    const response = await apiClient.post(
+      `/workflow/rule/${ruleId}/default-structure`,
+    )
+    return response.data
+  },
+
   getById: async (workflowId: string): Promise<GetWorkflowResponse> => {
     const response = await apiClient.get(`/workflow/${workflowId}`)
     return response.data

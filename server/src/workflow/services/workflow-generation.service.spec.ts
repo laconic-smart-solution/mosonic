@@ -23,7 +23,10 @@ describe('WorkflowGenerationService', () => {
   const rule = {
     ruleId: 'r1',
     name: 'Campaign',
-    channels: [{ channel: 'instagram', priority: 'high', contentStyle: 'visual' }],
+    channels: [
+      { channel: 'instagram', priority: 'high', contentStyle: 'visual' },
+      { channel: 'facebook', priority: 'medium', contentStyle: 'story' },
+    ],
   } as Rule;
 
   it('orchestrates builder, config gen, and graph adapter', async () => {
@@ -44,10 +47,7 @@ describe('WorkflowGenerationService', () => {
     } as unknown as WorkflowConfigGenerationService;
 
     const svc = new WorkflowGenerationService(configGen);
-    const out = await svc.generate(rule, answers, {
-      userId: 'u1',
-      workflowId: 'w1',
-    });
+    const out = await svc.generate(rule, answers);
 
     expect(configGen.generateConfigs).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -55,11 +55,32 @@ describe('WorkflowGenerationService', () => {
       ]),
       rule,
       'Summer promo',
-      { userId: 'u1', workflowId: 'w1' },
     );
     expect(out.map((n) => n.type)).toEqual([
       WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Merge,
     ]);
     expect(out[0].userPrompt).toBe('Write promo copy');
+  });
+
+  it('buildDefaultStructure skips LLM and returns fixed preset graph', () => {
+    const configGen = {
+      generateConfigs: jest.fn(),
+    } as unknown as WorkflowConfigGenerationService;
+
+    const svc = new WorkflowGenerationService(configGen);
+    const out = svc.buildDefaultStructure(rule);
+
+    expect(configGen.generateConfigs).not.toHaveBeenCalled();
+    expect(out.map((n) => n.type)).toEqual([
+      WorkflowNodeType.KeywordPlanner,
+      WorkflowNodeType.Intelligence,
+      WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Merge,
+    ]);
   });
 });

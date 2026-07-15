@@ -283,6 +283,8 @@
   },
   "toolbar": {
     "workflowNameAria": "工作流名称",
+    "renameAria": "重命名工作流",
+    "renameHint": "点击以重命名此工作流",
     "untitledWorkflow": "未命名工作流",
     "rebuildNodes": "重建节点",
     "describeWorkflow": "描述工作流",
@@ -382,6 +384,17 @@
     "removedLanes": "已移除分支：{{lanes}}",
     "videoSettingsSaveFailed": "无法将视频设置保存到服务器。运行前请先保存工作流。"
   },
+  "canvasCredit": {
+    "title": "运行费用",
+    "total": "{{count}} 积分",
+    "balance": "可用 {{count}} 积分",
+    "calculating": "计算中…",
+    "error": "无法估算",
+    "staleHint": "有未保存的更改 — 保存后可刷新估算。",
+    "free": "此工作流没有计费节点。",
+    "show": "显示运行费用",
+    "hide": "隐藏运行费用"
+  },
   "toast": {
     "saved": "工作流已保存",
     "saveFailed": "无法保存工作流，请重试。",
@@ -422,6 +435,7 @@
     "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
     "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}",
     "emptyWorkflowHint": "通过问答向导配置工作流，然后在每次运行时生成内容。",
+    "preparingDefaultWorkflow": "正在准备默认工作流…",
     "modeUseCurrentWorkflow": "使用当前工作流",
     "modeGenerateWorkflow": "自动生成工作流",
     "modeTabCurrent": "当前",
@@ -561,6 +575,13 @@
     "selectAll": "全选",
     "deselectAll": "取消全选",
     "progress": "第 {{current}} 步，共 {{total}} 步",
+    "path": {
+      "chooserDescription": "使用标准流水线，或通过几个问题进行自定义。",
+      "defaultTitle": "默认",
+      "defaultDescription": "关键词 → 情报 → 文案，再按渠道 adapt 并合并。",
+      "takeQuestionTitle": "回答问题",
+      "takeQuestionDescription": "回答几个问题，为本轮生成自定义流水线。"
+    },
     "validation": {
       "selectAtLeastOneChannel": "请至少选择一个渠道。",
       "selectAtLeastOneLanguage": "请至少选择一种目标语言。"

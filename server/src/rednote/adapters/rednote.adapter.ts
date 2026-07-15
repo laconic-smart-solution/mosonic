@@ -109,10 +109,15 @@ export class RedNoteAdapter implements SocialProviderAdapter {
       await this.browserService.openCreatorPublishPage(page);
       const ok = await this.browserService.waitForCreatorLoggedIn(page, 20_000);
       if (ok) {
+        // Only replace handle when /user/me returns a verified nickname —
+        // never clear or invent one from DOM.
+        const handle =
+          await this.browserService.extractLoggedInUserHandle(page);
         await this.users.upsertRedNoteSession(account.userId, {
           ...meta,
           sessionStatus: 'active',
           lastVerifiedAt: new Date().toISOString(),
+          rednoteUserHandle: handle ?? meta.rednoteUserHandle,
         });
         return 'active';
       }

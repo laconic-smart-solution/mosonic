@@ -20,6 +20,10 @@ jest.mock('../content/content.service', () => ({
   ContentService: class ContentService {},
 }));
 
+jest.mock('../rednote/rednote.service', () => ({
+  RedNoteService: class RedNoteService {},
+}));
+
 describe('UploadService', () => {
   const findOne = jest.fn();
   const find = jest.fn();
@@ -1224,6 +1228,70 @@ describe('UploadService', () => {
       expect(entries.find((e) => e.channel === 'facebook')?.mediaUrl).toBe(
         'https://cdn.example/fb.jpg',
       );
+    });
+
+    it('does not copy facebook lane image onto channels without their own media', () => {
+      const pipeline = {
+        graph: { lanes: ['instagram', 'facebook', 'linkedin'] },
+        nodes: [
+          {
+            nodeId: 'img_fb',
+            lane: 'facebook',
+            type: WorkflowNodeType.ImageGeneration,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ image: 'https://cdn.example/fb.jpg' }),
+          },
+          {
+            nodeId: 'adapt_ig',
+            lane: 'instagram',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'IG caption' }),
+          },
+          {
+            nodeId: 'adapt_fb',
+            lane: 'facebook',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'FB caption' }),
+          },
+          {
+            nodeId: 'adapt_li',
+            lane: 'linkedin',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'LI caption' }),
+          },
+        ],
+      } as unknown as PipelineDocument;
+
+      const ruleChannels = ['instagram', 'facebook', 'linkedin'].map(
+        (channel) => ({
+          channel,
+          priority: 'high',
+          contentStyle: '',
+          contentMapping: {
+            caption: CaptionMappingSource.Text,
+            media: ChannelMediaMapping.Image,
+          },
+        }),
+      );
+
+      const entries = service.buildChannelEntriesFromPipeline(
+        ruleChannels as never,
+        pipeline,
+        {
+          text: 'trunk',
+          // Flattened snapshot includes facebook lane media — must not leak.
+          image: 'https://cdn.example/fb.jpg',
+        },
+      );
+
+      expect(entries.find((e) => e.channel === 'facebook')?.mediaUrl).toBe(
+        'https://cdn.example/fb.jpg',
+      );
+      expect(entries.find((e) => e.channel === 'instagram')?.mediaUrl).toBeNull();
+      expect(entries.find((e) => e.channel === 'linkedin')?.mediaUrl).toBeNull();
     });
   });
 

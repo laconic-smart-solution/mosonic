@@ -57,9 +57,13 @@ export class RedNoteLoginProcessor extends WorkerHost {
     await sleep(2000);
 
     const browser = await this.browserService.launch();
+    let meCapture: { getHandle: () => string | undefined; dispose: () => void } |
+      undefined;
     try {
       const page = await browser.newPage();
       await this.browserService.preparePage(page);
+      meCapture = this.browserService.attachMeProfileCapture(page);
+
       await page.goto(this.browserService.loginUrl(), {
         waitUntil: 'domcontentloaded',
         timeout: 60_000,
@@ -104,16 +108,14 @@ export class RedNoteLoginProcessor extends WorkerHost {
           const encrypted = this.cookieCrypto.encrypt(JSON.stringify(cookies));
           const ref = this.cookieCrypto.newCookiesRef();
           const nowIso = new Date().toISOString();
-          let handle: string | undefined;
-          try {
-            handle = await page.evaluate(() => {
-              const el =
-                document.querySelector('[class*="name"]') ||
-                document.querySelector('.user-name');
-              return el?.textContent?.trim() || undefined;
-            });
-          } catch {
-            handle = undefined;
+
+          // Prefer network-captured /user/me from the QR login success flow;
+          // then retry an explicit me fetch. Never scrape DOM names.
+          await sleep(1500);
+          let handle = meCapture.getHandle();
+          if (!handle) {
+            handle =
+              await this.browserService.extractLoggedInUserHandle(page);
           }
 
           await this.users.upsertRedNoteSession(userId, {
@@ -122,13 +124,15 @@ export class RedNoteLoginProcessor extends WorkerHost {
             sessionStatus: 'active',
             lastVerifiedAt: nowIso,
             lastQrScanAt: nowIso,
-            rednoteUserHandle: handle,
+            ...(handle ? { rednoteUserHandle: handle } : {}),
           });
 
           this.gateway.emitToUser(userId, 'login_success', {
             handle: handle ?? null,
           });
-          this.logger.log(`RedNote login success user=${userId}`);
+          this.logger.log(
+            `RedNote login success user=${userId} handle=${handle ?? 'n/a'}`,
+          );
           return;
         }
 
@@ -161,6 +165,7 @@ export class RedNoteLoginProcessor extends WorkerHost {
       this.gateway.emitToUser(userId, 'login_failed', { reason });
       throw err;
     } finally {
+      meCapture?.dispose();
       await browser.close().catch(() => undefined);
       await this.locks.release(lockKey);
       this.gateway.clearQrCache(userId);

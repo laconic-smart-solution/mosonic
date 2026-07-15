@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Browser, ElementHandle, Page } from 'puppeteer';
+import type { Browser, ElementHandle, HTTPResponse, Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
 import {
   RedNoteSelectorMismatchError,
   RedNoteSessionInvalidError,
 } from './errors/rednote.errors';
+import { parseXiaohongshuMeProfile } from './parse-xiaohongshu-me-profile';
 
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -660,6 +661,114 @@ export class RedNoteBrowserService {
       return avatar !== null;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Resolve the logged-in RedNote nickname from the official `/user/me` API only.
+   * Never scrape the DOM — feed/sidebar text is unstable and looks "random".
+   */
+  async extractLoggedInUserHandle(page: Page): Promise<string | undefined> {
+    try {
+      const current = page.url();
+      if (!/www\.(xiaohongshu|rednote)\.com/i.test(current)) {
+        await page.goto('https://www.xiaohongshu.com/explore', {
+          waitUntil: 'domcontentloaded',
+          timeout: 45_000,
+        });
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    } catch (err) {
+      this.logger.debug(
+        `RedNote handle: navigate to www failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const handle = await this.fetchMeNickname(page);
+      if (handle) {
+        this.logger.log(
+          `RedNote handle from me API (attempt ${attempt}): ${handle.slice(0, 48)}`,
+        );
+        return handle;
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+
+    this.logger.warn('RedNote handle: /user/me did not return a nickname');
+    return undefined;
+  }
+
+  /**
+   * Capture `/user/me` responses during QR login — Xiaohongshu calls this after
+   * a successful scan, often before our intentional fetch runs.
+   */
+  attachMeProfileCapture(page: Page): {
+    getHandle: () => string | undefined;
+    dispose: () => void;
+  } {
+    let handle: string | undefined;
+    const onResponse = (response: HTTPResponse) => {
+      void (async () => {
+        try {
+          const url = response.url();
+          if (!/\/api\/sns\/web\/v[12]\/user\/(me|selfinfo)\b/i.test(url)) {
+            return;
+          }
+          if (!response.ok()) return;
+          const parsed = parseXiaohongshuMeProfile(await response.json());
+          if (parsed) {
+            handle = parsed;
+            this.logger.log(
+              `RedNote me profile captured from network: ${parsed.slice(0, 48)}`,
+            );
+          }
+        } catch {
+          // ignore parse/network errors
+        }
+      })();
+    };
+
+    page.on('response', onResponse);
+    return {
+      getHandle: () => handle,
+      dispose: () => {
+        page.off('response', onResponse);
+      },
+    };
+  }
+
+  private async fetchMeNickname(page: Page): Promise<string | undefined> {
+    try {
+      const json = await page.evaluate(async () => {
+        const urls = [
+          'https://edith.xiaohongshu.com/api/sns/web/v2/user/me',
+          'https://edith.xiaohongshu.com/api/sns/web/v1/user/selfinfo',
+        ];
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, {
+              credentials: 'include',
+              headers: { Accept: 'application/json' },
+            });
+            if (!res.ok) continue;
+            return await res.json();
+          } catch {
+            // try next
+          }
+        }
+        return null;
+      });
+      return parseXiaohongshuMeProfile(json) ?? undefined;
+    } catch (err) {
+      this.logger.debug(
+        `RedNote me fetch failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return undefined;
     }
   }
 

@@ -47,6 +47,19 @@ export const useRegenerateWorkflowByRuleMutation = () => {
   })
 }
 
+export const useApplyDefaultWorkflowStructureMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ruleId: string) =>
+      workflowService.applyDefaultStructure(ruleId),
+    onSuccess: (_data, ruleId) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+    },
+    meta: { silent: true },
+  })
+}
+
 export const useGetWorkflowByRuleIdQuery = (
   ruleId: string | undefined,
   options?: { refetchInterval?: number | false },

@@ -1,7 +1,9 @@
-import { Sparkles } from "lucide-react"
+import { useRef } from "react"
+import { Pencil, Sparkles } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 import { T } from "@/lib/tokens"
 
 type WorkflowToolbarProps = {
@@ -43,6 +45,7 @@ export function WorkflowToolbar({
 }: WorkflowToolbarProps) {
   const { t } = useTranslation("workflow")
   const { t: tCredit } = useTranslation("credit")
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const workflowGenLabel =
     workflowGenerationCredits != null && workflowGenerationCredits > 0
       ? tCredit("generationCost", { count: workflowGenerationCredits })
@@ -54,22 +57,55 @@ export function WorkflowToolbar({
       style={{ background: T.surfaceBg, borderColor: T.surfaceBorder }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <Input
-          value={wfName}
-          onChange={(e) => onWfNameChange(e.target.value)}
-          onBlur={() => onWfNameCommit?.()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault()
-              e.currentTarget.blur()
-            }
-          }}
-          disabled={readOnly}
-          aria-label={t("toolbar.workflowNameAria")}
-          placeholder={t("toolbar.untitledWorkflow")}
-          className="h-8 max-w-[min(100%,320px)] min-w-[160px] truncate rounded-lg border-transparent bg-muted/40 px-2.5 text-sm font-bold shadow-none focus-visible:border-ring focus-visible:bg-background focus-visible:truncate-none"
-          style={{ color: T.textPrimary }}
-        />
+        {!readOnly ? (
+          <div
+            className={cn(
+              "group/name flex h-8 max-w-[min(100%,360px)] min-w-[180px] items-center gap-1 rounded-lg border bg-muted/30 pl-2 pr-1",
+              "border-dashed border-border/70 transition-colors",
+              "hover:border-solid hover:border-border hover:bg-muted/50",
+              "focus-within:border-solid focus-within:border-ring focus-within:bg-background focus-within:shadow-sm",
+            )}
+            title={t("toolbar.renameHint")}
+          >
+            <Input
+              ref={nameInputRef}
+              value={wfName}
+              onChange={(e) => onWfNameChange(e.target.value)}
+              onBlur={() => onWfNameCommit?.()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  e.currentTarget.blur()
+                }
+              }}
+              aria-label={t("toolbar.workflowNameAria")}
+              placeholder={t("toolbar.untitledWorkflow")}
+              className="h-7 min-w-0 flex-1 truncate border-0 bg-transparent px-0.5 text-sm font-bold shadow-none focus-visible:ring-0"
+              style={{ color: T.textPrimary }}
+            />
+            <button
+              type="button"
+              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground group-hover/name:text-foreground group-focus-within/name:text-foreground"
+              aria-label={t("toolbar.renameAria")}
+              title={t("toolbar.renameHint")}
+              onMouseDown={(e) => {
+                // Keep focus on the input without triggering blur first.
+                e.preventDefault()
+                nameInputRef.current?.focus()
+                nameInputRef.current?.select()
+              }}
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </button>
+          </div>
+        ) : (
+          <p
+            className="h-8 max-w-[min(100%,320px)] truncate rounded-lg bg-muted/40 px-2.5 text-sm font-bold leading-8"
+            style={{ color: T.textPrimary }}
+          >
+            {wfName || t("toolbar.untitledWorkflow")}
+          </p>
+        )}
         {ruleName ? (
           <button
             type="button"

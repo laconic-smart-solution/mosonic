@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -17,6 +18,8 @@ import { McpService } from './mcp.service';
 
 @Controller('zernio')
 export class ZernioController {
+  private readonly logger = new Logger(ZernioController.name);
+
   constructor(
     private readonly mcpService: McpService,
     private readonly config: ConfigService,
@@ -61,7 +64,9 @@ export class ZernioController {
     @Query()
     query: {
       platform?: string;
+      connected?: string;
       accountId?: string;
+      account_id?: string;
       username?: string;
       state?: string;
     },
@@ -69,11 +74,13 @@ export class ZernioController {
   ) {
     const frontend = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
     try {
-      await this.mcpService.handleOAuthCallback(query);
+      const { platform } = await this.mcpService.handleOAuthCallback(query);
       res.redirect(
-        `${frontend}/settings/accounts?connected=${encodeURIComponent(query.platform ?? '')}`,
+        `${frontend}/settings/accounts?connected=${encodeURIComponent(platform)}`,
       );
-    } catch {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Zernio OAuth callback failed: ${message}`);
       res.redirect(`${frontend}/settings/accounts?zernio_error=callback_failed`);
     }
   }

@@ -256,6 +256,8 @@ export type WfNodeData = {
   status: NodeStatus
   locked: boolean
   config: Record<string, unknown>
+  /** Credits charged per run for this node type (from pipeline estimate). */
+  creditCost?: number
   previewText?: string
   previewImage?: string
   previewVideo?: string

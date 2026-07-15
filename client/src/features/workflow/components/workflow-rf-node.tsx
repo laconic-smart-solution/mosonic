@@ -27,6 +27,7 @@ import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
 import { cn } from "@/lib/utils"
+import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { WorkflowNodeAddButton } from "./workflow-node-add-button"
 import { WorkflowNodeInfoButton } from "./workflow-node-info-button"
 import { WorkflowNodeSettingsButton } from "./workflow-node-settings-button"
@@ -111,6 +112,8 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
   ])
 
   const isWaitingReview = data.status === "waiting_review"
+  // Branch/merge are structural only — runtime never leaves idle, so hide the chip.
+  const showStatusChip = !isBranch && !isMerge
 
   return (
     <div
@@ -304,21 +307,29 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
             </p>
           ) : null}
 
-          <div className="mt-0.5 flex items-center justify-between">
-            <span
-              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
-              style={{
-                borderColor: sc.border,
-                background: sc.bg,
-                color: sc.text,
-              }}
-            >
-              <span
-                className="size-[5px] shrink-0 rounded-full"
-                style={{ background: sc.dot }}
-              />
-              {sc.label}
-            </span>
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {showStatusChip ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    borderColor: sc.border,
+                    background: sc.bg,
+                    color: sc.text,
+                  }}
+                >
+                  <span
+                    className="size-[5px] shrink-0 rounded-full"
+                    style={{ background: sc.dot }}
+                  />
+                  {sc.label}
+                </span>
+              ) : null}
+
+              {typeof data.creditCost === "number" && data.creditCost > 0 ? (
+                <CreditUsageBadge credits={data.creditCost} size="sm" />
+              ) : null}
+            </div>
 
             {data.status === "retrying" &&
             data.retryAttempt &&
