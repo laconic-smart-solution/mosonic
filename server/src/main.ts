@@ -6,6 +6,9 @@ import cookieParser from 'cookie-parser';
 import * as express from 'express';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { useSystemCaCertificates } from './common/tls-system-ca';
+
+useSystemCaCertificates();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
