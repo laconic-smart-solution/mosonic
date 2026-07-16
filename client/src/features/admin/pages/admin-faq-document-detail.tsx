@@ -5,18 +5,11 @@ import { useTranslation } from "react-i18next"
 import { PageShell } from "@/components/app/page-shell"
 import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { toastApiError } from "@/shared/lib/toast-error"
 
 import { adminApi } from "../api/admin.api"
+import { AdminFaqBarItem } from "../components/admin-faq-bar-item"
 import {
   useAdminFaqDocument,
   useAdminFaqDocumentFaqs,
@@ -127,38 +120,21 @@ export default function AdminFaqDocumentDetailPage() {
           ) : null}
         </div>
 
-        <div className={cn(panelClass, "p-4 space-y-4")}>
+        <div className={cn(panelClass, "space-y-3 p-4")}>
           <h2 className="text-lg font-semibold">{t("faq.generatedFaqs")}</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("faq.columns.question")}</TableHead>
-                <TableHead>{t("faq.columns.answer")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {faqsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-muted-foreground">
-                    {tc("actions.loading")}
-                  </TableCell>
-                </TableRow>
-              ) : faqs?.items.length ? (
-                faqs.items.map((faq) => (
-                  <TableRow key={faq.id}>
-                    <TableCell className="max-w-sm font-medium">{faq.question}</TableCell>
-                    <TableCell className="text-muted-foreground">{faq.answer}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-muted-foreground">
-                    {t("faq.emptyFaqs")}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          {faqsLoading ? (
+            <p className="text-sm text-muted-foreground">{tc("actions.loading")}</p>
+          ) : faqs?.items.length ? (
+            <ul className="flex flex-col gap-2">
+              {faqs.items.map((faq) => (
+                <li key={faq.id}>
+                  <AdminFaqBarItem faq={faq} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("faq.emptyFaqs")}</p>
+          )}
         </div>
       </div>
     </PageShell>

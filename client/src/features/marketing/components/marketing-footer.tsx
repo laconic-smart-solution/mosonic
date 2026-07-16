@@ -14,7 +14,7 @@ export function MarketingFooter() {
       )}
     >
       <div>
-        <div className="grid gap-8 border-b border-border pb-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid gap-8 border-b border-border pb-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
           <div>
             <div className="mb-3 flex items-center gap-2.5 font-sans text-lg font-bold text-foreground">
               <Logo className="size-6 shrink-0" />
@@ -57,6 +57,25 @@ export function MarketingFooter() {
 
           <div>
             <h4 className="mb-3.5 font-mono text-xs tracking-[0.1em] text-foreground uppercase">
+              {t("footer.support")}
+            </h4>
+            <ul className="flex flex-col gap-2">
+              <li>
+                <Link
+                  to="/faq"
+                  className="transition-colors hover:text-teal-600 dark:hover:text-teal-400"
+                >
+                  {t("nav.faq")}
+                </Link>
+              </li>
+              <li>
+                <span>{t("footer.contact")}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="mb-3.5 font-mono text-xs tracking-[0.1em] text-foreground uppercase">
               {t("footer.company")}
             </h4>
             <ul className="flex flex-col gap-2">
@@ -67,9 +86,6 @@ export function MarketingFooter() {
                 >
                   {t("nav.about")}
                 </Link>
-              </li>
-              <li>
-                <span>{t("footer.contact")}</span>
               </li>
             </ul>
           </div>

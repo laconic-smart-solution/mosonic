@@ -1,0 +1,29 @@
+{
+  "title": "常见问题",
+  "subtitle": "浏览关于 Mosonic 的解答，或向助手提问。",
+  "searchPlaceholder": "搜索 FAQ",
+  "empty": "未找到 FAQ。",
+  "chatCta": "需要更具体的回答？请使用角落的聊天按钮。",
+  "seeMore": "查看更多",
+  "seeLess": "收起",
+  "prev": "上一页",
+  "next": "下一页",
+  "chat": {
+    "title": "FAQ 助手",
+    "subtitle": "基于 Mosonic 文档作答",
+    "toggle": "打开 FAQ 助手",
+    "close": "关闭 FAQ 助手",
+    "empty": "就 Mosonic 提问。",
+    "placeholder": "输入你的问题…",
+    "inputLabel": "你的问题",
+    "send": "发送",
+    "thinking": "思考中…",
+    "sources": "来源",
+    "error": "无法获取答案。",
+    "source": {
+      "faq": "来自 FAQ",
+      "llm": "AI 回答",
+      "no_match": "无匹配"
+    }
+  }
+}

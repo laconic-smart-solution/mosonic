@@ -196,6 +196,15 @@ export function PromptArea({
       onPointerDownCapture={(e) => {
         if (disabled) return
         e.stopPropagation()
+        const target = e.target
+        if (
+          target instanceof Element &&
+          target.closest(
+            "input, textarea, button, a, label, [role='button'], [contenteditable='true']",
+          )
+        ) {
+          return
+        }
         focusTextarea()
       }}
     >
@@ -273,6 +282,7 @@ export function PromptArea({
           >
             <div
               className="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center sm:gap-1.5 sm:px-4"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -284,6 +294,8 @@ export function PromptArea({
                   autoCorrect="off"
                   value={urlValue}
                   onChange={(e) => setUrlValue(e.target.value)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault()

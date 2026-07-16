@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { toastApiError } from "@/shared/lib/toast-error"
+import { faqService } from "@/shared/services/faq.service"
 
 import { adminApi } from "../api/admin.api"
 import type {
@@ -20,11 +21,17 @@ export function useAdminFaqDocuments(params: { page?: number; limit?: number }) 
   })
 }
 
+export type FaqDocumentUploadInput = {
+  file: File
+  onUploadProgress?: (percent: number) => void
+}
+
 export function useAdminFaqDocumentUpload() {
   const { t } = useTranslation("admin")
   const queryClient = useQueryClient()
-  return useMutation<GenerateFaqsResponse, unknown, File>({
-    mutationFn: (file) => adminApi.uploadFaqDocument(file),
+  return useMutation<GenerateFaqsResponse, unknown, FaqDocumentUploadInput>({
+    mutationFn: ({ file, onUploadProgress }) =>
+      adminApi.uploadFaqDocument(file, { onUploadProgress }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-faq-documents"] })
       queryClient.invalidateQueries({ queryKey: ["admin-faqs"] })
@@ -69,6 +76,6 @@ export function useAdminFaqDocumentFaqs(
 
 export function useAdminFaqAsk() {
   return useMutation<FaqAskResponse, unknown, { question: string }>({
-    mutationFn: ({ question }) => adminApi.askFaq({ question }),
+    mutationFn: ({ question }) => faqService.askFaq({ question }),
   })
 }

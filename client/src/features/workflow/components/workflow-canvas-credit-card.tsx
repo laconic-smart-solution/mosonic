@@ -10,7 +10,6 @@ type WorkflowCanvasCreditCardProps = {
   estimate: PipelineEstimateResponse | undefined
   loading?: boolean
   error?: boolean
-  stale?: boolean
   className?: string
   /** Start with the panel expanded. Default true. */
   defaultOpen?: boolean
@@ -20,7 +19,6 @@ export function WorkflowCanvasCreditCard({
   estimate,
   loading = false,
   error = false,
-  stale = false,
   className,
   defaultOpen = true,
 }: WorkflowCanvasCreditCardProps) {
@@ -82,12 +80,6 @@ export function WorkflowCanvasCreditCard({
               {t("canvasCredit.balance", {
                 count: formatCreditAmount(remaining),
               })}
-            </p>
-          ) : null}
-
-          {stale ? (
-            <p className="mt-1.5 text-[10px] leading-snug text-amber-700 dark:text-amber-400">
-              {t("canvasCredit.staleHint")}
             </p>
           ) : null}
 

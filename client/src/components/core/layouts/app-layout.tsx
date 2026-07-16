@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sidebar"
 import { BreadcrumbOverrideProvider } from "@/components/app/breadcrumb-override.context"
 import { NotificationProvider } from "@/features/notifications/notification-provider"
+import { FaqChatbot } from "@/features/faq/components/faq-chatbot"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 
 function AppLayout() {
@@ -30,6 +31,7 @@ function AppLayout() {
           </BreadcrumbOverrideProvider>
         </div>
       </SidebarInset>
+      <FaqChatbot />
     </SidebarProvider>
   )
 }

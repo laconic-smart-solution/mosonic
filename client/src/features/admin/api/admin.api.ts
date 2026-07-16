@@ -196,12 +196,26 @@ export const adminApi = {
       responseType: "blob",
     }),
 
-  uploadFaqDocument: (file: File) => {
+  uploadFaqDocument: (
+    file: File,
+    options?: { onUploadProgress?: (percent: number) => void },
+  ) => {
     const form = new FormData()
     form.append("file", file)
     return apiClient
       .post("/admin/faq/documents", form, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          if (!options?.onUploadProgress) return
+          const total = event.total ?? 0
+          if (total <= 0) {
+            options.onUploadProgress(0)
+            return
+          }
+          options.onUploadProgress(
+            Math.min(100, Math.round((event.loaded / total) * 100)),
+          )
+        },
       })
       .then((r) => r.data)
   },

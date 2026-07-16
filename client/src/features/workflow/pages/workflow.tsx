@@ -35,7 +35,6 @@ import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workf
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
 import { WorkflowNodeReviewDialog } from "@/features/workflow/components/workflow-node-review-dialog"
 import { workflowHasIntelligenceNode } from "@/features/workflow/lib/workflow-freshness.util"
-import { listReviewableWorkflowNodes } from "@/features/workflow/lib/workflow-review-nodes"
 import { rfNodesToApiPayload, getWfNodeTypeLabel } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import {
@@ -460,11 +459,6 @@ export default function WorkflowPage() {
     setConfigDraftDirty(false)
   }, [apiNodes])
 
-  const reviewableWorkflowNodes = useMemo(
-    () => listReviewableWorkflowNodes(apiNodes ?? []),
-    [apiNodes],
-  )
-
   useEffect(() => {
     setCanvasEdited(false)
     setConfigDraftDirty(false)
@@ -628,9 +622,7 @@ export default function WorkflowPage() {
         const normalizedStatus =
           node.status === "failed"
             ? "failed_final"
-            : node.status === "completed" || node.status === "skipped"
-              ? "completed"
-              : node.status
+            : node.status
         const merged = outputToRuntime(node.type, node.output)
         if (node.status === "waiting_review" && node.output) {
           const reviewText = extractReviewText(node.type, node.output)
@@ -1087,7 +1079,6 @@ export default function WorkflowPage() {
     contentPrompt: string,
     workflowIdOverride?: string,
     executionMode: PipelineUserExecutionMode = "auto",
-    reviewNodeIds?: string[],
   ) {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
@@ -1100,9 +1091,6 @@ export default function WorkflowPage() {
         contentPrompt,
         useLearnings,
         executionMode,
-        ...(executionMode === "step" && reviewNodeIds
-          ? { reviewNodeIds }
-          : {}),
       },
       {
         onSuccess: ({ pipelineId: id }) => {
@@ -1370,6 +1358,10 @@ export default function WorkflowPage() {
     )
   }
 
+  function handleSkipReviewNode(canvasNodeId: string) {
+    handleReviewNode(canvasNodeId, { action: "continue" })
+  }
+
   function handleSkipNode(nodeId: string) {
     if (!pipelineId) return
     const pipelineNodeId = resolvePipelineNodeIdForCanvas(nodeId)
@@ -1381,11 +1373,16 @@ export default function WorkflowPage() {
             ...prev,
             [nodeId]: {
               ...(prev[nodeId] ?? {}),
-              status: "completed",
+              status: "skipped",
               errorMessage: undefined,
               processingMessage: undefined,
             },
           }))
+          if (!completedNodeIdsRef.current.has(pipelineNodeId)) {
+            completedNodeIdsRef.current.add(pipelineNodeId)
+            setCompletedNodes(completedNodeIdsRef.current.size)
+          }
+          maybeTryFinalizePipelineRef.current(pipelineId)
         },
         onError: (err) => {
           toastApiError(err, "workflow:toasts.skipFailed")
@@ -1655,7 +1652,6 @@ export default function WorkflowPage() {
             ref={canvasRef}
             workflowId={activeWorkflowId ?? undefined}
             ruleId={ruleId}
-            canvasEdited={canvasEdited || configDraftDirty}
             apiNodes={pipelineCanvasOverride ? undefined : apiNodes}
             apiEdges={pipelineCanvasOverride ? undefined : apiEdges}
             rfNodesOverride={pipelineCanvasOverride?.nodes}
@@ -1672,6 +1668,7 @@ export default function WorkflowPage() {
             onRetryNode={handleRetryNode}
             onSkipNode={handleSkipNode}
             onOpenReviewNode={setReviewNodeId}
+            onSkipReviewNode={handleSkipReviewNode}
             onCanvasEdited={() => setCanvasEdited(true)}
             onConfigDraftChange={setConfigDraftDirty}
           />
@@ -1889,17 +1886,11 @@ export default function WorkflowPage() {
         }}
         workflowId={activeWorkflowId}
         ruleId={ruleId}
-        reviewableNodes={reviewableWorkflowNodes}
         isStarting={startPipelineMutation.isPending}
         showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
-        onConfirm={(executionMode, reviewNodeIds) => {
+        onConfirm={(executionMode) => {
           if (pendingRunPrompt != null) {
-            runStartPipelineMutation(
-              pendingRunPrompt,
-              undefined,
-              executionMode,
-              reviewNodeIds,
-            )
+            runStartPipelineMutation(pendingRunPrompt, undefined, executionMode)
           }
         }}
       />

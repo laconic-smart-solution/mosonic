@@ -30,6 +30,7 @@ export const UsagePlansPage = PageLoader(
 )
 export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
 export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
+export const MarketingFaqPage = PageLoader(lazy(() => import("@/features/marketing/pages/faq")))
 
 export const LoginPage = PageLoader(lazy(() => import("@/features/auth/pages/login")))
 export const SignupPage = PageLoader(lazy(() => import("@/features/auth/pages/signup")))

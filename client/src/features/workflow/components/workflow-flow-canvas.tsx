@@ -104,6 +104,7 @@ import { WorkflowRfNode } from "./workflow-rf-node"
 import {
   buildCreditEachByKey,
   creditCostForWfNode,
+  estimateCreditsFromCanvasNodes,
 } from "@/features/workflow/lib/workflow-node-credit"
 
 const nodeTypes = {
@@ -255,13 +256,12 @@ type WorkflowFlowCanvasProps = {
   onRetryNode?: (nodeId: string) => void
   onSkipNode?: (nodeId: string) => void
   onOpenReviewNode?: (nodeId: string) => void
+  onSkipReviewNode?: (nodeId: string) => void
   /** Fired when nodes/edges change in edit mode (not selection-only). */
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
   workflowId?: string
   ruleId?: string
-  /** When true, estimate may be stale vs unsaved canvas edits. */
-  canvasEdited?: boolean
 }
 
 export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowFlowCanvasProps>(
@@ -280,11 +280,11 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onRetryNode,
       onSkipNode,
       onOpenReviewNode,
+      onSkipReviewNode,
       onCanvasEdited,
       onConfigDraftChange,
       workflowId,
       ruleId,
-      canvasEdited = false,
     },
     ref,
   ) {
@@ -295,8 +295,12 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       Boolean(workflowId),
     )
     const creditEachByKey = useMemo(
-      () => buildCreditEachByKey(estimateQuery.data?.breakdown),
-      [estimateQuery.data?.breakdown],
+      () =>
+        buildCreditEachByKey(
+          estimateQuery.data?.breakdown,
+          estimateQuery.data?.unitCredits,
+        ),
+      [estimateQuery.data?.breakdown, estimateQuery.data?.unitCredits],
     )
     const flowTheme = useWorkflowFlowVisualTheme()
     const initialNodes = useMemo(() => [] as WfRfNode[], [])
@@ -305,6 +309,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const [nodes, setNodes, onNodesChange] = useNodesState<WfRfNode>(initialNodes)
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+    const liveEstimate = useMemo(() => {
+      if (!estimateQuery.data) return undefined
+      return estimateCreditsFromCanvasNodes(
+        nodes,
+        creditEachByKey,
+        estimateQuery.data.creditsRemaining,
+      )
+    }, [creditEachByKey, estimateQuery.data, nodes])
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null)
     const [propConfig, setPropConfig] = useState<Record<string, unknown>>({})
@@ -1058,6 +1070,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               runtime?.status === "waiting_review" && onOpenReviewNode
                 ? () => onOpenReviewNode(node.id)
                 : undefined,
+            onSkipReview:
+              runtime?.status === "waiting_review" && onSkipReviewNode
+                ? () => onSkipReviewNode(node.id)
+                : undefined,
             onOpenAddPopover: showAddButton
               ? (event: MouseEvent) => openAfterPopover(event, node.id)
               : undefined,
@@ -1077,6 +1093,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onRetryNode,
       onSkipNode,
       onOpenReviewNode,
+      onSkipReviewNode,
       closePanel,
       openAfterPopover,
       openInitialPopover,
@@ -1296,12 +1313,12 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             {workflowId ? (
               <Panel position="top-left" className="m-3!">
                 <WorkflowCanvasCreditCard
-                  estimate={estimateQuery.data}
+                  estimate={liveEstimate ?? estimateQuery.data}
                   loading={
-                    estimateQuery.isLoading || estimateQuery.isFetching
+                    estimateQuery.isLoading ||
+                    (estimateQuery.isFetching && !estimateQuery.data)
                   }
                   error={estimateQuery.isError}
-                  stale={canvasEdited}
                 />
               </Panel>
             ) : null}

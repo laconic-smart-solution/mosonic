@@ -7,6 +7,7 @@
     "features": "功能",
     "howItWorks": "如何运作",
     "about": "关于",
+    "faq": "FAQ",
     "menu": "菜单",
     "openMenu": "打开菜单"
   },
@@ -148,6 +149,7 @@
     "tagline": "为泰国中小企业及其服务机构打造的 AI 内容与发布平台",
     "product": "产品",
     "company": "公司",
+    "support": "支持",
     "getStarted": "开始使用",
     "features": "功能",
     "contact": "联系",

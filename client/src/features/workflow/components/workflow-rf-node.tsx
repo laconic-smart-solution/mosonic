@@ -370,17 +370,33 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
               </button>
             ) : null}
 
-            {isWaitingReview && data.onOpenReview ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  data.onOpenReview?.()
-                }}
-                className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-teal-700 border-teal-500/40 bg-teal-500/10 dark:text-teal-400"
-              >
-                {t("stepMode.openReview")}
-              </button>
+            {isWaitingReview && (data.onOpenReview || data.onSkipReview) ? (
+              <div className="flex gap-1">
+                {data.onOpenReview ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      data.onOpenReview?.()
+                    }}
+                    className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-teal-700 border-teal-500/40 bg-teal-500/10 dark:text-teal-400"
+                  >
+                    {t("stepMode.openReview")}
+                  </button>
+                ) : null}
+                {data.onSkipReview ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      data.onSkipReview?.()
+                    }}
+                    className="cursor-pointer rounded-[5px] border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground border-border bg-muted/50"
+                  >
+                    {t("stepMode.skipReview")}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
 
             {selected && data.onDelete ? (

@@ -19,8 +19,6 @@ import { Link, Outlet, useLocation } from "react-router-dom"
 import { BreadcrumbOverrideProvider } from "@/components/app/breadcrumb-override.context"
 import { cn } from "@/lib/utils"
 
-import { AdminFaqChatbot } from "@/features/admin/components/admin-faq-chatbot"
-
 const NAV_ITEMS: {
   key: "dashboard" | "users" | "cost" | "credit" | "nodeCredits" | "plans" | "topupPlans" | "usage" | "apiUsage" | "content" | "faq"
   href: string
@@ -91,7 +89,6 @@ export function AdminLayout() {
         <BreadcrumbOverrideProvider>
           <Outlet />
         </BreadcrumbOverrideProvider>
-        <AdminFaqChatbot />
       </main>
     </div>
   )
