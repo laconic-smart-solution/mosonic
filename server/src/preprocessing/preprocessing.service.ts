@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { fileTypeFromBuffer } from 'file-type';
 import { DocxHandler } from './handlers/docx.handler';
 import { ImageHandler } from './handlers/image.handler';
@@ -25,6 +25,8 @@ function extFromName(name: string): string {
 
 @Injectable()
 export class PreprocessingService {
+  private readonly logger = new Logger(PreprocessingService.name);
+
   constructor(
     private readonly pdfHandler: PdfHandler,
     private readonly docxHandler: DocxHandler,
@@ -99,9 +101,10 @@ export class PreprocessingService {
       try {
         chunks.push(await this.urlHandler.fetchAsChunk(trimmed));
       } catch (e) {
-        throw new BadRequestException(
-          `Could not read URL: ${trimmed} (${(e as Error).message})`,
-        );
+        const reason = (e as Error).message || 'fetch failed';
+        this.logger.warn(`URL fetch failed for ${trimmed}: ${reason}`);
+        // Keep extraction going when sites block scrapers (403/WAF) or TLS fails.
+        chunks.push(this.urlHandler.fallbackChunk(trimmed, reason));
       }
     }
 

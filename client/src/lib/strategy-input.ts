@@ -1,3 +1,5 @@
+import { collectStrategyUrls } from "@/lib/strategy-urls"
+
 /** Minimal attachment shape for flattening strategy context into one string or multipart upload. */
 export type StrategyAttachment = {
   type: "file" | "url"
@@ -17,10 +19,11 @@ export function buildRuleExtractFormData(
     (a): a is StrategyAttachment & { data: File } =>
       a.type === "file" && a.data instanceof File,
   )
-  const urls = attachments
+  const attachmentUrls = attachments
     .filter((a) => a.type === "url")
     .map((a) => (typeof a.data === "string" ? a.data : a.label).trim())
     .filter(Boolean)
+  const urls = collectStrategyUrls(trimmed, attachmentUrls)
 
   if (trimmed) fd.append("input", trimmed)
   for (const a of fileAttachments) {
