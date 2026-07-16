@@ -435,9 +435,10 @@ export class UsersService {
       provider: SocialProvider.REDNOTE,
       channel: REDNOTE_CHANNEL,
       externalAccountId: rednoteExternalAccountId(userId),
-      ...(handle
-        ? { username: handle, displayName: handle }
-        : {}),
+      // Always write username fields so a failed/missing me-profile clears
+      // previously scraped junk instead of leaving a random stale label.
+      username: handle ?? null,
+      displayName: handle ?? null,
       connectedAt: now,
       lastSyncedAt: now,
       metadata: metadata as unknown as Prisma.InputJsonValue,

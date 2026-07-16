@@ -427,5 +427,81 @@
     "colCost": "成本 (USD)",
     "prev": "上一页",
     "next": "下一页"
+  },
+  "faq": {
+    "title": "FAQ 知识库",
+    "subtitle": "上传文档、查看生成的 FAQ，并通过助手提问。",
+    "tabsLabel": "FAQ 分区",
+    "tabs": {
+      "documents": "文档",
+      "faqs": "全部 FAQ"
+    },
+    "documentsHint": "上传 PDF、DOCX、TXT 或 Markdown，以生成 FAQ 并建立文档索引。",
+    "upload": "上传文档",
+    "uploading": "上传中…",
+    "uploadSuccess": "文档处理成功。",
+    "uploadError": "无法上传文档。",
+    "uploadDialog": {
+      "title": "上传 FAQ 文档",
+      "description": "上传文档以生成 FAQ，并为助手建立内容索引。",
+      "dropTitle": "将文件拖放到此处",
+      "dropHint": "PDF、DOCX、TXT 或 Markdown · 最大 25 MB",
+      "browse": "浏览文件",
+      "remove": "移除",
+      "submit": "上传并生成",
+      "retry": "重试",
+      "viewDocument": "查看文档",
+      "invalidType": "不支持的文件类型。请使用 PDF、DOCX、TXT 或 Markdown。",
+      "tooLarge": "文件过大。最大为 {{maxMb}} MB。",
+      "progressIdle": "准备上传",
+      "progressUploading": "正在上传文件…",
+      "progressProcessing": "正在生成 FAQ 并建立索引…",
+      "progressDone": "处理完成",
+      "progressFailed": "上传失败",
+      "processingHint": "大型文档可能需要一分钟。请保持此对话框打开。",
+      "successTitle": "文档已就绪",
+      "successHint": "已从 {{filename}} 生成 {{count}} 条 FAQ。"
+    },
+    "download": "下载",
+    "downloadError": "无法下载文档。",
+    "documentDetail": "文档详情",
+    "documentNotFound": "未找到文档。",
+    "generatedFaqs": "已生成的 FAQ",
+    "seeMore": "查看更多",
+    "seeLess": "收起",
+    "searchFaqs": "搜索 FAQ",
+    "viewDocument": "查看文档",
+    "emptyDocuments": "尚未上传文档。",
+    "emptyFaqs": "未找到 FAQ。",
+    "error": "错误",
+    "columns": {
+      "filename": "文件名",
+      "status": "状态",
+      "faqCount": "FAQ",
+      "size": "大小",
+      "uploadedBy": "上传者",
+      "createdAt": "上传时间",
+      "question": "问题",
+      "answer": "答案",
+      "document": "文档"
+    },
+    "chat": {
+      "title": "FAQ 助手",
+      "subtitle": "基于已上传文档作答",
+      "toggle": "打开 FAQ 助手",
+      "close": "关闭 FAQ 助手",
+      "empty": "就已上传的文档提问。",
+      "placeholder": "输入你的问题…",
+      "inputLabel": "你的问题",
+      "send": "发送",
+      "thinking": "思考中…",
+      "sources": "来源",
+      "error": "无法获取答案。",
+      "source": {
+        "faq": "来自 FAQ",
+        "llm": "AI 回答",
+        "no_match": "无匹配"
+      }
+    }
   }
 }

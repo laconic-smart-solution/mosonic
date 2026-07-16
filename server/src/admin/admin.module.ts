@@ -23,8 +23,8 @@ import { AdminCostService } from './services/admin-cost.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
 import { AdminUserProvisioningService } from './services/admin-user-provisioning.service';
 import { AdminUsersService } from './services/admin-users.service';
-import { AdminFaqClientService } from './services/admin-faq-client.service';
 import { AdminFaqService } from './services/admin-faq.service';
+import { FaqModule } from '../faq/faq.module';
 
 @Module({
   imports: [
@@ -37,6 +37,7 @@ import { AdminFaqService } from './services/admin-faq.service';
     OpenAiBillingModule,
     ApiUsageModule,
     ContentModule,
+    FaqModule,
     forwardRef(() => OrchestrationModule),
   ],
   controllers: [
@@ -55,7 +56,6 @@ import { AdminFaqService } from './services/admin-faq.service';
     AdminUsersService,
     AdminCostService,
     AdminContentService,
-    AdminFaqClientService,
     AdminFaqService,
     AdminUserProvisioningService,
   ],

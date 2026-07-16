@@ -12,7 +12,6 @@ import {
   FileStack,
   Home,
   Library,
-  Sparkles,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -22,10 +21,7 @@ import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.cont
 import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits } from "@/shared/lib/api-error"
 
-import { Button } from "@/components/ui/button"
 import { PromptArea, type Attachment } from "@/components/core/prompt-area"
-import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
-import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
 import {
   WorkflowFlowCanvas,
   type WorkflowFlowCanvasHandle,
@@ -36,12 +32,9 @@ import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-c
 import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
 import { PipelineStopConfirmDialog } from "@/features/pipeline/components/pipeline-stop-confirm-dialog"
 import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
-import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
 import { WorkflowNodeReviewDialog } from "@/features/workflow/components/workflow-node-review-dialog"
 import { workflowHasIntelligenceNode } from "@/features/workflow/lib/workflow-freshness.util"
-import { listReviewableWorkflowNodes } from "@/features/workflow/lib/workflow-review-nodes"
-import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { rfNodesToApiPayload, getWfNodeTypeLabel } from "@/features/workflow/data/workflow-model"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import {
@@ -62,13 +55,11 @@ import {
   getVideoPresenterErrorsFromRfNodes,
 } from "@/features/workflow/lib/workflow-node-validation"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
-import { useGenerationCreditCostsQuery } from "@/shared/queries/credit.query"
 import { useRuleByIdQuery } from "@/shared/queries/rule.query"
 import { useContentPageQuery } from "@/shared/queries/content.query"
 import {
-  useGenerateWorkflow,
+  useApplyDefaultWorkflowStructureMutation,
   useGetWorkflowByRuleIdQuery,
-  useRegenerateWorkflowByRuleMutation,
   usePatchWorkflowMutation,
   useSaveWorkflowNodesByRuleMutation,
   useSaveWorkflowNodesMutation,
@@ -144,7 +135,6 @@ function normalizeBranchNodesForSave(nodes: WfRfNode[]): WfRfNode[] {
 
 export default function WorkflowPage() {
   const { t } = useTranslation("workflow")
-  const generationCostsQuery = useGenerationCreditCostsQuery()
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -216,19 +206,14 @@ export default function WorkflowPage() {
   const generationInFlightRef = useRef(false)
   /** True after pipeline start submit until id is known from HTTP or first socket event. */
   const pipelineInFlightRef = useRef(false)
-  /** When set, start pipeline with this prompt after workflow generation completes. */
+  /** When set, start pipeline with this prompt after workflow structure is ready. */
   const pendingPipelineAfterWorkflowRef = useRef<string | null>(null)
-  const runPipelineAfterQaRef = useRef(false)
-  const lastQaAnswersRef = useRef<WorkflowQAAnswers | null>(null)
-  const [qaWizardOpen, setQaWizardOpen] = useState(false)
-  const [qaInitialMessage, setQaInitialMessage] = useState("")
   const [runConfirmOpen, setRunConfirmOpen] = useState(false)
-  const [workflowGenConfirmOpen, setWorkflowGenConfirmOpen] = useState(false)
-  const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
   const [pendingRunPrompt, setPendingRunPrompt] = useState<string | null>(null)
   /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
   const workflowEventTargetRef = useRef<string | undefined>(undefined)
   const committedWfNameRef = useRef(i18n.t("workflow:toolbar.untitledWorkflow"))
+  const defaultStructureAttemptedRef = useRef(false)
   useEffect(() => {
     workflowEventTargetRef.current = activeWorkflowId
   }, [activeWorkflowId])
@@ -239,8 +224,7 @@ export default function WorkflowPage() {
     pipelineIdRef.current = pipelineId
   }, [pipelineId])
 
-  const generateWorkflow = useGenerateWorkflow()
-  const regenerateWorkflowByRule = useRegenerateWorkflowByRuleMutation()
+  const applyDefaultStructure = useApplyDefaultWorkflowStructureMutation()
   const saveNodesMutation = useSaveWorkflowNodesMutation()
   const saveByRuleMutation = useSaveWorkflowNodesByRuleMutation()
   const patchWorkflowMutation = usePatchWorkflowMutation()
@@ -322,14 +306,45 @@ export default function WorkflowPage() {
   })
   const ruleQuery = useRuleByIdQuery<RuleEntity>(ruleId)
 
+  useEffect(() => {
+    defaultStructureAttemptedRef.current = false
+  }, [ruleId])
+
+  useEffect(() => {
+    if (!ruleId) return
+    if (!workflowByRuleQuery.isFetched) return
+    if (applyDefaultStructure.isPending) return
+    if (defaultStructureAttemptedRef.current) return
+    if (generationStep === "failed") return
+    if (processingMode === "processing") return
+
+    const nodes = workflowByRuleQuery.data?.nodes
+    if (nodes && nodes.length > 0) {
+      defaultStructureAttemptedRef.current = true
+      return
+    }
+
+    // No workflow or empty node list → apply fixed default (free, no LLM).
+    if (
+      workflowByRuleQuery.data == null ||
+      !nodes ||
+      nodes.length === 0
+    ) {
+      defaultStructureAttemptedRef.current = true
+      applyDefaultWorkflowStructure()
+    }
+  }, [
+    ruleId,
+    workflowByRuleQuery.data,
+    workflowByRuleQuery.isFetched,
+    applyDefaultStructure.isPending,
+    generationStep,
+    processingMode,
+  ])
+
   const branchChannels = useMemo(
     () => resolveBranchChannels({ mode: "rule_channels" }, ruleQuery.data?.channels),
     [ruleQuery.data?.channels],
-  )
-
-  const ruleChannelIds = useMemo(
-    () => branchChannels.map((c) => c.id),
-    [branchChannels],
   )
 
   const activePipelineSnap = useMemo(() => {
@@ -443,11 +458,6 @@ export default function WorkflowPage() {
     setCanvasEdited(false)
     setConfigDraftDirty(false)
   }, [apiNodes])
-
-  const reviewableWorkflowNodes = useMemo(
-    () => listReviewableWorkflowNodes(apiNodes ?? []),
-    [apiNodes],
-  )
 
   useEffect(() => {
     setCanvasEdited(false)
@@ -612,9 +622,7 @@ export default function WorkflowPage() {
         const normalizedStatus =
           node.status === "failed"
             ? "failed_final"
-            : node.status === "completed" || node.status === "skipped"
-              ? "completed"
-              : node.status
+            : node.status
         const merged = outputToRuntime(node.type, node.output)
         if (node.status === "waiting_review" && node.output) {
           const reviewText = extractReviewText(node.type, node.output)
@@ -1036,6 +1044,9 @@ export default function WorkflowPage() {
             if (name) {
               committedWfNameRef.current = name
             }
+            void queryClient.invalidateQueries({
+              queryKey: ["pipeline", "estimate"],
+            })
           },
         },
       )
@@ -1056,6 +1067,9 @@ export default function WorkflowPage() {
           setActiveWorkflowId(data.workflowId)
           if (name) committedWfNameRef.current = name
           void workflowByRuleQuery.refetch()
+          void queryClient.invalidateQueries({
+            queryKey: ["pipeline", "estimate"],
+          })
         },
       },
     )
@@ -1065,7 +1079,6 @@ export default function WorkflowPage() {
     contentPrompt: string,
     workflowIdOverride?: string,
     executionMode: PipelineUserExecutionMode = "auto",
-    reviewNodeIds?: string[],
   ) {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
@@ -1078,9 +1091,6 @@ export default function WorkflowPage() {
         contentPrompt,
         useLearnings,
         executionMode,
-        ...(executionMode === "step" && reviewNodeIds
-          ? { reviewNodeIds }
-          : {}),
       },
       {
         onSuccess: ({ pipelineId: id }) => {
@@ -1193,70 +1203,33 @@ export default function WorkflowPage() {
     )
   }
 
-  function handleOpenQaWizard(initialMessage = "", runAfter = false) {
+  function applyDefaultWorkflowStructure() {
     if (!ruleId) return
-    setQaInitialMessage(initialMessage)
-    runPipelineAfterQaRef.current = runAfter
-    setQaWizardOpen(true)
-  }
-
-  function requestWorkflowGeneration(answers: WorkflowQAAnswers) {
-    pendingWorkflowAnswersRef.current = answers
-    setQaWizardOpen(false)
-    setWorkflowGenConfirmOpen(true)
-  }
-
-  function executeWorkflowGeneration(answers: WorkflowQAAnswers) {
-    if (!ruleId) return
-    lastQaAnswersRef.current = answers
-    const additionalMessage = answers.additionalMessage.trim()
-    setWorkflowPrompt(answers.additionalMessage)
-    if (runPipelineAfterQaRef.current) {
-      pendingPipelineAfterWorkflowRef.current = additionalMessage || null
-    }
-    runPipelineAfterQaRef.current = false
-
     generationInFlightRef.current = true
     setGenerationStep("started")
-    if (activeWorkflowId) joinWorkflowRoom(activeWorkflowId)
-
-    const onSuccess = (data: { workflowId: string }) => {
-      workflowEventTargetRef.current = data.workflowId
-      setActiveWorkflowId(data.workflowId)
-      setApiNodes([])
-      setGenerationStep("generating")
-      joinWorkflowRoom(data.workflowId)
-      navigate(`/workflow/${ruleId}`, {
-        replace: true,
-        state: {
-          ruleName,
-          generating: true,
-          contentPrompt: additionalMessage,
-        },
-      })
-      void workflowByRuleQuery.refetch()
-    }
-
-    const onError = (err: unknown) => {
-      generationInFlightRef.current = false
-      setGenerationStep(null)
-      if (isInsufficientCredits(err)) {
-        toastApiError(err, "credit:runConfirm.insufficientTitle")
-        return
-      }
-      toastApiError(err, "workflow:errors.generateWorkflowFailed")
-    }
-
-    if (activeWorkflowId) {
-      regenerateWorkflowByRule.mutate({ answers, ruleId }, { onSuccess, onError })
-      return
-    }
-
-    generateWorkflow.mutate({ ruleId, answers }, { onSuccess, onError })
-  }
-
-  function submitWorkflowGeneration(answers: WorkflowQAAnswers) {
-    requestWorkflowGeneration(answers)
+    setFailureMessage("")
+    applyDefaultStructure.mutate(ruleId, {
+      onSuccess: (data) => {
+        workflowEventTargetRef.current = data.workflowId
+        setActiveWorkflowId(data.workflowId)
+        joinWorkflowRoom(data.workflowId)
+        void workflowByRuleQuery.refetch().then(() => {
+          generationInFlightRef.current = false
+          setGenerationStep(null)
+        })
+      },
+      onError: (err) => {
+        generationInFlightRef.current = false
+        defaultStructureAttemptedRef.current = false
+        setGenerationStep("failed")
+        setFailureMessage(
+          err instanceof Error
+            ? err.message
+            : t("errors.generateWorkflowFailed"),
+        )
+        toastApiError(err, "workflow:errors.generateWorkflowFailed")
+      },
+    })
   }
 
   function handlePrimaryAction(text: string, _attachments: Attachment[]) {
@@ -1385,6 +1358,10 @@ export default function WorkflowPage() {
     )
   }
 
+  function handleSkipReviewNode(canvasNodeId: string) {
+    handleReviewNode(canvasNodeId, { action: "continue" })
+  }
+
   function handleSkipNode(nodeId: string) {
     if (!pipelineId) return
     const pipelineNodeId = resolvePipelineNodeIdForCanvas(nodeId)
@@ -1396,11 +1373,16 @@ export default function WorkflowPage() {
             ...prev,
             [nodeId]: {
               ...(prev[nodeId] ?? {}),
-              status: "completed",
+              status: "skipped",
               errorMessage: undefined,
               processingMessage: undefined,
             },
           }))
+          if (!completedNodeIdsRef.current.has(pipelineNodeId)) {
+            completedNodeIdsRef.current.add(pipelineNodeId)
+            setCompletedNodes(completedNodeIdsRef.current.size)
+          }
+          maybeTryFinalizePipelineRef.current(pipelineId)
         },
         onError: (err) => {
           toastApiError(err, "workflow:toasts.skipFailed")
@@ -1485,9 +1467,10 @@ export default function WorkflowPage() {
 
   const canvasMode = useMemo(() => {
     if (
-      generationStep &&
-      generationStep !== "failed" &&
-      (!apiNodes || apiNodes.length === 0)
+      applyDefaultStructure.isPending ||
+      (generationStep &&
+        generationStep !== "failed" &&
+        (!apiNodes || apiNodes.length === 0))
     )
       return "loading"
     if (workflowByRuleQuery.isLoading && (!apiNodes || apiNodes.length === 0))
@@ -1498,6 +1481,7 @@ export default function WorkflowPage() {
     return "ready"
   }, [
     apiNodes,
+    applyDefaultStructure.isPending,
     generationStep,
     ruleId,
     workflowByRuleQuery.data,
@@ -1531,15 +1515,12 @@ export default function WorkflowPage() {
     if (generationStep === "generating" || generationStep === "started") {
       return true
     }
-    if (generateWorkflow.isPending || regenerateWorkflowByRule.isPending) {
-      return true
-    }
+    if (applyDefaultStructure.isPending) return true
     return false
   }, [
-    generateWorkflow.isPending,
+    applyDefaultStructure.isPending,
     generationStep,
     processingMode,
-    regenerateWorkflowByRule.isPending,
   ])
 
   const generationUiLocked = useMemo(() => {
@@ -1555,8 +1536,6 @@ export default function WorkflowPage() {
     promptInputDisabled,
     selectedSnapshotPipelineId,
   ])
-
-  const generateWorkflowDisabled = promptInputDisabled
 
   const generationBlockedByDrafts =
     !promptInputDisabled &&
@@ -1591,7 +1570,7 @@ export default function WorkflowPage() {
   return (
     <PageShell variant="canvas">
       <div
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 rounded-lg flex-col overflow-hidden"
         style={{ background: T.canvasBg }}
       >
       <WorkflowToolbar
@@ -1603,16 +1582,11 @@ export default function WorkflowPage() {
           navigate("/rules", { state: { selectedRuleId: ruleId } })
         }
         onRun={() => handlePrimaryAction(workflowPrompt, [])}
-        onGenerateWorkflow={() => handleOpenQaWizard("", false)}
         runLabel={t("toolbar.generateContent")}
         onSave={processingMode === "edit" ? handleSave : undefined}
         isSaving={saveNodesMutation.isPending || saveByRuleMutation.isPending}
         readOnly={processingMode === "processing"}
         generationDisabled={generationUiLocked}
-        generateWorkflowDisabled={generateWorkflowDisabled}
-        workflowGenerationCredits={
-          generationCostsQuery.data?.workflowGeneration
-        }
         showCancel={processingMode === "processing"}
         onCancel={handleRequestStopPipeline}
       />
@@ -1677,6 +1651,7 @@ export default function WorkflowPage() {
           <WorkflowFlowCanvas
             ref={canvasRef}
             workflowId={activeWorkflowId ?? undefined}
+            ruleId={ruleId}
             apiNodes={pipelineCanvasOverride ? undefined : apiNodes}
             apiEdges={pipelineCanvasOverride ? undefined : apiEdges}
             rfNodesOverride={pipelineCanvasOverride?.nodes}
@@ -1693,6 +1668,7 @@ export default function WorkflowPage() {
             onRetryNode={handleRetryNode}
             onSkipNode={handleSkipNode}
             onOpenReviewNode={setReviewNodeId}
+            onSkipReviewNode={handleSkipReviewNode}
             onCanvasEdited={() => setCanvasEdited(true)}
             onConfigDraftChange={setConfigDraftDirty}
           />
@@ -1730,20 +1706,8 @@ export default function WorkflowPage() {
                   {canvasMode === "empty" ? (
                     <div className="flex flex-col items-center gap-3 py-3">
                       <p className="text-center text-sm text-muted-foreground">
-                        {t("promptBar.emptyWorkflowHint")}
+                        {t("promptBar.preparingDefaultWorkflow")}
                       </p>
-                      <Button
-                        type="button"
-                        onClick={() => handleOpenQaWizard("", false)}
-                        disabled={generateWorkflowDisabled}
-                        className="gap-2"
-                      >
-                        <Sparkles className="size-4" aria-hidden />
-                        {t("toolbar.generateWorkflow")}
-                      </Button>
-                      <GenerationCreditHint
-                        credits={generationCostsQuery.data?.workflowGeneration}
-                      />
                     </div>
                   ) : (
                     <>
@@ -1811,19 +1775,10 @@ export default function WorkflowPage() {
           onRetry={
             generationStep === "failed"
               ? () => {
-                  if (
-                    generateWorkflow.isPending ||
-                    regenerateWorkflowByRule.isPending
-                  ) {
-                    return
-                  }
+                  if (applyDefaultStructure.isPending) return
                   setFailureMessage("")
-                  const last = lastQaAnswersRef.current
-                  if (last) {
-                    submitWorkflowGeneration(last)
-                    return
-                  }
-                  handleOpenQaWizard(workflowPrompt.trim(), false)
+                  defaultStructureAttemptedRef.current = false
+                  applyDefaultWorkflowStructure()
                 }
               : undefined
           }
@@ -1931,49 +1886,13 @@ export default function WorkflowPage() {
         }}
         workflowId={activeWorkflowId}
         ruleId={ruleId}
-        reviewableNodes={reviewableWorkflowNodes}
         isStarting={startPipelineMutation.isPending}
         showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
-        onConfirm={(executionMode, reviewNodeIds) => {
+        onConfirm={(executionMode) => {
           if (pendingRunPrompt != null) {
-            runStartPipelineMutation(
-              pendingRunPrompt,
-              undefined,
-              executionMode,
-              reviewNodeIds,
-            )
+            runStartPipelineMutation(pendingRunPrompt, undefined, executionMode)
           }
         }}
-      />
-
-      <GenerationCreditConfirmDialog
-        open={workflowGenConfirmOpen}
-        onOpenChange={(open) => {
-          setWorkflowGenConfirmOpen(open)
-          if (!open) pendingWorkflowAnswersRef.current = null
-        }}
-        kind="workflow"
-        isSubmitting={
-          generateWorkflow.isPending || regenerateWorkflowByRule.isPending
-        }
-        onConfirm={() => {
-          const answers = pendingWorkflowAnswersRef.current
-          if (!answers) return
-          setWorkflowGenConfirmOpen(false)
-          executeWorkflowGeneration(answers)
-          pendingWorkflowAnswersRef.current = null
-        }}
-      />
-
-      <WorkflowQaWizard
-        open={qaWizardOpen}
-        onOpenChange={setQaWizardOpen}
-        ruleChannelIds={ruleChannelIds}
-        initialMessage={qaInitialMessage}
-        isSubmitting={
-          generateWorkflow.isPending || regenerateWorkflowByRule.isPending
-        }
-        onSubmit={submitWorkflowGeneration}
       />
 
       <WorkflowContentDrawer
@@ -1996,7 +1915,7 @@ export default function WorkflowPage() {
       />
 
     </div>
-    </PageShell>
+  </PageShell>
   )
 }
 

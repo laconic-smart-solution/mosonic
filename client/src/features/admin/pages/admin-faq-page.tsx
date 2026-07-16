@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Upload } from "lucide-react"
@@ -17,8 +17,9 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
+import { AdminFaqBarItem } from "../components/admin-faq-bar-item"
+import { AdminFaqUploadDialog } from "../components/admin-faq-upload-dialog"
 import {
-  useAdminFaqDocumentUpload,
   useAdminFaqDocuments,
   useAdminFaqs,
 } from "../hooks/use-admin-faq"
@@ -54,7 +55,7 @@ export default function AdminFaqPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = parseTab(searchParams.get("tab"))
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const [docPage, setDocPage] = useState(1)
   const [faqPage, setFaqPage] = useState(1)
@@ -70,17 +71,6 @@ export default function AdminFaqPage() {
     limit: 20,
     q: faqSearch || undefined,
   })
-  const upload = useAdminFaqDocumentUpload()
-
-  const onFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    upload.mutate(file, {
-      onSettled: () => {
-        if (fileInputRef.current) fileInputRef.current.value = ""
-      },
-    })
-  }
 
   return (
     <PageShell>
@@ -109,24 +99,10 @@ export default function AdminFaqPage() {
           <div className={cn(panelClass, "p-4 space-y-4")}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">{t("faq.documentsHint")}</p>
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.docx,.txt,.md"
-                  className="sr-only"
-                  id="faq-upload-input"
-                  onChange={onFileSelected}
-                />
-                <Button
-                  type="button"
-                  disabled={upload.isPending}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="size-4" aria-hidden />
-                  {upload.isPending ? t("faq.uploading") : t("faq.upload")}
-                </Button>
-              </div>
+              <Button type="button" onClick={() => setUploadOpen(true)}>
+                <Upload className="size-4" aria-hidden />
+                {t("faq.upload")}
+              </Button>
             </div>
 
             <Table>
@@ -194,7 +170,7 @@ export default function AdminFaqPage() {
             ) : null}
           </div>
         ) : (
-          <div className={cn(panelClass, "p-4 space-y-4")}>
+          <div className={cn(panelClass, "space-y-4 p-4")}>
             <form
               className="flex flex-wrap gap-2"
               onSubmit={(e) => {
@@ -215,33 +191,19 @@ export default function AdminFaqPage() {
               </Button>
             </form>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("faq.columns.question")}</TableHead>
-                  <TableHead>{t("faq.columns.answer")}</TableHead>
-                  <TableHead>{t("faq.columns.document")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {faqsLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground">
-                      {tc("actions.loading")}
-                    </TableCell>
-                  </TableRow>
-                ) : faqs?.items.length ? (
-                  faqs.items.map((faq) => (
-                    <TableRow key={faq.id}>
-                      <TableCell className="max-w-xs font-medium">{faq.question}</TableCell>
-                      <TableCell className="max-w-md text-muted-foreground">
-                        {faq.answer}
-                      </TableCell>
-                      <TableCell>
-                        {faq.source_document_id ? (
+            {faqsLoading ? (
+              <p className="text-sm text-muted-foreground">{tc("actions.loading")}</p>
+            ) : faqs?.items.length ? (
+              <ul className="flex flex-col gap-2">
+                {faqs.items.map((faq) => (
+                  <li key={faq.id}>
+                    <AdminFaqBarItem
+                      faq={faq}
+                      footer={
+                        faq.source_document_id ? (
                           <Button
                             variant="link"
-                            className="h-auto p-0"
+                            className="h-auto p-0 text-xs"
                             onClick={() =>
                               navigate(`/admin/faq/documents/${faq.source_document_id}`)
                             }
@@ -249,20 +211,16 @@ export default function AdminFaqPage() {
                             {t("faq.viewDocument")}
                           </Button>
                         ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground">
-                      {t("faq.emptyFaqs")}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("faq.emptyFaqs")}</p>
+            )}
 
             {faqs && faqs.total > faqs.limit ? (
               <div className="flex justify-end gap-2">
@@ -287,6 +245,8 @@ export default function AdminFaqPage() {
           </div>
         )}
       </div>
+
+      <AdminFaqUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </PageShell>
   )
 }

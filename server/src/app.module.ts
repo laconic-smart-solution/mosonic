@@ -24,6 +24,7 @@ import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
+import { FaqModule } from './faq/faq.module';
 import { CostModule } from './cost/cost.module';
 import { CreditModule } from './credit/credit.module';
 import { PlanModule } from './plan/plan.module';
@@ -45,6 +46,7 @@ import {
     AuthModule,
     UsersModule,
     AdminModule,
+    FaqModule,
     LlmModule,
     PreprocessingModule,
     CostModule,

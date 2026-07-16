@@ -206,9 +206,10 @@ export default function SettingsAccountsPage() {
     const handle = rn.handle?.trim() || null
     const idx = base.findIndex((a) => a.channel.toLowerCase() === "rednote")
     if (idx >= 0) {
-      if (!handle) return base
       const existing = base[idx]
-      if (existing.username || existing.displayName) return base
+      // Always take handle from the RedNote account API — never keep a stale
+      // scraped username from social_accounts while a verified handle exists
+      // (or is intentionally absent).
       const next = [...base]
       next[idx] = {
         ...existing,
@@ -222,7 +223,7 @@ export default function SettingsAccountsPage() {
       {
         userId: user?.id ?? "",
         channel: "rednote",
-        accountId: handle ?? "rednote",
+        accountId: "rednote",
         username: handle,
         displayName: handle,
         connectedAt: rn.lastVerifiedAt ?? new Date().toISOString(),

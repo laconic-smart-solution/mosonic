@@ -27,10 +27,12 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
 const MARKETING_NAV = [
+  { type: "route" as const, path: "/home", labelKey: "marketing:nav.landing", end: true },
   { type: "hash" as const, hash: "features", labelKey: "marketing:nav.features" },
   { type: "hash" as const, hash: "how-it-works", labelKey: "marketing:nav.howItWorks" },
   { type: "hash" as const, hash: "about", labelKey: "marketing:nav.about" },
   { type: "route" as const, path: "/pricing", labelKey: "marketing:nav.pricing" },
+  { type: "route" as const, path: "/faq", labelKey: "marketing:nav.faq" },
 ]
 
 function marketingNavLinkClass(isActive: boolean, compact = false) {
@@ -81,8 +83,16 @@ function MarketingNavLinks({
           <NavLink
             key={item.path}
             to={item.path}
+            end={"end" in item ? item.end : false}
             onClick={onNavigate}
-            className={({ isActive }) => marketingNavLinkClass(isActive, compact)}
+            className={({ isActive }) =>
+              marketingNavLinkClass(
+                item.path === "/"
+                  ? isActive && !location.hash
+                  : isActive,
+                compact,
+              )
+            }
           >
             {t(item.labelKey)}
           </NavLink>

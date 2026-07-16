@@ -113,6 +113,97 @@ export class WorkflowService {
     return this.regenerateWorkflowByRuleId(ruleId, { answers: body.answers }, auth);
   }
 
+  /**
+   * Apply the fixed default node graph (keyword → intelligence → text ± branch).
+   * No LLM and no workflow-generation credit charge.
+   */
+  async applyDefaultWorkflowStructure(
+    ruleId: string,
+    auth: TenancyAuth,
+  ): Promise<GenerateWorkflowResponseDto> {
+    const normalizedRuleId = ruleId.trim();
+    if (!normalizedRuleId) {
+      throw new BadRequestException('ruleId must not be empty');
+    }
+
+    const rule = await this.ruleService.getRuleById(normalizedRuleId, auth);
+    const ruleChannelIds = resolveRuleChannelIds(
+      (Array.isArray(rule.channels) ? rule.channels : []) as never[],
+    );
+    if (!ruleChannelIds.length) {
+      throw new BadRequestException(
+        'Rule must include at least one distribution channel before creating a workflow',
+      );
+    }
+
+    const existing = await this.workflows.findLatestByRule(
+      normalizedRuleId,
+      auth,
+    );
+    const workflowName = this.workflowNameFromAnswers('', normalizedRuleId);
+    const workflow =
+      existing ??
+      (await this.createWorkflow(
+        normalizedRuleId,
+        workflowName,
+        auth.userId,
+      ));
+
+    if (existing?.workflowId) {
+      await this.workflows.updateById(
+        existing.workflowId,
+        { status: WorkflowStatus.Generating, name: existing.name || workflowName },
+        auth,
+      );
+    }
+
+    await this.workflows.updateById(
+      workflow.workflowId,
+      { ruleRef: normalizedRuleId },
+      auth,
+    );
+
+    const generatedNodes =
+      this.workflowGeneration.buildDefaultStructure(rule as never);
+    const { nodeIds, edges: persistedEdges } =
+      await this.persistGeneratedNodes(
+        workflow.workflowId,
+        generatedNodes,
+        auth.userId,
+        auth,
+        ruleChannelIds,
+      );
+
+    await this.workflows.appendVersion(
+      workflow.workflowId,
+      {
+        versionNumber: 1,
+        nodes: nodeIds,
+        edges: persistedEdges,
+        createdAt: new Date(),
+      },
+      {
+        nodes: nodeIds,
+        edges: persistedEdges as unknown as never,
+        status: WorkflowStatus.Ready,
+        version: 1,
+      },
+      auth,
+    );
+
+    const nodes = await this.workflowNodes.findByWorkflow(
+      workflow.workflowId,
+      auth,
+    );
+    this.events.emitToWorkflow(workflow.workflowId, 'workflow:completed', {
+      workflowId: workflow.workflowId,
+      nodes,
+      edges: persistedEdges,
+    });
+
+    return { workflowId: workflow.workflowId, ruleId: normalizedRuleId };
+  }
+
   async regenerateWorkflowByRuleId(
     ruleId: string,
     body: RegenerateWorkflowByRuleRequestDto,

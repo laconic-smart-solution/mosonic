@@ -58,7 +58,7 @@ import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.er
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { CreditService } from '../credit/credit.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
-import { isPipelineNodeCreditType } from '../credit/lib/billable-node-credit-types';
+import { isPipelineNodeCreditType, BILLABLE_NODE_CREDIT_DEFAULTS } from '../credit/lib/billable-node-credit-types';
 import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { NodeExecutor } from './node-executor.service';
@@ -564,20 +564,36 @@ export class OrchestrationService {
       creditsEach: number;
       creditsTotal: number;
     }>;
+    /** Unit credits for every pipeline-billable type (for live canvas recalculation). */
+    unitCredits: Record<string, number>;
     creditsRemaining: number;
     sufficient: boolean;
   }> {
     const nodeTypes = await this.resolveBillableNodeTypesForEstimate(input);
     const { totalCredits, breakdown } =
       await this.computeNodeCreditEstimate(nodeTypes);
+    const unitCredits = await this.getPipelineNodeUnitCredits();
     const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
 
     return {
       totalCredits,
       breakdown,
+      unitCredits,
       creditsRemaining,
       sufficient: creditsRemaining >= totalCredits,
     };
+  }
+
+  /** Active credit cost for each pipeline-billable node type (not rule/workflow gen). */
+  private async getPipelineNodeUnitCredits(): Promise<Record<string, number>> {
+    const unitCredits: Record<string, number> = {};
+    for (const row of BILLABLE_NODE_CREDIT_DEFAULTS) {
+      if (!isPipelineNodeCreditType(row.nodeType)) continue;
+      unitCredits[row.nodeType] =
+        (await this.nodeCreditPriceService.getActiveCostCredit(row.nodeType)) ??
+        0;
+    }
+    return unitCredits;
   }
 
   private async resolveBillableNodeTypesForEstimate(input: {

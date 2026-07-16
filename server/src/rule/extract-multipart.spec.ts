@@ -48,7 +48,24 @@ describe('parseRuleExtractMultipart', () => {
 describe('parseUrlsMultipart', () => {
   it('parses url array', () => {
     expect(parseUrlsMultipart(JSON.stringify(['https://example.com']))).toEqual([
-      'https://example.com',
+      'https://example.com/',
     ]);
+  });
+
+  it('normalizes bare hosts', () => {
+    expect(parseUrlsMultipart(JSON.stringify(['zenichub.com/en']))).toEqual([
+      'https://zenichub.com/en',
+    ]);
+  });
+});
+
+describe('parseRuleExtractMultipart urls from text', () => {
+  it('extracts urls pasted only in input', () => {
+    const req = parseRuleExtractMultipart(
+      [],
+      'Create a rule from https://zenichub.com/en',
+      undefined,
+    );
+    expect(req.urls).toEqual(['https://zenichub.com/en']);
   });
 });

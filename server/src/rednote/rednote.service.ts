@@ -40,6 +40,25 @@ import {
 import { RedNoteGateway } from './rednote.gateway';
 import { RedNoteLockService } from './rednote-lock.service';
 
+/** Drop synthetic / placeholder / scrape-junk values that are not a real profile handle. */
+function sanitizeRedNoteHandle(raw: string | null | undefined): string | null {
+  const handle = raw?.trim() || '';
+  if (!handle) return null;
+  if (/^rednote:/i.test(handle) || handle.toLowerCase() === 'rednote') {
+    return null;
+  }
+  // Legacy DOM scrapes often pulled feed titles / multi-line chrome.
+  if (handle.length > 40 || /\n|\r/.test(handle)) return null;
+  if (
+    /^(登录|註冊|注册|login|sign\s*in|探索|发现|發現|关注|關注|消息|我|home|explore|xiaohongshu|小红书|小紅書)$/i.test(
+      handle,
+    )
+  ) {
+    return null;
+  }
+  return handle;
+}
+
 @Injectable()
 export class RedNoteService {
   private readonly logger = new Logger(RedNoteService.name);
@@ -201,7 +220,9 @@ export class RedNoteService {
       sessionStatus: meta?.sessionStatus ?? null,
       lastVerifiedAt: meta?.lastVerifiedAt ?? null,
       needsReauth,
-      handle: meta?.rednoteUserHandle ?? account.username ?? null,
+      handle: sanitizeRedNoteHandle(
+        meta?.rednoteUserHandle ?? account.username ?? null,
+      ),
     };
   }
 

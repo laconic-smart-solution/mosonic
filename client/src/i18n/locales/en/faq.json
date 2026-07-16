@@ -1,0 +1,29 @@
+{
+  "title": "Frequently asked questions",
+  "subtitle": "Browse answers about Mosonic, or ask the assistant anything.",
+  "searchPlaceholder": "Search FAQs",
+  "empty": "No FAQs found.",
+  "chatCta": "Need a more specific answer? Use the chat button in the corner.",
+  "seeMore": "See more",
+  "seeLess": "See less",
+  "prev": "Previous",
+  "next": "Next",
+  "chat": {
+    "title": "FAQ assistant",
+    "subtitle": "Answers from Mosonic documentation",
+    "toggle": "Open FAQ assistant",
+    "close": "Close FAQ assistant",
+    "empty": "Ask a question about Mosonic.",
+    "placeholder": "Type your question…",
+    "inputLabel": "Your question",
+    "send": "Send message",
+    "thinking": "Thinking…",
+    "sources": "Sources",
+    "error": "Could not get an answer.",
+    "source": {
+      "faq": "From FAQ",
+      "llm": "AI answer",
+      "no_match": "No match"
+    }
+  }
+}

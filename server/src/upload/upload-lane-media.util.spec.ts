@@ -1,6 +1,9 @@
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
-import { laneMediaFromPipelineNodes } from './upload-lane-media.util';
+import {
+  laneMediaFromPipelineNodes,
+  trunkMediaFromPipelineNodes,
+} from './upload-lane-media.util';
 
 describe('laneMediaFromPipelineNodes', () => {
   it('returns last-wins lane image and video URLs', () => {
@@ -51,5 +54,28 @@ describe('laneMediaFromPipelineNodes', () => {
     ];
 
     expect(laneMediaFromPipelineNodes(nodes, 'instagram')).toEqual({});
+  });
+});
+
+describe('trunkMediaFromPipelineNodes', () => {
+  it('returns media only from unlaned nodes', () => {
+    const nodes = [
+      {
+        lane: null,
+        type: WorkflowNodeType.ImageGeneration,
+        status: PipelineNodeExecutionStatus.Completed,
+        output: JSON.stringify({ image: 'https://cdn.example/shared.jpg' }),
+      },
+      {
+        lane: 'facebook',
+        type: WorkflowNodeType.ImageGeneration,
+        status: PipelineNodeExecutionStatus.Completed,
+        output: JSON.stringify({ image: 'https://cdn.example/fb.jpg' }),
+      },
+    ];
+
+    expect(trunkMediaFromPipelineNodes(nodes)).toEqual({
+      image: 'https://cdn.example/shared.jpg',
+    });
   });
 });

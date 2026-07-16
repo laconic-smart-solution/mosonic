@@ -54,7 +54,10 @@ import {
   resolveAutomappedCaption,
   resolveAutomappedMediaUrl,
 } from './upload-channel-publish.util';
-import { laneMediaFromPipelineNodes } from './upload-lane-media.util';
+import {
+  laneMediaFromPipelineNodes,
+  trunkMediaFromPipelineNodes,
+} from './upload-lane-media.util';
 import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
@@ -141,10 +144,11 @@ export class UploadService {
         ? parsePipelineNodeOutputString(adaptNode.output)
         : null;
       const map = normalizedRuleChannelMapping(ruleCh);
-      const laneMedia = laneMediaFromPipelineNodes(
-        pipeline.nodes ?? [],
-        lane,
-      );
+      const nodes = pipeline.nodes ?? [];
+      const laneMedia = laneMediaFromPipelineNodes(nodes, lane);
+      const trunkMedia = trunkMediaFromPipelineNodes(nodes);
+      // Per-lane media only; fall back to true trunk (unlaned) nodes — never
+      // flattened resolvedOutputs.image/video (those include other lanes' media).
       const laneResolved: ResolvedContentOutputs = {
         ...resolvedOutputs,
         text:
@@ -157,8 +161,8 @@ export class UploadService {
         summary:
           (typeof adaptOut?.summary === 'string' ? adaptOut.summary : undefined) ??
           resolvedOutputs.summary,
-        image: laneMedia.image ?? resolvedOutputs.image,
-        video: laneMedia.video ?? resolvedOutputs.video,
+        image: laneMedia.image ?? trunkMedia.image,
+        video: laneMedia.video ?? trunkMedia.video,
       };
       const caption = resolveAutomappedCaption(map.caption, laneResolved);
       const mediaUrl = resolveAutomappedMediaUrl(map.media, laneResolved);
@@ -211,17 +215,12 @@ export class UploadService {
   ): UploadChannelEntry {
     const ro = resolvedOutputs ?? {};
     const fallbackCaption = this.fallbackPrimaryCaption(ro);
-    const channelKey = channel.trim().toLowerCase();
-    const fallbackMedia = (
-      channelKey === 'rednote' || channelKey === 'youtube'
-        ? ro.video?.trim() || ro.image?.trim()
-        : ro.image?.trim() || ro.video?.trim()
-    ) as string | null;
     return {
       channel,
       included: true,
       caption: fallbackCaption,
-      mediaUrl: fallbackMedia,
+      // Do not copy flattened resolved media — it may belong to another lane.
+      mediaUrl: null,
       mediaUrls: [],
       youtubeTitle: null,
       status: UploadChannelStatus.Pending,
@@ -1126,19 +1125,15 @@ export class UploadService {
 
   private resolveRowMediaForPublish(
     row: UploadChannelEntry,
-    ro: ResolvedContentOutputs,
+    _ro: ResolvedContentOutputs,
   ): string[] {
     const key = row.channel.trim().toLowerCase();
     const urls = this.rowAllMedia(row);
     if (key === 'rednote' || key === 'youtube') {
       const videos = urls.filter((u) => this.isVideoMediaUrl(u));
-      if (videos.length > 0) return [videos[0]!];
-      const fallback = (ro.video?.trim() || '').trim();
-      return fallback.length > 0 ? [fallback] : [];
+      return videos.length > 0 ? [videos[0]!] : [];
     }
-    if (urls.length > 0) return urls;
-    const fallback = (ro.image?.trim() || ro.video?.trim() || '').trim();
-    return fallback.length > 0 ? [fallback] : [];
+    return urls;
   }
 
   private channelRequiresMedia(channelKey: string): boolean {
@@ -1241,15 +1236,10 @@ export class UploadService {
       caption = this.fallbackPrimaryCaption(outs);
     }
 
-    let mediaUrl = (c.mediaUrl ?? '').trim() || null;
+    const mediaUrl = (c.mediaUrl ?? '').trim() || null;
     const mediaUrls = [...(c.mediaUrls ?? [])]
       .map((u) => u.trim())
       .filter(Boolean);
-    if (!mediaUrl && !mediaUrls.length) {
-      mediaUrl = (outs.image?.trim() || outs.video?.trim() || null) as
-        | string
-        | null;
-    }
 
     return {
       channel: c.channel,
@@ -1280,14 +1270,8 @@ export class UploadService {
     if (!(row.caption ?? '').trim()) {
       row.caption = this.fallbackPrimaryCaption(outs);
     }
-    const hasMedia =
-      (row.mediaUrl ?? '').trim().length > 0 ||
-      (row.mediaUrls?.some((u) => u?.trim()) ?? false);
-    if (!hasMedia) {
-      row.mediaUrl = (outs.image?.trim() || outs.video?.trim() || null) as
-        | string
-        | null;
-    }
+    // Never auto-fill media from flattened resolvedOutputs — lane-specific
+    // images would leak onto every empty channel.
     if (!Array.isArray(row.mediaUrls)) {
       row.mediaUrls = [];
     }

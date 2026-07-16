@@ -267,16 +267,11 @@ export function effectiveMediaUrlsForPublish(
   const laneMedia = resolveLaneMediaForChannel(channelKey, resolved, layers)
   if (key === "rednote" || key === "youtube") {
     const laneVideo = laneMedia.video?.trim()
-    if (laneVideo) return [laneVideo]
-    const trunkVideo = resolved.video?.trim()
-    return trunkVideo ? [trunkVideo] : []
+    return laneVideo ? [laneVideo] : []
   }
 
   const laneUrl = (laneMedia.video ?? laneMedia.image ?? "").trim()
-  if (laneUrl) return [laneUrl]
-
-  const fallback = (resolved.image?.trim() || resolved.video?.trim() || "").trim()
-  return fallback ? [fallback] : []
+  return laneUrl ? [laneUrl] : []
 }
 
 export function getChannelMediaValidationError(
