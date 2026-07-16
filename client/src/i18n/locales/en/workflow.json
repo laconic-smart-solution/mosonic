@@ -251,6 +251,7 @@
     "retrying": "Retrying",
     "done": "Done",
     "completed": "Completed",
+    "skipped": "Skipped",
     "failed_final": "Failed",
     "failed": "Failed",
     "waiting_review": "Review"
@@ -260,18 +261,13 @@
     "auto": "Auto",
     "autoHint": "Run all nodes without pausing",
     "step": "Step",
-    "stepHint": "Choose which steps pause for your review",
-    "reviewStepsTitle": "Steps to review",
-    "reviewStepsHint": "Unchecked steps run automatically without pausing.",
-    "selectAll": "Select all",
-    "clearAll": "Clear all",
-    "noStepsSelected": "Select at least one step to review.",
-    "reviewStepCount": "{{selected}} of {{total}} steps will pause for review",
+    "stepHint": "Pause at each reviewable step; choose Review or Skip on the canvas",
     "reviewTitle": "Review output",
     "reviewDialogTitle": "Review node output",
     "reviewDialogDescription": "Review and edit output for {{node}} before continuing the pipeline.",
-    "clickToReview": "Click this node to review the generated output.",
+    "clickToReview": "Review the output or skip to continue automatically.",
     "openReview": "Review",
+    "skipReview": "Skip",
     "continue": "Continue",
     "regenerate": "Regenerate",
     "regenerateWithCredits": "Regenerate ({{credits}} credits)",
@@ -288,6 +284,8 @@
   },
   "toolbar": {
     "workflowNameAria": "Workflow name",
+    "renameAria": "Rename workflow",
+    "renameHint": "Click to rename this workflow",
     "untitledWorkflow": "Untitled Workflow",
     "rebuildNodes": "Rebuild nodes",
     "describeWorkflow": "Describe workflow",
@@ -387,6 +385,16 @@
     "removedLanes": "Removed lanes: {{lanes}}",
     "videoSettingsSaveFailed": "Could not save video settings to the server. Use Save workflow before running."
   },
+  "canvasCredit": {
+    "title": "Run cost",
+    "total": "{{count}} credits",
+    "balance": "{{count}} credits available",
+    "calculating": "Calculating…",
+    "error": "Could not estimate",
+    "free": "No billable nodes in this workflow.",
+    "show": "Show run cost",
+    "hide": "Hide run cost"
+  },
   "toast": {
     "saved": "Workflow saved successfully",
     "saveFailed": "Could not save workflow. Please try again.",
@@ -427,6 +435,7 @@
     "saveBeforeGenerateHint": "Save workflow changes or apply node settings before generating. You can still edit this prompt.",
     "usingWorkflow": "Using workflow: {{name}} · {{count}} {{nodesLabel}}",
     "emptyWorkflowHint": "Set up your pipeline with the Q&A wizard, then generate content for each run.",
+    "preparingDefaultWorkflow": "Preparing your default workflow…",
     "modeUseCurrentWorkflow": "Use current workflow",
     "modeGenerateWorkflow": "Auto-generate workflow",
     "modeTabCurrent": "Current",
@@ -566,6 +575,13 @@
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
     "progress": "Step {{current}} of {{total}}",
+    "path": {
+      "chooserDescription": "Start with the standard pipeline, or answer a few questions to customize it.",
+      "defaultTitle": "Default",
+      "defaultDescription": "Keyword → Intelligence → Text, then branch into adapt lanes and merge.",
+      "takeQuestionTitle": "Take a question",
+      "takeQuestionDescription": "Answer a few questions to customize the pipeline for this run."
+    },
     "validation": {
       "selectAtLeastOneChannel": "Select at least one channel.",
       "selectAtLeastOneLanguage": "Select at least one target language."

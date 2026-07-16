@@ -146,41 +146,61 @@ export class McpService {
   async handleOAuthCallback(query: {
     state?: string;
     platform?: string;
+    /** Zernio standard redirect uses `connected={platform}`, not `platform`. */
+    connected?: string;
     accountId?: string;
+    account_id?: string;
     username?: string;
-  }): Promise<void> {
+  }): Promise<{ platform: string }> {
     const state = query.state;
     if (!state?.trim()) {
       throw new BadRequestException('Missing OAuth state');
     }
     const { userId } = await this.oauthState.verifyState(state);
-    const platform = query.platform?.trim() ?? '';
-    const accountId = query.accountId?.trim() ?? '';
-    if (!platform || !accountId) {
-      throw new BadRequestException(
-        'Missing platform or accountId from Zernio',
+
+    // Zernio docs: standard redirect appends connected, profileId, accountId, username.
+    const platform = (
+      query.platform?.trim() ||
+      query.connected?.trim() ||
+      ''
+    ).toLowerCase();
+    const accountId =
+      query.accountId?.trim() || query.account_id?.trim() || '';
+    const username = query.username?.trim() || undefined;
+
+    if (platform && accountId) {
+      await this.usersService.setZernioConnectedAccount(
+        userId,
+        platform,
+        accountId,
+        username ? { username } : undefined,
+      );
+    } else {
+      this.logger.warn(
+        `Zernio OAuth callback missing platform/accountId for user=${userId} keys=${Object.keys(query).join(',')}; falling back to account sync`,
       );
     }
-
-    const username = query.username?.trim() || undefined;
-    await this.usersService.setZernioConnectedAccount(
-      userId,
-      platform,
-      accountId,
-      username ? { username } : undefined,
-    );
 
     try {
       await this.syncAccounts(userId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Account may still be saved locally from setZernioConnectedAccount above.
       this.logger.warn(
         `Zernio account sync skipped after callback for ${userId}: ${message}`,
       );
+      if (!platform || !accountId) {
+        throw new BadRequestException(
+          'OAuth completed but account details were missing and sync failed',
+        );
+      }
     }
+
+    const resolvedPlatform = platform || query.connected?.trim() || 'account';
     this.logger.log(
-      `Zernio OAuth saved ${platform} for user ${userId} (${username ?? ''})`,
+      `Zernio OAuth saved ${resolvedPlatform} for user ${userId} (${username ?? ''})`,
     );
+    return { platform: resolvedPlatform };
   }
 
   async syncAccounts(userId: string): Promise<{

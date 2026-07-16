@@ -28,6 +28,8 @@ export type PipelineEstimateBreakdownItem = {
 export type PipelineEstimateResponse = {
   totalCredits: number
   breakdown: PipelineEstimateBreakdownItem[]
+  /** Unit credits for all pipeline-billable types (live canvas recalculation). */
+  unitCredits?: Record<string, number>
   creditsRemaining: number
   sufficient: boolean
 }

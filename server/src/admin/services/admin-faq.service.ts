@@ -8,7 +8,7 @@ import type { Response } from 'express';
 import { FileProxyService } from '../../content/file-proxy.service';
 import { buildFileStorageFolderPath } from '../../common/utils/file-storage-path.util';
 import { uploadBufferToFileService } from '../../upload/file-service-upload.util';
-import { AdminFaqClientService } from './admin-faq-client.service';
+import { FaqClientService } from '../../faq/faq-client.service';
 
 type FaqDocumentResponse = {
   id: string;
@@ -26,7 +26,7 @@ type FaqDocumentResponse = {
 @Injectable()
 export class AdminFaqService {
   constructor(
-    private readonly client: AdminFaqClientService,
+    private readonly client: FaqClientService,
     private readonly fileProxy: FileProxyService,
     private readonly config: ConfigService,
   ) {}

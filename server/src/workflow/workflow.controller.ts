@@ -133,6 +133,15 @@ export class WorkflowController {
     return this.workflowService.getWorkflowByRuleId(ruleId, auth);
   }
 
+  @Post('rule/:ruleId/default-structure')
+  applyDefaultStructure(
+    @Req() req: Request,
+    @Param('ruleId') ruleId: string,
+  ): Promise<GenerateWorkflowResponseDto> {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.workflowService.applyDefaultWorkflowStructure(ruleId, auth);
+  }
+
   @Post('rule/:ruleId/regenerate')
   @UsePipes(
     new ValidationPipe({

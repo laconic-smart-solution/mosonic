@@ -1,6 +1,10 @@
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { WorkflowQAAnswersDto } from './dto/workflow-qa-answers.dto';
 import {
+  assignNodeIds,
+  expandGraphLaneTemplates,
+} from './workflow-graph-expand.util';
+import {
   buildWorkflowNodes,
   toPersistableGraph,
 } from './workflow-structure.builder';
@@ -186,5 +190,43 @@ describe('toPersistableGraph', () => {
       (n) => n.type === WorkflowNodeType.Translation,
     );
     expect(translations).toHaveLength(6);
+  });
+
+  it('Default preset: keyword → intelligence → text → branch → adapt → merge (multi-channel)', () => {
+    const answers = baseAnswers({
+      useKeywordPlanner: true,
+      useWebSearch: true,
+    });
+    const logical = buildWorkflowNodes(answers, RULE_CHANNELS);
+    const graph = toPersistableGraph(logical, RULE_CHANNELS);
+    expect(graph.map((n) => n.type)).toEqual([
+      WorkflowNodeType.KeywordPlanner,
+      WorkflowNodeType.Intelligence,
+      WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Merge,
+    ]);
+
+    const expanded = expandGraphLaneTemplates(
+      assignNodeIds(graph),
+      RULE_CHANNELS,
+    );
+    expect(expanded.map((n) => n.type)).toEqual([
+      WorkflowNodeType.KeywordPlanner,
+      WorkflowNodeType.Intelligence,
+      WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Merge,
+    ]);
+    expect(
+      expanded
+        .filter((n) => n.type === WorkflowNodeType.Adapt)
+        .map((n) => n.lane)
+        .sort(),
+    ).toEqual([...RULE_CHANNELS].sort());
   });
 });

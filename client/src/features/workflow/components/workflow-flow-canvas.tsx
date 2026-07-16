@@ -19,6 +19,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   addEdge,
   useEdgesState,
@@ -86,11 +87,13 @@ import {
 
 import type { WorkflowEdge, WorkflowNode } from "@/shared/types/workflow.type"
 import { heygenService } from "@/shared/services/heygen.service"
+import { usePipelineEstimateQuery } from "@/shared/queries/pipeline.query"
 import { toast } from "sonner"
 import { NodeSelectPopover } from "./node-select-popover"
 import { PlusEdge } from "./plus-edge"
 import { PlusPlaceholderNode } from "./plus-placeholder-node"
 import { nodeHasConfigurableSettings } from "./workflow-node-config-fields"
+import { WorkflowCanvasCreditCard } from "./workflow-canvas-credit-card"
 import { WorkflowPropertiesPanel } from "./workflow-properties-panel"
 import {
   WorkflowNodePalette,
@@ -98,6 +101,11 @@ import {
 } from "./workflow-node-palette"
 import { WorkflowPaletteDropHints } from "./workflow-palette-drop-hints"
 import { WorkflowRfNode } from "./workflow-rf-node"
+import {
+  buildCreditEachByKey,
+  creditCostForWfNode,
+  estimateCreditsFromCanvasNodes,
+} from "@/features/workflow/lib/workflow-node-credit"
 
 const nodeTypes = {
   wfNode: WorkflowRfNode,
@@ -248,10 +256,12 @@ type WorkflowFlowCanvasProps = {
   onRetryNode?: (nodeId: string) => void
   onSkipNode?: (nodeId: string) => void
   onOpenReviewNode?: (nodeId: string) => void
+  onSkipReviewNode?: (nodeId: string) => void
   /** Fired when nodes/edges change in edit mode (not selection-only). */
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
   workflowId?: string
+  ruleId?: string
 }
 
 export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowFlowCanvasProps>(
@@ -270,13 +280,28 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onRetryNode,
       onSkipNode,
       onOpenReviewNode,
+      onSkipReviewNode,
       onCanvasEdited,
       onConfigDraftChange,
       workflowId,
+      ruleId,
     },
     ref,
   ) {
     const { t } = useTranslation("workflow")
+    const estimateQuery = usePipelineEstimateQuery(
+      workflowId,
+      ruleId,
+      Boolean(workflowId),
+    )
+    const creditEachByKey = useMemo(
+      () =>
+        buildCreditEachByKey(
+          estimateQuery.data?.breakdown,
+          estimateQuery.data?.unitCredits,
+        ),
+      [estimateQuery.data?.breakdown, estimateQuery.data?.unitCredits],
+    )
     const flowTheme = useWorkflowFlowVisualTheme()
     const initialNodes = useMemo(() => [] as WfRfNode[], [])
     const initialEdges = useMemo(() => [] as Edge[], [])
@@ -284,6 +309,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
 
     const [nodes, setNodes, onNodesChange] = useNodesState<WfRfNode>(initialNodes)
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+    const liveEstimate = useMemo(() => {
+      if (!estimateQuery.data) return undefined
+      return estimateCreditsFromCanvasNodes(
+        nodes,
+        creditEachByKey,
+        estimateQuery.data.creditsRemaining,
+      )
+    }, [creditEachByKey, estimateQuery.data, nodes])
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [settingsNodeId, setSettingsNodeId] = useState<string | null>(null)
     const [propConfig, setPropConfig] = useState<Record<string, unknown>>({})
@@ -1003,12 +1036,19 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           nodes.some((n) => n.type === "branchNode")
         const runtime = runtimeById[node.id]
 
+        const creditCost = creditCostForWfNode(
+          wfType,
+          node.data.config,
+          creditEachByKey,
+        )
+
         return {
           ...node,
           data: {
             ...node.data,
             ...runtimeById[node.id],
             readOnly,
+            creditCost,
             onDelete:
               readOnly || (node.type === "mergeNode" && hasBranch)
                 ? undefined
@@ -1030,6 +1070,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               runtime?.status === "waiting_review" && onOpenReviewNode
                 ? () => onOpenReviewNode(node.id)
                 : undefined,
+            onSkipReview:
+              runtime?.status === "waiting_review" && onSkipReviewNode
+                ? () => onSkipReviewNode(node.id)
+                : undefined,
             onOpenAddPopover: showAddButton
               ? (event: MouseEvent) => openAfterPopover(event, node.id)
               : undefined,
@@ -1042,12 +1086,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       activeAfterSourceId,
       afterSourceIds,
       channelCount,
+      creditEachByKey,
       deleteNode,
       edges,
       nodes,
       onRetryNode,
       onSkipNode,
       onOpenReviewNode,
+      onSkipReviewNode,
       closePanel,
       openAfterPopover,
       openInitialPopover,
@@ -1251,7 +1297,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             <Background
               gap={24}
               size={1}
-              color={flowTheme.backgroundDotColor}
+              // color={flowTheme.backgroundDotColor}
             />
             <Controls
               className="border-(--nt-border)! shadow-md!"
@@ -1264,6 +1310,18 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               zoomable
               pannable
             />
+            {workflowId ? (
+              <Panel position="top-left" className="m-3!">
+                <WorkflowCanvasCreditCard
+                  estimate={liveEstimate ?? estimateQuery.data}
+                  loading={
+                    estimateQuery.isLoading ||
+                    (estimateQuery.isFetching && !estimateQuery.data)
+                  }
+                  error={estimateQuery.isError}
+                />
+              </Panel>
+            ) : null}
             {paletteDragType ? (
               <WorkflowPaletteDropHints
                 hints={dropHints}

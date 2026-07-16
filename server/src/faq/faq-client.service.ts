@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { type AxiosInstance, isAxiosError } from 'axios';
 
 @Injectable()
-export class AdminFaqClientService {
+export class FaqClientService {
   private readonly http: AxiosInstance;
 
   constructor(private readonly config: ConfigService) {

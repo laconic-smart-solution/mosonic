@@ -243,6 +243,7 @@ export const STATUS_MAP = {
   retrying: { bg: "#FFEDD5", text: "#EA580C", border: "#FDBA74", dot: "#EA580C" },
   done: { bg: "#DCFCE7", text: "#16A34A", border: "#86EFAC", dot: "#16A34A" },
   completed: { bg: "#DCFCE7", text: "#16A34A", border: "#86EFAC", dot: "#16A34A" },
+  skipped: { bg: "#EDF2F7", text: "#718096", border: "#D9E1EC", dot: "#A0AEC0" },
   waiting_review: { bg: "#CCFBF1", text: "#0D9488", border: "#5EEAD4", dot: "#0D9488" },
   failed_final: { bg: "#FEE2E2", text: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
   failed: { bg: "#FEE2E2", text: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
@@ -256,6 +257,8 @@ export type WfNodeData = {
   status: NodeStatus
   locked: boolean
   config: Record<string, unknown>
+  /** Credits charged per run for this node type (from pipeline estimate). */
+  creditCost?: number
   previewText?: string
   previewImage?: string
   previewVideo?: string
@@ -272,6 +275,7 @@ export type WfNodeData = {
   onRetry?: () => void
   onSkip?: () => void
   onOpenReview?: () => void
+  onSkipReview?: () => void
   reviewText?: string
   onOpenAddPopover?: (event: MouseEvent, nodeId: string) => void
   readOnly?: boolean
@@ -649,6 +653,7 @@ const STATUS_CHIP: Record<NodeStatus, ChipColor> = {
   retrying: "amber",
   done: "green",
   completed: "green",
+  skipped: "gray",
   waiting_review: "indigo",
   failed_final: "red",
   failed: "red",

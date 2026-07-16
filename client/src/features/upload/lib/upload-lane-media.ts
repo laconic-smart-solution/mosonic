@@ -23,6 +23,15 @@ export type LaneMediaUrls = {
   video?: string
 }
 
+function mediaFromLayer(layer: Record<string, unknown>): LaneMediaUrls {
+  const img = typeof layer.image === "string" ? layer.image.trim() : ""
+  const vid = typeof layer.video === "string" ? layer.video.trim() : ""
+  return {
+    image: img || undefined,
+    video: vid || undefined,
+  }
+}
+
 /** Per-lane image/video from materialized nodeOutputs (nodeId suffix or layer fields). */
 export function laneMediaFromNodeOutputs(
   channelKey: string,
@@ -46,28 +55,67 @@ export function laneMediaFromNodeOutputs(
       layers.nodeUserEdits,
       nodeId,
     )
-    const img =
-      typeof layer.image === "string" ? layer.image.trim() : ""
-    const vid =
-      typeof layer.video === "string" ? layer.video.trim() : ""
-    if (img) image = img
-    if (vid) video = vid
+    const media = mediaFromLayer(layer)
+    if (media.image) image = media.image
+    if (media.video) video = media.video
   }
 
   return { image, video }
 }
 
+/** Shared trunk media from nodes without a lane suffix (pre-branch). */
+export function trunkMediaFromNodeOutputs(
+  layers: WorkflowNodeLayersSnapshot,
+): LaneMediaUrls {
+  let image: string | undefined
+  let video: string | undefined
+
+  const nodeIds = new Set([
+    ...Object.keys(layers.nodeOutputs ?? {}),
+    ...Object.keys(layers.nodeUserEdits ?? {}),
+  ])
+
+  for (const nodeId of nodeIds) {
+    if (laneSuffixFromNodeId(nodeId)) continue
+
+    const layer = mergeNodeOutputLayers(
+      layers.nodeOutputs,
+      layers.nodeUserEdits,
+      nodeId,
+    )
+    const media = mediaFromLayer(layer)
+    if (media.image) image = media.image
+    if (media.video) video = media.video
+  }
+
+  return { image, video }
+}
+
+/**
+ * Resolve media for a channel.
+ * Prefer lane-specific layers, then true trunk (unlaned) layers.
+ * Never fall back to flattened resolved.image/video when layers are present —
+ * that snapshot mixes every lane's media and would auto-assign FB images to IG, etc.
+ */
 export function resolveLaneMediaForChannel(
   channelKey: string,
   resolved: UploadResolvedOutputs,
   layers?: WorkflowNodeLayersSnapshot | null,
 ): LaneMediaUrls {
-  const fromLayers = layers ? laneMediaFromNodeOutputs(channelKey, layers) : {}
+  if (layers) {
+    const fromLane = laneMediaFromNodeOutputs(channelKey, layers)
+    const fromTrunk = trunkMediaFromNodeOutputs(layers)
+    return {
+      image: fromLane.image ?? fromTrunk.image,
+      video: fromLane.video ?? fromTrunk.video,
+    }
+  }
+
   const trunkImage = resolved.image?.trim()
   const trunkVideo = resolved.video?.trim()
   return {
-    image: fromLayers.image ?? (trunkImage || undefined),
-    video: fromLayers.video ?? (trunkVideo || undefined),
+    image: trunkImage || undefined,
+    video: trunkVideo || undefined,
   }
 }
 
