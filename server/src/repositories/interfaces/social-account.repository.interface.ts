@@ -83,6 +83,11 @@ export interface ISocialAccountRepository {
     provider: SocialProvider,
   ): Promise<SocialAccountRecord[]>;
 
+  findActiveByProviderAndExternalAccountId(
+    provider: SocialProvider,
+    externalAccountId: string,
+  ): Promise<SocialAccountRecord | null>;
+
   updateStatusAndMetadata(
     userId: string,
     provider: SocialProvider,

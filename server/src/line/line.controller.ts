@@ -1,6 +1,17 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { UserRecord } from '../domain/users/user.types';
 import { LineQrQueryDto } from './dto/line.dto';
 import { LineService } from './line.service';
 
@@ -27,5 +38,31 @@ export class LineController {
       'Cache-Control': 'public, max-age=86400',
     });
     res.send(png);
+  }
+
+  /**
+   * Start (or resume) LINE account linking.
+   * Returns QR + CONNECT code when not yet linked; connected status when already linked.
+   */
+  @Post('connect')
+  async startConnect(@Req() req: Request) {
+    const user = req.auth!.localUser as UserRecord;
+    return this.line.startConnect(user.userId);
+  }
+
+  /** Poll whether the logged-in user has linked LINE. */
+  @Get('connect/status')
+  async connectStatus(@Req() req: Request) {
+    const user = req.auth!.localUser as UserRecord;
+    return this.line.getConnectStatus(user.userId);
+  }
+
+  /** Unlink LINE from the logged-in Mosonic account. */
+  @Delete('connect')
+  @HttpCode(200)
+  async disconnect(@Req() req: Request) {
+    const user = req.auth!.localUser as UserRecord;
+    await this.line.disconnect(user.userId);
+    return { success: true };
   }
 }

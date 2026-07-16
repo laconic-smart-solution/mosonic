@@ -14,7 +14,40 @@
       "cost": "Cost (USD)",
       "content": "Content",
       "apiUsage": "API usage",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "communication": "Communication",
+      "line": "LINE"
+    }
+  },
+  "communication": {
+    "line": {
+      "title": "LINE messaging",
+      "subtitle": "Message users who have linked their LINE account.",
+      "total": "{{count}} connected users",
+      "searchPlaceholder": "Search email, name, or LINE id",
+      "search": "Search",
+      "loading": "Loading connected users…",
+      "loadError": "Could not load LINE connections.",
+      "empty": "No users have connected LINE yet.",
+      "showing": "Showing {{start}}–{{end}} of {{total}}",
+      "send": "Send message",
+      "sending": "Sending…",
+      "sendTitle": "Send LINE message",
+      "sendDesc": "Send a direct message to {{name}}.",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Type your message…",
+      "sendHint": "Press Ctrl+Enter to send quickly.",
+      "charCount": "{{count}} / {{max}}",
+      "noEmail": "No email on file",
+      "cancel": "Cancel",
+      "sendSuccess": "Message sent via LINE.",
+      "sendError": "Could not send LINE message.",
+      "columns": {
+        "user": "User",
+        "email": "Email",
+        "connectedAt": "Connected",
+        "actions": "Actions"
+      }
     }
   },
   "dashboard": {

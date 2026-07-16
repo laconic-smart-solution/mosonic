@@ -44,6 +44,7 @@ import {
   AdminContentDetailPage,
   AdminFaqPage,
   AdminFaqDocumentDetailPage,
+  AdminLinePage,
   SuspendedPage,
   NotFoundPage,
 } from "../constants/lazyload"
@@ -167,6 +168,7 @@ export const router = createBrowserRouter([
           { path: "content/:contentId", element: <AdminContentDetailPage /> },
           { path: "faq", element: <AdminFaqPage /> },
           { path: "faq/documents/:documentId", element: <AdminFaqDocumentDetailPage /> },
+          { path: "communication/line", element: <AdminLinePage /> },
         ],
       },
     ],

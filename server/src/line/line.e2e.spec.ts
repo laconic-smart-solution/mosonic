@@ -13,6 +13,8 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { LineConnectCodeService } from './line-connect-code.service';
+import { LineConnectionService } from './line-connection.service';
 import { LineController } from './line.controller';
 import { LineWebhookController } from './line-webhook.controller';
 import { LineService } from './line.service';
@@ -47,6 +49,25 @@ describeLive('LINE integration (e2e against live line-service)', () => {
         {
           provide: ConfigService,
           useValue: { get: (key: string) => ENV[key] },
+        },
+        {
+          provide: LineConnectCodeService,
+          useValue: {
+            issue: jest.fn(),
+            peekForUser: jest.fn(),
+            consume: jest.fn(),
+            onModuleDestroy: jest.fn(),
+          },
+        },
+        {
+          provide: LineConnectionService,
+          useValue: {
+            findByUserId: jest.fn(),
+            findByLineUserId: jest.fn(),
+            upsert: jest.fn(),
+            disconnectByUserId: jest.fn(),
+            disconnectByLineUserId: jest.fn(),
+          },
         },
       ],
     })
@@ -99,10 +120,24 @@ describeLive('LINE integration (e2e against live line-service)', () => {
   });
 
   it('GET /line/qr works with no LINE token configured (QR never reaches LINE)', async () => {
-    const bare = new LineService({
-      get: (key: string) =>
-        key === 'LINE_CHANNEL_ACCESS_TOKEN' ? undefined : ENV[key],
-    } as unknown as ConfigService);
+    const bare = new LineService(
+      {
+        get: (key: string) =>
+          key === 'LINE_CHANNEL_ACCESS_TOKEN' ? undefined : ENV[key],
+      } as unknown as ConfigService,
+      {
+        issue: jest.fn(),
+        peekForUser: jest.fn(),
+        consume: jest.fn(),
+      } as unknown as LineConnectCodeService,
+      {
+        findByUserId: jest.fn(),
+        findByLineUserId: jest.fn(),
+        upsert: jest.fn(),
+        disconnectByUserId: jest.fn(),
+        disconnectByLineUserId: jest.fn(),
+      } as unknown as LineConnectionService,
+    );
 
     await expect(bare.getQrCode()).resolves.toMatchObject({
       basicId: '@136laxkx',

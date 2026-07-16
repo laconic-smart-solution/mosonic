@@ -11,6 +11,7 @@ import { AccountChannelsSection } from "@/features/settings/components/account-c
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
 import { AccountSettingsToolbar } from "@/features/settings/components/account-settings-toolbar"
 import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
+import { AccountGetInTouchSection } from "@/features/settings/components/account-get-in-touch-section"
 import { SocialUnlockConfirmDialog } from "@/features/settings/components/social-unlock-confirm-dialog"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
 import { toastApiError } from "@/shared/lib/toast-error"
@@ -253,7 +254,10 @@ export default function SettingsAccountsPage() {
         <AccountSettingsPageHeader />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
-          <AccountUserProfileCard user={user} loading={hydrated && !user} />
+          <div className="flex min-w-0 flex-col gap-4">
+            <AccountUserProfileCard user={user} loading={hydrated && !user} />
+            <AccountGetInTouchSection />
+          </div>
 
           <div className="flex min-w-0 flex-col gap-6">
             {/* <section className={panelClass}>

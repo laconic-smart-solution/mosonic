@@ -17,6 +17,41 @@
       "member": "成员"
     }
   },
+  "contact": {
+    "sectionTitle": "联系我们",
+    "sectionDesc": "通过可用渠道联系团队。",
+    "openButton": "打开联系选项",
+    "modalTitle": "联系选项",
+    "modalDesc": "选择一个渠道与我们联系。",
+    "line": {
+      "label": "LINE 官方账号",
+      "description": "关联你的 LINE 账号以接收我们的更新。",
+      "connect": "连接",
+      "manage": "查看连接",
+      "manageAria": "查看 LINE 连接",
+      "connectAria": "通过 LINE 联系我们",
+      "statusBadge": "已连接",
+      "statusLoading": "正在检查 LINE 连接…",
+      "statusConnected": "LINE 已关联到你的账号",
+      "alreadyLinkedHint": "你的账号已关联，无需再次连接。",
+      "qrTitle": "通过 LINE 连接",
+      "qrDesc": "添加我们的官方账号，然后在聊天中发送下方的 CONNECT 验证码。",
+      "openLineApp": "打开 LINE 加好友链接",
+      "loadFailed": "无法加载 LINE 连接会话。",
+      "qrUnavailable": "二维码不可用 — 请使用下方打开 LINE。",
+      "step1": "1. 扫描二维码或打开加好友链接。",
+      "step2": "2. 在 LINE 聊天中发送以下完整消息：",
+      "copyCode": "复制 CONNECT 消息",
+      "copied": "已复制到剪贴板",
+      "codeExpires": "验证码约 {{minutes}} 分钟后过期",
+      "waiting": "正在等待你的 CONNECT 消息…",
+      "connectedTitle": "已连接 LINE",
+      "connectedDesc": "你的 Mosonic 账号已关联 LINE。",
+      "disconnect": "断开连接",
+      "disconnecting": "正在断开…",
+      "done": "完成"
+    }
+  },
   "toolbar": {
     "createProfile": "创建 Zernio 配置文件",
     "syncAccounts": "同步账户"

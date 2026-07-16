@@ -12,7 +12,41 @@
       "usage": "用量",
       "cost": "费用 (USD)",
       "content": "内容",
-      "apiUsage": "API 用量"
+      "apiUsage": "API 用量",
+      "faq": "FAQ",
+      "communication": "通讯",
+      "line": "LINE"
+    }
+  },
+  "communication": {
+    "line": {
+      "title": "LINE 消息",
+      "subtitle": "向已关联 LINE 账号的用户发送消息。",
+      "total": "{{count}} 位已关联用户",
+      "searchPlaceholder": "搜索邮箱、姓名或 LINE id",
+      "search": "搜索",
+      "loading": "正在加载已关联用户…",
+      "loadError": "无法加载 LINE 关联列表。",
+      "empty": "暂无用户关联 LINE。",
+      "showing": "显示 {{start}}–{{end}} / 共 {{total}}",
+      "send": "发送消息",
+      "sending": "发送中…",
+      "sendTitle": "发送 LINE 消息",
+      "sendDesc": "向 {{name}} 发送私信。",
+      "messageLabel": "消息",
+      "messagePlaceholder": "输入消息内容…",
+      "sendHint": "按 Ctrl+Enter 快速发送。",
+      "charCount": "{{count}} / {{max}}",
+      "noEmail": "无邮箱",
+      "cancel": "取消",
+      "sendSuccess": "已通过 LINE 发送消息。",
+      "sendError": "无法发送 LINE 消息。",
+      "columns": {
+        "user": "用户",
+        "email": "邮箱",
+        "connectedAt": "关联时间",
+        "actions": "操作"
+      }
     }
   },
   "dashboard": {
