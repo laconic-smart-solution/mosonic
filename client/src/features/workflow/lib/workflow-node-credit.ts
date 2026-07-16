@@ -46,9 +46,22 @@ export function creditCostForWfNode(
 
 export type CanvasCreditNodeInput = {
   type?: string
-  data: {
-    wfType: string
-    config?: Record<string, unknown>
+  /** Heterogeneous RF node data; only `wfType` / `config` are read when present. */
+  data: unknown
+}
+
+function readWfCreditFields(data: unknown): {
+  wfType?: string
+  config?: Record<string, unknown>
+} {
+  if (!data || typeof data !== "object") return {}
+  const record = data as Record<string, unknown>
+  return {
+    wfType: typeof record.wfType === "string" ? record.wfType : undefined,
+    config:
+      record.config && typeof record.config === "object"
+        ? (record.config as Record<string, unknown>)
+        : undefined,
   }
 }
 
@@ -64,7 +77,9 @@ export function estimateCreditsFromCanvasNodes(
 
   for (const node of nodes) {
     if (node.type === "plus_placeholder") continue
-    const key = resolveWfNodeCreditKey(node.data.wfType, node.data.config)
+    const { wfType, config } = readWfCreditFields(node.data)
+    if (!wfType) continue
+    const key = resolveWfNodeCreditKey(wfType, config)
     if (!key) continue
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
