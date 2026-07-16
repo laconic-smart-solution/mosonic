@@ -17,6 +17,41 @@
       "member": "Member"
     }
   },
+  "contact": {
+    "sectionTitle": "Get in touch with us",
+    "sectionDesc": "Reach our team through available channels.",
+    "openButton": "Open contact options",
+    "modalTitle": "Contact options",
+    "modalDesc": "Choose a channel to connect with us.",
+    "line": {
+      "label": "LINE Official Account",
+      "description": "Link your LINE account to receive updates from us.",
+      "connect": "Connect",
+      "manage": "View connection",
+      "manageAria": "View LINE connection",
+      "connectAria": "Connect with us on LINE",
+      "statusBadge": "Connected",
+      "statusLoading": "Checking LINE connection…",
+      "statusConnected": "LINE is linked to your account",
+      "alreadyLinkedHint": "Your account is already linked. You do not need to connect again.",
+      "qrTitle": "Connect on LINE",
+      "qrDesc": "Add our Official Account, then send the CONNECT code below in the chat.",
+      "openLineApp": "Open LINE add-friend link",
+      "loadFailed": "Could not load LINE connect session.",
+      "qrUnavailable": "QR unavailable — use Open LINE below.",
+      "step1": "1. Scan the QR or open the add-friend link.",
+      "step2": "2. In the LINE chat, send this exact message:",
+      "copyCode": "Copy CONNECT message",
+      "copied": "Copied to clipboard",
+      "codeExpires": "Code expires in about {{minutes}} min",
+      "waiting": "Waiting for your CONNECT message…",
+      "connectedTitle": "LINE connected",
+      "connectedDesc": "Your Mosonic account is linked to LINE.",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting…",
+      "done": "Done"
+    }
+  },
   "toolbar": {
     "createProfile": "Create Zernio profile",
     "syncAccounts": "Sync accounts"

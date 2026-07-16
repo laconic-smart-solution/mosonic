@@ -280,6 +280,21 @@ export class PrismaSocialAccountRepository implements ISocialAccountRepository {
     });
   }
 
+  findActiveByProviderAndExternalAccountId(
+    provider: SocialProvider,
+    externalAccountId: string,
+  ): Promise<SocialAccountRecord | null> {
+    const id = externalAccountId.trim();
+    if (!id) return Promise.resolve(null);
+    return this.prisma.socialAccount.findFirst({
+      where: {
+        provider,
+        externalAccountId: id,
+        status: SocialAccountStatus.ACTIVE,
+      },
+    });
+  }
+
   async updateStatusAndMetadata(
     userId: string,
     provider: SocialProvider,

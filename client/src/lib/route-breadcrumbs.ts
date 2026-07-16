@@ -120,6 +120,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     href: "/admin/faq",
     parent: "/admin",
   },
+  {
+    pattern: "/admin/communication/line",
+    labelKey: "layout.nav.line",
+    ns: "admin",
+    href: "/admin/communication/line",
+    parent: "/admin",
+  },
   { pattern: "/admin", labelKey: "layout.title", ns: "admin", href: "/admin/dashboard" },
 
   // App detail / nested

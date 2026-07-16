@@ -23,6 +23,7 @@ import { ZernioMcpClient } from './zernio/zernio.mcp';
 import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
 import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
+import { SocialProvider } from '@prisma/client';
 
 @Injectable()
 export class McpService {
@@ -219,7 +220,12 @@ export class McpService {
   }> {
     const accounts = (
       await this.usersService.getAllActiveConnectedAccounts(userId)
-    ).filter((a) => !isDeprecatedChannelId(a.channel));
+    ).filter(
+      (a) =>
+        !isDeprecatedChannelId(a.channel) &&
+        a.channel.trim().toLowerCase() !== 'line' &&
+        a.provider !== SocialProvider.LINE,
+    );
     const unlockedChannels = (
       await this.creditService.listUnlockedSocialChannels(userId)
     ).filter((ch) => !isDeprecatedChannelId(ch));

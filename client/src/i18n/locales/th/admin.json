@@ -13,7 +13,40 @@
       "cost": "ค่าใช้จ่าย (USD)",
       "content": "คอนเทนต์",
       "apiUsage": "การใช้ API",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "communication": "การสื่อสาร",
+      "line": "LINE"
+    }
+  },
+  "communication": {
+    "line": {
+      "title": "ข้อความ LINE",
+      "subtitle": "ส่งข้อความถึงผู้ใช้ที่เชื่อมบัญชี LINE แล้ว",
+      "total": "ผู้ใช้ที่เชื่อมต่อ {{count}} คน",
+      "searchPlaceholder": "ค้นหาอีเมล ชื่อ หรือ LINE id",
+      "search": "ค้นหา",
+      "loading": "กำลังโหลดผู้ใช้ที่เชื่อมต่อ…",
+      "loadError": "โหลดรายการเชื่อมต่อ LINE ไม่สำเร็จ",
+      "empty": "ยังไม่มีผู้ใช้เชื่อมต่อ LINE",
+      "showing": "แสดง {{start}}–{{end}} จาก {{total}}",
+      "send": "ส่งข้อความ",
+      "sending": "กำลังส่ง…",
+      "sendTitle": "ส่งข้อความ LINE",
+      "sendDesc": "ส่งข้อความตรงถึง {{name}}",
+      "messageLabel": "ข้อความ",
+      "messagePlaceholder": "พิมพ์ข้อความ…",
+      "sendHint": "กด Ctrl+Enter เพื่อส่งเร็ว",
+      "charCount": "{{count}} / {{max}}",
+      "noEmail": "ไม่มีอีเมล",
+      "cancel": "ยกเลิก",
+      "sendSuccess": "ส่งข้อความทาง LINE แล้ว",
+      "sendError": "ส่งข้อความ LINE ไม่สำเร็จ",
+      "columns": {
+        "user": "ผู้ใช้",
+        "email": "อีเมล",
+        "connectedAt": "เชื่อมเมื่อ",
+        "actions": "การทำงาน"
+      }
     }
   },
   "dashboard": {
