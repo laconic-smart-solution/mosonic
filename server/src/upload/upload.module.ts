@@ -7,6 +7,7 @@ import { McpModule } from '../mcp/mcp.module';
 import { PostModule } from '../post/post.module';
 import { RedNoteModule } from '../rednote/rednote.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { SchedulerModule } from '../scheduler/scheduler.module';
 import { UsersModule } from '../users/users.module';
 import { UploadController } from './upload.controller';
 import { UploadMediaController } from './upload-media.controller';
@@ -24,6 +25,7 @@ import { UploadService } from './upload.service';
     RepositoriesModule,
     forwardRef(() => ContentModule),
     PostModule,
+    SchedulerModule,
   ],
   controllers: [UploadMediaController, UploadController],
   providers: [UploadService, UploadScheduledSyncService],

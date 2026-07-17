@@ -6,6 +6,7 @@ import type {
   UploadDetail,
   UploadResolvedOutputs,
 } from "@/shared/types/upload.type"
+import { zonedDateTimeLocalToUtcIso } from "@/shared/lib/timezones"
 
 export { getApiErrorMessage } from "@/shared/lib/api-error"
 
@@ -103,11 +104,13 @@ export function buildGlobalPublishRequest(
   connectedChannelSet: Set<string>,
   publishNow: boolean,
   scheduledLocal: string,
+  timezone?: string,
 ): PublishUploadRequest {
+  const zone = timezone?.trim() || "UTC"
   const scheduledAt = publishNow
     ? null
     : scheduledLocal.trim()
-      ? new Date(scheduledLocal).toISOString()
+      ? zonedDateTimeLocalToUtcIso(scheduledLocal, zone)
       : null
 
   const channels: ChannelPublishRequest[] = upload.channels.map((row) => {
@@ -125,6 +128,7 @@ export function buildGlobalPublishRequest(
   return {
     publishNow,
     scheduledAt,
+    ...(publishNow ? {} : { timezone: zone }),
     channels,
   }
 }
@@ -137,11 +141,13 @@ export function buildPublishRequest(
   publishNow: boolean,
   scheduledLocal: string,
   resolved: UploadResolvedOutputs,
+  timezone?: string,
 ): PublishUploadRequest {
+  const zone = timezone?.trim() || "UTC"
   const scheduledAt = publishNow
     ? null
     : scheduledLocal.trim()
-      ? new Date(scheduledLocal).toISOString()
+      ? zonedDateTimeLocalToUtcIso(scheduledLocal, zone)
       : null
 
   const channels: ChannelPublishRequest[] = upload.channels.map((row) => {
@@ -161,6 +167,7 @@ export function buildPublishRequest(
   return {
     publishNow,
     scheduledAt,
+    ...(publishNow ? {} : { timezone: zone }),
     channels,
   }
 }

@@ -400,6 +400,9 @@ export class ZernioRestClient {
       if (payload.scheduledFor !== null) {
         body.scheduledFor = payload.scheduledFor;
         body.timezone = 'UTC';
+      } else {
+        // Clear Zernio-owned schedule (Mosonic scheduler owns timing).
+        body.scheduledFor = null;
       }
     }
     if (payload.title !== undefined) body.title = payload.title;

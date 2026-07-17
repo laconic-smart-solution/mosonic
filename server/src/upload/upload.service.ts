@@ -14,6 +14,7 @@ import { EventsService } from '../events/events.service';
 import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   isTikTokPhotoMedia,
   tiktokPhotoCaptionError,
@@ -119,6 +120,7 @@ export class UploadService {
     private readonly postService: PostService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
+    private readonly scheduler: SchedulerService,
   ) {}
 
   buildChannelEntriesFromPipeline(
@@ -697,13 +699,25 @@ export class UploadService {
           ? title
           : undefined;
 
-      await this.mcpService.updatePost({
-        postId,
-        content,
-        scheduledFor: scheduledIso,
-        title: titleForPost,
-        ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
-      });
+      const hasContentUpdate =
+        hasCaptionUpdate || hasTitleUpdate || hasMediaUpdate;
+      if (hasContentUpdate) {
+        await this.mcpService.updatePost({
+          postId,
+          content,
+          title: titleForPost,
+          ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
+        });
+      }
+
+      const localPostId = post.postId?.trim();
+      if (scheduledIso && localPostId) {
+        await this.scheduler.reschedulePostPublish(
+          localPostId,
+          scheduledIso,
+          body.timezone ?? undefined,
+        );
+      }
     }
 
     for (const ch of scheduledChannels) {
@@ -923,22 +937,32 @@ export class UploadService {
                 title: w.youtubeTitle,
               };
             }),
+            // Timing is owned by Mosonic scheduler; Zernio only gets a draft.
             publishNow: body.publishNow,
-            scheduledAt: scheduledIso,
+            scheduledAt: null,
           },
         );
         zernioPostId = postId;
 
-        await this.postService.createPostFromSuccessfulPublish({
-          userId: publisherUserId,
-          uploadRef: publishUploadId,
-          ruleRef: publishRuleRef,
-          contentRef: publishContentRef,
-          zernioPostId: postId,
-          channels: zernioWork.map((w) => w.row.channel.toLowerCase()),
-          publishNow: body.publishNow,
-          scheduledAt: scheduledDate,
-        });
+        const { postId: localPostId } =
+          await this.postService.createPostFromSuccessfulPublish({
+            userId: publisherUserId,
+            uploadRef: publishUploadId,
+            ruleRef: publishRuleRef,
+            contentRef: publishContentRef,
+            zernioPostId: postId,
+            channels: zernioWork.map((w) => w.row.channel.toLowerCase()),
+            publishNow: body.publishNow,
+            scheduledAt: scheduledDate,
+          });
+
+        if (!body.publishNow && scheduledIso) {
+          await this.scheduler.createPostPublish(
+            localPostId,
+            scheduledIso,
+            body.timezone ?? undefined,
+          );
+        }
 
         for (const w of zernioWork) {
           const chKey = w.row.channel.toLowerCase();
