@@ -1,0 +1,30 @@
+{
+  "page": {
+    "title": "公告",
+    "subtitle": "来自 Mosonic 的平台通知。",
+    "loading": "正在加载公告…",
+    "loadingMore": "正在加载更多…",
+    "scrollForMore": "向下滚动加载更多",
+    "end": "已全部加载",
+    "loadError": "无法加载公告。",
+    "empty": "暂无公告。",
+    "viewMore": "查看更多",
+    "showLess": "收起",
+    "showing": "显示 {{start}}–{{end}} / 共 {{total}}"
+  },
+  "banner": {
+    "viewMore": "查看更多",
+    "dismiss": "关闭"
+  },
+  "lowCredit": {
+    "badge": "积分",
+    "title": "积分余额不足",
+    "message": "剩余 {{remaining}} 积分（{{percent}}%）。请充值以继续生成。",
+    "topUp": "充值"
+  },
+  "levels": {
+    "info": "信息",
+    "warning": "警告",
+    "critical": "紧急"
+  }
+}

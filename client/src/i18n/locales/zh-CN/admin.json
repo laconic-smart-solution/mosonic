@@ -15,7 +15,8 @@
       "apiUsage": "API 用量",
       "faq": "FAQ",
       "communication": "通讯",
-      "line": "LINE"
+      "line": "LINE",
+      "announcements": "公告"
     }
   },
   "communication": {
@@ -46,6 +47,51 @@
         "email": "邮箱",
         "connectedAt": "关联时间",
         "actions": "操作"
+      }
+    },
+    "announcements": {
+      "title": "公告",
+      "subtitle": "在应用内和/或通过 LINE 发布平台公告。",
+      "publish": "发布",
+      "publishing": "发布中…",
+      "publishTitle": "发布公告",
+      "publishDesc": "向活跃用户发送应用内通知，并可选择向所有已关联 LINE 用户广播。",
+      "titleLabel": "标题",
+      "titlePlaceholder": "简短标题…",
+      "messageLabel": "内容",
+      "messagePlaceholder": "编写公告内容…",
+      "levelLabel": "级别",
+      "levels": {
+        "info": "信息",
+        "warning": "警告",
+        "critical": "紧急"
+      },
+      "channelInApp": "应用内通知",
+      "channelInAppHint": "通过 Socket 通知所有活跃用户。",
+      "channelLine": "LINE 广播",
+      "channelLineHint": "批量发送给所有已关联的 LINE 账号。",
+      "channelInAppShort": "应用内",
+      "channelLineShort": "LINE",
+      "channelRequired": "请至少启用一个渠道。",
+      "charCount": "{{count}} / {{max}}",
+      "cancel": "取消",
+      "publishSuccess": "公告已发布。",
+      "publishError": "无法发布公告。",
+      "loading": "正在加载公告…",
+      "loadError": "无法加载公告。",
+      "empty": "暂无公告。",
+      "showing": "显示 {{start}}–{{end}} / 共 {{total}}",
+      "status": {
+        "published": "已发布",
+        "failed": "失败"
+      },
+      "columns": {
+        "title": "标题",
+        "message": "内容",
+        "level": "级别",
+        "channels": "渠道",
+        "status": "状态",
+        "publishedAt": "发布时间"
       }
     }
   },

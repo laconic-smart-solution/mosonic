@@ -34,6 +34,7 @@ export interface IUserRepository {
   ): Promise<number>;
   deleteByUserId(userId: string): Promise<boolean>;
   listAllUserIds(): Promise<string[]>;
+  listActiveUserIds(): Promise<string[]>;
   listWithZernioAccounts(): Promise<
     Array<Pick<UserRecord, 'userId' | 'zernioConnectedAccounts'>>
   >;

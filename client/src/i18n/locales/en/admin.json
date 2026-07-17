@@ -16,7 +16,8 @@
       "apiUsage": "API usage",
       "faq": "FAQ",
       "communication": "Communication",
-      "line": "LINE"
+      "line": "LINE",
+      "announcements": "Announcements"
     }
   },
   "communication": {
@@ -47,6 +48,51 @@
         "email": "Email",
         "connectedAt": "Connected",
         "actions": "Actions"
+      }
+    },
+    "announcements": {
+      "title": "Announcements",
+      "subtitle": "Publish platform announcements in-app and/or via LINE.",
+      "publish": "Publish",
+      "publishing": "Publishing…",
+      "publishTitle": "Publish announcement",
+      "publishDesc": "Send to active users in-app and optionally to all LINE-connected users.",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Short headline…",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Write the announcement…",
+      "levelLabel": "Level",
+      "levels": {
+        "info": "Info",
+        "warning": "Warning",
+        "critical": "Critical"
+      },
+      "channelInApp": "In-app notification",
+      "channelInAppHint": "Socket notification to all active users.",
+      "channelLine": "LINE broadcast",
+      "channelLineHint": "Batch message to all connected LINE accounts.",
+      "channelInAppShort": "In-app",
+      "channelLineShort": "LINE",
+      "channelRequired": "Enable at least one channel.",
+      "charCount": "{{count}} / {{max}}",
+      "cancel": "Cancel",
+      "publishSuccess": "Announcement published.",
+      "publishError": "Could not publish announcement.",
+      "loading": "Loading announcements…",
+      "loadError": "Could not load announcements.",
+      "empty": "No announcements yet.",
+      "showing": "Showing {{start}}–{{end}} of {{total}}",
+      "status": {
+        "published": "Published",
+        "failed": "Failed"
+      },
+      "columns": {
+        "title": "Title",
+        "message": "Message",
+        "level": "Level",
+        "channels": "Channels",
+        "status": "Status",
+        "publishedAt": "Published"
       }
     }
   },
