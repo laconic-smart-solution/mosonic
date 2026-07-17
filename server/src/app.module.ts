@@ -21,6 +21,7 @@ import { PostModule } from './post/post.module';
 import { UploadModule } from './upload/upload.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { LineModule } from './line/line.module';
+import { TelegramModule } from './telegram/telegram.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
@@ -70,6 +71,7 @@ import {
     SchedulerModule,
     WebhookModule,
     LineModule,
+    TelegramModule,
     CampaignModule,
     NewsTriggerModule,
     IntegrationsModule,
