@@ -35,9 +35,10 @@ neutral-tex  →  line-service  →  LINE
        ▼                         │                         ▼        │
 ┌────────────────────────────────┴────────────────────────────┐     │
 │              line-service (:8083) — stateless, no DB        │─────┘
-│  /api/v1/qr        render PNG        (no LINE call)         │
-│  /api/v1/messages  push proxy        (token from caller)    │
-│  /api/v1/webhooks  verify HMAC + forward  (secret from URL) │
+│  /api/v1/qr              render PNG        (no LINE call)   │
+│  /api/v1/messages        push proxy        (token from caller) │
+│  /api/v1/messages/batch  multicast proxy   (chunk + rate limit) │
+│  /api/v1/webhooks        verify HMAC + forward  (secret from URL) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,6 +62,8 @@ Because line-service stores no credentials, rotating a LINE token is a neutral-t
 | `LineController` | `src/line/line.controller.ts` | `GET /line/qr`, `GET /line/qr.png` — cookie/JWT guarded |
 | `LineWebhookController` | `src/line/line-webhook.controller.ts` | `POST /line/webhook` — public, shared-token guarded |
 | `LineService` | `src/line/line.service.ts` | The only place that holds the LINE token; proxies to line-service, reacts to events |
+| `LineConnectionService` | `src/line/line-connection.service.ts` | Prisma `line_connections` (stores `lineUserId`) |
+| `AdminLineController` | `src/admin/controllers/admin-line.controller.ts` | Admin list / 1:1 send / global announcement |
 | DTOs / types | `src/line/dto/line.dto.ts`, `src/line/line.types.ts` | Validation + event shapes |
 | `line-service` | `communication-service/app/line-service/` | Go/Fiber proxy on `:8083` |
 
@@ -105,8 +108,27 @@ contract for the sake of one round trip.
 
 ## Flow 3 — Outbound message
 
-`LineService.sendText()` → `POST :8083/api/v1/messages`. Used by Flow 2 today; it's the
-entry point for any future "message this user" feature.
+`LineService.sendText()` → `POST :8083/api/v1/messages`. Used by Flow 2 and admin
+one-to-one send (`POST /admin/line/connections/:userId/messages`).
+
+## Flow 4 — Global announcement (admin)
+
+Broadcast the same text to every Mosonic user who has linked LINE
+(`line_connections.lineUserId`).
+
+```
+1. Admin        POST /admin/line/announcements  { "text": "…" }  (JWT + AdminGuard)
+2. Nest         SELECT lineUserId FROM line_connections
+3. LineService  POST :8083/api/v1/messages/batch
+                  + X-Gateway-Secret + X-Line-Channel-Access-Token
+                  body: { recipient_ids, text }
+4. line-service chunk 500 → LINE Multicast API
+                  min interval between chunks + 429 backoff
+5. Admin        { total, sent, failed, chunkCount, failedRecipientIds }
+```
+
+neutral-tex owns the recipient list; line-service stays stateless. No announcement
+history is persisted in this pass — the response is the delivery summary only.
 
 ---
 

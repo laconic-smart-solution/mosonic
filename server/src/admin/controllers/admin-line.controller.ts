@@ -50,4 +50,14 @@ export class AdminLineController {
   ) {
     return this.line.sendMessageToUser(userId, body.text);
   }
+
+  @Post('announcements')
+  @UsePipes(bodyPipe)
+  @ApiOperation({
+    summary:
+      'Send a global LINE text announcement to all connected users (batch/multicast)',
+  })
+  announce(@Body() body: AdminSendLineMessageDto) {
+    return this.line.announce(body.text);
+  }
 }

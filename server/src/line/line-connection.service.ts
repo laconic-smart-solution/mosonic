@@ -62,6 +62,14 @@ export class LineConnectionService {
       .catch(() => undefined);
   }
 
+  async listAllLineUserIds(): Promise<string[]> {
+    const rows = await this.prisma.lineConnection.findMany({
+      select: { lineUserId: true },
+      orderBy: { connectedAt: 'asc' },
+    });
+    return rows.map((row) => row.lineUserId);
+  }
+
   async listForAdmin(args: {
     page: number;
     limit: number;
