@@ -24,6 +24,7 @@ import {
 } from '../events/notification.util';
 import { LineNotifyService } from '../line/line-notify.service';
 import { TelegramNotifyService } from '../telegram/telegram-notify.service';
+import { ViberNotifyService } from '../viber/viber-notify.service';
 import { LoggingService } from '../logging/logging.service';
 import type { WorkflowNodeRecord } from '../domain/workflow/workflow.types';
 import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
@@ -128,6 +129,7 @@ export class OrchestrationService {
     private readonly contentService: ContentService,
     private readonly lineNotify: LineNotifyService,
     private readonly telegramNotify: TelegramNotifyService,
+    private readonly viberNotify: ViberNotifyService,
   ) {
     this.useQueue =
       config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
@@ -1704,6 +1706,10 @@ export class OrchestrationService {
       id,
       `${body.title} — ${body.message}`,
     );
+    void this.viberNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
   }
 
   private notifyPipelineFailed(
@@ -1729,6 +1735,10 @@ export class OrchestrationService {
       `${body.title}: ${body.message}`,
     );
     void this.telegramNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
+    void this.viberNotify.notifyUser(
       id,
       `${body.title}: ${body.message}`,
     );

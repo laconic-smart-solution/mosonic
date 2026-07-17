@@ -22,6 +22,7 @@ import { UploadModule } from './upload/upload.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { LineModule } from './line/line.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { ViberModule } from './viber/viber.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
@@ -72,6 +73,7 @@ import {
     WebhookModule,
     LineModule,
     TelegramModule,
+    ViberModule,
     CampaignModule,
     NewsTriggerModule,
     IntegrationsModule,

@@ -11,6 +11,7 @@ import { EventsService } from '../events/events.service';
 import { userRoom } from '../events/notification.util';
 import { LineNotifyService } from '../line/line-notify.service';
 import { TelegramNotifyService } from '../telegram/telegram-notify.service';
+import { ViberNotifyService } from '../viber/viber-notify.service';
 import { PayniService } from '../payni/payni.service';
 import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
 import type { ICreditTopupPurchaseRepository } from '../repositories/interfaces/credit-topup-purchase.repository.interface';
@@ -70,6 +71,7 @@ export class CreditService {
     private readonly paymentService: PaymentService,
     private readonly lineNotify: LineNotifyService,
     private readonly telegramNotify: TelegramNotifyService,
+    private readonly viberNotify: ViberNotifyService,
   ) {
     const raw = Number(
       config.get('CREDIT_LOW_BALANCE_THRESHOLD_PCT', DEFAULT_LOW_BALANCE_THRESHOLD_PCT),
@@ -729,6 +731,7 @@ export class CreditService {
       const lowCreditMsg = `Low credit alert: ${safeRemaining} of ${budget} credits remaining (${percentRemaining}%). Top up to keep generating.`;
       await this.lineNotify.notifyUser(userPlan.userId, lowCreditMsg);
       await this.telegramNotify.notifyUser(userPlan.userId, lowCreditMsg);
+      await this.viberNotify.notifyUser(userPlan.userId, lowCreditMsg);
       await this.userPlans.markLowBalanceNotified(userPlan.id);
     } catch {
       // noop — credit layer must not break pipelines
