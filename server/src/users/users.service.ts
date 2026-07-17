@@ -373,7 +373,7 @@ export class UsersService {
     };
   }
 
-  /** All ACTIVE social accounts across providers (Settings + publish routing). */
+  /** Publishing channels only (Zernio / RedNote). LINE is contact-only. */
   async getAllActiveConnectedAccounts(
     userId: string,
   ): Promise<ConnectedAccountRecord[]> {
@@ -381,7 +381,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    const rows = await this.socialAccounts.findActiveByUserId(userId);
+    const rows = (await this.socialAccounts.findActiveByUserId(userId)).filter(
+      (row) =>
+        row.provider !== SocialProvider.LINE &&
+        row.channel.trim().toLowerCase() !== 'line',
+    );
     if (rows.length > 0) {
       return rows.map(toConnectedAccountRecord);
     }
@@ -391,7 +395,7 @@ export class UsersService {
     return normalizeZernioConnectedAccountsJson(
       user.zernioConnectedAccounts,
       userId,
-    );
+    ).filter((a) => a.channel.trim().toLowerCase() !== 'line');
   }
 
   async getPublishAccounts(userId: string): Promise<SocialAccountRecord[]> {
@@ -399,7 +403,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    return this.socialAccounts.findActiveByUserId(userId);
+    return (await this.socialAccounts.findActiveByUserId(userId)).filter(
+      (row) =>
+        row.provider !== SocialProvider.LINE &&
+        row.channel.trim().toLowerCase() !== 'line',
+    );
   }
 
   async findRedNoteAccount(userId: string): Promise<SocialAccountRecord | null> {

@@ -17,6 +17,41 @@
       "member": "สมาชิก"
     }
   },
+  "contact": {
+    "sectionTitle": "ติดต่อเรา",
+    "sectionDesc": "ติดต่อทีมงานผ่านช่องทางที่มีให้บริการ",
+    "openButton": "เปิดตัวเลือกการติดต่อ",
+    "modalTitle": "ช่องทางการติดต่อ",
+    "modalDesc": "เลือกช่องทางที่ต้องการติดต่อกับเรา",
+    "line": {
+      "label": "LINE Official Account",
+      "description": "เชื่อมบัญชี LINE เพื่อรับการอัปเดตจากเรา",
+      "connect": "เชื่อมต่อ",
+      "manage": "ดูการเชื่อมต่อ",
+      "manageAria": "ดูการเชื่อมต่อ LINE",
+      "connectAria": "เชื่อมต่อกับเราผ่าน LINE",
+      "statusBadge": "เชื่อมต่อแล้ว",
+      "statusLoading": "กำลังตรวจสอบการเชื่อมต่อ LINE…",
+      "statusConnected": "บัญชี LINE เชื่อมกับบัญชีของคุณแล้ว",
+      "alreadyLinkedHint": "บัญชีของคุณเชื่อมอยู่แล้ว ไม่ต้องเชื่อมต่ออีก",
+      "qrTitle": "เชื่อมต่อผ่าน LINE",
+      "qrDesc": "เพิ่มบัญชีทางการของเรา แล้วส่งรหัส CONNECT ด้านล่างในแชท",
+      "openLineApp": "เปิดลิงก์เพิ่มเพื่อนใน LINE",
+      "loadFailed": "ไม่สามารถโหลดเซสชันเชื่อมต่อ LINE ได้",
+      "qrUnavailable": "QR ไม่พร้อม — กดเปิด LINE ด้านล่าง",
+      "step1": "1. สแกน QR หรือเปิดลิงก์เพิ่มเพื่อน",
+      "step2": "2. ในแชท LINE ส่งข้อความนี้ตามนี้:",
+      "copyCode": "คัดลอกข้อความ CONNECT",
+      "copied": "คัดลอกแล้ว",
+      "codeExpires": "รหัสหมดอายุในประมาณ {{minutes}} นาที",
+      "waiting": "กำลังรอข้อความ CONNECT ของคุณ…",
+      "connectedTitle": "เชื่อมต่อ LINE แล้ว",
+      "connectedDesc": "บัญชี Mosonic ของคุณเชื่อมกับ LINE แล้ว",
+      "disconnect": "ยกเลิกการเชื่อมต่อ",
+      "disconnecting": "กำลังยกเลิก…",
+      "done": "เสร็จสิ้น"
+    }
+  },
   "toolbar": {
     "createProfile": "สร้างโปรไฟล์ Zernio",
     "syncAccounts": "ซิงก์บัญชี"

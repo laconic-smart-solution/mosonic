@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
+import { periodCreditBudget } from "@/shared/lib/period-credit-budget"
 import { useUsageSummaryQuery, useCreditBalanceSocketRefresh } from "@/shared/queries/usage.query"
 
 function formatCredits(value: number): string {
@@ -28,10 +29,16 @@ export function TopbarCreditBalance({
   useCreditBalanceSocketRefresh()
   const { data, isLoading, isError } = useUsageSummaryQuery()
 
-  const creditsRemaining = data?.creditsRemaining ?? 0
-  const creditsPerMonth = data?.creditsPerMonth ?? 0
+  const creditsRemaining = Math.max(0, data?.creditsRemaining ?? 0)
+  const creditsBudget =
+    data?.creditsBudget ??
+    periodCreditBudget({
+      creditsPerMonth: data?.creditsPerMonth ?? 0,
+      creditsUsed: data?.creditsUsed ?? 0,
+      creditsRemaining,
+    })
   const lowBalance =
-    creditsPerMonth > 0 && creditsRemaining / creditsPerMonth < 0.1
+    creditsBudget > 0 && creditsRemaining / creditsBudget < 0.1
 
   const label = isLoading
     ? t("credits.loading")

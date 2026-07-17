@@ -225,4 +225,15 @@ export const adminApi = {
 
   askFaq: (body: { question: string; topK?: number }) =>
     apiClient.post("/admin/faq/ask", body).then((r) => r.data),
+
+  listLineConnections: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+  }) => apiClient.get("/admin/line/connections", { params }).then((r) => r.data),
+
+  sendLineMessage: (userId: string, body: { text: string }) =>
+    apiClient
+      .post(`/admin/line/connections/${userId}/messages`, body)
+      .then((r) => r.data),
 }

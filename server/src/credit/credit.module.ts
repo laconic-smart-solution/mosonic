@@ -22,10 +22,12 @@ import { ServiceRateService } from './service-rate.service';
 import { AuthModule } from '../auth/auth.module';
 import { CostModule } from '../cost/cost.module';
 import { EventsModule } from '../events/events.module';
+import { LineModule } from '../line/line.module';
 import { PayniModule } from '../payni/payni.module';
 import { PaymentModule } from '../payment/payment.module';
 import { PlanModule } from '../plan/plan.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { ConfigModule } from '@nestjs/config';
 import { Module, forwardRef } from '@nestjs/common';
 
 const DEFAULT_FIXED_COSTS = [
@@ -47,9 +49,11 @@ const DEFAULT_SERVICE_RATES = [
 
 @Module({
   imports: [
+    ConfigModule,
     AuthModule,
     CostModule,
     EventsModule,
+    forwardRef(() => LineModule),
     PayniModule,
     PaymentModule,
     forwardRef(() => PlanModule),

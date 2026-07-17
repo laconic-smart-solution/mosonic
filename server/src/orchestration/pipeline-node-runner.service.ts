@@ -6,6 +6,8 @@ import { buildIntelligenceContextFromPostMetrics } from '../analytics/intelligen
 import { PostAnalyticsService } from '../post/post-analytics.service';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
+import { pipelineFailedNotification } from '../events/notification.util';
+import { LineNotifyService } from '../line/line-notify.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
 import type { NodeExecutorInput } from '../nodes/types/node-execution.types';
@@ -41,6 +43,7 @@ export class PipelineNodeRunnerService {
     @Inject(RULE_REPOSITORY)
     private readonly rules: IRuleRepository,
     private readonly postAnalyticsService: PostAnalyticsService,
+    private readonly lineNotify: LineNotifyService,
   ) {
     this.laneScopedPause =
       config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() === 'true';
@@ -202,6 +205,25 @@ export class PipelineNodeRunnerService {
           reason: 'budget',
           scope: err.scope,
         });
+        const userId = pipeline.userId?.trim();
+        if (userId) {
+          const body = pipelineFailedNotification({
+            pipelineId: payload.pipelineId,
+            message: err.message,
+            reason: 'budget',
+            ruleRef: pipeline.ruleRef,
+          });
+          this.events.emitUserNotification({
+            userId,
+            sector: 'pipeline',
+            type: 'pipeline.failed',
+            ...body,
+          });
+          void this.lineNotify.notifyUser(
+            userId,
+            `${body.title}: ${body.message}`,
+          );
+        }
         throw err;
       }
       throw err;
