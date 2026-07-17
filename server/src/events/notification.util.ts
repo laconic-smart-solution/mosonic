@@ -242,3 +242,137 @@ export function pipelineNodeReviewNotification(args: {
     action: { label: 'Review step', href },
   };
 }
+
+function formatChannels(channels: string[] | undefined | null): string {
+  const list = (channels ?? []).map((c) => c.trim()).filter(Boolean);
+  return list.length > 0 ? list.join(', ') : 'your connected channels';
+}
+
+/** Format an instant in the given IANA timezone (falls back to UTC). */
+export function formatScheduleInstant(
+  iso: string,
+  timezone?: string | null,
+): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const tz = timezone?.trim() || 'UTC';
+  try {
+    const formatted = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short',
+    }).format(d);
+    return formatted.replace(',', '');
+  } catch {
+    return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+  }
+}
+
+/** Replace `{channels}`, `{uploadId}`, `{postId}`, `{scheduledAt}` in notify templates. */
+export function renderNotifyTemplate(
+  template: string,
+  vars: Record<string, string>,
+): string {
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
+    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key]! : '';
+  });
+}
+
+/** Confirmed local schedule (Mosonic / Zernio). */
+export function postScheduledNotification(args: {
+  uploadId: string;
+  scheduledAt: string;
+  channels?: string[] | null;
+  /** IANA timezone for display (e.g. Asia/Bangkok). */
+  timezone?: string | null;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  const tz = args.timezone?.trim() || 'UTC';
+  return {
+    title: 'Post scheduled',
+    message: `Your post is scheduled for ${formatScheduleInstant(args.scheduledAt, tz)} on ${formatChannels(args.channels)}.`,
+    data: {
+      uploadId: args.uploadId,
+      scheduledAt: args.scheduledAt,
+      timezone: tz,
+      channels: args.channels ?? [],
+    },
+    action: { label: 'View upload', href: `/upload/${args.uploadId}` },
+  };
+}
+
+/** Scheduler fired — publish request sent to Zernio. */
+export function postPublishingNowNotification(args: {
+  uploadId: string;
+  postId: string;
+  channels?: string[] | null;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  return {
+    title: 'Publishing now',
+    message: `Your scheduled post is publishing now to ${formatChannels(args.channels)}.`,
+    data: {
+      uploadId: args.uploadId,
+      postId: args.postId,
+      channels: args.channels ?? [],
+    },
+    action: { label: 'View upload', href: `/upload/${args.uploadId}` },
+  };
+}
+
+/** Post reached Published (webhook or Zernio sync). */
+export function postPublishedNotification(args: {
+  uploadId?: string | null;
+  postId: string;
+  channels?: string[] | null;
+  /** Optional env override for title; supports `{channels}`, `{uploadId}`, `{postId}`. */
+  titleTemplate?: string | null;
+  /** Optional env override for message; supports `{channels}`, `{uploadId}`, `{postId}`. */
+  messageTemplate?: string | null;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  const uploadId = args.uploadId?.trim() || undefined;
+  const channelsLabel = formatChannels(args.channels);
+  const vars = {
+    channels: channelsLabel,
+    uploadId: uploadId ?? '',
+    postId: args.postId,
+  };
+  const title = args.titleTemplate?.trim()
+    ? renderNotifyTemplate(args.titleTemplate.trim(), vars)
+    : 'Post published';
+  const message = args.messageTemplate?.trim()
+    ? renderNotifyTemplate(args.messageTemplate.trim(), vars)
+    : `Your post was published to ${channelsLabel}.`;
+  return {
+    title,
+    message,
+    data: {
+      uploadId,
+      postId: args.postId,
+      channels: args.channels ?? [],
+    },
+    action: {
+      label: 'View upload',
+      href: uploadId ? `/upload/${uploadId}` : '/upload',
+    },
+  };
+}

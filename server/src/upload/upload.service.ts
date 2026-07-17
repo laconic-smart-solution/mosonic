@@ -11,6 +11,8 @@ import { UserRole } from '../users/schemas/user.schema';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { ContentService } from '../content/content.service';
 import { EventsService } from '../events/events.service';
+import { postScheduledNotification } from '../events/notification.util';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
@@ -121,6 +123,7 @@ export class UploadService {
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
     private readonly scheduler: SchedulerService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   buildChannelEntriesFromPipeline(
@@ -1074,7 +1077,44 @@ export class UploadService {
       });
     }
 
+    if (
+      !body.publishNow &&
+      scheduledIso &&
+      channelsSucceeded.length > 0
+    ) {
+      this.notifyPostScheduled(publisherUserId, {
+        uploadId: publishUploadId,
+        scheduledAt: scheduledIso,
+        channels: channelsSucceeded,
+        timezone: body.timezone ?? undefined,
+      });
+    }
+
     return { success: true };
+  }
+
+  private notifyPostScheduled(
+    userId: string,
+    args: {
+      uploadId: string;
+      scheduledAt: string;
+      channels: string[];
+      timezone?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postScheduledNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.scheduled',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 
   async retryUpload(

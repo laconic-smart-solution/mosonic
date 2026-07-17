@@ -60,6 +60,7 @@ describe('UploadService', () => {
   };
   const events = {
     emitToRoom: jest.fn(),
+    emitUserNotification: jest.fn(),
   };
 
   const contentService = {
@@ -79,6 +80,10 @@ describe('UploadService', () => {
     cancelPostPublish: jest.fn().mockResolvedValue(undefined),
   };
 
+  const comms = {
+    notifyUser: jest.fn().mockResolvedValue(undefined),
+  };
+
   const service = new UploadService(
     uploadModel as never,
     mcpService as never,
@@ -87,6 +92,7 @@ describe('UploadService', () => {
     postService as never,
     contentService as never,
     scheduler as never,
+    comms as never,
   );
 
   function mockChannel(row: {

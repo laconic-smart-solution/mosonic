@@ -172,6 +172,10 @@ export class ZernioRestClient {
     if (!payload.publishNow && payload.scheduledAt) {
       body.scheduledFor = payload.scheduledAt;
       body.timezone = 'UTC';
+      body.isDraft = false;
+    } else if (!payload.publishNow && !payload.scheduledAt) {
+      // Mosonic scheduler owns timing — keep a Zernio draft until SOCIAL_PUBLISH.
+      body.isDraft = true;
     }
 
     const firstPlat = platforms[0] as Record<string, unknown> | undefined;
@@ -395,11 +399,17 @@ export class ZernioRestClient {
 
     const body: Record<string, unknown> = {};
     if (payload.content !== undefined) body.content = payload.content;
-    if (payload.publishNow === true) body.publishNow = true;
+    if (payload.publishNow === true) {
+      // Mosonic-scheduled posts are created as Zernio drafts (no scheduledFor).
+      // publishNow alone returns 200 but leaves the draft unchanged — must clear isDraft.
+      body.publishNow = true;
+      body.isDraft = false;
+    }
     if (payload.scheduledFor !== undefined) {
       if (payload.scheduledFor !== null) {
         body.scheduledFor = payload.scheduledFor;
         body.timezone = 'UTC';
+        body.isDraft = false;
       } else {
         // Clear Zernio-owned schedule (Mosonic scheduler owns timing).
         body.scheduledFor = null;
