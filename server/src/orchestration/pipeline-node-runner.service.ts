@@ -9,6 +9,7 @@ import { EventsService } from '../events/events.service';
 import { pipelineFailedNotification } from '../events/notification.util';
 import { LineNotifyService } from '../line/line-notify.service';
 import { TelegramNotifyService } from '../telegram/telegram-notify.service';
+import { ViberNotifyService } from '../viber/viber-notify.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
 import type { NodeExecutorInput } from '../nodes/types/node-execution.types';
@@ -46,6 +47,7 @@ export class PipelineNodeRunnerService {
     private readonly postAnalyticsService: PostAnalyticsService,
     private readonly lineNotify: LineNotifyService,
     private readonly telegramNotify: TelegramNotifyService,
+    private readonly viberNotify: ViberNotifyService,
   ) {
     this.laneScopedPause =
       config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() === 'true';
@@ -226,6 +228,10 @@ export class PipelineNodeRunnerService {
             `${body.title}: ${body.message}`,
           );
           void this.telegramNotify.notifyUser(
+            userId,
+            `${body.title}: ${body.message}`,
+          );
+          void this.viberNotify.notifyUser(
             userId,
             `${body.title}: ${body.message}`,
           );

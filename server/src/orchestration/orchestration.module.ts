@@ -10,6 +10,7 @@ import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
 import { LineModule } from '../line/line.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { ViberModule } from '../viber/viber.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
@@ -111,6 +112,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     CreditModule,
     forwardRef(() => LineModule),
     forwardRef(() => TelegramModule),
+    forwardRef(() => ViberModule),
     NodesModule,
     LoggingModule,
     EventsModule,

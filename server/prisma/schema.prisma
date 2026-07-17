@@ -201,6 +201,7 @@ model User {
   socialAccounts      SocialAccount[]
   lineConnection      LineConnection?
   telegramConnection  TelegramConnection?
+  viberConnection     ViberConnection?
 
   @@index([email])
   @@index([username])
@@ -235,6 +236,20 @@ model TelegramConnection {
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("telegram_connections")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model ViberConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  viberUserId String   @unique
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("viber_connections")
 }
 
 model SocialAccount {
