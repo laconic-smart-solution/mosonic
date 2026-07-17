@@ -137,6 +137,14 @@ export class PrismaUserRepository implements IUserRepository {
     return rows.map((r) => r.userId);
   }
 
+  async listActiveUserIds(): Promise<string[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: { userId: true },
+    });
+    return rows.map((r) => r.userId);
+  }
+
   listWithZernioAccounts(): Promise<
     Array<Pick<UserRecord, 'userId' | 'zernioConnectedAccounts'>>
   > {

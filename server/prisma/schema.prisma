@@ -854,3 +854,37 @@ model HeygenUserAvatar {
   @@index([userId, createdAt(sort: Desc)])
   @@map("heygen_user_avatars")
 }
+
+enum AnnouncementStatus {
+  published
+  failed
+}
+
+enum AnnouncementLevel {
+  info
+  warning
+  critical
+}
+
+model Announcement {
+  id                  String             @id @default(uuid())
+  title               String
+  message             String
+  level               AnnouncementLevel  @default(info)
+  status              AnnouncementStatus @default(published)
+  sendInApp           Boolean            @default(true)
+  sendLine            Boolean            @default(false)
+  createdBy           String
+  publishedAt         DateTime           @default(now())
+  inAppRecipientCount Int                @default(0)
+  lineTotal           Int?
+  lineSent            Int?
+  lineFailed          Int?
+  lineFailedIds       String[]           @default([])
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("announcements")
+}
