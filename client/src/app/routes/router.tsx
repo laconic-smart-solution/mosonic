@@ -45,6 +45,8 @@ import {
   AdminFaqPage,
   AdminFaqDocumentDetailPage,
   AdminLinePage,
+  AdminAnnouncementsPage,
+  AnnouncementsPage,
   SuspendedPage,
   NotFoundPage,
 } from "../constants/lazyload"
@@ -131,6 +133,7 @@ export const router = createBrowserRouter([
           { path: "/upload/:uploadId", element: <UploadPage /> },
           { path: "/posts", element: <PostsPage /> },
           { path: "/posts/:postId", element: <PostDetailPage /> },
+          { path: "/announcements", element: <AnnouncementsPage /> },
           { path: "/settings/accounts", element: <SettingsAccountsPage /> },
           {
             path: "/usage",
@@ -169,6 +172,10 @@ export const router = createBrowserRouter([
           { path: "faq", element: <AdminFaqPage /> },
           { path: "faq/documents/:documentId", element: <AdminFaqDocumentDetailPage /> },
           { path: "communication/line", element: <AdminLinePage /> },
+          {
+            path: "communication/announcements",
+            element: <AdminAnnouncementsPage />,
+          },
         ],
       },
     ],

@@ -7,6 +7,7 @@ import {
   Gauge,
   History,
   LayoutDashboard,
+  Megaphone,
   MessageCircle,
   MessageCircleQuestion,
   MessagesSquare,
@@ -57,10 +58,17 @@ const NAV_ITEMS: {
 ]
 
 const COMMUNICATION_CHILDREN: {
-  key: "line"
+  key: "line" | "announcements"
   href: string
   icon: LucideIcon
-}[] = [{ key: "line", href: "/admin/communication/line", icon: MessageCircle }]
+}[] = [
+  { key: "line", href: "/admin/communication/line", icon: MessageCircle },
+  {
+    key: "announcements",
+    href: "/admin/communication/announcements",
+    icon: Megaphone,
+  },
+]
 
 function pathActive(pathname: string, href: string) {
   if (pathname === href) return true

@@ -1,0 +1,30 @@
+{
+  "page": {
+    "title": "ประกาศ",
+    "subtitle": "ประกาศจากแพลตฟอร์ม Mosonic",
+    "loading": "กำลังโหลดประกาศ…",
+    "loadingMore": "กำลังโหลดเพิ่ม…",
+    "scrollForMore": "เลื่อนเพื่อดูเพิ่ม",
+    "end": "ครบทุกรายการแล้ว",
+    "loadError": "โหลดประกาศไม่สำเร็จ",
+    "empty": "ยังไม่มีประกาศ",
+    "viewMore": "ดูเพิ่มเติม",
+    "showLess": "แสดงน้อยลง",
+    "showing": "แสดง {{start}}–{{end}} จาก {{total}}"
+  },
+  "banner": {
+    "viewMore": "ดูเพิ่มเติม",
+    "dismiss": "ปิด"
+  },
+  "lowCredit": {
+    "badge": "เครดิต",
+    "title": "เครดิตเหลือน้อย",
+    "message": "เหลือ {{remaining}} เครดิต ({{percent}}%) เติมเครดิตเพื่อใช้งานต่อ",
+    "topUp": "เติมเครดิต"
+  },
+  "levels": {
+    "info": "ข้อมูล",
+    "warning": "คำเตือน",
+    "critical": "สำคัญมาก"
+  }
+}

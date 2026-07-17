@@ -68,6 +68,13 @@ export const AdminFaqDocumentDetailPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-faq-document-detail")),
 )
 export const AdminLinePage = PageLoader(lazy(() => import("@/features/admin/pages/admin-line")))
+export const AdminAnnouncementsPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-announcements")),
+)
+
+export const AnnouncementsPage = PageLoader(
+  lazy(() => import("@/features/announcements/pages/announcements-page")),
+)
 
 export const SuspendedPage = PageLoader(lazy(() => import("@/features/error/pages/suspended")))
 export const NotFoundPage = PageLoader(lazy(() => import("@/features/error/pages/not-found")))
