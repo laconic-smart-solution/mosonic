@@ -6,6 +6,7 @@ import { AdminOpenAiBillingController } from './controllers/admin-openai-billing
 import { AdminContentController } from './controllers/admin-content.controller';
 import { AdminFaqController } from './controllers/admin-faq.controller';
 import { AdminLineController } from './controllers/admin-line.controller';
+import { AdminTelegramController } from './controllers/admin-telegram.controller';
 import { AdminTopupPlansController } from './controllers/admin-topup-plans.controller';
 import { AdminCostController } from './controllers/admin-cost.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
@@ -20,6 +21,7 @@ import { OpenAiBillingModule } from '../openai-billing/openai-billing.module';
 import { ApiUsageModule } from '../api-usage/api-usage.module';
 import { ContentModule } from '../content/content.module';
 import { LineModule } from '../line/line.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { AdminContentService } from './services/admin-content.service';
 import { AdminCostService } from './services/admin-cost.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
@@ -27,6 +29,7 @@ import { AdminUserProvisioningService } from './services/admin-user-provisioning
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminFaqService } from './services/admin-faq.service';
 import { AdminLineService } from './services/admin-line.service';
+import { AdminTelegramService } from './services/admin-telegram.service';
 import { FaqModule } from '../faq/faq.module';
 
 @Module({
@@ -42,6 +45,7 @@ import { FaqModule } from '../faq/faq.module';
     ContentModule,
     FaqModule,
     LineModule,
+    TelegramModule,
     forwardRef(() => OrchestrationModule),
   ],
   controllers: [
@@ -53,6 +57,7 @@ import { FaqModule } from '../faq/faq.module';
     AdminContentController,
     AdminFaqController,
     AdminLineController,
+    AdminTelegramController,
     AdminTopupPlansController,
     AdminPipelineJobsController,
   ],
@@ -63,6 +68,7 @@ import { FaqModule } from '../faq/faq.module';
     AdminContentService,
     AdminFaqService,
     AdminLineService,
+    AdminTelegramService,
     AdminUserProvisioningService,
   ],
 })

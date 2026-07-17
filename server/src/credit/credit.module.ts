@@ -23,6 +23,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CostModule } from '../cost/cost.module';
 import { EventsModule } from '../events/events.module';
 import { LineModule } from '../line/line.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { PayniModule } from '../payni/payni.module';
 import { PaymentModule } from '../payment/payment.module';
 import { PlanModule } from '../plan/plan.module';
@@ -54,6 +55,7 @@ const DEFAULT_SERVICE_RATES = [
     CostModule,
     EventsModule,
     forwardRef(() => LineModule),
+    forwardRef(() => TelegramModule),
     PayniModule,
     PaymentModule,
     forwardRef(() => PlanModule),
