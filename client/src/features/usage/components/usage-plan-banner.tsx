@@ -5,6 +5,7 @@ import { ArrowUpCircle, Sparkles } from "lucide-react"
 import { buttonVariants } from "@/lib/button-variants"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
+import { periodCreditBudget } from "@/shared/lib/period-credit-budget"
 import { useUsageSummaryQuery, useCurrentPlanQuery } from "@/shared/queries/usage.query"
 import { usePublicPlansQuery } from "@/shared/queries/plan.query"
 
@@ -29,9 +30,17 @@ export function UsagePlanBanner({ lowBalance = false, className }: UsagePlanBann
   const data = summary.data
   const creditsPerMonth = data?.creditsPerMonth ?? 0
   const creditsUsed = data?.creditsUsed ?? 0
+  const creditsRemaining = Math.max(0, data?.creditsRemaining ?? 0)
+  const creditsBudget =
+    data?.creditsBudget ??
+    periodCreditBudget({
+      creditsPerMonth,
+      creditsUsed,
+      creditsRemaining,
+    })
   const percentUsed =
-    creditsPerMonth > 0
-      ? Math.min(100, Math.round((creditsUsed / creditsPerMonth) * 100))
+    creditsBudget > 0
+      ? Math.min(100, Math.round((creditsUsed / creditsBudget) * 100))
       : 0
 
   const resetDate = data?.billingPeriod
@@ -54,7 +63,7 @@ export function UsagePlanBanner({ lowBalance = false, className }: UsagePlanBann
 
   const isLow =
     lowBalance ||
-    (creditsPerMonth > 0 && data != null && data.creditsRemaining / creditsPerMonth < 0.1)
+    (creditsBudget > 0 && creditsRemaining / creditsBudget < 0.1)
 
   return (
     <section className={cn(usagePanelClass, className)}>
@@ -107,12 +116,12 @@ export function UsagePlanBanner({ lowBalance = false, className }: UsagePlanBann
           <span>
             {t("planBanner.creditsUsed", {
               used: formatCredits(creditsUsed),
-              total: formatCredits(creditsPerMonth),
+              total: formatCredits(creditsBudget),
             })}
           </span>
           <span className="text-muted-foreground">
             {t("planBanner.remaining", {
-              count: formatCredits(data?.creditsRemaining ?? 0),
+              count: formatCredits(creditsRemaining),
             })}
           </span>
         </div>

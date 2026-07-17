@@ -171,6 +171,31 @@ export class PrismaUserPlanRepository implements IUserPlanRepository {
     });
   }
 
+  async debitActiveCreditsIfSufficient(
+    userId: string,
+    amount: number,
+  ): Promise<UserPlanRecord | null> {
+    const debit = Math.max(0, Math.floor(amount));
+    if (debit <= 0) {
+      return this.findActiveByUserId(userId);
+    }
+
+    const result = await this.prisma.userPlan.updateMany({
+      where: {
+        userId: userId.trim(),
+        status: 'active',
+        creditsRemaining: { gte: debit },
+      },
+      data: {
+        creditsRemaining: { decrement: debit },
+        creditsUsed: { increment: debit },
+      },
+    });
+
+    if (result.count === 0) return null;
+    return this.findActiveByUserId(userId);
+  }
+
   markLowBalanceNotified(userPlanId: string): Promise<void> {
     return this.prisma.userPlan
       .update({

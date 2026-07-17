@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CreditConfigService } from '../credit/credit-config.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
+import { periodCreditBudget } from '../credit/lib/period-credit-budget.util';
 import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
 import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
 import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
@@ -120,11 +121,16 @@ export class UsageService {
     const creditsPerMonth = plan
       ? await this.planService.getCreditsForPlan(plan)
       : userPlan?.creditsPerMonth ?? 0;
-    const creditsRemaining = userPlan?.creditsRemaining ?? 0;
+    const creditsRemaining = Math.max(0, userPlan?.creditsRemaining ?? 0);
     const creditsUsed = userPlan?.creditsUsed ?? ledgerCreditsUsed;
+    const creditsBudget = periodCreditBudget({
+      creditsPerMonth,
+      creditsUsed,
+      creditsRemaining,
+    });
     const percentUsed =
-      creditsPerMonth > 0
-        ? Math.min(100, Math.round((creditsUsed / creditsPerMonth) * 100))
+      creditsBudget > 0
+        ? Math.min(100, Math.round((creditsUsed / creditsBudget) * 100))
         : 0;
 
     return {
@@ -139,6 +145,7 @@ export class UsageService {
       creditsUsed,
       creditsRemaining,
       creditsPerMonth,
+      creditsBudget,
       percentUsed,
       billingPeriod: userPlan?.billingPeriod ?? billingPeriod,
       byNodeType: [...byNodeTypeMap.entries()].map(([nodeType, v]) => ({
