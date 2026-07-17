@@ -5,9 +5,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { UserPlanRecord } from '../domain/plans/plan.types';
 import { EventsService } from '../events/events.service';
 import { userRoom } from '../events/notification.util';
+import { LineNotifyService } from '../line/line-notify.service';
 import { PayniService } from '../payni/payni.service';
 import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
 import type { ICreditTopupPurchaseRepository } from '../repositories/interfaces/credit-topup-purchase.repository.interface';
@@ -22,6 +24,7 @@ import {
 import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';
+import { periodCreditBudget } from './lib/period-credit-budget.util';
 import {
   PaymentService,
   type CreditPackage,
@@ -41,11 +44,16 @@ export type InitiateTopupResult = {
   instant?: { creditsRemaining: number; creditsAdded: number };
 };
 
+/** Default: notify when remaining credits fall below 10% of monthly allotment. */
+const DEFAULT_LOW_BALANCE_THRESHOLD_PCT = 10;
+
 @Injectable()
 export class CreditService {
   private readonly logger = new Logger(CreditService.name);
+  private readonly lowBalanceThresholdPct: number;
 
   constructor(
+    config: ConfigService,
     @Inject(CREDIT_LEDGER_REPOSITORY)
     private readonly ledger: ICreditLedgerRepository,
     @Inject(CREDIT_TOPUP_REPOSITORY)
@@ -59,7 +67,14 @@ export class CreditService {
     private readonly events: EventsService,
     private readonly payniService: PayniService,
     private readonly paymentService: PaymentService,
-  ) {}
+    private readonly lineNotify: LineNotifyService,
+  ) {
+    const raw = Number(
+      config.get('CREDIT_LOW_BALANCE_THRESHOLD_PCT', DEFAULT_LOW_BALANCE_THRESHOLD_PCT),
+    );
+    const pct = Number.isFinite(raw) ? raw : DEFAULT_LOW_BALANCE_THRESHOLD_PCT;
+    this.lowBalanceThresholdPct = Math.min(100, Math.max(0, pct)) / 100;
+  }
 
   async getPackages(): Promise<CreditPackage[]> {
     const plans = await this.paymentService.listTopupPlans({ activeOnly: true });
@@ -307,16 +322,7 @@ export class CreditService {
       })),
     );
 
-    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
-      creditsUsed: total,
-      creditsRemaining: -total,
-    });
-
-    if (!updated) {
-      throw new NotFoundException(
-        `No active plan found for userId=${args.userId}`,
-      );
-    }
+    const updated = await this.debitOrThrow(args.userId, total);
 
     await this.maybeEmitLowBalance(updated);
     this.emitBalanceUpdated(updated);
@@ -350,16 +356,7 @@ export class CreditService {
       billingPeriod: currentBillingPeriod(),
     });
 
-    const updated = await this.userPlans.adjustActiveCredits(args.userId, {
-      creditsUsed: args.credits,
-      creditsRemaining: -args.credits,
-    });
-
-    if (!updated) {
-      throw new NotFoundException(
-        `No active plan found for userId=${args.userId}`,
-      );
-    }
+    const updated = await this.debitOrThrow(args.userId, args.credits);
 
     await this.maybeEmitLowBalance(updated);
     this.emitBalanceUpdated(updated);
@@ -516,16 +513,7 @@ export class CreditService {
     });
 
     if (args.credits > 0) {
-      const updated = await this.userPlans.adjustActiveCredits(args.userId, {
-        creditsUsed: args.credits,
-        creditsRemaining: -args.credits,
-      });
-
-      if (!updated) {
-        throw new NotFoundException(
-          `No active plan found for userId=${args.userId}`,
-        );
-      }
+      const updated = await this.debitOrThrow(args.userId, args.credits);
 
       await this.maybeEmitLowBalance(updated);
       this.emitBalanceUpdated(updated);
@@ -649,17 +637,7 @@ export class CreditService {
         billingPeriod: dto.billingPeriod,
       });
 
-      const updated = await this.userPlans.adjustActiveCredits(dto.userId, {
-        creditsUsed: creditsCharged,
-        creditsRemaining: -creditsCharged,
-      });
-
-      if (!updated) {
-        this.logger.warn(
-          `No active user_plan for userId=${dto.userId}; ledger written without balance update`,
-        );
-        return;
-      }
+      const updated = await this.debitOrThrow(dto.userId, creditsCharged);
 
       await this.maybeEmitLowBalance(updated);
       this.emitBalanceUpdated(updated);
@@ -669,6 +647,27 @@ export class CreditService {
       );
       throw err;
     }
+  }
+
+  /** Atomic debit — never drives creditsRemaining below zero. */
+  private async debitOrThrow(
+    userId: string,
+    amount: number,
+  ): Promise<UserPlanRecord> {
+    const updated = await this.userPlans.debitActiveCreditsIfSufficient(
+      userId,
+      amount,
+    );
+    if (updated) return updated;
+
+    const plan = await this.userPlans.findActiveByUserId(userId);
+    if (!plan) {
+      throw new NotFoundException(`No active plan found for userId=${userId}`);
+    }
+    throw new InsufficientCreditsException({
+      requiredCredits: amount,
+      creditsRemaining: plan.creditsRemaining,
+    });
   }
 
   private emitBalanceUpdated(userPlan: UserPlanRecord): void {
@@ -706,19 +705,29 @@ export class CreditService {
   }
 
   private async maybeEmitLowBalance(userPlan: UserPlanRecord): Promise<void> {
-    if (userPlan.creditsPerMonth <= 0) return;
-    const pctRemaining =
-      userPlan.creditsRemaining / userPlan.creditsPerMonth;
-    if (pctRemaining >= 0.1) return;
+    const budget = periodCreditBudget({
+      creditsPerMonth: userPlan.creditsPerMonth,
+      creditsUsed: userPlan.creditsUsed,
+      creditsRemaining: userPlan.creditsRemaining,
+    });
+    if (budget <= 0) return;
+    const safeRemaining = Math.max(0, userPlan.creditsRemaining);
+    const pctRemaining = safeRemaining / budget;
+    if (pctRemaining >= this.lowBalanceThresholdPct) return;
     if (userPlan.lowBalanceNotifiedAt != null) return;
 
     try {
+      const percentRemaining = Math.round(pctRemaining * 100);
       this.events.emitToRoom(userRoom(userPlan.userId), 'credit:low_balance', {
         userId: userPlan.userId,
-        creditsRemaining: userPlan.creditsRemaining,
+        creditsRemaining: safeRemaining,
         creditsPerMonth: userPlan.creditsPerMonth,
-        percentRemaining: pctRemaining * 100,
+        percentRemaining,
       });
+      await this.lineNotify.notifyUser(
+        userPlan.userId,
+        `Low credit alert: ${safeRemaining} of ${budget} credits remaining (${percentRemaining}%). Top up to keep generating.`,
+      );
       await this.userPlans.markLowBalanceNotified(userPlan.id);
     } catch {
       // noop — credit layer must not break pipelines

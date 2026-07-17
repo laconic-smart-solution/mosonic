@@ -19,8 +19,10 @@ import { ContentService } from '../content/content.service';
 import {
   newsContentReadyNotification,
   pipelineCompletedNotification,
+  pipelineFailedNotification,
   pipelineStartedNotification,
 } from '../events/notification.util';
+import { LineNotifyService } from '../line/line-notify.service';
 import { LoggingService } from '../logging/logging.service';
 import type { WorkflowNodeRecord } from '../domain/workflow/workflow.types';
 import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
@@ -123,6 +125,7 @@ export class OrchestrationService {
     private readonly outboundWebhooks: OutboundWebhookService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
+    private readonly lineNotify: LineNotifyService,
   ) {
     this.useQueue =
       config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
@@ -390,9 +393,16 @@ export class OrchestrationService {
           completedAt: new Date(),
         });
         await this.reconcilePipelineCredits(pipelineId);
+        const enqueueFailMessage =
+          'Could not start pipeline queue. Is Redis running?';
         this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
           pipelineId,
-          message: 'Could not start pipeline queue. Is Redis running?',
+          message: enqueueFailMessage,
+        });
+        this.notifyPipelineFailed(input.auth.userId, {
+          pipelineId,
+          message: enqueueFailMessage,
+          ruleRef: rule.ruleId,
         });
         throw err;
       }
@@ -419,9 +429,16 @@ export class OrchestrationService {
         completedAt: new Date(),
       });
       await this.reconcilePipelineCredits(pipelineId);
+      const unexpectedMessage =
+        'An unexpected error occurred. Please try again.';
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
         pipelineId,
-        message: 'An unexpected error occurred. Please try again.',
+        message: unexpectedMessage,
+      });
+      this.notifyPipelineFailed(input.auth.userId, {
+        pipelineId,
+        message: unexpectedMessage,
+        ruleRef: rule.ruleId,
       });
     });
     return { pipelineId };
@@ -1011,6 +1028,11 @@ export class OrchestrationService {
         pipelineId,
         message,
       });
+      this.notifyPipelineFailed(pipeline.userId, {
+        pipelineId,
+        message,
+        ruleRef: pipeline.ruleRef,
+      });
       return null;
     }
   }
@@ -1353,6 +1375,12 @@ export class OrchestrationService {
       message: 'Pipeline stopped',
       reason: 'cancelled',
     });
+    this.notifyPipelineFailed(pipeline.userId, {
+      pipelineId,
+      message: 'Pipeline stopped',
+      reason: 'cancelled',
+      ruleRef: pipeline.ruleRef,
+    });
     return { success: true, keptProgress: false };
   }
 
@@ -1666,6 +1694,34 @@ export class OrchestrationService {
       type: 'pipeline.completed',
       ...body,
     });
+    void this.lineNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
+  }
+
+  private notifyPipelineFailed(
+    userId: string | undefined | null,
+    args: {
+      pipelineId: string;
+      message: string;
+      reason?: string;
+      ruleRef?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = pipelineFailedNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'pipeline',
+      type: 'pipeline.failed',
+      ...body,
+    });
+    void this.lineNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
   }
 
   private readonly pausedPipelines = new Map<
@@ -1733,6 +1789,12 @@ export class OrchestrationService {
             message: err.message,
             reason: 'budget',
             scope: err.scope,
+          });
+          this.notifyPipelineFailed(userId, {
+            pipelineId,
+            message: err.message,
+            reason: 'budget',
+            ruleRef: ruleId,
           });
           throw err;
         }

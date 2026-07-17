@@ -8,6 +8,7 @@ import { IntegrationsModule } from '../integrations/integrations.module';
 import { CostModule } from '../cost/cost.module';
 import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
+import { LineModule } from '../line/line.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
@@ -107,6 +108,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     forwardRef(() => IntegrationsModule),
     CostModule,
     CreditModule,
+    forwardRef(() => LineModule),
     NodesModule,
     LoggingModule,
     EventsModule,

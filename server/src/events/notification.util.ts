@@ -67,6 +67,34 @@ export function pipelineCompletedNotification(args: {
   };
 }
 
+export function pipelineFailedNotification(args: {
+  pipelineId: string;
+  message: string;
+  reason?: string;
+  ruleRef?: string;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  const { pipelineId, message, reason, ruleRef } = args;
+  const href = ruleRef?.trim()
+    ? `/workflow/${ruleRef.trim()}?pipelineId=${pipelineId}`
+    : `/pipelines`;
+  const isCancelled = reason === 'cancelled';
+  return {
+    title: isCancelled ? 'Pipeline stopped' : 'Pipeline failed',
+    message: message.trim() || 'Your pipeline could not be completed.',
+    data: {
+      pipelineId,
+      reason: reason ?? undefined,
+      ruleRef: ruleRef ?? undefined,
+    },
+    action: { label: 'View run', href },
+  };
+}
+
 export function newsPipelineStartedNotification(args: {
   pipelineId: string;
   ruleRef: string;
