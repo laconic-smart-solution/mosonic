@@ -26,7 +26,7 @@ describe('UploadScheduledSyncService', () => {
   const mcpService = { getZernioPost };
 
   const emitToRoom = jest.fn();
-  const events = { emitToRoom };
+  const events = { emitToRoom, emitUserNotification: jest.fn() };
 
   let leanScanDocs: Array<{ zernioPostId: string }>;
   let postsForZernioId: Record<string, PostDocument[]>;
@@ -84,6 +84,10 @@ describe('UploadScheduledSyncService', () => {
     ensureForPost: jest.fn().mockResolvedValue(null),
   };
 
+  const comms = {
+    notifyUser: jest.fn().mockResolvedValue(undefined),
+  };
+
   const service = new UploadScheduledSyncService(
     config,
     uploadModel as never,
@@ -92,6 +96,7 @@ describe('UploadScheduledSyncService', () => {
     mcpService as never,
     events as never,
     postAnalyticsService as never,
+    comms as never,
   );
 
   beforeEach(() => {

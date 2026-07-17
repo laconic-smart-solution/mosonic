@@ -1,10 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import {
   redisEnvFromConfig,
   resolveRedisUrl,
 } from '../config/redis-connection.util';
+import { EventsService } from '../events/events.service';
+import { postPublishingNowNotification } from '../events/notification.util';
 import { McpService } from '../mcp/mcp.service';
 import { PostService } from '../post/post.service';
 import { PostStatus } from '../post/schemas/post.schema';
@@ -24,6 +27,8 @@ export class SchedulerEventsBridgeService
     private readonly config: ConfigService,
     private readonly posts: PostService,
     private readonly mcp: McpService,
+    private readonly events: EventsService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   onModuleInit(): void {
@@ -104,6 +109,11 @@ export class SchedulerEventsBridgeService
       this.logger.log(
         `SOCIAL_PUBLISH: triggered Zernio publishNow for post ${postId}`,
       );
+      this.notifyPublishingNow(post.userId, {
+        uploadId: post.uploadRef,
+        postId: post.postId,
+        channels: post.channels,
+      });
     } catch (error) {
       this.logger.error(
         `SOCIAL_PUBLISH failed for ${postId}: ${
@@ -111,5 +121,28 @@ export class SchedulerEventsBridgeService
         }`,
       );
     }
+  }
+
+  private notifyPublishingNow(
+    userId: string | null | undefined,
+    args: {
+      uploadId: string;
+      postId: string;
+      channels?: string[] | null;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postPublishingNowNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.publishing',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 }
