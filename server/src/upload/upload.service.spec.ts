@@ -31,6 +31,21 @@ describe('UploadService', () => {
   const uploadModel = {
     findOne,
     find,
+    findByUploadIdScoped: jest.fn((...args: unknown[]) => {
+      const result = findOne(...args) as { exec?: () => Promise<unknown> };
+      if (result && typeof result.exec === 'function') {
+        return result.exec();
+      }
+      return result;
+    }),
+    findByUploadId: jest.fn((...args: unknown[]) => {
+      const result = findOne(...args) as { exec?: () => Promise<unknown> };
+      if (result && typeof result.exec === 'function') {
+        return result.exec();
+      }
+      return result;
+    }),
+    save: jest.fn(async (doc: unknown) => doc),
     collection: { findOne: collectionFindOne },
   };
   const mcpService = {
@@ -58,6 +73,12 @@ describe('UploadService', () => {
     updateScheduledPostForChannel: jest.fn().mockResolvedValue(undefined),
   };
 
+  const scheduler = {
+    createPostPublish: jest.fn().mockResolvedValue({ id: 'job-1' }),
+    reschedulePostPublish: jest.fn().mockResolvedValue({ id: 'job-1' }),
+    cancelPostPublish: jest.fn().mockResolvedValue(undefined),
+  };
+
   const service = new UploadService(
     uploadModel as never,
     mcpService as never,
@@ -65,6 +86,7 @@ describe('UploadService', () => {
     events as never,
     postService as never,
     contentService as never,
+    scheduler as never,
   );
 
   function mockChannel(row: {
@@ -102,6 +124,8 @@ describe('UploadService', () => {
     });
     postService.updateScheduledPostsOnUpload.mockResolvedValue(undefined);
     postService.updateScheduledPostForChannel.mockResolvedValue(undefined);
+    scheduler.createPostPublish.mockResolvedValue({ id: 'job-1' });
+    scheduler.reschedulePostPublish.mockResolvedValue({ id: 'job-1' });
   });
 
   it('calls Zernio once with all included channels and marks published', async () => {
@@ -396,7 +420,7 @@ describe('UploadService', () => {
     expect(mcpService.publishCreatePostBatch).not.toHaveBeenCalled();
   });
 
-  it('passes scheduledAt to Zernio when publishing later', async () => {
+  it('creates Zernio draft without scheduledAt and registers Mosonic scheduler job', async () => {
     const save = jest.fn().mockResolvedValue(undefined);
     const future = new Date(Date.now() + 3600_000).toISOString();
     const doc = {
@@ -437,8 +461,12 @@ describe('UploadService', () => {
       'user-1',
       expect.objectContaining({
         publishNow: false,
-        scheduledAt: future,
+        scheduledAt: null,
       }),
+    );
+    expect(scheduler.createPostPublish).toHaveBeenCalledWith(
+      'local-post-id',
+      future,
     );
     expect(doc.channels[0].status).toBe(UploadChannelStatus.Scheduled);
   });
@@ -785,7 +813,7 @@ describe('UploadService', () => {
     });
     mcpService.updatePost.mockResolvedValue({ success: true });
     postService.findScheduledPostsForUpload.mockResolvedValue([
-      { zernioPostId: 'post_1' },
+      { postId: 'local-1', zernioPostId: 'post_1' },
     ] as never);
 
     await service.updateUpload(
@@ -808,9 +836,12 @@ describe('UploadService', () => {
     expect(mcpService.updatePost).toHaveBeenCalledWith({
       postId: 'post_1',
       content: 'new caption',
-      scheduledFor: future,
       title: 'New title',
     });
+    expect(scheduler.reschedulePostPublish).toHaveBeenCalledWith(
+      'local-1',
+      future,
+    );
     expect(doc.channels[0].caption).toBe('new caption');
     expect(doc.channels[1].caption).toBe('new caption');
     expect(doc.channels[1].youtubeTitle).toBe('New title');
@@ -865,8 +896,8 @@ describe('UploadService', () => {
     });
     mcpService.updatePost.mockResolvedValue({ success: true });
     postService.findScheduledPostsForUpload.mockResolvedValue([
-      { zernioPostId: 'post_ig', channels: ['instagram'] },
-      { zernioPostId: 'post_yt', channels: ['youtube'] },
+      { postId: 'local-ig', zernioPostId: 'post_ig', channels: ['instagram'] },
+      { postId: 'local-yt', zernioPostId: 'post_yt', channels: ['youtube'] },
     ] as never);
 
     await service.updateUpload(
@@ -883,9 +914,12 @@ describe('UploadService', () => {
     expect(mcpService.updatePost).toHaveBeenCalledWith({
       postId: 'post_ig',
       content: 'new ig only',
-      scheduledFor: future,
       title: undefined,
     });
+    expect(scheduler.reschedulePostPublish).toHaveBeenCalledWith(
+      'local-ig',
+      future,
+    );
     expect(postService.updateScheduledPostForChannel).toHaveBeenCalledWith(
       'u1',
       'instagram',

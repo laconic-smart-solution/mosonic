@@ -76,6 +76,10 @@
     "publishingInProgress": "Publishing in progress…",
     "editScheduled": "Edit scheduled post",
     "whenToPublish": "When to publish",
+    "timezone": "Timezone",
+    "timezoneSearchPlaceholder": "Search timezones…",
+    "timezoneEmpty": "No timezone found",
+    "timezoneHint": "Times are interpreted in {{zone}}.",
     "confirm": "Confirm",
     "channelPublishing": "{{platform}} publishing",
     "rednotePublishOnly": "RedNote supports publish now only — scheduling is not available."

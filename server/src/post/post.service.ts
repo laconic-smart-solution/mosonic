@@ -23,6 +23,7 @@ import {
   POST_REPOSITORY,
   UPLOAD_REPOSITORY,
 } from '../repositories/tokens';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   UploadChannelStatus,
   type UploadChannelEntry,
@@ -80,7 +81,13 @@ export class PostService {
     private readonly uploads: IUploadRepository,
     private readonly mcpService: McpService,
     private readonly postAnalyticsService: PostAnalyticsService,
+    private readonly scheduler: SchedulerService,
   ) {}
+
+  /** Unscoped lookup for internal jobs (scheduler Redis consumer). */
+  findByPostIdInternal(postId: string): Promise<PostRecord | null> {
+    return this.posts.findByPostId(postId.trim());
+  }
 
   private async ensurePostAnalyticsRecord(post: PostRecord): Promise<void> {
     await this.postAnalyticsService.ensureForPost(post);
@@ -1081,6 +1088,10 @@ export class PostService {
       post.status === PostStatus.Partial
     ) {
       return await this.unpublishAndCancelPost(post, channels);
+    }
+
+    if (post.status === PostStatus.Scheduled) {
+      await this.scheduler.cancelPostPublish(post.postId);
     }
 
     const zernioId = post.zernioPostId?.trim();

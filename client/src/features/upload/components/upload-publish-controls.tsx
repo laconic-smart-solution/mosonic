@@ -1,9 +1,10 @@
-import { useEffect, type RefObject } from "react"
+import { useEffect, useId, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import { CalendarClock, Loader2, Lock, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Popover,
   PopoverContent,
@@ -14,6 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import type { UploadChannelStatus } from "@/shared/types/upload.type"
+import { TimezoneCombobox } from "./timezone-combobox"
 
 type UploadPublishControlsProps = {
   scope?: "channel" | "global"
@@ -25,10 +27,12 @@ type UploadPublishControlsProps = {
   schedulePopoverOpen: boolean
   schedulePopoverAnchorRef: RefObject<Element | null>
   scheduledLocal: string
+  scheduleTimezone: string
   publishPending: boolean
   onPublishNow: () => void
   onScheduleOpenChange: (open: boolean) => void
   onScheduleChange: (v: string) => void
+  onScheduleTimezoneChange: (timezone: string) => void
   onConfirmSchedule: () => void
   className?: string
 }
@@ -42,14 +46,18 @@ export function UploadPublishControls({
   schedulePopoverOpen,
   schedulePopoverAnchorRef,
   scheduledLocal,
+  scheduleTimezone,
   publishPending,
   onPublishNow,
   onScheduleOpenChange,
   onScheduleChange,
+  onScheduleTimezoneChange,
   onConfirmSchedule,
   className,
 }: UploadPublishControlsProps) {
   const { t } = useTranslation(["upload", "common"])
+  const datetimeId = useId()
+  const datetimeHintId = `${datetimeId}-hint`
   const isGlobal = scope === "global"
   const locked =
     !isGlobal &&
@@ -145,7 +153,7 @@ export function UploadPublishControls({
                   side="bottom"
                   sideOffset={8}
                   collisionPadding={12}
-                  className="z-70 w-[min(340px,calc(100vw-1.75rem))] gap-4 p-4"
+                  className="z-70 w-[min(360px,calc(100vw-1.75rem))] gap-4 p-4"
                 >
                   <PopoverHeader className="space-y-0.5 pb-1">
                     <PopoverTitle className="text-base">
@@ -159,15 +167,30 @@ export function UploadPublishControls({
                         : platformLabel}
                     </p>
                   </PopoverHeader>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                      {t("upload:publish.whenToPublish")}
-                    </p>
-                    <Input
-                      type="datetime-local"
-                      value={scheduledLocal}
-                      onChange={(e) => onScheduleChange(e.target.value)}
-                      className="h-11 w-full min-w-0 text-sm"
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={datetimeId}
+                        className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
+                      >
+                        {t("upload:publish.whenToPublish")}
+                      </Label>
+                      <Input
+                        id={datetimeId}
+                        type="datetime-local"
+                        value={scheduledLocal}
+                        onChange={(e) => onScheduleChange(e.target.value)}
+                        className="h-11 w-full min-w-0 text-sm"
+                        aria-describedby={datetimeHintId}
+                      />
+                      <p id={datetimeHintId} className="sr-only">
+                        {t("upload:publish.dateTime")}
+                      </p>
+                    </div>
+                    <TimezoneCombobox
+                      value={scheduleTimezone}
+                      onChange={onScheduleTimezoneChange}
+                      disabled={publishPending}
                     />
                   </div>
                   <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">

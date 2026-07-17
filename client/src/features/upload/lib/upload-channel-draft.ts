@@ -5,6 +5,7 @@ import type {
   UploadChannelRow,
   UploadResolvedOutputs,
 } from "@/shared/types/upload.type"
+import { zonedDateTimeLocalToUtcIso } from "@/shared/lib/timezones"
 
 import { mergeNodeOutputLayers } from "@/features/content/data/content-review-helpers"
 
@@ -406,12 +407,21 @@ export function buildSingleChannelPublishRequest(params: {
   connectedSet: Set<string>
   publishNow: boolean
   scheduledLocal: string
+  timezone?: string
 }): PublishUploadRequest {
-  const { upload, channelKey, connectedSet, publishNow, scheduledLocal } = params
+  const {
+    upload,
+    channelKey,
+    connectedSet,
+    publishNow,
+    scheduledLocal,
+    timezone,
+  } = params
+  const zone = timezone?.trim() || "UTC"
   const scheduledAt = publishNow
     ? null
     : scheduledLocal.trim()
-      ? new Date(scheduledLocal).toISOString()
+      ? zonedDateTimeLocalToUtcIso(scheduledLocal, zone)
       : null
 
   const channels = upload.channels.map((r) => {
@@ -423,5 +433,10 @@ export function buildSingleChannelPublishRequest(params: {
     return { channel: r.channel, included }
   })
 
-  return { publishNow, scheduledAt, channels }
+  return {
+    publishNow,
+    scheduledAt,
+    ...(publishNow ? {} : { timezone: zone }),
+    channels,
+  }
 }

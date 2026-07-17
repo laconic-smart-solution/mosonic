@@ -24,6 +24,7 @@ import type { UploadPaletteDragPayload } from "@/features/upload/components/uplo
 import { UploadMediaDropZone } from "@/features/upload/components/upload-media-drop-zone"
 import { UploadPreviewDialog } from "@/features/upload/components/upload-preview-dialog"
 import { UploadPublishControls } from "@/features/upload/components/upload-publish-controls"
+import { TimezoneCombobox } from "@/features/upload/components/timezone-combobox"
 import { UploadStatusBanner } from "@/features/upload/components/upload-status-banner"
 import { UploadTextDropZone } from "@/features/upload/components/upload-text-drop-zone"
 import { UploadContentReviewPanel } from "@/features/upload/components/upload-content-review-panel"
@@ -53,6 +54,12 @@ import {
 } from "@/features/upload/lib/upload-platform-media"
 import { isRedNoteSessionFailureMessage } from "@/features/upload/lib/rednote-upload-status"
 import { toastApiError } from "@/shared/lib/toast-error"
+import {
+  getDefaultTimezone,
+  isZonedDateTimeLocalInFuture,
+  utcIsoToZonedDateTimeLocal,
+  zonedDateTimeLocalToUtcIso,
+} from "@/shared/lib/timezones"
 import {
   buildGlobalPublishRequest,
   getApiErrorMessage,
@@ -134,12 +141,11 @@ const captionLabels: Record<string, string> = {
   custom: "Custom",
 }
 
-function toDatetimeLocalValue(iso: string | null | undefined) {
-  if (!iso) return ""
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ""
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
+function toDatetimeLocalValue(
+  iso: string | null | undefined,
+  timeZone: string = getDefaultTimezone(),
+) {
+  return utcIsoToZonedDateTimeLocal(iso, timeZone)
 }
 
 const CANONICAL_UPLOAD_TAB_ORDER = [
@@ -205,8 +211,14 @@ export default function UploadPage() {
   const [scheduledLocalByChannel, setScheduledLocalByChannel] = useState<
     Record<string, string>
   >({})
+  const [scheduleTimezoneByChannel, setScheduleTimezoneByChannel] = useState<
+    Record<string, string>
+  >({})
   const [showGlobalSchedule, setShowGlobalSchedule] = useState(false)
   const [globalScheduledLocal, setGlobalScheduledLocal] = useState("")
+  const [globalScheduleTimezone, setGlobalScheduleTimezone] = useState(
+    getDefaultTimezone,
+  )
   const [workflowLayers, setWorkflowLayers] =
     useState<WorkflowNodeLayersSnapshot | null>(null)
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
@@ -476,13 +488,27 @@ export default function UploadPage() {
 
   const activeIsScheduled = activeRow?.status === "scheduled"
 
+  const scheduleTimezoneForActive =
+    scheduleTimezoneByChannel[activeKey] ?? getDefaultTimezone()
+
   const scheduledLocalForActive =
     scheduledLocalByChannel[activeKey] ??
-    toDatetimeLocalValue(activeRow?.scheduledAt)
+    toDatetimeLocalValue(activeRow?.scheduledAt, scheduleTimezoneForActive)
 
-  const scheduleDirty =
-    activeIsScheduled &&
-    scheduledLocalForActive !== toDatetimeLocalValue(activeRow?.scheduledAt)
+  const scheduleDirty = (() => {
+    if (!activeIsScheduled || !activeRow?.scheduledAt) return false
+    try {
+      const nextIso = zonedDateTimeLocalToUtcIso(
+        scheduledLocalForActive,
+        scheduleTimezoneForActive,
+      )
+      return (
+        new Date(nextIso).getTime() !== new Date(activeRow.scheduledAt).getTime()
+      )
+    } catch {
+      return true
+    }
+  })()
 
   useEffect(() => {
     if (!activeRow || activeRow.status !== "scheduled") return
@@ -490,10 +516,18 @@ export default function UploadPage() {
       if (prev[activeKey]) return prev
       return {
         ...prev,
-        [activeKey]: toDatetimeLocalValue(activeRow.scheduledAt),
+        [activeKey]: toDatetimeLocalValue(
+          activeRow.scheduledAt,
+          scheduleTimezoneByChannel[activeKey] ?? getDefaultTimezone(),
+        ),
       }
     })
-  }, [activeKey, activeRow?.scheduledAt, activeRow?.status])
+  }, [
+    activeKey,
+    activeRow?.scheduledAt,
+    activeRow?.status,
+    scheduleTimezoneByChannel,
+  ])
 
   useEffect(() => {
     if (activeKey === "rednote") {
@@ -851,20 +885,26 @@ export default function UploadPage() {
     }
 
     const scheduledLocal = scheduledLocalForActive
+    const timezone = scheduleTimezoneForActive
     const badSchedule =
       !scheduledLocal.trim() ||
-      Number.isNaN(new Date(scheduledLocal).getTime()) ||
-      new Date(scheduledLocal).getTime() <= Date.now()
+      !isZonedDateTimeLocalInFuture(scheduledLocal, timezone)
     if (badSchedule) {
       toast.error(
         scheduledLocal.trim()
-          ? "Scheduled time must be in the future."
-          : "Select a date and time."
+          ? i18n.t("upload:toast.scheduleFuture")
+          : i18n.t("upload:toast.selectDateTime"),
       )
       return
     }
 
-    const scheduledAt = new Date(scheduledLocal).toISOString()
+    let scheduledAt: string
+    try {
+      scheduledAt = zonedDateTimeLocalToUtcIso(scheduledLocal, timezone)
+    } catch {
+      toast.error(i18n.t("upload:toast.selectDateTime"))
+      return
+    }
 
     try {
       await updateMutation.mutateAsync({
@@ -873,6 +913,7 @@ export default function UploadPage() {
           channel: activeRow.channel,
           caption,
           scheduledAt,
+          timezone,
           mediaUrl: patchBody.mediaUrl,
           mediaUrls: patchBody.mediaUrls,
           ...(normalizeChannelKey(activeRow.channel) === "youtube"
@@ -939,17 +980,17 @@ export default function UploadPage() {
       return
     }
     const channelScheduledLocal = scheduledLocalByChannel[activeKey] ?? ""
+    const channelTimezone = scheduleTimezoneForActive
     const pubNow = !isSchedule
     if (!pubNow) {
       const badSchedule =
         !channelScheduledLocal.trim() ||
-        Number.isNaN(new Date(channelScheduledLocal).getTime()) ||
-        new Date(channelScheduledLocal).getTime() <= Date.now()
+        !isZonedDateTimeLocalInFuture(channelScheduledLocal, channelTimezone)
       if (badSchedule) {
         toast.error(
           channelScheduledLocal.trim()
-            ? "Scheduled time must be in the future."
-            : "Select a date and time."
+            ? i18n.t("upload:toast.scheduleFuture")
+            : i18n.t("upload:toast.selectDateTime"),
         )
         return
       }
@@ -978,6 +1019,7 @@ export default function UploadPage() {
         connectedSet: connectedChannelSet,
         publishNow: pubNow,
         scheduledLocal: channelScheduledLocal,
+        timezone: channelTimezone,
       })
       await publishMutation.mutateAsync({ uploadId, body })
       toast.success(
@@ -995,13 +1037,15 @@ export default function UploadPage() {
     if (!pubNow) {
       const badSchedule =
         !globalScheduledLocal.trim() ||
-        Number.isNaN(new Date(globalScheduledLocal).getTime()) ||
-        new Date(globalScheduledLocal).getTime() <= Date.now()
+        !isZonedDateTimeLocalInFuture(
+          globalScheduledLocal,
+          globalScheduleTimezone,
+        )
       if (badSchedule) {
         toast.error(
           globalScheduledLocal.trim()
-            ? "Scheduled time must be in the future."
-            : "Select a date and time."
+            ? i18n.t("upload:toast.scheduleFuture")
+            : i18n.t("upload:toast.selectDateTime"),
         )
         return
       }
@@ -1014,7 +1058,8 @@ export default function UploadPage() {
       includedByKey,
       connectedChannelSet,
       pubNow,
-      globalScheduledLocal
+      globalScheduledLocal,
+      globalScheduleTimezone,
     )
     // RedNote is publish-now only — drop it from schedule-all so other
     // channels can still be scheduled.
@@ -1199,12 +1244,14 @@ export default function UploadPage() {
               schedulePopoverOpen={showGlobalSchedule}
               schedulePopoverAnchorRef={globalSchedulePopoverAnchorRef}
               scheduledLocal={globalScheduledLocal}
+              scheduleTimezone={globalScheduleTimezone}
               publishPending={
                 publishMutation.isPending || updateMutation.isPending
               }
               onPublishNow={() => void publishGlobalNow(false)}
               onScheduleOpenChange={setShowGlobalSchedule}
               onScheduleChange={setGlobalScheduledLocal}
+              onScheduleTimezoneChange={setGlobalScheduleTimezone}
               onConfirmSchedule={() => void publishGlobalNow(true)}
             />
           ) : null}
@@ -1324,6 +1371,7 @@ export default function UploadPage() {
                             channelSchedulePopoverAnchorRef
                           }
                           scheduledLocal={scheduledLocalForActive}
+                          scheduleTimezone={scheduleTimezoneForActive}
                           publishPending={
                             publishMutation.isPending ||
                             updateMutation.isPending
@@ -1336,26 +1384,44 @@ export default function UploadPage() {
                               [activeKey]: v,
                             }))
                           }
+                          onScheduleTimezoneChange={(tz) =>
+                            setScheduleTimezoneByChannel((prev) => ({
+                              ...prev,
+                              [activeKey]: tz,
+                            }))
+                          }
                           onConfirmSchedule={() => void publishActiveNow(true)}
                         />
                       </div>
                     ) : null}
 
                     {activeIsScheduled ? (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                          {i18n.t("upload:publish.whenToPublish")}
-                        </p>
-                        <Input
-                          type="datetime-local"
-                          value={scheduledLocalForActive}
-                          onChange={(e) =>
-                            setScheduledLocalByChannel((prev) => ({
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                            {i18n.t("upload:publish.whenToPublish")}
+                          </p>
+                          <Input
+                            type="datetime-local"
+                            value={scheduledLocalForActive}
+                            onChange={(e) =>
+                              setScheduledLocalByChannel((prev) => ({
+                                ...prev,
+                                [activeKey]: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs"
+                          />
+                        </div>
+                        <TimezoneCombobox
+                          value={scheduleTimezoneForActive}
+                          onChange={(tz) =>
+                            setScheduleTimezoneByChannel((prev) => ({
                               ...prev,
-                              [activeKey]: e.target.value,
+                              [activeKey]: tz,
                             }))
                           }
-                          className="h-9 text-xs"
+                          disabled={updateMutation.isPending}
                         />
                       </div>
                     ) : null}
