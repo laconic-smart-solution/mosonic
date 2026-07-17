@@ -11,6 +11,7 @@ import { EventsModule } from '../events/events.module';
 import { LineModule } from '../line/line.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { ViberModule } from '../viber/viber.module';
+import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { LoggingModule } from '../logging/logging.module';
 import { NodesModule } from '../nodes/nodes.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
@@ -113,6 +114,7 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     forwardRef(() => LineModule),
     forwardRef(() => TelegramModule),
     forwardRef(() => ViberModule),
+    forwardRef(() => WhatsAppModule),
     NodesModule,
     LoggingModule,
     EventsModule,

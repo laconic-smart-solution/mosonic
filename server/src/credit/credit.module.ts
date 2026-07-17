@@ -25,6 +25,7 @@ import { EventsModule } from '../events/events.module';
 import { LineModule } from '../line/line.module';
 import { TelegramModule } from '../telegram/telegram.module';
 import { ViberModule } from '../viber/viber.module';
+import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { PayniModule } from '../payni/payni.module';
 import { PaymentModule } from '../payment/payment.module';
 import { PlanModule } from '../plan/plan.module';
@@ -58,6 +59,7 @@ const DEFAULT_SERVICE_RATES = [
     forwardRef(() => LineModule),
     forwardRef(() => TelegramModule),
     forwardRef(() => ViberModule),
+    forwardRef(() => WhatsAppModule),
     PayniModule,
     PaymentModule,
     forwardRef(() => PlanModule),

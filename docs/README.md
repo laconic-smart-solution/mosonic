@@ -6,5 +6,6 @@
 | [setup-line.md](./setup-line.md) | LINE Official Account — messaging setup |
 | [setup-telegram.md](./setup-telegram.md) | Telegram bot — messaging setup |
 | [setup-viber.md](./setup-viber.md) | Viber Public Account — messaging setup |
+| [setup-whatsapp.md](./setup-whatsapp.md) | WhatsApp Cloud API — messaging setup |
 
-Communication proxies live under `communication-service/app/{line,telegram,viber}-service/`.
+Communication proxies live under `communication-service/app/{line,telegram,viber,whatsapp}-service/`.

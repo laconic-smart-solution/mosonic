@@ -202,6 +202,7 @@ model User {
   lineConnection      LineConnection?
   telegramConnection  TelegramConnection?
   viberConnection     ViberConnection?
+  whatsappConnection  WhatsAppConnection?
 
   @@index([email])
   @@index([username])
@@ -250,6 +251,20 @@ model ViberConnection {
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("viber_connections")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model WhatsAppConnection {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  whatsappWaId String   @unique // digits phone / wa_id
+  connectedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("whatsapp_connections")
 }
 
 model SocialAccount {
