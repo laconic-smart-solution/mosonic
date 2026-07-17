@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import {
   ANALYTICS_REPOSITORY,
+  ANNOUNCEMENT_REPOSITORY,
   BUDGET_SETTINGS_REPOSITORY,
   CAMPAIGN_AUTONOMY_POLICY_REPOSITORY,
   CAMPAIGN_SCHEDULE_REPOSITORY,
@@ -35,6 +36,7 @@ import {
   WORKFLOW_REPOSITORY,
 } from './tokens';
 import { PrismaAnalyticsRepository } from './prisma/prisma-analytics.repository';
+import { PrismaAnnouncementRepository } from './prisma/prisma-announcement.repository';
 import { PrismaBudgetSettingsRepository } from './prisma/prisma-budget-settings.repository';
 import { PrismaCampaignAutonomyPolicyRepository } from './prisma/prisma-campaign-autonomy-policy.repository';
 import { PrismaCampaignScheduleRepository } from './prisma/prisma-campaign-schedule.repository';
@@ -136,6 +138,7 @@ const repositoryProviders = [
   },
   { provide: WEBHOOK_EVENT_REPOSITORY, useClass: PrismaWebhookEventRepository },
   { provide: SYNC_LOCK_REPOSITORY, useClass: PrismaSyncLockRepository },
+  { provide: ANNOUNCEMENT_REPOSITORY, useClass: PrismaAnnouncementRepository },
 ];
 
 @Module({

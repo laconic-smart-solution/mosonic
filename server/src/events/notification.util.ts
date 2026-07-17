@@ -192,6 +192,28 @@ export function newsContentReadyNotification(args: {
   };
 }
 
+export function adminAnnouncementNotification(args: {
+  announcementId: string;
+  title: string;
+  message: string;
+  level?: string;
+}): {
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  action?: NotificationAction;
+} {
+  return {
+    title: args.title,
+    message: args.message,
+    data: {
+      announcementId: args.announcementId,
+      level: args.level ?? 'info',
+    },
+    action: { label: 'View announcements', href: '/announcements' },
+  };
+}
+
 export function workflowCompletedNotification(args: {
   workflowId: string;
   ruleRef?: string;

@@ -1,6 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { EventsModule } from '../events/events.module';
+import { AdminAnnouncementsController } from './controllers/admin-announcements.controller';
 import { AdminApiUsageController } from './controllers/admin-api-usage.controller';
 import { AdminOpenAiBillingController } from './controllers/admin-openai-billing.controller';
 import { AdminContentController } from './controllers/admin-content.controller';
@@ -28,6 +30,7 @@ import { AdminDashboardService } from './services/admin-dashboard.service';
 import { AdminUserProvisioningService } from './services/admin-user-provisioning.service';
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminFaqService } from './services/admin-faq.service';
+import { AdminAnnouncementsService } from './services/admin-announcements.service';
 import { AdminLineService } from './services/admin-line.service';
 import { AdminTelegramService } from './services/admin-telegram.service';
 import { FaqModule } from '../faq/faq.module';
@@ -46,9 +49,11 @@ import { FaqModule } from '../faq/faq.module';
     FaqModule,
     LineModule,
     TelegramModule,
+    EventsModule,
     forwardRef(() => OrchestrationModule),
   ],
   controllers: [
+    AdminAnnouncementsController,
     AdminDashboardController,
     AdminApiUsageController,
     AdminOpenAiBillingController,
@@ -62,6 +67,7 @@ import { FaqModule } from '../faq/faq.module';
     AdminPipelineJobsController,
   ],
   providers: [
+    AdminAnnouncementsService,
     AdminDashboardService,
     AdminUsersService,
     AdminCostService,

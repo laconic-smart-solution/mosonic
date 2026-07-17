@@ -236,4 +236,18 @@ export const adminApi = {
     apiClient
       .post(`/admin/line/connections/${userId}/messages`, body)
       .then((r) => r.data),
+
+  listAnnouncements: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/admin/announcements", { params }).then((r) => r.data),
+
+  publishAnnouncement: (body: {
+    title: string
+    message: string
+    level?: "info" | "warning" | "critical"
+    sendInApp?: boolean
+    sendLine?: boolean
+  }) => apiClient.post("/admin/announcements", body).then((r) => r.data),
+
+  getAnnouncement: (id: string) =>
+    apiClient.get(`/admin/announcements/${id}`).then((r) => r.data),
 }
