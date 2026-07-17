@@ -157,6 +157,41 @@ rather than a validation-style message.
 
 ---
 
+## Admin — global announcement (backend)
+
+Admin-only broadcast to every connected LINE user. Not used by the end-user app UI yet.
+
+| Method | Path | Auth | Body |
+|--------|------|------|------|
+| `POST` | `/admin/line/announcements` | Admin JWT | `{ "text": "…" }` (1–5000 chars) |
+
+**Behavior:** Nest loads all `lineUserId` values from `line_connections`, then calls
+line-service `POST /api/v1/messages/batch` (LINE Multicast, chunked + rate-limited).
+
+**Success:**
+
+```json
+{
+  "success": true,
+  "total": 42,
+  "sent": 42,
+  "failed": 0,
+  "chunkCount": 1,
+  "failedRecipientIds": []
+}
+```
+
+If nobody is connected, returns `total: 0` / `sent: 0` without calling line-service.
+
+Related admin endpoints:
+
+| Method | Path | Use |
+|--------|------|-----|
+| `GET` | `/admin/line/connections` | Paginated list of linked users |
+| `POST` | `/admin/line/connections/:userId/messages` | Send text to one linked user |
+
+---
+
 ## What you do NOT need to build
 
 - **Accepting friend requests.** LINE has no accept API — adding a friend is instant and

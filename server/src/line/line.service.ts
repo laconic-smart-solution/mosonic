@@ -179,6 +179,49 @@ export class LineService {
     }
   }
 
+  /**
+   * Multicast a text message to many LINE users via line-service batch API.
+   * line-service chunks recipients (500) and applies rate limiting.
+   */
+  async sendBatchText(
+    recipientIds: string[],
+    text: string,
+  ): Promise<{
+    total: number;
+    sent: number;
+    failed: number;
+    chunkCount: number;
+    failedRecipientIds: string[];
+  }> {
+    const res = await this.fetchLine(`${this.baseUrl}/api/v1/messages/batch`, {
+      method: 'POST',
+      headers: this.sendHeaders(),
+      body: JSON.stringify({ recipient_ids: recipientIds, text }),
+    });
+
+    const body = (await res.json().catch(() => ({}))) as LineServiceEnvelope<{
+      total: number;
+      sent: number;
+      failed: number;
+      chunk_count: number;
+      failed_recipient_ids?: string[];
+    }>;
+
+    if (!res.ok || !body.success || !body.data) {
+      throw new ServiceUnavailableException(
+        body.error ?? `line-service returned HTTP ${res.status}`,
+      );
+    }
+
+    return {
+      total: body.data.total,
+      sent: body.data.sent,
+      failed: body.data.failed,
+      chunkCount: body.data.chunk_count,
+      failedRecipientIds: body.data.failed_recipient_ids ?? [],
+    };
+  }
+
   async startConnect(userId: string): Promise<LineConnectStartResponse> {
     const existing = await this.connections.findByUserId(userId);
     const qr = await this.getQrCodeSafe(280);

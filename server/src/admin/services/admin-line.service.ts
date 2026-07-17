@@ -68,4 +68,33 @@ export class AdminLineService {
       lineUserId: connection.lineUserId,
     };
   }
+
+  /**
+   * Broadcast a text announcement to every connected LINE user.
+   * Recipients come from line_connections; delivery goes through line-service batch/multicast.
+   */
+  async announce(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      throw new BadRequestException('Message text is required');
+    }
+
+    const recipientIds = await this.connections.listAllLineUserIds();
+    if (recipientIds.length === 0) {
+      return {
+        success: true,
+        total: 0,
+        sent: 0,
+        failed: 0,
+        chunkCount: 0,
+        failedRecipientIds: [] as string[],
+      };
+    }
+
+    const result = await this.line.sendBatchText(recipientIds, trimmed);
+    return {
+      success: true,
+      ...result,
+    };
+  }
 }
