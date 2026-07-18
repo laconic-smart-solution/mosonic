@@ -8,9 +8,12 @@
     "subtitle": "管理您的个人资料、语言和已连接的发布渠道。"
   },
   "profile": {
+    "sectionTitle": "个人资料",
+    "detailsTitle": "账户详情",
     "email": "邮箱",
     "phone": "电话",
     "address": "地址",
+    "notSet": "未设置",
     "unnamed": "账户",
     "roles": {
       "admin": "管理员",
@@ -20,6 +23,7 @@
   "contact": {
     "sectionTitle": "联系我们",
     "sectionDesc": "通过可用渠道联系团队。",
+    "messagingTitle": "消息",
     "openButton": "打开联系选项",
     "modalTitle": "联系选项",
     "modalDesc": "选择一个渠道与我们联系。",

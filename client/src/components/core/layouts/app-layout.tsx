@@ -28,9 +28,9 @@ function AppLayout() {
         <Topbar />
         <AnnouncementGlobalBanner />
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto [animation:fadeUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-          {/* <BreadcrumbOverrideProvider> */}
+          <BreadcrumbOverrideProvider>
             <Outlet />
-          {/* </BreadcrumbOverrideProvider> */}
+          </BreadcrumbOverrideProvider>
         </div>
       </SidebarInset>
       <FaqChatbot />

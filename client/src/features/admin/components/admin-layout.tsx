@@ -111,7 +111,7 @@ export function AdminLayout() {
 
           <Accordion
             className="rounded-none border-0"
-            defaultValue={communicationActive ? "communication" : undefined}
+            defaultValue={communicationActive ? ["communication"] : undefined}
           >
             <AccordionItem value="communication" className="border-0 data-open:bg-transparent">
               <AccordionTrigger

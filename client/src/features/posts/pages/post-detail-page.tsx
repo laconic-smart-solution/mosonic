@@ -282,7 +282,7 @@ export default function PostDetailPage() {
 
     scheduledLocal: "",
 
-    mediaTab: "single",
+    mediaTab: "multiple",
 
     imageUrls: [],
 
@@ -300,7 +300,7 @@ export default function PostDetailPage() {
 
     draft.mediaTab !== "video" &&
 
-    (draft.imageUrls.length > 0 || draft.mediaTab === "single")
+    draft.imageUrls.length > 0
 
       ? 90
 
