@@ -11,9 +11,12 @@ import { UserRole } from '../users/schemas/user.schema';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { ContentService } from '../content/content.service';
 import { EventsService } from '../events/events.service';
+import { postScheduledNotification } from '../events/notification.util';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   isTikTokPhotoMedia,
   tiktokPhotoCaptionError,
@@ -108,6 +111,25 @@ export type UpdateUploadResult = { success: true };
 
 const FAILURE_REASON_MAX = 500;
 
+function scheduleAwarePublishError(err: unknown): string {
+  const raw =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : '';
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes('scheduler') ||
+    msg.includes('econnrefused') ||
+    msg.includes('service unavailable') ||
+    msg.includes('bad gateway')
+  ) {
+    return 'Scheduling service is unavailable. Connect the scheduler and try again.';
+  }
+  return getFriendlyZernioPublishError(err);
+}
+
 @Injectable()
 export class UploadService {
   constructor(
@@ -119,6 +141,8 @@ export class UploadService {
     private readonly postService: PostService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
+    private readonly scheduler: SchedulerService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   buildChannelEntriesFromPipeline(
@@ -697,13 +721,25 @@ export class UploadService {
           ? title
           : undefined;
 
-      await this.mcpService.updatePost({
-        postId,
-        content,
-        scheduledFor: scheduledIso,
-        title: titleForPost,
-        ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
-      });
+      const hasContentUpdate =
+        hasCaptionUpdate || hasTitleUpdate || hasMediaUpdate;
+      if (hasContentUpdate) {
+        await this.mcpService.updatePost({
+          postId,
+          content,
+          title: titleForPost,
+          ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
+        });
+      }
+
+      const localPostId = post.postId?.trim();
+      if (scheduledIso && localPostId) {
+        await this.scheduler.reschedulePostPublish(
+          localPostId,
+          scheduledIso,
+          body.timezone ?? undefined,
+        );
+      }
     }
 
     for (const ch of scheduledChannels) {
@@ -908,6 +944,7 @@ export class UploadService {
 
     const zernioTask = async (): Promise<void> => {
       if (zernioWork.length === 0) return;
+      let createdLocalPostId: string | null = null;
       try {
         const { postId } = await this.mcpService.publishCreatePostBatch(
           auth.userId,
@@ -923,22 +960,33 @@ export class UploadService {
                 title: w.youtubeTitle,
               };
             }),
+            // Timing is owned by Mosonic scheduler; Zernio only gets a draft.
             publishNow: body.publishNow,
-            scheduledAt: scheduledIso,
+            scheduledAt: null,
           },
         );
         zernioPostId = postId;
 
-        await this.postService.createPostFromSuccessfulPublish({
-          userId: publisherUserId,
-          uploadRef: publishUploadId,
-          ruleRef: publishRuleRef,
-          contentRef: publishContentRef,
-          zernioPostId: postId,
-          channels: zernioWork.map((w) => w.row.channel.toLowerCase()),
-          publishNow: body.publishNow,
-          scheduledAt: scheduledDate,
-        });
+        const { postId: localPostId } =
+          await this.postService.createPostFromSuccessfulPublish({
+            userId: publisherUserId,
+            uploadRef: publishUploadId,
+            ruleRef: publishRuleRef,
+            contentRef: publishContentRef,
+            zernioPostId: postId,
+            channels: zernioWork.map((w) => w.row.channel.toLowerCase()),
+            publishNow: body.publishNow,
+            scheduledAt: scheduledDate,
+          });
+        createdLocalPostId = localPostId;
+
+        if (!body.publishNow && scheduledIso) {
+          await this.scheduler.createPostPublish(
+            localPostId,
+            scheduledIso,
+            body.timezone ?? undefined,
+          );
+        }
 
         for (const w of zernioWork) {
           const chKey = w.row.channel.toLowerCase();
@@ -970,7 +1018,14 @@ export class UploadService {
           }
         }
       } catch (err: unknown) {
-        const msg = getFriendlyZernioPublishError(err);
+        if (createdLocalPostId) {
+          try {
+            await this.postService.discardOrphanedPost(createdLocalPostId);
+          } catch {
+            // Upload channel is marked failed below; orphan cleanup is best-effort.
+          }
+        }
+        const msg = scheduleAwarePublishError(err);
         for (const w of zernioWork) {
           const chKey = w.row.channel.toLowerCase();
           w.row.status = UploadChannelStatus.Failed;
@@ -987,21 +1042,41 @@ export class UploadService {
 
     const rednoteTasks = rednoteWork.map(async (w) => {
       const chKey = REDNOTE_CHANNEL;
-      if (!body.publishNow) {
-        w.row.status = UploadChannelStatus.Failed;
-        w.row.failureReason =
-          'RedNote supports publish now only — scheduling is not available.';
-        w.row.retryCount = (w.row.retryCount ?? 0) + 1;
-        this.emitUploadEvent(publishUploadId, 'upload:failed', {
-          uploadId: publishUploadId,
-          channel: chKey,
-          message: w.row.failureReason,
-        });
-        return;
-      }
-
-      const localPostId = randomUUID();
+      let createdLocalPostId: string | null = null;
       try {
+        if (!body.publishNow) {
+          const { postId: localPostId } =
+            await this.postService.createPostFromSuccessfulPublish({
+              userId: publisherUserId,
+              uploadRef: publishUploadId,
+              ruleRef: publishRuleRef,
+              contentRef: publishContentRef,
+              zernioPostId: `rednote:${randomUUID()}`,
+              channels: [chKey],
+              publishNow: false,
+              scheduledAt: scheduledDate,
+            });
+          createdLocalPostId = localPostId;
+          await this.scheduler.createPostPublish(
+            localPostId,
+            scheduledIso!,
+            body.timezone ?? undefined,
+          );
+          w.row.status = UploadChannelStatus.Scheduled;
+          w.row.scheduledAt = scheduledDate;
+          w.row.publishedAt = null;
+          w.row.failureReason = null;
+          channelsSucceeded.push(chKey);
+          this.emitUploadEvent(publishUploadId, 'upload:scheduled', {
+            uploadId: publishUploadId,
+            channel: chKey,
+            scheduledAt: scheduledDate!.toISOString(),
+            postId: localPostId,
+          });
+          return;
+        }
+
+        const localPostId = randomUUID();
         await this.redNoteService.publishEnqueue({
           userId: auth.userId,
           postId: localPostId,
@@ -1011,12 +1086,18 @@ export class UploadService {
           scheduledAt: null,
         });
       } catch (err: unknown) {
+        if (createdLocalPostId) {
+          try {
+            await this.postService.discardOrphanedPost(createdLocalPostId);
+          } catch {
+            // Best-effort; channel failure reason is set below.
+          }
+        }
         if (isRedNoteSessionInvalidError(err)) {
           w.row.failureReason =
             'Publish failed — could not verify RedNote creator session. Retry, or reconnect in Settings if this persists.';
         } else {
-          w.row.failureReason =
-            err instanceof Error ? err.message : 'RedNote publish failed';
+          w.row.failureReason = scheduleAwarePublishError(err);
         }
         w.row.status = UploadChannelStatus.Failed;
         w.row.retryCount = (w.row.retryCount ?? 0) + 1;
@@ -1050,7 +1131,44 @@ export class UploadService {
       });
     }
 
+    if (
+      !body.publishNow &&
+      scheduledIso &&
+      channelsSucceeded.length > 0
+    ) {
+      this.notifyPostScheduled(publisherUserId, {
+        uploadId: publishUploadId,
+        scheduledAt: scheduledIso,
+        channels: channelsSucceeded,
+        timezone: body.timezone ?? undefined,
+      });
+    }
+
     return { success: true };
+  }
+
+  private notifyPostScheduled(
+    userId: string,
+    args: {
+      uploadId: string;
+      scheduledAt: string;
+      channels: string[];
+      timezone?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postScheduledNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.scheduled',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 
   async retryUpload(

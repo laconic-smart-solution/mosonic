@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import i18n from "@/i18n"
-import { Eye } from "lucide-react"
+import { Eye, Save, X } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PageShell } from "@/components/app/page-shell"
@@ -24,6 +24,7 @@ import type { UploadPaletteDragPayload } from "@/features/upload/components/uplo
 import { UploadMediaDropZone } from "@/features/upload/components/upload-media-drop-zone"
 import { UploadPreviewDialog } from "@/features/upload/components/upload-preview-dialog"
 import { UploadPublishControls } from "@/features/upload/components/upload-publish-controls"
+import { TimezoneCombobox } from "@/features/upload/components/timezone-combobox"
 import { UploadStatusBanner } from "@/features/upload/components/upload-status-banner"
 import { UploadTextDropZone } from "@/features/upload/components/upload-text-drop-zone"
 import { UploadContentReviewPanel } from "@/features/upload/components/upload-content-review-panel"
@@ -53,6 +54,12 @@ import {
 } from "@/features/upload/lib/upload-platform-media"
 import { isRedNoteSessionFailureMessage } from "@/features/upload/lib/rednote-upload-status"
 import { toastApiError } from "@/shared/lib/toast-error"
+import {
+  getDefaultTimezone,
+  isZonedDateTimeLocalInFuture,
+  utcIsoToZonedDateTimeLocal,
+  zonedDateTimeLocalToUtcIso,
+} from "@/shared/lib/timezones"
 import {
   buildGlobalPublishRequest,
   getApiErrorMessage,
@@ -134,12 +141,11 @@ const captionLabels: Record<string, string> = {
   custom: "Custom",
 }
 
-function toDatetimeLocalValue(iso: string | null | undefined) {
-  if (!iso) return ""
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ""
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
+function toDatetimeLocalValue(
+  iso: string | null | undefined,
+  timeZone: string = getDefaultTimezone(),
+) {
+  return utcIsoToZonedDateTimeLocal(iso, timeZone)
 }
 
 const CANONICAL_UPLOAD_TAB_ORDER = [
@@ -205,8 +211,14 @@ export default function UploadPage() {
   const [scheduledLocalByChannel, setScheduledLocalByChannel] = useState<
     Record<string, string>
   >({})
+  const [scheduleTimezoneByChannel, setScheduleTimezoneByChannel] = useState<
+    Record<string, string>
+  >({})
   const [showGlobalSchedule, setShowGlobalSchedule] = useState(false)
   const [globalScheduledLocal, setGlobalScheduledLocal] = useState("")
+  const [globalScheduleTimezone, setGlobalScheduleTimezone] = useState(
+    getDefaultTimezone,
+  )
   const [workflowLayers, setWorkflowLayers] =
     useState<WorkflowNodeLayersSnapshot | null>(null)
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
@@ -476,13 +488,27 @@ export default function UploadPage() {
 
   const activeIsScheduled = activeRow?.status === "scheduled"
 
+  const scheduleTimezoneForActive =
+    scheduleTimezoneByChannel[activeKey] ?? getDefaultTimezone()
+
   const scheduledLocalForActive =
     scheduledLocalByChannel[activeKey] ??
-    toDatetimeLocalValue(activeRow?.scheduledAt)
+    toDatetimeLocalValue(activeRow?.scheduledAt, scheduleTimezoneForActive)
 
-  const scheduleDirty =
-    activeIsScheduled &&
-    scheduledLocalForActive !== toDatetimeLocalValue(activeRow?.scheduledAt)
+  const scheduleDirty = (() => {
+    if (!activeIsScheduled || !activeRow?.scheduledAt) return false
+    try {
+      const nextIso = zonedDateTimeLocalToUtcIso(
+        scheduledLocalForActive,
+        scheduleTimezoneForActive,
+      )
+      return (
+        new Date(nextIso).getTime() !== new Date(activeRow.scheduledAt).getTime()
+      )
+    } catch {
+      return true
+    }
+  })()
 
   useEffect(() => {
     if (!activeRow || activeRow.status !== "scheduled") return
@@ -490,10 +516,18 @@ export default function UploadPage() {
       if (prev[activeKey]) return prev
       return {
         ...prev,
-        [activeKey]: toDatetimeLocalValue(activeRow.scheduledAt),
+        [activeKey]: toDatetimeLocalValue(
+          activeRow.scheduledAt,
+          scheduleTimezoneByChannel[activeKey] ?? getDefaultTimezone(),
+        ),
       }
     })
-  }, [activeKey, activeRow?.scheduledAt, activeRow?.status])
+  }, [
+    activeKey,
+    activeRow?.scheduledAt,
+    activeRow?.status,
+    scheduleTimezoneByChannel,
+  ])
 
   useEffect(() => {
     if (activeKey === "rednote") {
@@ -615,6 +649,7 @@ export default function UploadPage() {
             checked
               ? i18n.t("upload:toast.channelIncluded")
               : i18n.t("upload:toast.channelExcluded"),
+            { id: "upload-channel-include" },
           )
         })
         .catch((err) => toastApiError(err, "upload:toast.saveFailed"))
@@ -719,21 +754,18 @@ export default function UploadPage() {
         return
       }
       if (payload.kind !== "image") return
-      if (tab === "single") {
-        setDraft(activeKey, {
-          imageUrls: [payload.url],
-          videoUrl: null,
-          dirty: true,
-        })
-        return
-      }
       const next = [...draft.imageUrls]
       if (next.length >= cfg.maxCarousel) {
         toast.error(`Maximum ${cfg.maxCarousel} images for this platform.`)
         return
       }
       next.push(payload.url)
-      setDraft(activeKey, { imageUrls: next, videoUrl: null, dirty: true })
+      setDraft(activeKey, {
+        mediaTab: "multiple",
+        imageUrls: next,
+        videoUrl: null,
+        dirty: true,
+      })
     }
   }
 
@@ -823,6 +855,29 @@ export default function UploadPage() {
     )
   }
 
+  function discardActiveChannel() {
+    if (!upload || !activeRow) return
+    const restored = draftFromUploadRow(
+      activeRow,
+      activeKey,
+      upload.resolvedOutputs,
+      workflowLayers
+    )
+    setDraftsByChannel((prev) => ({
+      ...prev,
+      [activeKey]: restored,
+    }))
+    if (activeIsScheduled && activeRow.scheduledAt) {
+      const tz =
+        scheduleTimezoneByChannel[activeKey] ?? getDefaultTimezone()
+      setScheduledLocalByChannel((prev) => ({
+        ...prev,
+        [activeKey]: toDatetimeLocalValue(activeRow.scheduledAt, tz),
+      }))
+    }
+    setShowChannelSchedule(false)
+  }
+
   async function saveScheduledChannel() {
     if (!uploadId || !upload || !activeRow || !activeIsScheduled) return
     const patchBody = draftToPatchBody(
@@ -851,20 +906,26 @@ export default function UploadPage() {
     }
 
     const scheduledLocal = scheduledLocalForActive
+    const timezone = scheduleTimezoneForActive
     const badSchedule =
       !scheduledLocal.trim() ||
-      Number.isNaN(new Date(scheduledLocal).getTime()) ||
-      new Date(scheduledLocal).getTime() <= Date.now()
+      !isZonedDateTimeLocalInFuture(scheduledLocal, timezone)
     if (badSchedule) {
       toast.error(
         scheduledLocal.trim()
-          ? "Scheduled time must be in the future."
-          : "Select a date and time."
+          ? i18n.t("upload:toast.scheduleFuture")
+          : i18n.t("upload:toast.selectDateTime"),
       )
       return
     }
 
-    const scheduledAt = new Date(scheduledLocal).toISOString()
+    let scheduledAt: string
+    try {
+      scheduledAt = zonedDateTimeLocalToUtcIso(scheduledLocal, timezone)
+    } catch {
+      toast.error(i18n.t("upload:toast.selectDateTime"))
+      return
+    }
 
     try {
       await updateMutation.mutateAsync({
@@ -873,6 +934,7 @@ export default function UploadPage() {
           channel: activeRow.channel,
           caption,
           scheduledAt,
+          timezone,
           mediaUrl: patchBody.mediaUrl,
           mediaUrls: patchBody.mediaUrls,
           ...(normalizeChannelKey(activeRow.channel) === "youtube"
@@ -908,10 +970,6 @@ export default function UploadPage() {
       toast.error(i18n.t("upload:toast.rednoteNeedsReauth"))
       return
     }
-    if (activeKey === "rednote" && isSchedule) {
-      toast.error(i18n.t("upload:toast.rednoteNoSchedule"))
-      return
-    }
     if (!connectedChannelSet.has(activeKey)) {
       toast.error(i18n.t("upload:toast.connectAccount"))
       return
@@ -939,17 +997,17 @@ export default function UploadPage() {
       return
     }
     const channelScheduledLocal = scheduledLocalByChannel[activeKey] ?? ""
+    const channelTimezone = scheduleTimezoneForActive
     const pubNow = !isSchedule
     if (!pubNow) {
       const badSchedule =
         !channelScheduledLocal.trim() ||
-        Number.isNaN(new Date(channelScheduledLocal).getTime()) ||
-        new Date(channelScheduledLocal).getTime() <= Date.now()
+        !isZonedDateTimeLocalInFuture(channelScheduledLocal, channelTimezone)
       if (badSchedule) {
         toast.error(
           channelScheduledLocal.trim()
-            ? "Scheduled time must be in the future."
-            : "Select a date and time."
+            ? i18n.t("upload:toast.scheduleFuture")
+            : i18n.t("upload:toast.selectDateTime"),
         )
         return
       }
@@ -978,6 +1036,7 @@ export default function UploadPage() {
         connectedSet: connectedChannelSet,
         publishNow: pubNow,
         scheduledLocal: channelScheduledLocal,
+        timezone: channelTimezone,
       })
       await publishMutation.mutateAsync({ uploadId, body })
       toast.success(
@@ -995,13 +1054,15 @@ export default function UploadPage() {
     if (!pubNow) {
       const badSchedule =
         !globalScheduledLocal.trim() ||
-        Number.isNaN(new Date(globalScheduledLocal).getTime()) ||
-        new Date(globalScheduledLocal).getTime() <= Date.now()
+        !isZonedDateTimeLocalInFuture(
+          globalScheduledLocal,
+          globalScheduleTimezone,
+        )
       if (badSchedule) {
         toast.error(
           globalScheduledLocal.trim()
-            ? "Scheduled time must be in the future."
-            : "Select a date and time."
+            ? i18n.t("upload:toast.scheduleFuture")
+            : i18n.t("upload:toast.selectDateTime"),
         )
         return
       }
@@ -1014,33 +1075,12 @@ export default function UploadPage() {
       includedByKey,
       connectedChannelSet,
       pubNow,
-      globalScheduledLocal
+      globalScheduledLocal,
+      globalScheduleTimezone,
     )
-    // RedNote is publish-now only — drop it from schedule-all so other
-    // channels can still be scheduled.
-    if (!pubNow) {
-      const hadRednote = body.channels.some(
-        (c) => c.included && c.channel.toLowerCase() === "rednote"
-      )
-      body.channels = body.channels.map((c) =>
-        c.channel.toLowerCase() === "rednote"
-          ? { ...c, included: false }
-          : c
-      )
-      if (hadRednote) {
-        toast.message(i18n.t("upload:toast.rednoteScheduleSkipped"))
-      }
-    }
     const includedChannels = body.channels.filter((c) => c.included)
     if (includedChannels.length === 0) {
-      toast.error(
-        !pubNow &&
-          Object.entries(includedByKey).some(
-            ([k, on]) => on && k === "rednote" && connectedChannelSet.has("rednote")
-          )
-          ? i18n.t("upload:toast.rednoteNoSchedule")
-          : i18n.t("upload:toast.noEligibleChannels")
-      )
+      toast.error(i18n.t("upload:toast.noEligibleChannels"))
       return
     }
 
@@ -1199,33 +1239,42 @@ export default function UploadPage() {
               schedulePopoverOpen={showGlobalSchedule}
               schedulePopoverAnchorRef={globalSchedulePopoverAnchorRef}
               scheduledLocal={globalScheduledLocal}
+              scheduleTimezone={globalScheduleTimezone}
               publishPending={
                 publishMutation.isPending || updateMutation.isPending
               }
               onPublishNow={() => void publishGlobalNow(false)}
               onScheduleOpenChange={setShowGlobalSchedule}
               onScheduleChange={setGlobalScheduledLocal}
+              onScheduleTimezoneChange={setGlobalScheduleTimezone}
               onConfirmSchedule={() => void publishGlobalNow(true)}
             />
           ) : null}
         </div>
 
-        <UploadChannelTabs
-          channels={channelTabs}
-          activeKey={activeKey}
-          onSelect={(key) => {
-            setSelectedChannelKey(key)
-            setShowGlobalSchedule(false)
-          }}
-          dotStatusByKey={dotStatusByKey}
-          includedByKey={includedByKey}
-          onIncludedChange={handleChannelIncludedChange}
-          includeSwitchDisabledByKey={includeSwitchDisabledByKey}
-          includeSwitchPending={patchMutation.isPending}
-        />
+        <div className="grid min-w-0 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-start">
+          <aside className="min-w-0 rounded-xl border border-border bg-card p-3 shadow-sm xl:sticky xl:top-20">
+            <p className="mb-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              Channels
+            </p>
+            <UploadChannelTabs
+              layout="grid"
+              channels={channelTabs}
+              activeKey={activeKey}
+              onSelect={(key) => {
+                setSelectedChannelKey(key)
+                setShowGlobalSchedule(false)
+              }}
+              dotStatusByKey={dotStatusByKey}
+              includedByKey={includedByKey}
+              onIncludedChange={handleChannelIncludedChange}
+              includeSwitchDisabledByKey={includeSwitchDisabledByKey}
+              includeSwitchPending={patchMutation.isPending}
+            />
+          </aside>
 
-        <div className="min-h-[min(520px,70vh)] min-w-0">
-          <UploadContentReviewPanel
+          <div className="min-w-0">
+            <UploadContentReviewPanel
             contentId={upload.contentRef}
             uploadId={uploadId}
             embedInUpload
@@ -1254,10 +1303,29 @@ export default function UploadPage() {
                       <Eye className="size-3.5" aria-hidden />
                       Preview
                     </Button>
+                    {activeDraft.dirty || scheduleDirty ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={
+                          patchMutation.isPending || updateMutation.isPending
+                        }
+                        onClick={discardActiveChannel}
+                      >
+                        <X className="size-3.5" aria-hidden />
+                        {i18n.t("common:actions.cancel")}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant={
+                        activeDraft.dirty || scheduleDirty
+                          ? "default"
+                          : "outline"
+                      }
                       disabled={
                         (!activeIsScheduled && !activeDraft.dirty) ||
                         (activeIsScheduled &&
@@ -1267,12 +1335,13 @@ export default function UploadPage() {
                         updateMutation.isPending
                       }
                       className={cn(
-                        "h-8 text-xs",
+                        "h-8 gap-1.5 px-3 text-xs font-semibold",
                         (activeDraft.dirty || scheduleDirty) &&
-                          "border-primary/50 text-primary",
+                          "bg-[#1D9E75] text-white hover:bg-[#0F6E56] dark:bg-[#1D9E75] dark:text-white dark:hover:bg-[#0F6E56]",
                       )}
                       onClick={saveActiveChannel}
                     >
+                      <Save className="size-3.5" aria-hidden />
                       {activeIsScheduled && updateMutation.isPending
                         ? "Saving…"
                         : "Save"}
@@ -1297,68 +1366,151 @@ export default function UploadPage() {
                 ) : null}
 
                 {activeRow && mediaCfg ? (
-                  <div className="h-[70vh] space-y-3 overflow-y-auto">
+                  <div className="space-y-3 overflow-y-auto">
                     {activeIsScheduled ? (
                       <div className="rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-[11px] text-blue-950 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-100">
                         {i18n.t("upload:editor.scheduledHint")}
                       </div>
                     ) : null}
 
-                    {activeRow &&
-                    mediaCfg &&
-                    bannerVariant !== "not_connected" &&
-                    bannerVariant !== "needs_reauth" ? (
-                      <div className="relative">
-                        <div
-                          ref={channelSchedulePopoverAnchorRef}
-                          aria-hidden
-                          className="pointer-events-none absolute top-0 right-0 size-px"
-                        />
-                        <UploadPublishControls
-                          scope="channel"
-                          platformLabel={mediaCfg.displayName}
-                          serverStatus={activeRow.status}
-                          scheduleSupported={activeKey !== "rednote"}
-                          schedulePopoverOpen={showChannelSchedule}
-                          schedulePopoverAnchorRef={
-                            channelSchedulePopoverAnchorRef
-                          }
-                          scheduledLocal={scheduledLocalForActive}
-                          publishPending={
-                            publishMutation.isPending ||
-                            updateMutation.isPending
-                          }
-                          onPublishNow={() => void publishActiveNow(false)}
-                          onScheduleOpenChange={setShowChannelSchedule}
-                          onScheduleChange={(v) =>
-                            setScheduledLocalByChannel((prev) => ({
+                    {activeIsScheduled ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                            {i18n.t("upload:publish.whenToPublish")}
+                          </p>
+                          <Input
+                            type="datetime-local"
+                            value={scheduledLocalForActive}
+                            onChange={(e) =>
+                              setScheduledLocalByChannel((prev) => ({
+                                ...prev,
+                                [activeKey]: e.target.value,
+                              }))
+                            }
+                            className="h-9 text-xs"
+                          />
+                        </div>
+                        <TimezoneCombobox
+                          value={scheduleTimezoneForActive}
+                          onChange={(tz) =>
+                            setScheduleTimezoneByChannel((prev) => ({
                               ...prev,
-                              [activeKey]: v,
+                              [activeKey]: tz,
                             }))
                           }
-                          onConfirmSchedule={() => void publishActiveNow(true)}
+                          disabled={updateMutation.isPending}
                         />
                       </div>
                     ) : null}
 
-                    {activeIsScheduled ? (
-                      <div className="space-y-1.5">
+<div className="space-y-2">
+                      <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                        Media
+                      </p>
+                      <div className="flex overflow-hidden rounded-md border">
+                        {mediaCfg.tabs.map((tab) => {
+                          const active =
+                            (activeDraft.mediaTab === "video"
+                              ? "video"
+                              : "multiple") === tab
+                          return (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() =>
+                                setDraft(activeKey, {
+                                  mediaTab: tab,
+                                  ...(tab === "video"
+                                    ? { imageUrls: [] }
+                                    : { videoUrl: null }),
+                                })
+                              }
+                              className={cn(
+                                "flex-1 border-r px-2 py-1.5 text-[11px] transition-colors last:border-r-0",
+                                active
+                                  ? "bg-muted font-medium text-foreground"
+                                  : "bg-background text-muted-foreground hover:bg-muted/50"
+                              )}
+                            >
+                              {mediaTabLabels(tab)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <UploadMediaDropZone
+                        mode={
+                          activeDraft.mediaTab === "video"
+                            ? "video"
+                            : "multiple"
+                        }
+                        imageUrls={activeDraft.imageUrls}
+                        videoUrl={activeDraft.videoUrl}
+                        maxImages={mediaCfg.maxCarousel}
+                        activeDrag={activeDrag}
+                        onRemoveImage={(i) => {
+                          const next = activeDraft.imageUrls.filter(
+                            (_, j) => j !== i
+                          )
+                          setDraft(activeKey, {
+                            mediaTab: "multiple",
+                            imageUrls: next,
+                            dirty: true,
+                          })
+                        }}
+                        onClear={() =>
+                          setDraft(activeKey, {
+                            imageUrls: [],
+                            videoUrl: null,
+                            dirty: true,
+                          })
+                        }
+                        onUploadedUrls={(urls) => {
+                          const tab =
+                            activeDraft.mediaTab === "video"
+                              ? "video"
+                              : "multiple"
+                          if (tab === "video") {
+                            setDraft(activeKey, {
+                              mediaTab: "video",
+                              videoUrl: urls[0] ?? null,
+                              imageUrls: [],
+                              dirty: true,
+                            })
+                            return
+                          }
+                          const merged = [
+                            ...activeDraft.imageUrls,
+                            ...urls,
+                          ].slice(0, mediaCfg.maxCarousel)
+                          setDraft(activeKey, {
+                            mediaTab: "multiple",
+                            imageUrls: merged,
+                            videoUrl: null,
+                            dirty: true,
+                          })
+                        }}
+                      />
+                    </div>
+
+                    {normalizeChannelKey(activeRow.channel) === "youtube" ? (
+                      <div className="space-y-2 px-2">
                         <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                          {i18n.t("upload:publish.whenToPublish")}
+                          Video title
                         </p>
                         <Input
-                          type="datetime-local"
-                          value={scheduledLocalForActive}
+                          value={activeDraft.youtubeTitle}
                           onChange={(e) =>
-                            setScheduledLocalByChannel((prev) => ({
-                              ...prev,
-                              [activeKey]: e.target.value,
-                            }))
+                            setDraft(activeKey, {
+                              youtubeTitle: e.target.value,
+                            })
                           }
-                          className="h-9 text-xs"
+                          placeholder="Enter YouTube video title…"
+                          className="text-xs"
                         />
                       </div>
                     ) : null}
+
 
                     <div className="space-y-2">
                       <UploadTextDropZone
@@ -1394,96 +1546,52 @@ export default function UploadPage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                        Media
-                      </p>
-                      <div className="flex overflow-hidden rounded-md border">
-                        {mediaCfg.tabs.map((tab) => {
-                          const active = activeDraft.mediaTab === tab
-                          return (
-                            <button
-                              key={tab}
-                              type="button"
-                              onClick={() =>
-                                setDraft(activeKey, { mediaTab: tab })
-                              }
-                              className={cn(
-                                "flex-1 border-r px-2 py-1.5 text-[11px] transition-colors last:border-r-0",
-                                active
-                                  ? "bg-muted font-medium text-foreground"
-                                  : "bg-background text-muted-foreground hover:bg-muted/50"
-                              )}
-                            >
-                              {mediaTabLabels(tab)}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      <UploadMediaDropZone
-                        mode={activeDraft.mediaTab}
-                        imageUrls={activeDraft.imageUrls}
-                        videoUrl={activeDraft.videoUrl}
-                        maxImages={mediaCfg.maxCarousel}
-                        activeDrag={activeDrag}
-                        onRemoveImage={(i) => {
-                          const next = activeDraft.imageUrls.filter(
-                            (_, j) => j !== i
-                          )
-                          setDraft(activeKey, { imageUrls: next, dirty: true })
-                        }}
-                        onClear={() =>
-                          setDraft(activeKey, {
-                            imageUrls: [],
-                            videoUrl: null,
-                            dirty: true,
-                          })
-                        }
-                        onUploadedUrls={(urls) => {
-                          const tab = activeDraft.mediaTab
-                          if (tab === "video") {
-                            setDraft(activeKey, {
-                              videoUrl: urls[0] ?? null,
-                              imageUrls: [],
-                              dirty: true,
-                            })
-                            return
-                          }
-                          if (tab === "single") {
-                            setDraft(activeKey, {
-                              imageUrls: urls.slice(0, 1),
-                              videoUrl: null,
-                              dirty: true,
-                            })
-                            return
-                          }
-                          const merged = [
-                            ...activeDraft.imageUrls,
-                            ...urls,
-                          ].slice(0, mediaCfg.maxCarousel)
-                          setDraft(activeKey, {
-                            imageUrls: merged,
-                            videoUrl: null,
-                            dirty: true,
-                          })
-                        }}
-                      />
-                    </div>
+                   
+                   
 
-                    {normalizeChannelKey(activeRow.channel) === "youtube" ? (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                          Video title
-                        </p>
-                        <Input
-                          value={activeDraft.youtubeTitle}
-                          onChange={(e) =>
-                            setDraft(activeKey, {
-                              youtubeTitle: e.target.value,
-                            })
+                    {activeRow &&
+                    mediaCfg &&
+                    bannerVariant !== "not_connected" &&
+                    bannerVariant !== "needs_reauth" ? (
+                      <div className="relative border-t border-border/60 pt-3">
+                        <div
+                          ref={channelSchedulePopoverAnchorRef}
+                          aria-hidden
+                          className="pointer-events-none absolute top-0 right-0 size-px"
+                        />
+                        <UploadPublishControls
+                          scope="channel"
+                          platformLabel={mediaCfg.displayName}
+                          serverStatus={activeRow.status}
+                          scheduleSupported
+                          unsavedChanges={
+                            activeDraft.dirty || scheduleDirty
                           }
-                          placeholder="Enter YouTube video title…"
-                          className="text-xs"
+                          schedulePopoverOpen={showChannelSchedule}
+                          schedulePopoverAnchorRef={
+                            channelSchedulePopoverAnchorRef
+                          }
+                          scheduledLocal={scheduledLocalForActive}
+                          scheduleTimezone={scheduleTimezoneForActive}
+                          publishPending={
+                            publishMutation.isPending ||
+                            updateMutation.isPending
+                          }
+                          onPublishNow={() => void publishActiveNow(false)}
+                          onScheduleOpenChange={setShowChannelSchedule}
+                          onScheduleChange={(v) =>
+                            setScheduledLocalByChannel((prev) => ({
+                              ...prev,
+                              [activeKey]: v,
+                            }))
+                          }
+                          onScheduleTimezoneChange={(tz) =>
+                            setScheduleTimezoneByChannel((prev) => ({
+                              ...prev,
+                              [activeKey]: tz,
+                            }))
+                          }
+                          onConfirmSchedule={() => void publishActiveNow(true)}
                         />
                       </div>
                     ) : null}
@@ -1491,7 +1599,8 @@ export default function UploadPage() {
                 ) : null}
               </div>
             }
-          />
+            />
+          </div>
         </div>
       </div>
 

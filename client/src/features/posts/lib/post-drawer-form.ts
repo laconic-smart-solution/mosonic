@@ -66,7 +66,7 @@ export function draftMediaFromItems(items: PostMediaItem[]): Pick<
   "mediaTab" | "imageUrls" | "videoUrl"
 > {
   if (items.length === 0) {
-    return { mediaTab: "single", imageUrls: [], videoUrl: null }
+    return { mediaTab: "multiple", imageUrls: [], videoUrl: null }
   }
   const video = items.find((i) => i.kind === "video")
   if (video) {
@@ -74,7 +74,7 @@ export function draftMediaFromItems(items: PostMediaItem[]): Pick<
   }
   const images = items.filter((i) => i.kind === "image").map((i) => i.url)
   return {
-    mediaTab: images.length > 1 ? "multiple" : "single",
+    mediaTab: "multiple",
     imageUrls: images,
     videoUrl: null,
   }
@@ -90,15 +90,11 @@ export function postDraftToMediaPayload(
     const v = draft.videoUrl?.trim() || null
     return { mediaUrl: v, mediaUrls: v ? [v] : [] }
   }
-  if (draft.mediaTab === "multiple") {
-    const urls = draft.imageUrls
-      .map((u) => u.trim())
-      .filter(Boolean)
-      .slice(0, cfg.maxCarousel || 10)
-    return { mediaUrl: urls[0] ?? null, mediaUrls: urls }
-  }
-  const u = draft.imageUrls[0]?.trim() || null
-  return { mediaUrl: u, mediaUrls: u ? [u] : [] }
+  const urls = draft.imageUrls
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .slice(0, cfg.maxCarousel || 10)
+  return { mediaUrl: urls[0] ?? null, mediaUrls: urls }
 }
 
 export function editableFieldsFromZernio(

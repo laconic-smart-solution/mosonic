@@ -32,7 +32,7 @@ export function UploadMediaDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("mediaDetail.title")}</DialogTitle>
           <DialogDescription>{t("mediaDetail.description")}</DialogDescription>

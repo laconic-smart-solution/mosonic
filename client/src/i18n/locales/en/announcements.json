@@ -1,0 +1,30 @@
+{
+  "page": {
+    "title": "Announcements",
+    "subtitle": "Platform notices from Mosonic.",
+    "loading": "Loading announcements…",
+    "loadingMore": "Loading more…",
+    "scrollForMore": "Scroll for more",
+    "end": "You're all caught up",
+    "loadError": "Could not load announcements.",
+    "empty": "No announcements yet.",
+    "viewMore": "View more",
+    "showLess": "Show less",
+    "showing": "Showing {{start}}–{{end}} of {{total}}"
+  },
+  "banner": {
+    "viewMore": "View more",
+    "dismiss": "Dismiss"
+  },
+  "lowCredit": {
+    "badge": "Credits",
+    "title": "Low credit balance",
+    "message": "{{remaining}} credits left ({{percent}}%). Top up to keep generating.",
+    "topUp": "Top up"
+  },
+  "levels": {
+    "info": "Info",
+    "warning": "Warning",
+    "critical": "Critical"
+  }
+}

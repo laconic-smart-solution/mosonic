@@ -17,6 +17,11 @@ export class UpdateUploadDto {
   @IsOptional()
   scheduledAt?: string | null;
 
+  /** IANA timezone for schedule metadata (e.g. Asia/Bangkok). */
+  @IsString()
+  @IsOptional()
+  timezone?: string | null;
+
   @IsString()
   @IsOptional()
   youtubeTitle?: string | null;

@@ -21,6 +21,7 @@
     "openDialog": "预览",
     "save": "保存",
     "noMedia": "无媒体",
+    "noMediaHint": "添加图片或视频以查看预览。",
     "previousMedia": "上一张",
     "nextMedia": "下一张",
     "mediaCounter": "{{current}} / {{total}}",
@@ -29,7 +30,8 @@
   "mediaDetail": {
     "title": "媒体预览",
     "description": "查看所选媒体的完整尺寸。",
-    "openHint": "查看大图"
+    "openHint": "查看大图",
+    "openOverflow": "查看另外 {{count}} 张图片"
   },
   "scheduledEdit": {
     "title": "编辑定时帖子",
@@ -44,7 +46,9 @@
     "confirm": "确认更改"
   },
   "editor": {
-    "scheduledHint": "此帖子已定时。在下方编辑文案、媒体、时间或 YouTube 标题，然后点击保存以同步到 Zernio。"
+    "scheduledHint": "此帖子已定时。在下方编辑文案、媒体、时间或 YouTube 标题，然后点击保存以同步到 Zernio。",
+    "seeMore": "查看更多",
+    "seeLess": "收起"
   },
   "fields": {
     "media": "媒体",
@@ -52,8 +56,8 @@
     "youtubeTitlePlaceholder": "输入 YouTube 视频标题…"
   },
   "mediaTab": {
-    "single": "单图",
-    "multiple": "多图",
+    "single": "图片",
+    "multiple": "图片",
     "video": "视频"
   },
   "tiktok": {
@@ -69,13 +73,20 @@
     "schedulePublication": "定时发布",
     "scheduleAllChannels": "定时所有已包含渠道",
     "dateTime": "日期和时间",
+    "whenToPublish": "发布时间",
+    "timezone": "时区",
+    "timezoneSearchPlaceholder": "搜索时区…",
+    "timezoneEmpty": "未找到时区",
+    "timezoneHint": "时间按 {{zone}} 解释。",
+    "confirm": "确认",
     "cancel": "取消",
     "confirmSchedule": "确认定时",
     "publishedNoAction": "已发布 — 无需进一步操作",
     "scheduledEditable": "已定时 — 在下方编辑后点击保存以更新",
     "publishingInProgress": "正在发布…",
     "editScheduled": "编辑定时帖子",
-    "rednotePublishOnly": "RedNote 仅支持立即发布，不支持定时发布。"
+    "rednotePublishOnly": "RedNote 仅支持立即发布，不支持定时发布。",
+    "saveBeforePublish": "请先保存更改，然后再发布或定时。"
   },
   "banner": {
     "notConnected": "您的 {{platform}} 账户未连接。",

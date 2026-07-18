@@ -4,6 +4,7 @@ import { EventsModule } from '../events/events.module';
 import { PostModule } from '../post/post.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UsersModule } from '../users/users.module';
+import { CommsModule } from '../comms/comms.module';
 import { WebhookController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
 
@@ -14,6 +15,7 @@ import { WebhookService } from './webhook.service';
     RepositoriesModule,
     EventsModule,
     UsersModule,
+    CommsModule,
   ],
   controllers: [WebhookController],
   providers: [WebhookService],

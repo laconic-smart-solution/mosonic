@@ -1,11 +1,8 @@
 import { InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
-import type { Model } from 'mongoose';
-import type { UploadDocument } from '../upload/schemas/upload.schema';
-import type { UsersService } from '../users/users.service';
 import { EventsService } from '../events/events.service';
-import type { WebhookEventDocument } from './webhook-event.schema';
+import type { UsersService } from '../users/users.service';
 import { WebhookService } from './webhook.service';
 
 describe('WebhookService', () => {
@@ -17,10 +14,13 @@ describe('WebhookService', () => {
     } as unknown as ConfigService;
     return new WebhookService(
       config,
-      {} as Model<WebhookEventDocument>,
-      {} as Model<UploadDocument>,
+      {} as never,
+      {} as never,
+      {} as never,
       {} as EventsService,
       {} as UsersService,
+      {} as never,
+      { notifyUser: jest.fn() } as never,
     );
   }
 
@@ -69,24 +69,23 @@ describe('WebhookService', () => {
         k === 'ZERNIO_WEBHOOK_SECRET' ? secret : undefined,
       ),
     } as unknown as ConfigService;
-    const create = jest.fn().mockRejectedValue({ code: 11000 });
-    const findUpload = jest.fn();
-    const webhookModel = { create } as unknown as Model<WebhookEventDocument>;
-    const uploadModel = {
-      findOne: findUpload,
-    } as unknown as Model<UploadDocument>;
+    const tryRecord = jest.fn().mockResolvedValue('duplicate');
+    const findByUploadId = jest.fn();
     const svc = new WebhookService(
       config,
-      webhookModel,
-      uploadModel,
+      { tryRecord } as never,
+      { findByUploadId } as never,
+      {} as never,
       {} as EventsService,
       {} as UsersService,
+      {} as never,
+      { notifyUser: jest.fn() } as never,
     );
     const body = Buffer.from(
       JSON.stringify({ event: 'post.published', post: { _id: 'p1' } }),
     );
     await svc.handleEvent('evt-dup', body);
-    expect(create).toHaveBeenCalled();
-    expect(findUpload).not.toHaveBeenCalled();
+    expect(tryRecord).toHaveBeenCalled();
+    expect(findByUploadId).not.toHaveBeenCalled();
   });
 });

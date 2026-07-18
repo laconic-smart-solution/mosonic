@@ -38,7 +38,9 @@ export function interpretZernioPostForSync(parsed: unknown | null): SyncPostDeci
     s === 'scheduled' ||
     s === 'pending' ||
     s === 'processing' ||
-    s === 'queued'
+    s === 'queued' ||
+    s === 'publishing' ||
+    s === 'draft'
   ) {
     return { kind: 'noop_scheduled' };
   }

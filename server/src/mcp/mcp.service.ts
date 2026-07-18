@@ -235,6 +235,43 @@ export class McpService {
     return { accounts, unlockedChannels };
   }
 
+  /**
+   * Resolve the Mosonic user's Zernio-connected WhatsApp accountId (SocialAccount / sync cache).
+   */
+  async resolveWhatsAppAccountId(userId: string): Promise<string | null> {
+    const accounts =
+      await this.usersService.getAllActiveConnectedAccounts(userId);
+    const wa = accounts.find(
+      (a) => a.channel.trim().toLowerCase() === 'whatsapp',
+    );
+    return wa?.accountId?.trim() || null;
+  }
+
+  /**
+   * Send WhatsApp text via Zernio inbox (free-form or optional template fallback).
+   */
+  async sendWhatsAppInboxText(params: {
+    userId: string;
+    participantId: string;
+    message: string;
+    templateName?: string;
+    templateLanguage?: string;
+  }): Promise<void> {
+    const accountId = await this.resolveWhatsAppAccountId(params.userId);
+    if (!accountId) {
+      throw new BadRequestException(
+        'No Zernio WhatsApp account connected for this user',
+      );
+    }
+    await this.zernioRest.sendWhatsAppInboxText({
+      accountId,
+      participantId: params.participantId,
+      message: params.message,
+      templateName: params.templateName,
+      templateLanguage: params.templateLanguage,
+    });
+  }
+
   async getConnectionCreditQuote(userId: string): Promise<{
     nodeType: typeof SOCIAL_ACCOUNT_CONNECT_NODE_TYPE;
     creditsEach: number;

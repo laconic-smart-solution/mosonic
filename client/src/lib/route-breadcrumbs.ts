@@ -127,6 +127,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     href: "/admin/communication/line",
     parent: "/admin",
   },
+  {
+    pattern: "/admin/communication/announcements",
+    labelKey: "layout.nav.announcements",
+    ns: "admin",
+    href: "/admin/communication/announcements",
+    parent: "/admin",
+  },
   { pattern: "/admin", labelKey: "layout.title", ns: "admin", href: "/admin/dashboard" },
 
   // App detail / nested
@@ -180,6 +187,7 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
   { pattern: "/content", labelKey: "nav.content", href: "/content" },
   { pattern: "/upload", labelKey: "routes.upload", href: "/upload" },
   { pattern: "/posts", labelKey: "nav.posts", href: "/posts" },
+  { pattern: "/announcements", labelKey: "nav.announcements", href: "/announcements" },
   { pattern: "/settings/accounts", labelKey: "nav.settingsAccounts", href: "/settings/accounts" },
   { pattern: "/usage/plans", labelKey: "tabs.plans", ns: "usage", href: "/usage/plans", parent: "/usage" },
   { pattern: "/usage/topup", labelKey: "tabs.topup", ns: "usage", href: "/usage/topup", parent: "/usage" },

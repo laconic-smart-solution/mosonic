@@ -20,6 +20,16 @@ describe('PostService', () => {
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    findByPostId: jest.fn((postId: string) => {
+      const result = postModel.findOne() as {
+        exec?: () => Promise<unknown>;
+      };
+      if (result && typeof result.exec === 'function') {
+        return result.exec();
+      }
+      return result;
+    }),
+    deleteByPostId: jest.fn().mockResolvedValue(true),
     deleteOne: jest.fn(),
     updateMany: jest.fn(),
     countDocuments: jest.fn(),
@@ -47,12 +57,19 @@ describe('PostService', () => {
     syncFromZernio: jest.fn(),
   };
 
+  const scheduler = {
+    createPostPublish: jest.fn(),
+    reschedulePostPublish: jest.fn(),
+    cancelPostPublish: jest.fn().mockResolvedValue(undefined),
+  };
+
   function service(): PostService {
     return new PostService(
       postModel as never,
       uploadModel as never,
       mcpService as never,
       postAnalyticsService as never,
+      scheduler as never,
     );
   }
 
@@ -112,14 +129,21 @@ describe('PostService', () => {
     uploadModel.findOne.mockReturnValue({
       exec: jest.fn().mockResolvedValue(uploadDoc),
     });
+    (uploadModel as { findByUploadId?: jest.Mock }).findByUploadId = jest
+      .fn()
+      .mockResolvedValue(uploadDoc);
+    (uploadModel as { save?: jest.Mock }).save = jest
+      .fn()
+      .mockImplementation(async (doc: unknown) => doc);
 
     const res = await service().deletePost('p-sched', {
       userId: 'u1',
       role: 'CUSTOMER' as never,
     });
 
+    expect(scheduler.cancelPostPublish).toHaveBeenCalledWith('p-sched');
     expect(mcpService.deleteZernioPost).toHaveBeenCalledWith('z-sched');
-    expect(postModel.deleteOne).toHaveBeenCalledWith({ postId: 'p-sched' });
+    expect(postModel.deleteByPostId).toHaveBeenCalledWith('p-sched');
     expect(channel.status).toBe(UploadChannelStatus.Pending);
     expect(channel.scheduledAt).toBeNull();
     expect(channel.failureReason).toBeNull();
