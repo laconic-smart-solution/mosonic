@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { UsersModule } from '../users/users.module';
@@ -11,7 +11,7 @@ import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
 
 @Module({
-  imports: [UsersModule, AuthModule, CreditModule],
+  imports: [UsersModule, AuthModule, forwardRef(() => CreditModule)],
   controllers: [McpController, ZernioController],
   providers: [
     McpService,
