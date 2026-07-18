@@ -89,6 +89,31 @@ export class PostService {
     return this.posts.findByPostId(postId.trim());
   }
 
+  /**
+   * Removes a post that was created during schedule/publish but never became
+   * usable (e.g. Mosonic scheduler registration failed after the draft/post
+   * row was written). Does not mutate upload channel rows.
+   */
+  async discardOrphanedPost(postId: string): Promise<void> {
+    const id = postId.trim();
+    if (!id) return;
+    const post = await this.posts.findByPostId(id);
+    if (!post) return;
+
+    await this.scheduler.cancelPostPublish(id);
+
+    const zernioId = post.zernioPostId?.trim();
+    if (zernioId && isZernioRemotePostId(zernioId)) {
+      try {
+        await this.mcpService.deleteZernioPost(zernioId);
+      } catch {
+        // Best-effort cleanup; upload failure path still reports the schedule error.
+      }
+    }
+
+    await this.posts.deleteByPostId(id);
+  }
+
   private async ensurePostAnalyticsRecord(post: PostRecord): Promise<void> {
     await this.postAnalyticsService.ensureForPost(post);
   }

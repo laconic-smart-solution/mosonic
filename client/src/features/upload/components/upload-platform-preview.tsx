@@ -110,7 +110,7 @@ export function UploadPlatformPreview({
         imageUrls={imageUrls}
         videoUrl={videoUrl}
         variant={variant}
-        fillFrame={false}
+        fillFrame
       />
     )
 
@@ -136,7 +136,7 @@ export function UploadPlatformPreview({
         <div className="flex justify-center bg-muted/25 p-3">
           <div
             className={cn(
-              "relative w-full max-w-[220px] flex justify-center items-center overflow-hidden rounded-xl border border-border/70 bg-black shadow-inner",
+              "relative w-full max-w-[220px] overflow-hidden rounded-xl border border-border/70 bg-zinc-900 shadow-inner",
               isDialog
                 ? "aspect-9/16 max-h-[min(480px,60vh)]"
                 : "aspect-9/16 max-h-[min(340px,52vh)]",

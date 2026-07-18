@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -19,10 +19,13 @@ type Props = {
   initialIndex?: number
   /**
    * Fill a fixed parent frame (e.g. TikTok/RedNote 9:16 phone).
-   * Media uses object-cover and ignores natural max-height caps.
+   * Media uses object-contain and ignores natural max-height caps.
    */
   fillFrame?: boolean
 }
+
+const DIALOG_FRAME =
+  "relative h-[min(52vh,480px)] w-full overflow-hidden rounded-lg bg-muted/40"
 
 export function UploadPreviewMedia({
   mediaTab,
@@ -42,26 +45,52 @@ export function UploadPreviewMedia({
     setActiveIndex(initialIndex)
   }, [mediaTab, videoUrl, imageUrls.join("|"), initialIndex])
 
-  const naturalMaxH = isDialog
-    ? "max-h-[min(52vh,480px)]"
-    : "max-h-40"
+  const naturalMaxH = isDialog ? undefined : "max-h-40"
   const mediaClass = fillFrame
-    ? cn("absolute inset-0 size-full bg-black object-cover", className)
-    : cn("w-full bg-muted object-cover", naturalMaxH, className)
+    ? cn("absolute inset-0 size-full bg-black object-contain", className)
+    : isDialog
+      ? cn("absolute inset-0 size-full object-contain", className)
+      : cn("w-full bg-muted object-contain", naturalMaxH, className)
   const loadingClass = fillFrame
-    ? cn("absolute inset-0 flex size-full items-center justify-center bg-black/80", className)
-    : cn(
-        "flex w-full items-center justify-center bg-muted/50",
-        isDialog ? "min-h-[240px]" : "min-h-[140px] max-h-40",
+    ? cn(
+        "absolute inset-0 flex size-full items-center justify-center bg-black/80",
+        className,
       )
+    : isDialog
+      ? cn(
+          "absolute inset-0 flex size-full items-center justify-center bg-muted/50",
+          className,
+        )
+      : cn(
+          "flex w-full items-center justify-center bg-muted/50",
+          "min-h-[140px] max-h-40",
+        )
 
   if (mediaTab === "video" && videoUrl) {
+    if (isDialog || fillFrame) {
+      return (
+        <div
+          className={cn(
+            fillFrame ? "absolute inset-0 size-full bg-black" : DIALOG_FRAME,
+            !fillFrame && "bg-black",
+            className,
+          )}
+        >
+          <FileServiceVideo
+            url={videoUrl}
+            className="absolute inset-0 size-full object-contain"
+            controls={isDialog && !fillFrame}
+            muted={!isDialog || fillFrame}
+          />
+        </div>
+      )
+    }
     return (
       <FileServiceVideo
         url={videoUrl}
         className={mediaClass}
-        controls={isDialog && !fillFrame}
-        muted={!isDialog || fillFrame}
+        controls={false}
+        muted
       />
     )
   }
@@ -70,27 +99,67 @@ export function UploadPreviewMedia({
     return (
       <div
         className={cn(
-          "flex items-center justify-center text-xs text-muted-foreground",
+          "flex flex-col items-center justify-center gap-2 text-center",
           fillFrame
-            ? "absolute inset-0 size-full bg-black/80 text-white/70"
-            : cn(
-                "bg-muted/50",
-                isDialog ? "min-h-[240px] rounded-lg" : "min-h-[140px]",
-              ),
+            ? "absolute inset-0 size-full bg-zinc-900 px-4"
+            : isDialog
+              ? cn(DIALOG_FRAME, "px-4")
+              : cn("w-full bg-muted/40 px-4", "min-h-[140px]"),
           className,
         )}
+        role="img"
+        aria-label={t("preview.noMedia")}
       >
-        {t("preview.noMedia")}
+        <div
+          className={cn(
+            "flex size-11 items-center justify-center rounded-full",
+            fillFrame
+              ? "bg-white/10 text-white/80"
+              : "bg-background/80 text-muted-foreground shadow-sm",
+          )}
+        >
+          <ImageOff className="size-5" strokeWidth={1.75} aria-hidden />
+        </div>
+        <div className="space-y-0.5">
+          <p
+            className={cn(
+              "text-sm font-medium",
+              fillFrame ? "text-white/90" : "text-foreground/80",
+            )}
+          >
+            {t("preview.noMedia")}
+          </p>
+          <p
+            className={cn(
+              "max-w-[12rem] text-[11px] leading-snug",
+              fillFrame ? "text-white/50" : "text-muted-foreground",
+            )}
+          >
+            {t("preview.noMediaHint")}
+          </p>
+        </div>
       </div>
     )
   }
 
   if (images.length === 1) {
+    if (isDialog) {
+      return (
+        <div className={cn(DIALOG_FRAME, className)}>
+          <FileServiceImage
+            url={images[0]!}
+            alt=""
+            className="absolute inset-0 size-full object-contain"
+            loadingClassName={loadingClass}
+          />
+        </div>
+      )
+    }
     return (
       <FileServiceImage
         url={images[0]!}
         alt=""
-        className={cn(mediaClass, !fillFrame && isDialog && "")}
+        className={mediaClass}
         loadingClassName={loadingClass}
       />
     )
@@ -110,7 +179,7 @@ export function UploadPreviewMedia({
         <FileServiceImage
           url={currentUrl}
           alt=""
-          className="absolute inset-0 size-full bg-black object-cover"
+          className="absolute inset-0 size-full bg-black object-contain"
           loadingClassName="absolute inset-0 flex size-full items-center justify-center bg-black/80"
         />
         {isDialog ? (
@@ -162,18 +231,25 @@ export function UploadPreviewMedia({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="relative overflow-hidden bg-muted/30">
+      <div
+        className={cn(
+          "relative overflow-hidden",
+          isDialog ? DIALOG_FRAME : "bg-muted/30",
+        )}
+      >
         <FileServiceImage
           url={currentUrl}
           alt=""
           className={cn(
-            "w-full bg-muted object-cover",
-            isDialog ? "max-h-[min(48vh,440px)]" : "max-h-40",
+            isDialog
+              ? "absolute inset-0 size-full object-contain"
+              : "max-h-40 w-full bg-muted object-contain",
           )}
-          loadingClassName={cn(
-            "flex w-full items-center justify-center bg-muted/50",
-            isDialog ? "min-h-[220px]" : "min-h-[140px] max-h-40",
-          )}
+          loadingClassName={
+            isDialog
+              ? "absolute inset-0 flex size-full items-center justify-center bg-muted/50"
+              : "flex min-h-[140px] max-h-40 w-full items-center justify-center bg-muted/50"
+          }
         />
         {isDialog ? (
           <>
@@ -181,7 +257,7 @@ export function UploadPreviewMedia({
               type="button"
               variant="secondary"
               size="icon-sm"
-              className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-background/90 shadow-sm"
+              className="absolute top-1/2 left-2 z-10 -translate-y-1/2 rounded-full bg-background/90 shadow-sm"
               onClick={goPrev}
               aria-label={t("preview.previousMedia")}
             >
@@ -191,13 +267,13 @@ export function UploadPreviewMedia({
               type="button"
               variant="secondary"
               size="icon-sm"
-              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-background/90 shadow-sm"
+              className="absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded-full bg-background/90 shadow-sm"
               onClick={goNext}
               aria-label={t("preview.nextMedia")}
             >
               <ChevronRight className="size-4" aria-hidden />
             </Button>
-            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
+            <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
               {t("preview.mediaCounter", {
                 current: safeIndex + 1,
                 total: images.length,
@@ -215,7 +291,7 @@ export function UploadPreviewMedia({
               type="button"
               onClick={() => setActiveIndex(index)}
               className={cn(
-                "relative size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors",
+                "relative size-14 shrink-0 overflow-hidden rounded-md border-2 bg-muted/40 transition-colors",
                 index === safeIndex
                   ? "border-primary"
                   : "border-transparent opacity-70 hover:opacity-100",
@@ -237,7 +313,9 @@ export function UploadPreviewMedia({
               key={index}
               className={cn(
                 "size-1.5 rounded-full",
-                index === safeIndex ? "bg-foreground/70" : "bg-muted-foreground/30",
+                index === safeIndex
+                  ? "bg-foreground/70"
+                  : "bg-muted-foreground/30",
               )}
               aria-hidden
             />

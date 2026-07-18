@@ -131,6 +131,8 @@ export function inferMediaTabFromUrls(
     if (cfg.tabs.length === 1 && cfg.tabs[0] === "video") return "video"
     if (!imageUrl) return "video"
   }
-  if (imageUrl) return preferredTab === "multiple" ? "multiple" : "single"
-  return preferredTab ?? cfg.tabs[0] ?? "single"
+  if (imageUrl) return "multiple"
+  return preferredTab === "video"
+    ? "video"
+    : (cfg.tabs[0] ?? "multiple")
 }

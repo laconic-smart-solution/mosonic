@@ -21,6 +21,7 @@
     "openDialog": "Preview",
     "save": "Save",
     "noMedia": "No media",
+    "noMediaHint": "Add an image or video to see the preview.",
     "previousMedia": "Previous media",
     "nextMedia": "Next media",
     "mediaCounter": "{{current}} / {{total}}",
@@ -29,7 +30,8 @@
   "mediaDetail": {
     "title": "Media preview",
     "description": "Full-size view of the selected media.",
-    "openHint": "View full size"
+    "openHint": "View full size",
+    "openOverflow": "View {{count}} more images"
   },
   "scheduledEdit": {
     "title": "Edit scheduled post",
@@ -44,7 +46,9 @@
     "confirm": "Confirm changes"
   },
   "editor": {
-    "scheduledHint": "This post is scheduled. Edit caption, media, schedule time, or YouTube title below, then click Save to sync changes to Zernio."
+    "scheduledHint": "This post is scheduled. Edit caption, media, schedule time, or YouTube title below, then click Save to sync changes to Zernio.",
+    "seeMore": "See more",
+    "seeLess": "See less"
   },
   "fields": {
     "media": "Media",
@@ -52,8 +56,8 @@
     "youtubeTitlePlaceholder": "Enter YouTube video title…"
   },
   "mediaTab": {
-    "single": "Single image",
-    "multiple": "Multiple images",
+    "single": "Images",
+    "multiple": "Images",
     "video": "Video"
   },
   "tiktok": {
@@ -82,7 +86,8 @@
     "timezoneHint": "Times are interpreted in {{zone}}.",
     "confirm": "Confirm",
     "channelPublishing": "{{platform}} publishing",
-    "rednotePublishOnly": "RedNote supports publish now only — scheduling is not available."
+    "rednotePublishOnly": "RedNote supports publish now only — scheduling is not available.",
+    "saveBeforePublish": "Save your changes before publishing or scheduling."
   },
   "banner": {
     "notConnected": "Your {{platform}} account is not connected.",

@@ -45,6 +45,7 @@ describe('UploadService', () => {
       }
       return result;
     }),
+    findLatestByContentRef: jest.fn(),
     save: jest.fn(async (doc: unknown) => doc),
     collection: { findOne: collectionFindOne },
   };
@@ -72,6 +73,7 @@ describe('UploadService', () => {
     findScheduledPostsForUpload: jest.fn().mockResolvedValue([]),
     updateScheduledPostsOnUpload: jest.fn().mockResolvedValue(undefined),
     updateScheduledPostForChannel: jest.fn().mockResolvedValue(undefined),
+    discardOrphanedPost: jest.fn().mockResolvedValue(undefined),
   };
 
   const scheduler = {
@@ -130,8 +132,10 @@ describe('UploadService', () => {
     });
     postService.updateScheduledPostsOnUpload.mockResolvedValue(undefined);
     postService.updateScheduledPostForChannel.mockResolvedValue(undefined);
+    postService.discardOrphanedPost.mockResolvedValue(undefined);
     scheduler.createPostPublish.mockResolvedValue({ id: 'job-1' });
     scheduler.reschedulePostPublish.mockResolvedValue({ id: 'job-1' });
+    uploadModel.findLatestByContentRef.mockResolvedValue(null);
   });
 
   it('calls Zernio once with all included channels and marks published', async () => {
@@ -473,6 +477,107 @@ describe('UploadService', () => {
     expect(scheduler.createPostPublish).toHaveBeenCalledWith(
       'local-post-id',
       future,
+      undefined,
+    );
+    expect(doc.channels[0].status).toBe(UploadChannelStatus.Scheduled);
+  });
+
+  it('rolls back scheduled post when Mosonic scheduler registration fails', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const future = new Date(Date.now() + 3600_000).toISOString();
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      ruleRef: 'rule-1',
+      workflowRef: 'wf-1',
+      userId: 'user-1',
+      channels: [mockChannel({ channel: 'linkedin' })],
+      resolvedOutputs: { text: 'hi' },
+      status: UploadJobStatus.Pending,
+      save,
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [
+        { channel: 'linkedin', accountId: 'acc_li', connectedAt: new Date() },
+      ],
+    });
+    mcpService.publishCreatePostBatch.mockResolvedValue({
+      postId: 'sched_1',
+      raw: {},
+    });
+    scheduler.createPostPublish.mockRejectedValue(
+      new Error('SCHEDULER_SERVICE_URL is not set'),
+    );
+
+    await service.publishUpload(
+      'u1',
+      {
+        publishNow: false,
+        scheduledAt: future,
+        channels: [{ channel: 'linkedin', included: true }],
+      },
+      { userId: 'user-1', role: 'CUSTOMER' as never },
+    );
+
+    expect(postService.discardOrphanedPost).toHaveBeenCalledWith('local-post-id');
+    expect(doc.channels[0].status).toBe(UploadChannelStatus.Failed);
+    expect(doc.channels[0].failureReason).toMatch(/scheduling service/i);
+  });
+
+  it('schedules RedNote publish through Mosonic scheduler', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const future = new Date(Date.now() + 3_600_000).toISOString();
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      ruleRef: 'rule-1',
+      workflowRef: 'wf-1',
+      userId: 'user-1',
+      channels: [
+        mockChannel({
+          channel: 'rednote',
+          caption: 'hello rednote',
+          mediaUrl: 'https://cdn.example/video.mp4',
+          mediaUrls: ['https://cdn.example/video.mp4'],
+        }),
+      ],
+      resolvedOutputs: { text: 'hello rednote' },
+      status: UploadJobStatus.Pending,
+      save,
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [{ channel: 'rednote', accountId: 'acc_red', connectedAt: new Date() }],
+    });
+
+    await service.publishUpload(
+      'u1',
+      {
+        publishNow: false,
+        scheduledAt: future,
+        channels: [{ channel: 'rednote', included: true }],
+      },
+      { userId: 'user-1', role: 'CUSTOMER' as never },
+    );
+
+    expect(mcpService.publishCreatePostBatch).not.toHaveBeenCalled();
+    expect(redNoteService.publishEnqueue).not.toHaveBeenCalled();
+    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channels: ['rednote'],
+        publishNow: false,
+      }),
+    );
+    expect(scheduler.createPostPublish).toHaveBeenCalledTimes(1);
+    expect(scheduler.createPostPublish).toHaveBeenCalledWith(
+      'local-post-id',
+      future,
+      undefined,
     );
     expect(doc.channels[0].status).toBe(UploadChannelStatus.Scheduled);
   });
@@ -847,6 +952,7 @@ describe('UploadService', () => {
     expect(scheduler.reschedulePostPublish).toHaveBeenCalledWith(
       'local-1',
       future,
+      undefined,
     );
     expect(doc.channels[0].caption).toBe('new caption');
     expect(doc.channels[1].caption).toBe('new caption');
@@ -854,7 +960,6 @@ describe('UploadService', () => {
     expect(doc.channels[2].caption).toBe('published caption');
     expect(doc.channels[0].scheduledAt?.toISOString()).toBe(future);
     expect(doc.channels[1].scheduledAt?.toISOString()).toBe(future);
-    expect(markModified).toHaveBeenCalledWith('channels');
     expect(events.emitToRoom).toHaveBeenCalledWith(
       'upload_u1',
       'upload:updated',
@@ -925,6 +1030,7 @@ describe('UploadService', () => {
     expect(scheduler.reschedulePostPublish).toHaveBeenCalledWith(
       'local-ig',
       future,
+      undefined,
     );
     expect(postService.updateScheduledPostForChannel).toHaveBeenCalledWith(
       'u1',
@@ -1349,11 +1455,7 @@ describe('UploadService', () => {
         status: UploadJobStatus.Pending,
         save,
       };
-      findOne.mockReturnValue({
-        sort: () => ({
-          exec: () => Promise.resolve(doc),
-        }),
-      });
+      uploadModel.findLatestByContentRef.mockResolvedValue(doc);
       mcpService.getConnectedAccounts.mockResolvedValue({ accounts: [] });
       const customChannels = [
         mockChannel({ channel: 'instagram', caption: 'IG from adapt' }),
@@ -1373,12 +1475,16 @@ describe('UploadService', () => {
         { userId: 'user-1' },
       );
 
-      expect(doc.channels).toHaveLength(2);
+      expect(uploadModel.save).toHaveBeenCalled();
+      const saved = uploadModel.save.mock.calls[0]?.[0] as {
+        channels: Array<{ channel: string; caption: string }>;
+      };
+      expect(saved.channels).toHaveLength(2);
       expect(
-        doc.channels.find((c) => c.channel === 'instagram')?.caption,
+        saved.channels.find((c) => c.channel === 'instagram')?.caption,
       ).toBe('IG from adapt');
       expect(
-        doc.channels.find((c) => c.channel === 'facebook')?.caption,
+        saved.channels.find((c) => c.channel === 'facebook')?.caption,
       ).toBe('FB from adapt');
     });
   });
