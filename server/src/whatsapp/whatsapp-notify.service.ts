@@ -32,6 +32,7 @@ export class WhatsAppNotifyService {
       await this.whatsapp.sendText(
         connection.whatsappWaId,
         msg.slice(0, MAX_WHATSAPP_TEXT),
+        id,
       );
     } catch (err) {
       this.logger.warn(

@@ -31,7 +31,7 @@ describe('WhatsAppNotifyService', () => {
       whatsappWaId: '15551234567',
     });
     await service.notifyUser('u1', 'hello');
-    expect(whatsapp.sendText).toHaveBeenCalledWith('15551234567', 'hello');
+    expect(whatsapp.sendText).toHaveBeenCalledWith('15551234567', 'hello', 'u1');
   });
 
   it('swallows send errors', async () => {

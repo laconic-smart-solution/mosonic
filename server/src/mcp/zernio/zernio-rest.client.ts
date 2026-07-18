@@ -621,6 +621,254 @@ export class ZernioRestClient {
   }
 
   /**
+   * Search inbox conversations (message text + contact identity / phone).
+   * @see https://docs.zernio.com/messages/search-inbox-conversations
+   */
+  async searchInboxConversations(params: {
+    query: string;
+    platform?: string;
+    accountId?: string;
+    profileId?: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      participantId?: string;
+      accountId?: string;
+      platform?: string;
+    }>
+  > {
+    const query = params.query.trim();
+    if (query.length < 2) return [];
+    try {
+      const res = await this.http.get<{
+        data?: Array<{
+          conversation?: {
+            id?: string;
+            participantId?: string;
+            accountId?: string;
+            platform?: string;
+          };
+          id?: string;
+          participantId?: string;
+          accountId?: string;
+          platform?: string;
+        }>;
+      }>('/inbox/conversations/search', {
+        params: {
+          query,
+          ...(params.platform ? { platform: params.platform } : {}),
+          ...(params.accountId ? { accountId: params.accountId } : {}),
+          ...(params.profileId ? { profileId: params.profileId } : {}),
+          limit: params.limit ?? 20,
+        },
+      });
+      const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+      return rows
+        .map((row) => {
+          const c = row.conversation ?? row;
+          const id = typeof c.id === 'string' ? c.id.trim() : '';
+          if (!id) return null;
+          return {
+            id,
+            ...(typeof c.participantId === 'string'
+              ? { participantId: c.participantId }
+              : {}),
+            ...(typeof c.accountId === 'string'
+              ? { accountId: c.accountId }
+              : {}),
+            ...(typeof c.platform === 'string' ? { platform: c.platform } : {}),
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x != null);
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not search Zernio inbox — ${detail}`
+          : message || 'Zernio inbox search failed',
+      );
+    }
+  }
+
+  /**
+   * Create (or continue) an inbox conversation. WhatsApp requires an approved template
+   * to open / re-open outside the 24h window.
+   * @see https://docs.zernio.com/messages/create-inbox-conversation
+   */
+  async createInboxConversation(payload: {
+    accountId: string;
+    participantId: string;
+    message?: string;
+    templateName?: string;
+    templateLanguage?: string;
+    templateParams?: string[];
+  }): Promise<{ conversationId?: string; messageId?: string }> {
+    const accountId = payload.accountId.trim();
+    const participantId = payload.participantId.trim().replace(/^\+/, '');
+    if (!accountId || !participantId) {
+      throw new Error(
+        'Zernio createInboxConversation requires accountId and participantId',
+      );
+    }
+    const body: Record<string, unknown> = {
+      accountId,
+      participantId,
+    };
+    if (payload.message?.trim()) body.message = payload.message.trim();
+    if (payload.templateName?.trim()) {
+      body.templateName = payload.templateName.trim();
+      body.templateLanguage =
+        payload.templateLanguage?.trim() || 'en';
+      if (payload.templateParams?.length) {
+        body.templateParams = payload.templateParams;
+      }
+    }
+    this.logger.log(
+      `[REST] POST /inbox/conversations accountId=${accountId} participantId=${participantId}`,
+    );
+    try {
+      const res = await this.http.post<{
+        success?: boolean;
+        data?: { conversationId?: string; messageId?: string };
+      }>('/inbox/conversations', body);
+      return {
+        conversationId: res.data?.data?.conversationId,
+        messageId: res.data?.data?.messageId,
+      };
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not create Zernio inbox conversation — ${detail}`
+          : message || 'Zernio create inbox conversation failed',
+      );
+    }
+  }
+
+  /**
+   * Send a free-form (or template) message into an existing inbox conversation.
+   * @see https://docs.zernio.com/messages/send-inbox-message
+   */
+  async sendInboxMessage(payload: {
+    conversationId: string;
+    accountId: string;
+    message: string;
+  }): Promise<void> {
+    const conversationId = payload.conversationId.trim();
+    const accountId = payload.accountId.trim();
+    const message = payload.message.trim();
+    if (!conversationId || !accountId || !message) {
+      throw new Error(
+        'Zernio sendInboxMessage requires conversationId, accountId, and message',
+      );
+    }
+    const path = `/inbox/conversations/${encodeURIComponent(conversationId)}/messages`;
+    this.logger.log(`[REST] POST ${path} accountId=${accountId}`);
+    try {
+      await this.http.post(path, { accountId, message });
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const messageText = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not send Zernio inbox message — ${detail}`
+          : messageText || 'Zernio send inbox message failed',
+      );
+    }
+  }
+
+  /**
+   * Find-or-create WhatsApp inbox thread and send text (free-form inside 24h window;
+   * falls back to optional approved template when outside window / no thread).
+   */
+  async sendWhatsAppInboxText(params: {
+    accountId: string;
+    participantId: string;
+    message: string;
+    templateName?: string;
+    templateLanguage?: string;
+  }): Promise<void> {
+    const accountId = params.accountId.trim();
+    const participantId = params.participantId.trim().replace(/^\+/, '');
+    const message = params.message.trim();
+    if (!accountId || !participantId || !message) {
+      throw new Error(
+        'Zernio WhatsApp send requires accountId, participantId, and message',
+      );
+    }
+
+    const templateName = params.templateName?.trim();
+    const templateLanguage = params.templateLanguage?.trim() || 'en';
+
+    let conversationId: string | undefined;
+    try {
+      const hits = await this.searchInboxConversations({
+        query: participantId,
+        platform: 'whatsapp',
+        accountId,
+        limit: 20,
+      });
+      const exact = hits.find((h) => {
+        const pid = (h.participantId ?? '').replace(/^\+/, '');
+        return pid === participantId || pid.endsWith(participantId);
+      });
+      conversationId = exact?.id ?? hits[0]?.id;
+    } catch (err) {
+      this.logger.warn(
+        `Zernio inbox search before WhatsApp send failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    if (conversationId) {
+      try {
+        await this.sendInboxMessage({ conversationId, accountId, message });
+        return;
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        if (!templateName || !this.isWhatsAppTemplateRequiredError(detail)) {
+          throw err;
+        }
+        this.logger.warn(
+          `Zernio free-form WhatsApp send failed (likely outside 24h window); retrying with template ${templateName}`,
+        );
+      }
+    }
+
+    if (!templateName) {
+      throw new Error(
+        conversationId
+          ? 'WhatsApp free-form send failed and WHATSAPP_ZERNIO_TEMPLATE_NAME is not set'
+          : 'No Zernio WhatsApp conversation found; set WHATSAPP_ZERNIO_TEMPLATE_NAME for cold notify',
+      );
+    }
+
+    await this.createInboxConversation({
+      accountId,
+      participantId,
+      templateName,
+      templateLanguage,
+      templateParams: [message],
+    });
+  }
+
+  private isWhatsAppTemplateRequiredError(detail: string): boolean {
+    const lower = detail.toLowerCase();
+    return (
+      lower.includes('template_required') ||
+      lower.includes('template required') ||
+      lower.includes('24-hour') ||
+      lower.includes('24 hour') ||
+      lower.includes('customer care') ||
+      lower.includes('outside the window')
+    );
+  }
+
+  /**
    * DELETE /v1/accounts/{accountId} — removes the connected social account on Zernio.
    * @see https://docs.zernio.com
    */

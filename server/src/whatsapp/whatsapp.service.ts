@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { ZernioRestClient } from '../mcp/zernio/zernio-rest.client';
+import { UsersService } from '../users/users.service';
 import { WhatsAppConnectCodeService } from './whatsapp-connect-code.service';
 import { WhatsAppConnectionService } from './whatsapp-connection.service';
 import {
@@ -59,7 +61,19 @@ export class WhatsAppService {
     private readonly config: ConfigService,
     private readonly connectCodes: WhatsAppConnectCodeService,
     private readonly connections: WhatsAppConnectionService,
+    private readonly users: UsersService,
+    private readonly zernioRest: ZernioRestClient,
   ) {}
+
+  /** true (default) = Go whatsapp-service; false = Zernio inbox API. */
+  private get useGolang(): boolean {
+    const raw = this.config
+      .get<string>('WHATSAPP_USE_GOLANG')
+      ?.trim()
+      .toLowerCase();
+    if (raw === 'false' || raw === '0' || raw === 'no') return false;
+    return true;
+  }
 
   private get accessToken(): string {
     const token = this.config.get<string>('WHATSAPP_ACCESS_TOKEN')?.trim();
@@ -188,7 +202,20 @@ export class WhatsAppService {
       : new ServiceUnavailableException(message);
   }
 
-  async sendText(recipientId: string, text: string): Promise<void> {
+  /**
+   * Outbound text. When WHATSAPP_USE_GOLANG=false, requires userId to resolve the
+   * sender's Zernio WhatsApp accountId.
+   */
+  async sendText(
+    recipientId: string,
+    text: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!this.useGolang) {
+      await this.sendTextViaZernio(recipientId, text, userId);
+      return;
+    }
+
     const res = await this.fetchWhatsApp(`${this.baseUrl}/api/v1/messages`, {
       method: 'POST',
       headers: this.sendHeaders(),
@@ -201,6 +228,47 @@ export class WhatsAppService {
         .catch(() => ({}))) as WhatsAppServiceEnvelope<unknown>;
       throw new ServiceUnavailableException(
         body.error ?? `whatsapp-service returned HTTP ${res.status}`,
+      );
+    }
+  }
+
+  private async sendTextViaZernio(
+    recipientId: string,
+    text: string,
+    userId?: string,
+  ): Promise<void> {
+    const id = userId?.trim();
+    if (!id) {
+      throw new ServiceUnavailableException(
+        'WhatsApp Zernio send requires userId (set WHATSAPP_USE_GOLANG=true for Meta/Go sends without a Mosonic user)',
+      );
+    }
+    const accounts = await this.users.getAllActiveConnectedAccounts(id);
+    const wa = accounts.find(
+      (a) => a.channel.trim().toLowerCase() === 'whatsapp',
+    );
+    const accountId = wa?.accountId?.trim();
+    if (!accountId) {
+      throw new ServiceUnavailableException(
+        'No Zernio WhatsApp account connected for this user',
+      );
+    }
+    try {
+      await this.zernioRest.sendWhatsAppInboxText({
+        accountId,
+        participantId: recipientId,
+        message: text,
+        templateName:
+          this.config.get<string>('WHATSAPP_ZERNIO_TEMPLATE_NAME')?.trim() ||
+          undefined,
+        templateLanguage:
+          this.config.get<string>('WHATSAPP_ZERNIO_TEMPLATE_LANGUAGE')?.trim() ||
+          'en',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new ServiceUnavailableException(
+        message || 'Zernio WhatsApp send failed',
       );
     }
   }
@@ -589,6 +657,7 @@ export class WhatsAppService {
     await this.sendText(
       whatsappWaId,
       'Connected successfully! Your Mosonic account is now linked to WhatsApp.',
+      localUserId,
     );
     this.logger.log(
       `Linked WhatsApp user ${whatsappWaId} to local user ${localUserId}`,
