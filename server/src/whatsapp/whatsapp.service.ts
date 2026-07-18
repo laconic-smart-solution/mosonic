@@ -75,6 +75,15 @@ export class WhatsAppService {
     return true;
   }
 
+  /** true = send directly via Meta Graph API (no Go service or Zernio required). */
+  private get useMetaDirect(): boolean {
+    const raw = this.config
+      .get<string>('WHATSAPP_USE_META_DIRECT')
+      ?.trim()
+      .toLowerCase();
+    return raw === 'true' || raw === '1' || raw === 'yes';
+  }
+
   private get accessToken(): string {
     const token = this.config.get<string>('WHATSAPP_ACCESS_TOKEN')?.trim();
     if (!token) {
@@ -211,11 +220,19 @@ export class WhatsAppService {
     text: string,
     userId?: string,
   ): Promise<void> {
+    // Priority 1: direct Meta Graph API
+    if (this.useMetaDirect) {
+      await this.sendTextViaMeta(recipientId, text);
+      return;
+    }
+
+    // Priority 2: Zernio inbox API
     if (!this.useGolang) {
       await this.sendTextViaZernio(recipientId, text, userId);
       return;
     }
 
+    // Priority 3: Go whatsapp-service
     const res = await this.fetchWhatsApp(`${this.baseUrl}/api/v1/messages`, {
       method: 'POST',
       headers: this.sendHeaders(),
@@ -228,6 +245,48 @@ export class WhatsAppService {
         .catch(() => ({}))) as WhatsAppServiceEnvelope<unknown>;
       throw new ServiceUnavailableException(
         body.error ?? `whatsapp-service returned HTTP ${res.status}`,
+      );
+    }
+  }
+
+  /**
+   * Send a text message directly via Meta Cloud API (Graph API v18.0).
+   * Requires WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID.
+   */
+  private async sendTextViaMeta(
+    recipientId: string,
+    text: string,
+  ): Promise<void> {
+    const url = `https://graph.facebook.com/v18.0/${this.phoneNumberId}/messages`;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: recipientId,
+          type: 'text',
+          text: { body: text },
+        }),
+      });
+    } catch (err) {
+      throw new ServiceUnavailableException(
+        `Meta Graph API unreachable: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: { message?: string };
+      };
+      throw new ServiceUnavailableException(
+        body?.error?.message ?? `Meta Graph API returned HTTP ${res.status}`,
       );
     }
   }
