@@ -8,9 +8,12 @@
     "subtitle": "Manage your profile, language, and connected publishing channels."
   },
   "profile": {
+    "sectionTitle": "Profile",
+    "detailsTitle": "Account details",
     "email": "Email",
     "phone": "Phone",
     "address": "Address",
+    "notSet": "Not set",
     "unnamed": "Account",
     "roles": {
       "admin": "Administrator",
@@ -20,6 +23,7 @@
   "contact": {
     "sectionTitle": "Get in touch with us",
     "sectionDesc": "Reach our team through available channels.",
+    "messagingTitle": "Messaging",
     "openButton": "Open contact options",
     "modalTitle": "Contact options",
     "modalDesc": "Choose a channel to connect with us.",

@@ -1,13 +1,21 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import {
   redisEnvFromConfig,
   resolveRedisUrl,
 } from '../config/redis-connection.util';
+import { REDNOTE_CHANNEL } from '../domain/users/rednote-metadata.types';
 import { McpService } from '../mcp/mcp.service';
 import { PostService } from '../post/post.service';
 import { PostStatus } from '../post/schemas/post.schema';
+import { UserRole } from '../users/schemas/user.schema';
+import { UploadService } from '../upload/upload.service';
 import {
   SCHEDULER_EVENTS_CHANNEL,
   type SchedulerDispatchMessage,
@@ -24,6 +32,7 @@ export class SchedulerEventsBridgeService
     private readonly config: ConfigService,
     private readonly posts: PostService,
     private readonly mcp: McpService,
+    private readonly uploads: UploadService,
   ) {}
 
   onModuleInit(): void {
@@ -88,6 +97,36 @@ export class SchedulerEventsBridgeService
       this.logger.warn(
         `SOCIAL_PUBLISH: unexpected status ${post.status} for ${postId}`,
       );
+      return;
+    }
+    const channels = (post.channels ?? []).map((c) => c.trim().toLowerCase());
+    const isRedNoteOnly =
+      channels.length === 1 && channels[0] === REDNOTE_CHANNEL;
+    if (isRedNoteOnly) {
+      const uploadId = post.uploadRef?.trim();
+      if (!uploadId) {
+        this.logger.warn(`SOCIAL_PUBLISH: post ${postId} missing uploadRef`);
+        return;
+      }
+      try {
+        await this.uploads.publishUpload(
+          uploadId,
+          {
+            publishNow: true,
+            channels: [{ channel: REDNOTE_CHANNEL, included: true }],
+          },
+          { userId: post.userId, role: UserRole.CUSTOMER },
+        );
+        this.logger.log(
+          `SOCIAL_PUBLISH: triggered RedNote publish for post ${postId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `SOCIAL_PUBLISH failed for ${postId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
       return;
     }
     const zernioPostId = post.zernioPostId?.trim();

@@ -21,6 +21,7 @@
     "openDialog": "ตัวอย่าง",
     "save": "บันทึก",
     "noMedia": "ไม่มีสื่อ",
+    "noMediaHint": "เพิ่มรูปภาพหรือวิดีโอเพื่อดูตัวอย่าง",
     "previousMedia": "สื่อก่อนหน้า",
     "nextMedia": "สื่อถัดไป",
     "mediaCounter": "{{current}} / {{total}}",
@@ -29,7 +30,8 @@
   "mediaDetail": {
     "title": "ตัวอย่างสื่อ",
     "description": "ดูสื่อขนาดเต็ม",
-    "openHint": "ดูขนาดเต็ม"
+    "openHint": "ดูขนาดเต็ม",
+    "openOverflow": "ดูอีก {{count}} รูป"
   },
   "scheduledEdit": {
     "title": "แก้ไขโพสต์ที่กำหนดเวลา",
@@ -44,7 +46,9 @@
     "confirm": "ยืนยันการเปลี่ยนแปลง"
   },
   "editor": {
-    "scheduledHint": "โพสต์นี้ถูกกำหนดเวลาแล้ว แก้ไขคำบรรยาย สื่อ เวลา หรือชื่อ YouTube ด้านล่าง แล้วกดบันทึกเพื่อซิงก์ไปยัง Zernio"
+    "scheduledHint": "โพสต์นี้ถูกกำหนดเวลาแล้ว แก้ไขคำบรรยาย สื่อ เวลา หรือชื่อ YouTube ด้านล่าง แล้วกดบันทึกเพื่อซิงก์ไปยัง Zernio",
+    "seeMore": "ดูเพิ่มเติม",
+    "seeLess": "ดูน้อยลง"
   },
   "fields": {
     "media": "สื่อ",
@@ -52,8 +56,8 @@
     "youtubeTitlePlaceholder": "ใส่ชื่อวิดีโอ YouTube…"
   },
   "mediaTab": {
-    "single": "รูปเดียว",
-    "multiple": "หลายรูป",
+    "single": "รูปภาพ",
+    "multiple": "รูปภาพ",
     "video": "วิดีโอ"
   },
   "tiktok": {
@@ -81,7 +85,8 @@
     "scheduledEditable": "กำหนดเวลาแล้ว — แก้ไขด้านล่างแล้วกดบันทึกเพื่ออัปเดต",
     "publishingInProgress": "กำลังเผยแพร่…",
     "editScheduled": "แก้ไขโพสต์ที่กำหนดเวลา",
-    "rednotePublishOnly": "RedNote รองรับเฉพาะเผยแพร่ทันที — ไม่รองรับการกำหนดเวลา"
+    "rednotePublishOnly": "RedNote รองรับเฉพาะเผยแพร่ทันที — ไม่รองรับการกำหนดเวลา",
+    "saveBeforePublish": "บันทึกการเปลี่ยนแปลงก่อนเผยแพร่หรือกำหนดเวลา"
   },
   "banner": {
     "notConnected": "บัญชี {{platform}} ของคุณยังไม่ได้เชื่อม",

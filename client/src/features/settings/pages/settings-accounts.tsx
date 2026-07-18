@@ -11,7 +11,6 @@ import { AccountChannelsSection } from "@/features/settings/components/account-c
 import { AccountSettingsPageHeader } from "@/features/settings/components/account-settings-page-header"
 import { AccountSettingsToolbar } from "@/features/settings/components/account-settings-toolbar"
 import { AccountUserProfileCard } from "@/features/settings/components/account-user-profile-card"
-import { AccountGetInTouchSection } from "@/features/settings/components/account-get-in-touch-section"
 import { SocialUnlockConfirmDialog } from "@/features/settings/components/social-unlock-confirm-dialog"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
 import { toastApiError } from "@/shared/lib/toast-error"
@@ -253,25 +252,12 @@ export default function SettingsAccountsPage() {
       <div className="flex w-full flex-col gap-6">
         <AccountSettingsPageHeader />
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr] lg:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             <AccountUserProfileCard user={user} loading={hydrated && !user} />
-            <AccountGetInTouchSection />
           </div>
 
-          <div className="flex min-w-0 flex-col gap-6">
-            {/* <section className={panelClass}>
-              <div className="border-b border-border px-5 py-4">
-                <h2 className="font-heading text-[17px] tracking-tight text-foreground">
-                  {t("language.sectionTitle")}
-                </h2>
-                <p className="mt-1 text-[13px] text-muted-foreground">{t("language.sectionDesc")}</p>
-              </div>
-              <div className="p-5">
-                <LanguageSwitcher size="default" />
-              </div>
-            </section> */}
-
+          <div className="flex min-w-0 flex-col gap-5">
             <Alert className="border-dashed bg-muted/30">
               <Info className="size-4 text-muted-foreground" aria-hidden />
               <AlertTitle className="text-sm">{t("oauth.alertTitle")}</AlertTitle>
@@ -281,12 +267,14 @@ export default function SettingsAccountsPage() {
             </Alert>
 
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
                   <h2 className="font-heading text-[17px] tracking-tight text-foreground">
                     {t("channels.sectionTitle")}
                   </h2>
-                  <p className="mt-1 text-[13px] text-muted-foreground">{t("channels.sectionDesc")}</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    {t("channels.sectionDesc")}
+                  </p>
                 </div>
                 <AccountSettingsToolbar
                   onSyncAccounts={() =>

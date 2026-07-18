@@ -49,7 +49,7 @@ export function createEmptyDraft(): ChannelDraft {
     captionSource: "text",
     captionCustom: "",
     captionSourceNodeId: undefined,
-    mediaTab: "single",
+    mediaTab: "multiple",
     imageUrls: [],
     videoUrl: null,
     youtubeTitle: "",
@@ -70,24 +70,21 @@ function inferMediaTabFromRow(row: UploadChannelRow, channelKey: string): MediaT
     return "video"
   }
 
-  if (urls.length > 1) {
-    return "multiple"
-  }
-
   const candidate = urls[0] ?? row.mediaUrl?.trim()
   if (candidate && isVideoUrl(candidate)) {
     return "video"
   }
-  if (urls.length === 1) {
-    return "single"
-  }
 
   const auto = row.mediaUrl?.trim()
-  if (auto && isVideoUrl(auto)) {
+  if (auto && isVideoUrl(auto) && urls.every((u) => isVideoUrl(u))) {
     return "video"
   }
 
-  return cfg.tabs[0] ?? "single"
+  if (urls.length >= 1) {
+    return "multiple"
+  }
+
+  return cfg.tabs[0] ?? "multiple"
 }
 
 export function draftFromUploadRow(
@@ -368,15 +365,11 @@ export function draftToMediaStorage(
     const v = draft.videoUrl?.trim() || null
     return { mediaUrl: v, mediaUrls: v ? [v] : [] }
   }
-  if (draft.mediaTab === "multiple") {
-    const urls = draft.imageUrls
-      .map((u) => u.trim())
-      .filter(Boolean)
-      .slice(0, cfg.maxCarousel || 10)
-    return { mediaUrl: urls[0] ?? null, mediaUrls: urls }
-  }
-  const u = draft.imageUrls[0]?.trim() || null
-  return { mediaUrl: u, mediaUrls: u ? [u] : [] }
+  const urls = draft.imageUrls
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .slice(0, cfg.maxCarousel || 10)
+  return { mediaUrl: urls[0] ?? null, mediaUrls: urls }
 }
 
 export function draftToPatchBody(
