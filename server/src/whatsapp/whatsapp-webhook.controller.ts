@@ -83,7 +83,14 @@ export class WhatsAppWebhookController {
   ): { received: boolean } {
     const expected = this.config.get<string>('WHATSAPP_CALLBACK_TOKEN')?.trim();
     if (expected) {
-      this.assertToken(token);
+      try {
+        this.assertToken(token);
+      } catch (err) {
+        this.logger.warn(
+          'Direct WhatsApp webhook rejected: WHATSAPP_CALLBACK_TOKEN is set but Meta did not send a matching ?token= query. Clear WHATSAPP_CALLBACK_TOKEN for Meta direct webhooks, or append ?token=<value> to the Meta Callback URL.',
+        );
+        throw err;
+      }
     }
 
     const rawBody = req.rawBody;

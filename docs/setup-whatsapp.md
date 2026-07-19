@@ -143,7 +143,7 @@ WHATSAPP_ACTOR_ID=00000000-0000-0000-0000-000000000002
 | `WHATSAPP_VERIFY_TOKEN` | Meta `hub.verify_token` handshake |
 | `WHATSAPP_WEBHOOK_URL` | Documented target for Meta webhook config |
 | `WHATSAPP_WELCOME_MESSAGE` | On first inbound when not yet linked |
-| `WHATSAPP_CALLBACK_TOKEN` | Optional protect for forwarded `/whatsapp/webhook?token=` |
+| `WHATSAPP_CALLBACK_TOKEN` | **Leave empty** for Meta → `/whatsapp/webhook/direct`. Only set if the Callback URL includes `?token=...` (or Go forwarder). If set without `?token=` on the URL, Meta POSTs are rejected and CONNECT never links. |
 
 Restart Nest after changing env.
 
