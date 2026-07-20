@@ -7,7 +7,6 @@ export const WORKFLOW_QA_CHANNEL_OPTIONS = [
   'instagram',
   'facebook',
   'linkedin',
-  'twitter',
   'tiktok',
 ] as const;
 

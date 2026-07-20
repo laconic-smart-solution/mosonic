@@ -7,14 +7,14 @@ import { parseApiError } from "@/shared/lib/api-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
-/** Load `/auth/me` into user store when we have a token but no cached profile. */
+/** Load `/auth/me` into user store when we have a cookie session but no cached profile. */
 export function useSessionBootstrap() {
   const hydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const user = useUserStore((s) => s.user)
 
   useEffect(() => {
-    if (!hydrated || !accessToken || user) {
+    if (!hydrated || !isAuthenticated || user) {
       return
     }
 
@@ -29,14 +29,7 @@ export function useSessionBootstrap() {
         }
         const role = lu.role
         if (role === "ADMIN" || role === "CUSTOMER") {
-          const { accessToken, refreshToken } = useAuthStore.getState()
-          if (accessToken && refreshToken) {
-            useAuthStore.getState().setSession({
-              accessToken,
-              refreshToken,
-              role,
-            })
-          }
+          useAuthStore.getState().setRole(role)
         }
         useUserStore
           .getState()
@@ -56,5 +49,5 @@ export function useSessionBootstrap() {
     return () => {
       cancelled = true
     }
-  }, [hydrated, accessToken, user])
+  }, [hydrated, isAuthenticated, user])
 }

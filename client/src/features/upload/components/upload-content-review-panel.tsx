@@ -23,7 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { WorkflowNodeConfigFields } from "@/features/workflow/components/workflow-node-config-fields"
@@ -104,6 +109,11 @@ export type UploadContentReviewPanelProps = {
   generationChannelKeys?: string[]
   /** Default selected Generated contents filter tab. */
   generationDefaultKey?: GenerationLaneFilter
+  /**
+   * When true (e.g. active upload channel is published/publishing/scheduled),
+   * lock Re-run / Generate more / pipeline edits.
+   */
+  lockGeneration?: boolean
 }
 
 export function UploadContentReviewPanel({
@@ -114,6 +124,7 @@ export function UploadContentReviewPanel({
   onWorkflowLayersChange,
   generationChannelKeys,
   generationDefaultKey = "all",
+  lockGeneration = false,
 }: UploadContentReviewPanelProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -691,7 +702,7 @@ export function UploadContentReviewPanel({
     await uploadMediaForNode(nid, key, file)
   }
 
-  const blockPipeline = globalRerunning || isGeneratingMore
+  const blockPipeline = globalRerunning || isGeneratingMore || lockGeneration
 
   const approveDisabled =
     !approveEnabled || hasUnsavedChanges || approveLoading || blockPipeline
@@ -876,11 +887,11 @@ export function UploadContentReviewPanel({
         ) : null}
 
         {embedInUpload && preview !== undefined ? (
-          <div className="grid min-w-0 gap-4 px-4 py-4 md:px-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-5">
+          <div className="grid min-w-0 gap-4 px-4 md:px-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.9fr)] lg:items-start lg:gap-5">
             <div className="min-w-0">{preview}</div>
 
-            <div className="flex min-w-0 max-h-[89vh] overflow-y-auto flex-col rounded-xl border border-border bg-card shadow-sm">
-              <div className="border-b border-border px-4 py-2.5">
+            <div className="flex min-w-0 max-h-[calc(100vh-10.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:sticky lg:top-20">
+              <div className="shrink-0 border-b border-border px-4 py-2.5">
                 <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Generation
                 </p>
@@ -890,83 +901,84 @@ export function UploadContentReviewPanel({
                   </p>
                 ) : null}
               </div>
-              <div className="min-w-0">
-                <div className="w-full border-b border-border px-4 py-3 [&_button]:w-full">
-                  {genMoreButton}
-                </div>
-                <div className="px-4 py-3">
-                  <div className="mb-3 space-y-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-                          Generated contents
-                        </p>
-                        {totalCreditsUsed > 0 ? (
-                          <CreditUsageBadge
-                            credits={totalCreditsUsed}
-                            showLabel
-                          />
-                        ) : null}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="relative h-9 shrink-0 sm:min-w-[140px]"
-                        disabled={saveLoading || blockPipeline}
-                        onClick={() => void handleSave()}
-                      >
-                        {saveLoading ? "Saving…" : "Save changes"}
-                        {hasUnsavedChanges ? (
-                          <span
-                            className="absolute top-1 right-2 size-2 rounded-full bg-amber-500"
-                            aria-hidden
-                          />
-                        ) : null}
-                      </Button>
-                    </div>
-                    {embedInUpload && normalizedGenerationChannelKeys.length > 0 ? (
-                      <Tabs
-                        value={String(generationTabKey)}
-                        onValueChange={(v) => {
-                          if (v === "all") {
-                            setGenerationTabKey("all")
-                            return
-                          }
-                          setGenerationTabKey(normalizeChannelKey(v))
-                        }}
-                        className="min-w-0"
-                      >
-                        <TabsList
-                          variant="default"
-                          className="h-auto max-w-full min-w-0 justify-start gap-0.5 overflow-x-auto rounded-lg border border-border bg-muted/50 p-0.5"
-                        >
-                          <TabsTrigger
-                            value="all"
-                            className="h-7 shrink-0 flex-none rounded-md px-2.5 text-xs select-none after:hidden"
-                          >
-                            All
-                          </TabsTrigger>
-                          {normalizedGenerationChannelKeys.map((key) => {
-                            let label = key
-                            try {
-                              label = getPlatformMediaConfig(key).displayName
-                            } catch {
-                              // ignore
-                            }
-                            return (
-                              <TabsTrigger
-                                key={key}
-                                value={key}
-                                className="h-7 shrink-0 flex-none rounded-md px-2.5 text-xs select-none after:hidden"
-                              >
-                                {label}
-                              </TabsTrigger>
-                            )
-                          })}
-                        </TabsList>
-                      </Tabs>
+              <div className="w-full shrink-0 border-b border-border px-4 py-3 [&_button]:w-full">
+                {genMoreButton}
+              </div>
+              <div className="shrink-0 space-y-2.5 border-b border-border bg-card px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                      Generated contents
+                    </p>
+                    {totalCreditsUsed > 0 ? (
+                      <CreditUsageBadge
+                        credits={totalCreditsUsed}
+                        showLabel
+                      />
                     ) : null}
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="relative h-9 shrink-0 sm:min-w-[140px]"
+                    disabled={saveLoading || blockPipeline}
+                    onClick={() => void handleSave()}
+                  >
+                    {saveLoading ? "Saving…" : "Save changes"}
+                    {hasUnsavedChanges ? (
+                      <span
+                        className="absolute top-1 right-2 size-2 rounded-full bg-amber-500"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </Button>
+                </div>
+                {embedInUpload && normalizedGenerationChannelKeys.length > 0 ? (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Select
+                      value={String(generationTabKey)}
+                      onValueChange={(v) => {
+                        if (!v) return
+                        if (v === "all") {
+                          setGenerationTabKey("all")
+                          return
+                        }
+                        setGenerationTabKey(normalizeChannelKey(v))
+                      }}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="h-8 min-w-0 flex-1 rounded-lg bg-background text-xs"
+                        aria-label="Filter generated contents by channel"
+                      >
+                        <span className="truncate">
+                          {generationTabKey === "all"
+                            ? "All channels"
+                            : (generationFilterLabel ??
+                              String(generationTabKey))}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent align="start" className="min-w-[10rem]">
+                        <SelectItem value="all">All channels</SelectItem>
+                        {normalizedGenerationChannelKeys.map((key) => {
+                          let label = key
+                          try {
+                            label = getPlatformMediaConfig(key).displayName
+                          } catch {
+                            // ignore
+                          }
+                          return (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                   <div className="flex flex-col gap-2">
                     {filteredGenerationNodes.map((wfNode, cardIndex) => {
                       const nodeId = wfNode.nodeId
@@ -1030,7 +1042,6 @@ export function UploadContentReviewPanel({
                         : "No outputs to display yet."}
                     </p>
                   ) : null}
-                </div>
               </div>
             </div>
           </div>

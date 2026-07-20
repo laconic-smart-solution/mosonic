@@ -19,8 +19,13 @@ import { ContentService } from '../content/content.service';
 import {
   newsContentReadyNotification,
   pipelineCompletedNotification,
+  pipelineFailedNotification,
   pipelineStartedNotification,
 } from '../events/notification.util';
+import { LineNotifyService } from '../line/line-notify.service';
+import { TelegramNotifyService } from '../telegram/telegram-notify.service';
+import { ViberNotifyService } from '../viber/viber-notify.service';
+import { WhatsAppNotifyService } from '../whatsapp/whatsapp-notify.service';
 import { LoggingService } from '../logging/logging.service';
 import type { WorkflowNodeRecord } from '../domain/workflow/workflow.types';
 import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
@@ -58,7 +63,7 @@ import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.er
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { CreditService } from '../credit/credit.service';
 import { CreditCalculationService } from '../credit/credit-calculation.service';
-import { isPipelineNodeCreditType } from '../credit/lib/billable-node-credit-types';
+import { isPipelineNodeCreditType, BILLABLE_NODE_CREDIT_DEFAULTS } from '../credit/lib/billable-node-credit-types';
 import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { InsufficientCreditsException } from '../credit/insufficient-credits.exception';
 import { NodeExecutor } from './node-executor.service';
@@ -123,6 +128,10 @@ export class OrchestrationService {
     private readonly outboundWebhooks: OutboundWebhookService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
+    private readonly lineNotify: LineNotifyService,
+    private readonly telegramNotify: TelegramNotifyService,
+    private readonly viberNotify: ViberNotifyService,
+    private readonly whatsappNotify: WhatsAppNotifyService,
   ) {
     this.useQueue =
       config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
@@ -390,9 +399,16 @@ export class OrchestrationService {
           completedAt: new Date(),
         });
         await this.reconcilePipelineCredits(pipelineId);
+        const enqueueFailMessage =
+          'Could not start pipeline queue. Is Redis running?';
         this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
           pipelineId,
-          message: 'Could not start pipeline queue. Is Redis running?',
+          message: enqueueFailMessage,
+        });
+        this.notifyPipelineFailed(input.auth.userId, {
+          pipelineId,
+          message: enqueueFailMessage,
+          ruleRef: rule.ruleId,
         });
         throw err;
       }
@@ -419,9 +435,16 @@ export class OrchestrationService {
         completedAt: new Date(),
       });
       await this.reconcilePipelineCredits(pipelineId);
+      const unexpectedMessage =
+        'An unexpected error occurred. Please try again.';
       this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
         pipelineId,
-        message: 'An unexpected error occurred. Please try again.',
+        message: unexpectedMessage,
+      });
+      this.notifyPipelineFailed(input.auth.userId, {
+        pipelineId,
+        message: unexpectedMessage,
+        ruleRef: rule.ruleId,
       });
     });
     return { pipelineId };
@@ -564,20 +587,36 @@ export class OrchestrationService {
       creditsEach: number;
       creditsTotal: number;
     }>;
+    /** Unit credits for every pipeline-billable type (for live canvas recalculation). */
+    unitCredits: Record<string, number>;
     creditsRemaining: number;
     sufficient: boolean;
   }> {
     const nodeTypes = await this.resolveBillableNodeTypesForEstimate(input);
     const { totalCredits, breakdown } =
       await this.computeNodeCreditEstimate(nodeTypes);
+    const unitCredits = await this.getPipelineNodeUnitCredits();
     const creditsRemaining = await this.getCreditsRemaining(input.auth.userId);
 
     return {
       totalCredits,
       breakdown,
+      unitCredits,
       creditsRemaining,
       sufficient: creditsRemaining >= totalCredits,
     };
+  }
+
+  /** Active credit cost for each pipeline-billable node type (not rule/workflow gen). */
+  private async getPipelineNodeUnitCredits(): Promise<Record<string, number>> {
+    const unitCredits: Record<string, number> = {};
+    for (const row of BILLABLE_NODE_CREDIT_DEFAULTS) {
+      if (!isPipelineNodeCreditType(row.nodeType)) continue;
+      unitCredits[row.nodeType] =
+        (await this.nodeCreditPriceService.getActiveCostCredit(row.nodeType)) ??
+        0;
+    }
+    return unitCredits;
   }
 
   private async resolveBillableNodeTypesForEstimate(input: {
@@ -813,42 +852,98 @@ export class OrchestrationService {
     if (pipeline.dispatchMode !== PipelineDispatchMode.Queue) {
       throw new BadRequestException('Skip is only supported for queue pipelines');
     }
-    if (pipeline.status !== PipelineStatus.Paused) {
-      throw new BadRequestException('Pipeline is not paused');
+    if (
+      pipeline.status !== PipelineStatus.Paused &&
+      pipeline.status !== PipelineStatus.Running
+    ) {
+      throw new BadRequestException('Pipeline is not active');
     }
 
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
     if (!node) {
       throw new NotFoundException(`Node ${nodeId} not found in pipeline`);
     }
+    if (
+      node.status === PipelineNodeExecutionStatus.Completed ||
+      node.status === PipelineNodeExecutionStatus.Skipped
+    ) {
+      throw new BadRequestException('Node already finished');
+    }
 
+    const isPaused = pipeline.status === PipelineStatus.Paused;
+    const canForceSkipWhileRunning =
+      pipeline.status === PipelineStatus.Running &&
+      (node.status === PipelineNodeExecutionStatus.Running ||
+        node.status === PipelineNodeExecutionStatus.Failed);
+    const canSkipWhilePaused =
+      isPaused &&
+      (node.status === PipelineNodeExecutionStatus.Failed ||
+        node.status === PipelineNodeExecutionStatus.Running ||
+        node.status === PipelineNodeExecutionStatus.WaitingReview ||
+        pipeline.pausedNodeId === nodeId);
+
+    if (!canForceSkipWhileRunning && !canSkipWhilePaused) {
+      throw new BadRequestException(
+        'Node cannot be skipped in its current state',
+      );
+    }
+
+    await this.resolver.removeQueuedJobsForNode(pipelineId, nodeId);
+    if (node.externalJobId) {
+      await this.pipelineRepo.clearExternalJobId(pipelineId, nodeId);
+    }
     await this.pipelineRepo.markNodeSkipped(pipelineId, nodeId);
     await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Running, {
       pausedNodeId: null,
+      pausedLaneId: null,
     });
     await this.resolver.onNodeCompleted(pipelineId, nodeId);
     await this.resolver.maybeFinalize(pipelineId);
   }
 
-  async finalizePipeline(pipelineId: string): Promise<void> {
+  async finalizePipeline(
+    pipelineId: string,
+  ): Promise<{ contentId: string; uploadId: string } | null> {
     const pipeline = await this.pipelineRepo.findById(pipelineId);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
     if (pipeline.status === PipelineStatus.Completed) {
-      return;
+      const auth: TenancyAuth = {
+        userId: pipeline.userId ?? '',
+        role: UserRole.CUSTOMER,
+      };
+      const existing = await this.resolvePipelineArtifacts(pipelineId, auth);
+      if (existing.contentId && existing.uploadId) {
+        return {
+          contentId: existing.contentId,
+          uploadId: existing.uploadId,
+        };
+      }
+      return null;
     }
 
     const claimed = await this.pipelineRepo.claimPipelineFinalization(pipelineId);
     if (!claimed) {
       const fresh = await this.pipelineRepo.findById(pipelineId);
       if (fresh?.status === PipelineStatus.Completed) {
-        return;
+        const auth: TenancyAuth = {
+          userId: fresh.userId ?? '',
+          role: UserRole.CUSTOMER,
+        };
+        const existing = await this.resolvePipelineArtifacts(pipelineId, auth);
+        if (existing.contentId && existing.uploadId) {
+          return {
+            contentId: existing.contentId,
+            uploadId: existing.uploadId,
+          };
+        }
+        return null;
       }
       this.logger.warn(
         `[pipeline:${pipelineId}] finalizePipeline claim failed — status=${fresh?.status ?? 'missing'}`,
       );
-      return;
+      return null;
     }
 
     const rule = await this.rules.findById(pipeline.ruleRef);
@@ -919,6 +1014,8 @@ export class OrchestrationService {
           contentId: primaryContentId,
         });
       }
+
+      return { contentId: primaryContentId, uploadId: primaryUploadId };
     } catch (error) {
       this.logger.error(
         `Pipeline finalization failed for ${pipelineId}`,
@@ -937,6 +1034,12 @@ export class OrchestrationService {
         pipelineId,
         message,
       });
+      this.notifyPipelineFailed(pipeline.userId, {
+        pipelineId,
+        message,
+        ruleRef: pipeline.ruleRef,
+      });
+      return null;
     }
   }
 
@@ -1202,7 +1305,12 @@ export class OrchestrationService {
   async cancelPipeline(
     pipelineId: string,
     auth: TenancyAuth,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{
+    success: boolean;
+    keptProgress: boolean;
+    contentId?: string;
+    uploadId?: string;
+  }> {
     const pipeline = await this.pipelineRepo.findById(pipelineId, auth);
     if (!pipeline) {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
@@ -1216,10 +1324,48 @@ export class OrchestrationService {
 
     await this.resolver.removeQueuedJobsForPipeline(pipelineId);
 
+    let hasCompleted = false;
     for (const node of parsePipelineNodes(pipeline.nodes)) {
-      if (node.status === PipelineNodeExecutionStatus.Pending) {
-        await this.pipelineRepo.markNodeSkipped(pipelineId, node.nodeId);
+      if (node.status === PipelineNodeExecutionStatus.Completed) {
+        hasCompleted = true;
+        continue;
       }
+      if (node.status === PipelineNodeExecutionStatus.Skipped) {
+        continue;
+      }
+      if (node.externalJobId) {
+        await this.pipelineRepo.clearExternalJobId(pipelineId, node.nodeId);
+      }
+      await this.pipelineRepo.markNodeSkipped(pipelineId, node.nodeId);
+    }
+
+    const paused = this.pausedPipelines.get(pipelineId);
+    if (paused) {
+      this.pausedPipelines.delete(pipelineId);
+      paused.resolve();
+    }
+
+    if (hasCompleted) {
+      await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Running, {
+        pausedNodeId: null,
+        pausedLaneId: null,
+      });
+      const finalized = await this.finalizePipeline(pipelineId);
+      if (finalized) {
+        return {
+          success: true,
+          keptProgress: true,
+          contentId: finalized.contentId,
+          uploadId: finalized.uploadId,
+        };
+      }
+      const artifacts = await this.resolvePipelineArtifacts(pipelineId, auth);
+      return {
+        success: true,
+        keptProgress: Boolean(artifacts.contentId),
+        contentId: artifacts.contentId,
+        uploadId: artifacts.uploadId,
+      };
     }
 
     await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Failed, {
@@ -1230,18 +1376,18 @@ export class OrchestrationService {
 
     await this.reconcilePipelineCredits(pipelineId);
 
-    const paused = this.pausedPipelines.get(pipelineId);
-    if (paused) {
-      this.pausedPipelines.delete(pipelineId);
-      paused.resolve();
-    }
-
     this.events.emitToPipeline(pipelineId, 'pipeline:failed', {
       pipelineId,
       message: 'Pipeline stopped',
       reason: 'cancelled',
     });
-    return { success: true };
+    this.notifyPipelineFailed(pipeline.userId, {
+      pipelineId,
+      message: 'Pipeline stopped',
+      reason: 'cancelled',
+      ruleRef: pipeline.ruleRef,
+    });
+    return { success: true, keptProgress: false };
   }
 
   async resumeLane(
@@ -1554,6 +1700,58 @@ export class OrchestrationService {
       type: 'pipeline.completed',
       ...body,
     });
+    void this.lineNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
+    void this.telegramNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
+    void this.viberNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
+    void this.whatsappNotify.notifyUser(
+      id,
+      `${body.title} — ${body.message}`,
+    );
+  }
+
+  private notifyPipelineFailed(
+    userId: string | undefined | null,
+    args: {
+      pipelineId: string;
+      message: string;
+      reason?: string;
+      ruleRef?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = pipelineFailedNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'pipeline',
+      type: 'pipeline.failed',
+      ...body,
+    });
+    void this.lineNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
+    void this.telegramNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
+    void this.viberNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
+    void this.whatsappNotify.notifyUser(
+      id,
+      `${body.title}: ${body.message}`,
+    );
   }
 
   private readonly pausedPipelines = new Map<
@@ -1621,6 +1819,12 @@ export class OrchestrationService {
             message: err.message,
             reason: 'budget',
             scope: err.scope,
+          });
+          this.notifyPipelineFailed(userId, {
+            pipelineId,
+            message: err.message,
+            reason: 'budget',
+            ruleRef: ruleId,
           });
           throw err;
         }

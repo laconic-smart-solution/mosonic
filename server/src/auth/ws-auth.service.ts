@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { AuthCookieService } from './auth-cookie.service';
 import { type SsoTokenClaims } from './auth.types';
 import { UsersService } from '../users/users.service';
 import { tenancyFromLocalUser } from './tenancy.util';
@@ -22,6 +23,7 @@ export class WsAuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly users: UsersService,
+    private readonly cookies: AuthCookieService,
   ) {
     if (envFlagTrue(this.config.get<string>('SSO_AUTH_DISABLED'))) {
       this.jwks = null;
@@ -39,6 +41,37 @@ export class WsAuthService {
       throw new Error('SSO_JWKS_URL (or SSO_BASE_URL) is not set');
     }
     this.jwks = createRemoteJWKSet(new URL(url));
+  }
+
+  /**
+   * Resolve JWT from handshake auth.token, Authorization Bearer, or access cookie.
+   */
+  resolveSocketAccessToken(handshake: {
+    auth?: { token?: unknown };
+    headers?: { authorization?: unknown; cookie?: unknown };
+  }): string | undefined {
+    const fromAuth =
+      typeof handshake.auth?.token === 'string'
+        ? handshake.auth.token.trim()
+        : '';
+    if (fromAuth) return fromAuth;
+
+    const authorization = handshake.headers?.authorization;
+    if (
+      typeof authorization === 'string' &&
+      authorization.toLowerCase().startsWith('bearer ')
+    ) {
+      const bearer = authorization.slice(7).trim();
+      if (bearer) return bearer;
+    }
+
+    const cookieHeader =
+      typeof handshake.headers?.cookie === 'string'
+        ? handshake.headers.cookie
+        : undefined;
+    return (
+      this.cookies.readAccessTokenFromCookieHeader(cookieHeader) ?? undefined
+    );
   }
 
   async authenticateSocketToken(

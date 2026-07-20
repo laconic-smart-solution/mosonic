@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import {
   ANALYTICS_REPOSITORY,
+  ANNOUNCEMENT_REPOSITORY,
   BUDGET_SETTINGS_REPOSITORY,
   CAMPAIGN_AUTONOMY_POLICY_REPOSITORY,
   CAMPAIGN_SCHEDULE_REPOSITORY,
@@ -27,6 +28,7 @@ import {
   UPLOAD_REPOSITORY,
   USER_PLAN_REPOSITORY,
   USER_REPOSITORY,
+  SOCIAL_ACCOUNT_REPOSITORY,
   WEBHOOK_DELIVERY_REPOSITORY,
   WEBHOOK_EVENT_REPOSITORY,
   WEBHOOK_SUBSCRIPTION_REPOSITORY,
@@ -34,6 +36,7 @@ import {
   WORKFLOW_REPOSITORY,
 } from './tokens';
 import { PrismaAnalyticsRepository } from './prisma/prisma-analytics.repository';
+import { PrismaAnnouncementRepository } from './prisma/prisma-announcement.repository';
 import { PrismaBudgetSettingsRepository } from './prisma/prisma-budget-settings.repository';
 import { PrismaCampaignAutonomyPolicyRepository } from './prisma/prisma-campaign-autonomy-policy.repository';
 import { PrismaCampaignScheduleRepository } from './prisma/prisma-campaign-schedule.repository';
@@ -59,6 +62,7 @@ import { PrismaSyncLockRepository } from './prisma/prisma-sync-lock.repository';
 import { PrismaUploadRepository } from './prisma/prisma-upload.repository';
 import { PrismaUserPlanRepository } from './prisma/prisma-user-plan.repository';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
+import { PrismaSocialAccountRepository } from './prisma/prisma-social-account.repository';
 import { PrismaWebhookDeliveryRepository } from './prisma/prisma-webhook-delivery.repository';
 import { PrismaWebhookEventRepository } from './prisma/prisma-webhook-event.repository';
 import { PrismaWebhookSubscriptionRepository } from './prisma/prisma-webhook-subscription.repository';
@@ -67,6 +71,10 @@ import { PrismaWorkflowRepository } from './prisma/prisma-workflow.repository';
 
 const repositoryProviders = [
   { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
+  {
+    provide: SOCIAL_ACCOUNT_REPOSITORY,
+    useClass: PrismaSocialAccountRepository,
+  },
   { provide: PLAN_REPOSITORY, useClass: PrismaPlanRepository },
   { provide: USER_PLAN_REPOSITORY, useClass: PrismaUserPlanRepository },
   { provide: CREDIT_CONFIG_REPOSITORY, useClass: PrismaCreditConfigRepository },
@@ -130,6 +138,7 @@ const repositoryProviders = [
   },
   { provide: WEBHOOK_EVENT_REPOSITORY, useClass: PrismaWebhookEventRepository },
   { provide: SYNC_LOCK_REPOSITORY, useClass: PrismaSyncLockRepository },
+  { provide: ANNOUNCEMENT_REPOSITORY, useClass: PrismaAnnouncementRepository },
 ];
 
 @Module({

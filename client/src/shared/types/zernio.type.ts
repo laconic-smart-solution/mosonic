@@ -3,6 +3,8 @@ export type ZernioConnectedAccount = {
   channel: string
   accountId: string
   connectedAt: string
+  displayName?: string | null
+  username?: string | null
 }
 
 export type ZernioConnectedAccountsResponse = {

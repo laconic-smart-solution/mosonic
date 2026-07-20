@@ -26,7 +26,8 @@ export const POLL_CONFIG = {
     initialDelayMs: envInt('VIDEO_POLL_INITIAL_DELAY_MS', 15_000),
     intervalMs: envInt('VIDEO_POLL_INTERVAL_MS', 10_000),
     maxChecks: envInt('VIDEO_POLL_MAX_CHECKS', 180),
-    timeoutLabel: 'Video generation timed out after 30 minutes',
+    timeoutLabel:
+      'Video generation timed out after 30 minutes. You can retry this step or skip it to keep finished work.',
   },
   heygen: {
     minInitialDelayMs: envInt('HEYGEN_POLL_MIN_INITIAL_DELAY_MS', 10_000),
@@ -67,6 +68,13 @@ export function videoPollIntervalMs(provider: VideoPollProvider): number {
   return provider === 'heygen'
     ? POLL_CONFIG.heygen.intervalMs
     : POLL_CONFIG.video.intervalMs;
+}
+
+/** Wall-clock timeout for video polls (max checks × interval). */
+export function videoPollWallTimeoutMs(
+  provider: VideoPollProvider = 'sora',
+): number {
+  return POLL_CONFIG.video.maxChecks * videoPollIntervalMs(provider);
 }
 
 /** Unique BullMQ job id for a video check attempt. */

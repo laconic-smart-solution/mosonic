@@ -5,7 +5,6 @@ import { useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { LanguageSwitcher } from "@/components/language-switcher"
 import { PageShell } from "@/components/app/page-shell"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AccountChannelsSection } from "@/features/settings/components/account-channels-section"
@@ -18,6 +17,14 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { isInsufficientCredits, parseApiError } from "@/shared/lib/api-error"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { usageQueryKeys } from "@/shared/queries/usage.query"
+import { RedNoteQrConnectDialog } from "@/features/settings/components/rednote-qr-connect-dialog"
+import {
+  useRedNoteAccountQuery,
+  useRedNoteConnectMutation,
+  useRedNoteDisconnectMutation,
+  useRedNoteUnlockMutation,
+  rednoteQueryKeys,
+} from "@/shared/queries/rednote.query"
 import {
   useDisconnectZernioAccountMutation,
   useSyncZernioAccountsMutation,
@@ -28,8 +35,6 @@ import {
   zernioQueryKeys,
 } from "@/shared/queries/zernio.query"
 import { useUserStore } from "@/shared/stores/user.store"
-
-const panelClass = "overflow-hidden rounded-2xl border border-border bg-card"
 
 export default function SettingsAccountsPage() {
   const { t } = useTranslation("settings")
@@ -43,10 +48,16 @@ export default function SettingsAccountsPage() {
   const connectMutation = useZernioConnectMutation()
   const syncMutation = useSyncZernioAccountsMutation()
   const disconnectMutation = useDisconnectZernioAccountMutation()
+  const rednoteAccountQuery = useRedNoteAccountQuery()
+  const rednoteUnlockMutation = useRedNoteUnlockMutation()
+  const rednoteConnectMutation = useRedNoteConnectMutation()
+  const rednoteDisconnectMutation = useRedNoteDisconnectMutation()
   const handledOAuthRef = useRef(false)
   const initialSyncRef = useRef(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingPlatform, setPendingPlatform] = useState<string | null>(null)
+  const [rednoteQrOpen, setRednoteQrOpen] = useState(false)
+  const [rednoteSocketRoom, setRednoteSocketRoom] = useState<string | null>(null)
 
   const creditsEach = connectionCreditQuery.data?.creditsEach ?? 0
   const creditsRemaining = connectionCreditQuery.data?.creditsRemaining ?? 0
@@ -107,6 +118,24 @@ export default function SettingsAccountsPage() {
 
   function confirmUnlock() {
     if (!pendingPlatform) return
+    if (pendingPlatform === "rednote") {
+      rednoteUnlockMutation.mutate(undefined, {
+        onSuccess: () => {
+          setConfirmOpen(false)
+          setPendingPlatform(null)
+          toast.success(t("oauth.unlockedToast"))
+        },
+        onError: (err) => {
+          if (isInsufficientCredits(err)) {
+            toastApiError(err, "settings:unlockConfirm.insufficientTitle")
+            void connectionCreditQuery.refetch()
+            return
+          }
+          toastApiError(err, "settings:oauth.unlockFailed")
+        },
+      })
+      return
+    }
     unlockMutation.mutate(pendingPlatform, {
       onSuccess: () => {
         setConfirmOpen(false)
@@ -125,6 +154,23 @@ export default function SettingsAccountsPage() {
   }
 
   function connect(platform: string) {
+    if (platform === "rednote") {
+      rednoteConnectMutation.mutate(undefined, {
+        onSuccess: ({ socketRoom }) => {
+          setRednoteSocketRoom(socketRoom)
+          setRednoteQrOpen(true)
+        },
+        onError: (err) => {
+          if (parseApiError(err).status === 403) {
+            toast.error(t("oauth.unlockRequired"))
+            void accountsQuery.refetch()
+            return
+          }
+          toastApiError(err, "settings:oauth.connectUrlFailed")
+        },
+      })
+      return
+    }
     connectMutation.mutate(platform, {
       onSuccess: ({ connectUrl }) => {
         window.location.href = connectUrl
@@ -141,33 +187,77 @@ export default function SettingsAccountsPage() {
   }
 
   function disconnect(channel: string) {
+    if (channel === "rednote") {
+      rednoteDisconnectMutation.mutate(undefined, {
+        onSuccess: () => toast.success(t("oauth.disconnected")),
+      })
+      return
+    }
     disconnectMutation.mutate(channel, {
       onSuccess: () => toast.success(t("oauth.disconnected")),
       onError: (err) => toastApiError(err, "settings:oauth.disconnectFailed"),
     })
   }
 
+  const mergedAccounts = (() => {
+    const base = accountsQuery.data?.accounts ?? []
+    const rn = rednoteAccountQuery.data
+    if (!rn?.connected && !rn?.needsReauth) return base
+    const handle = rn.handle?.trim() || null
+    const idx = base.findIndex((a) => a.channel.toLowerCase() === "rednote")
+    if (idx >= 0) {
+      const existing = base[idx]
+      // Always take handle from the RedNote account API — never keep a stale
+      // scraped username from social_accounts while a verified handle exists
+      // (or is intentionally absent).
+      const next = [...base]
+      next[idx] = {
+        ...existing,
+        username: handle,
+        displayName: handle,
+      }
+      return next
+    }
+    return [
+      ...base,
+      {
+        userId: user?.id ?? "",
+        channel: "rednote",
+        accountId: "rednote",
+        username: handle,
+        displayName: handle,
+        connectedAt: rn.lastVerifiedAt ?? new Date().toISOString(),
+      },
+    ]
+  })()
+
+  const unlockedWithRednote = (() => {
+    const base = accountsQuery.data?.unlockedChannels ?? []
+    if (
+      rednoteAccountQuery.data?.connected ||
+      rednoteAccountQuery.data?.needsReauth ||
+      base.includes("rednote")
+    ) {
+      return Array.from(new Set([...base, "rednote"]))
+    }
+    return base
+  })()
+
+  const needsReauthChannels = rednoteAccountQuery.data?.needsReauth
+    ? ["rednote"]
+    : []
+
   return (
     <PageShell>
       <div className="flex w-full flex-col gap-6">
         <AccountSettingsPageHeader />
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr] lg:items-start">
-          <AccountUserProfileCard user={user} loading={hydrated && !user} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-4">
+            <AccountUserProfileCard user={user} loading={hydrated && !user} />
+          </div>
 
-          <div className="flex min-w-0 flex-col gap-6">
-            <section className={panelClass}>
-              <div className="border-b border-border px-5 py-4">
-                <h2 className="font-heading text-[17px] tracking-tight text-foreground">
-                  {t("language.sectionTitle")}
-                </h2>
-                <p className="mt-1 text-[13px] text-muted-foreground">{t("language.sectionDesc")}</p>
-              </div>
-              <div className="p-5">
-                <LanguageSwitcher size="default" />
-              </div>
-            </section>
-
+          <div className="flex min-w-0 flex-col gap-5">
             <Alert className="border-dashed bg-muted/30">
               <Info className="size-4 text-muted-foreground" aria-hidden />
               <AlertTitle className="text-sm">{t("oauth.alertTitle")}</AlertTitle>
@@ -177,12 +267,14 @@ export default function SettingsAccountsPage() {
             </Alert>
 
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
                   <h2 className="font-heading text-[17px] tracking-tight text-foreground">
                     {t("channels.sectionTitle")}
                   </h2>
-                  <p className="mt-1 text-[13px] text-muted-foreground">{t("channels.sectionDesc")}</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    {t("channels.sectionDesc")}
+                  </p>
                 </div>
                 <AccountSettingsToolbar
                   onSyncAccounts={() =>
@@ -196,15 +288,23 @@ export default function SettingsAccountsPage() {
               </div>
 
               <AccountChannelsSection
-                accounts={accountsQuery.data?.accounts}
-                unlockedChannels={accountsQuery.data?.unlockedChannels}
+                accounts={mergedAccounts}
+                unlockedChannels={unlockedWithRednote}
+                needsReauthChannels={needsReauthChannels}
                 loading={accountsQuery.isLoading}
                 onUnlock={requestUnlock}
                 onConnect={connect}
                 onDisconnect={disconnect}
-                unlockPending={unlockMutation.isPending}
-                connectPending={connectMutation.isPending}
-                disconnectPending={disconnectMutation.isPending}
+                unlockPending={
+                  unlockMutation.isPending || rednoteUnlockMutation.isPending
+                }
+                connectPending={
+                  connectMutation.isPending || rednoteConnectMutation.isPending
+                }
+                disconnectPending={
+                  disconnectMutation.isPending ||
+                  rednoteDisconnectMutation.isPending
+                }
                 creditsEach={creditsEach}
                 hideHeader
               />
@@ -224,7 +324,30 @@ export default function SettingsAccountsPage() {
         creditsRemaining={creditsRemaining}
         loading={connectionCreditQuery.isLoading}
         onConfirm={confirmUnlock}
-        isUnlocking={unlockMutation.isPending}
+        isUnlocking={
+          unlockMutation.isPending || rednoteUnlockMutation.isPending
+        }
+      />
+
+      <RedNoteQrConnectDialog
+        open={rednoteQrOpen}
+        onOpenChange={(open) => {
+          setRednoteQrOpen(open)
+          if (!open) setRednoteSocketRoom(null)
+        }}
+        socketRoom={rednoteSocketRoom}
+        onSuccess={() => {
+          toast.success(t("rednote.loginSuccess"))
+          void queryClient.invalidateQueries({
+            queryKey: rednoteQueryKeys.account,
+          })
+          void queryClient.invalidateQueries({
+            queryKey: zernioQueryKeys.accounts,
+          })
+        }}
+        onFailed={(reason) => {
+          toast.error(t("rednote.loginFailed", { reason }))
+        }}
       />
     </PageShell>
   )

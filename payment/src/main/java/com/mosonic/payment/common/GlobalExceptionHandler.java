@@ -37,4 +37,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, Map.of("error", ex.getMessage()), ex.getMessage(), Instant.now()));
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiResponse<>(false, Map.of("error", ex.getMessage()), ex.getMessage(), Instant.now()));
+    }
+
+    @ExceptionHandler(UpstreamServiceException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleUpstream(UpstreamServiceException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new ApiResponse<>(false, Map.of("error", ex.getMessage()), ex.getMessage(), Instant.now()));
+    }
 }

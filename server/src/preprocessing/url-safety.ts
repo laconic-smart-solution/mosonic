@@ -1,6 +1,62 @@
 import * as dns from 'node:dns/promises';
 import * as net from 'node:net';
 
+/** Ensures http(s) scheme so `new URL` and fetch accept pasted host paths. */
+export function normalizeHttpUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    throw new Error('Invalid URL');
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
+/** Best-effort normalize; returns null when not a usable http(s) URL. */
+export function tryNormalizeHttpUrl(rawUrl: string): string | null {
+  try {
+    const withScheme = normalizeHttpUrl(rawUrl);
+    const url = new URL(withScheme);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.hostname.includes('.')) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pull http(s) URLs and bare www./domain paths from free text so pasted links
+ * still reach the URL fetcher even when not sent in the `urls` field.
+ */
+export function extractUrlsFromText(text: string): string[] {
+  if (!text.trim()) return [];
+  const found = new Set<string>();
+  const patterned =
+    /(?:https?:\/\/|www\.)[^\s<>"'`]+|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s<>"'`]*)?/gi;
+  for (const match of text.matchAll(patterned)) {
+    let raw = match[0];
+    raw = raw.replace(/[),.;:!?\]]+$/g, '');
+    const normalized = tryNormalizeHttpUrl(raw);
+    if (normalized) found.add(normalized);
+  }
+  return [...found];
+}
+
+/** Merge explicit URL list with any URLs found in prompt text (deduped, normalized). */
+export function mergeUrlSources(text: string, urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of [...urls, ...extractUrlsFromText(text)]) {
+    const normalized = tryNormalizeHttpUrl(raw);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
 export function isBlockedHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost')) return true;
@@ -36,8 +92,9 @@ export function isBlockedIp(ip: string): boolean {
 export async function assertUrlSafeForFetch(rawUrl: string): Promise<URL> {
   let url: URL;
   try {
-    url = new URL(rawUrl);
-  } catch {
+    url = new URL(normalizeHttpUrl(rawUrl));
+  } catch (e) {
+    if (e instanceof Error && e.message === 'Invalid URL') throw e;
     throw new Error('Invalid URL');
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {

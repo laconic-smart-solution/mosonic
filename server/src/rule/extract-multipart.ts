@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { Express } from 'express';
+import { mergeUrlSources, tryNormalizeHttpUrl } from '../preprocessing/url-safety';
 import type { RuleExtractRequest } from './extract-request.types';
 import { hasMeaningfulGuidedIntake } from './rule-intake-merge.util';
 import { ruleIntakeAnswersSchema } from './rule-intake.zod';
@@ -17,9 +18,13 @@ export function parseUrlsMultipart(urlsRaw: unknown): string[] {
     if (!Array.isArray(parsed)) {
       throw new BadRequestException('urls must be a JSON array');
     }
-    return parsed.filter(
-      (u): u is string => typeof u === 'string' && u.trim().length > 0,
-    );
+    const out: string[] = [];
+    for (const u of parsed) {
+      if (typeof u !== 'string' || !u.trim()) continue;
+      const normalized = tryNormalizeHttpUrl(u);
+      if (normalized) out.push(normalized);
+    }
+    return out;
   } catch (e) {
     if (e instanceof BadRequestException) throw e;
     throw new BadRequestException('urls must be valid JSON');
@@ -53,7 +58,7 @@ export function parseRuleExtractMultipart(
   intakeRaw?: unknown,
 ): RuleExtractRequest {
   const trimmedInput = typeof input === 'string' ? input.trim() : '';
-  const urlList = parseUrlsMultipart(urlsRaw);
+  const urlList = mergeUrlSources(trimmedInput, parseUrlsMultipart(urlsRaw));
   const fileList = files ?? [];
   const intake = parseIntakeMultipart(intakeRaw);
 

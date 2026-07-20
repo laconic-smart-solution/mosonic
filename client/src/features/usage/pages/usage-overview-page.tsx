@@ -16,6 +16,7 @@ import { rangeToParams, type UsageRangeKey } from "@/features/usage/lib/usage-ra
 import { usagePanelClass } from "@/features/usage/components/usage-plan-banner"
 import { navigateAfterPipelineSuccess } from "@/features/workflow/lib/pipeline-completion-nav"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   ChartContainer,
   ChartTooltip,
@@ -63,11 +64,11 @@ function isRefundEntry(creditsCharged: number): boolean {
   return creditsCharged < 0
 }
 
-function formatLedgerCredits(creditsCharged: number): string {
-  if (isRefundEntry(creditsCharged)) {
-    return `+${formatCredits(-creditsCharged)}`
-  }
-  return formatCredits(creditsCharged)
+function formatLedgerAmount(creditsCharged: number): string {
+  const amount = formatCredits(Math.abs(creditsCharged))
+  if (creditsCharged < 0) return `+${amount}`
+  if (creditsCharged > 0) return `-${amount}`
+  return amount
 }
 
 export default function UsageOverviewPage() {
@@ -227,31 +228,52 @@ export default function UsageOverviewPage() {
             <h2 className="font-heading text-[17px] tracking-tight text-foreground">
               {t("ledger.title")}
             </h2>
+            <p className="mt-1 text-xs text-muted-foreground">{t("ledger.subtitle")}</p>
           </div>
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead>{t("ledger.date")}</TableHead>
+                <TableHead>{t("ledger.type")}</TableHead>
                 <TableHead>{t("ledger.operation")}</TableHead>
                 <TableHead>{t("ledger.provider")}</TableHead>
-                <TableHead className="text-right">{t("ledger.credits")}</TableHead>
+                <TableHead className="text-right">{t("ledger.amount")}</TableHead>
                 <TableHead className="w-[100px] text-right">{t("ledger.action")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ledgerEntries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                     {t("ledger.empty")}
                   </TableCell>
                 </TableRow>
               ) : (
                 ledgerEntries.map((row) => {
                   const refund = isRefundEntry(row.creditsCharged)
+                  const amountLabel = refund
+                    ? t("ledger.amountRefunded", {
+                        count: formatCredits(-row.creditsCharged),
+                      })
+                    : t("ledger.amountUsed", {
+                        count: formatCredits(row.creditsCharged),
+                      })
                   return (
                   <TableRow key={row._id ?? `${row.pipelineRef}-${row.createdAt}`}>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {new Date(row.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {refund ? (
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        >
+                          {t("ledger.typeRefund")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">{t("ledger.typeUsed")}</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm capitalize">
                       {refund
@@ -265,11 +287,14 @@ export default function UsageOverviewPage() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        "text-right font-mono tabular-nums",
-                        refund && "text-emerald-600 dark:text-emerald-400",
+                        "text-right font-mono text-sm font-medium tabular-nums",
+                        refund
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-foreground",
                       )}
+                      aria-label={amountLabel}
                     >
-                      {formatLedgerCredits(row.creditsCharged)}
+                      {formatLedgerAmount(row.creditsCharged)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

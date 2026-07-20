@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils"
 export type BannerVariant =
   | "hidden"
   | "not_connected"
+  | "needs_reauth"
+  | "manual_verify"
   | "failed"
   | "publishing"
   | "published"
@@ -22,6 +24,7 @@ type UploadStatusBannerProps = {
   variant: BannerVariant
   publishedAt: string | null
   scheduledAt: string | null
+  failureReason?: string | null
   onConnect?: () => void
   onRetry?: () => void
   /** When false, status text is shown without Connect / Retry buttons (e.g. preview dialog). */
@@ -46,6 +49,7 @@ export function UploadStatusBanner({
   variant,
   publishedAt,
   scheduledAt,
+  failureReason,
   onConnect,
   onRetry,
   showActions = true,
@@ -81,6 +85,51 @@ export function UploadStatusBanner({
     )
   }
 
+  if (variant === "needs_reauth") {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:border-amber-400/35 dark:bg-amber-500/15 dark:text-amber-100",
+        )}
+      >
+        <AlertCircle className="size-4 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">
+          {failureReason?.trim() ||
+            `${platformLabel} session expired. Reconnect in Settings.`}
+        </span>
+        {showActions ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 border-amber-600/40 bg-background/80 text-amber-950 hover:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-50 dark:hover:bg-amber-500/20"
+            onClick={() => onConnect?.()}
+          >
+            Reconnect
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (variant === "manual_verify") {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs",
+          "border-blue-500/40 bg-blue-500/10 text-blue-950 dark:border-blue-400/35 dark:bg-blue-500/15 dark:text-blue-100",
+        )}
+      >
+        <AlertTriangle className="size-4 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">
+          {failureReason?.trim() ||
+            `Published to ${platformLabel}, but confirmation was inconclusive — verify on the platform.`}
+        </span>
+      </div>
+    )
+  }
+
   if (variant === "failed") {
     return (
       <div
@@ -90,7 +139,9 @@ export function UploadStatusBanner({
         )}
       >
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
-        <span className="min-w-0 flex-1">Publishing failed. Please retry.</span>
+        <span className="min-w-0 flex-1">
+          {failureReason?.trim() || "Publishing failed. Please retry."}
+        </span>
         {showActions ? (
           <Button
             type="button"

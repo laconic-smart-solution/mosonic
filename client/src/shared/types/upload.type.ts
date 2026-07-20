@@ -58,6 +58,8 @@ export type ChannelPublishRequest = {
 export type PublishUploadRequest = {
   publishNow: boolean
   scheduledAt?: string | null
+  /** IANA timezone for the scheduled wall time (e.g. Asia/Bangkok). */
+  timezone?: string | null
   channels: ChannelPublishRequest[]
 }
 
@@ -75,6 +77,8 @@ export type UpdateUploadBody = {
   channel?: string | null
   caption?: string | null
   scheduledAt?: string | null
+  /** IANA timezone for the scheduled wall time (e.g. Asia/Bangkok). */
+  timezone?: string | null
   youtubeTitle?: string | null
   mediaUrl?: string | null
   mediaUrls?: string[]

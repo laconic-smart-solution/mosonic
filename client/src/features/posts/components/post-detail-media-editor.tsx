@@ -43,13 +43,21 @@ export function PostDetailMediaEditor({
       <CardContent className="space-y-2">
         <div className="flex overflow-hidden rounded-md border">
           {mediaCfg.tabs.map((tab) => {
-            const active = draft.mediaTab === tab
+            const active =
+              (draft.mediaTab === "video" ? "video" : "multiple") === tab
             return (
               <button
                 key={tab}
                 type="button"
                 disabled={disabled}
-                onClick={() => onChange({ mediaTab: tab })}
+                onClick={() =>
+                  onChange({
+                    mediaTab: tab,
+                    ...(tab === "video"
+                      ? { imageUrls: [] }
+                      : { videoUrl: null }),
+                  })
+                }
                 className={cn(
                   "flex-1 border-r px-2 py-1.5 text-[11px] transition-colors last:border-r-0",
                   active
@@ -65,7 +73,7 @@ export function PostDetailMediaEditor({
         </div>
         <DndContext onDragEnd={() => {}}>
           <UploadMediaDropZone
-            mode={draft.mediaTab}
+            mode={draft.mediaTab === "video" ? "video" : "multiple"}
             imageUrls={draft.imageUrls}
             videoUrl={draft.videoUrl}
             maxImages={mediaCfg.maxCarousel}
@@ -73,6 +81,7 @@ export function PostDetailMediaEditor({
             disabled={disabled}
             onRemoveImage={(i) => {
               onChange({
+                mediaTab: "multiple",
                 imageUrls: draft.imageUrls.filter((_, j) => j !== i),
               })
             }}
@@ -82,15 +91,9 @@ export function PostDetailMediaEditor({
             onUploadedUrls={(urls) => {
               if (draft.mediaTab === "video") {
                 onChange({
+                  mediaTab: "video",
                   videoUrl: urls[0] ?? null,
                   imageUrls: [],
-                })
-                return
-              }
-              if (draft.mediaTab === "single") {
-                onChange({
-                  imageUrls: urls.slice(0, 1),
-                  videoUrl: null,
                 })
                 return
               }
@@ -98,7 +101,11 @@ export function PostDetailMediaEditor({
                 0,
                 mediaCfg.maxCarousel,
               )
-              onChange({ imageUrls: merged, videoUrl: null })
+              onChange({
+                mediaTab: "multiple",
+                imageUrls: merged,
+                videoUrl: null,
+              })
             }}
           />
         </DndContext>

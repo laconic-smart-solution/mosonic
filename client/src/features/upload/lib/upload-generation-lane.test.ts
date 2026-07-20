@@ -12,8 +12,8 @@ import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
 
 describe("upload-generation-lane", () => {
-  it("lanesMatch treats twitter and x as the same", () => {
-    expect(lanesMatch("twitter", "x")).toBe(true)
+  it("lanesMatch compares normalized channel keys", () => {
+    expect(lanesMatch("Instagram", "instagram")).toBe(true)
     expect(lanesMatch("instagram", "facebook")).toBe(false)
   })
 

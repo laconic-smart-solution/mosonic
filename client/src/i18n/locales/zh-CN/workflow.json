@@ -246,6 +246,7 @@
     "retrying": "重试中",
     "done": "完成",
     "completed": "已完成",
+    "skipped": "已跳过",
     "failed_final": "失败",
     "failed": "失败",
     "waiting_review": "待审核"
@@ -255,18 +256,13 @@
     "auto": "自动",
     "autoHint": "连续运行所有节点",
     "step": "逐步",
-    "stepHint": "选择需要暂停供审核的步骤",
-    "reviewStepsTitle": "待审核步骤",
-    "reviewStepsHint": "未勾选的步骤将自动运行，不会暂停。",
-    "selectAll": "全选",
-    "clearAll": "清除",
-    "noStepsSelected": "请至少选择一个待审核步骤。",
-    "reviewStepCount": "{{total}} 个步骤中有 {{selected}} 个将暂停供审核",
+    "stepHint": "在每个可审核步骤暂停；在画布上选择审核或跳过",
     "reviewTitle": "审核输出",
     "reviewDialogTitle": "审核节点输出",
     "reviewDialogDescription": "在继续流水线之前审核并编辑 {{node}} 的输出。",
-    "clickToReview": "点击此节点以审核生成的输出。",
+    "clickToReview": "审核输出或跳过以自动继续。",
     "openReview": "审核",
+    "skipReview": "跳过",
     "continue": "继续",
     "regenerate": "重新生成",
     "regenerateWithCredits": "重新生成（{{credits}} 积分）",
@@ -283,6 +279,8 @@
   },
   "toolbar": {
     "workflowNameAria": "工作流名称",
+    "renameAria": "重命名工作流",
+    "renameHint": "点击以重命名此工作流",
     "untitledWorkflow": "未命名工作流",
     "rebuildNodes": "重建节点",
     "describeWorkflow": "描述工作流",
@@ -382,6 +380,16 @@
     "removedLanes": "已移除分支：{{lanes}}",
     "videoSettingsSaveFailed": "无法将视频设置保存到服务器。运行前请先保存工作流。"
   },
+  "canvasCredit": {
+    "title": "运行费用",
+    "total": "{{count}} 积分",
+    "balance": "可用 {{count}} 积分",
+    "calculating": "计算中…",
+    "error": "无法估算",
+    "free": "此工作流没有计费节点。",
+    "show": "显示运行费用",
+    "hide": "隐藏运行费用"
+  },
   "toast": {
     "saved": "工作流已保存",
     "saveFailed": "无法保存工作流，请重试。",
@@ -402,7 +410,8 @@
     "retryFailed": "无法重试。请重试。",
     "skipFailed": "无法跳过。请重试。",
     "describeWorkflow": "请描述要生成的工作流。",
-    "pipelineStopped": "流水线已停止"
+    "pipelineStopped": "流水线已停止",
+    "pipelineStoppedKeptProgress": "流水线已停止 — 已完成的步骤已保存为草稿"
   },
   "processing": {
     "generating": "生成中...",
@@ -421,6 +430,7 @@
     "saveBeforeGenerateHint": "生成前请保存工作流更改或应用节点设置。您仍可编辑此提示词。",
     "usingWorkflow": "使用工作流：{{name}} · {{count}} 个{{nodesLabel}}",
     "emptyWorkflowHint": "通过问答向导配置工作流，然后在每次运行时生成内容。",
+    "preparingDefaultWorkflow": "正在准备默认工作流…",
     "modeUseCurrentWorkflow": "使用当前工作流",
     "modeGenerateWorkflow": "自动生成工作流",
     "modeTabCurrent": "当前",
@@ -560,6 +570,13 @@
     "selectAll": "全选",
     "deselectAll": "取消全选",
     "progress": "第 {{current}} 步，共 {{total}} 步",
+    "path": {
+      "chooserDescription": "使用标准流水线，或通过几个问题进行自定义。",
+      "defaultTitle": "默认",
+      "defaultDescription": "关键词 → 情报 → 文案，再按渠道 adapt 并合并。",
+      "takeQuestionTitle": "回答问题",
+      "takeQuestionDescription": "回答几个问题，为本轮生成自定义流水线。"
+    },
     "validation": {
       "selectAtLeastOneChannel": "请至少选择一个渠道。",
       "selectAtLeastOneLanguage": "请至少选择一种目标语言。"

@@ -44,7 +44,7 @@ Mosonic does **not** train foundational AI language models. The proprietary inno
 ### Platform Capabilities (High Level)
 
 - Campaign-driven AI content generation (text, images, video, translation)
-- Multi-channel publishing (Facebook, Instagram, Twitter/X, LinkedIn)
+- Multi-channel publishing (Facebook, Instagram, LinkedIn, YouTube, TikTok)
 - Workflow automation with approval routing
 - API integration with CRM, e-commerce, and distribution channels
 - Real-time analytics with auto-feedback to improve campaign rules
@@ -496,8 +496,9 @@ A generic MCP endpoint handles actual publishing to all platforms. New platforms
 | --------- | -------- | ----------- | ------------- |
 | Facebook  | 63,206   | 1.91:1      | Yes           |
 | Instagram | 2,200    | 1:1 or 4:5  | Yes (60s)     |
-| Twitter/X | 280      | 16:9        | Yes (140s)    |
 | LinkedIn  | 3,000    | 1.91:1      | Yes           |
+| YouTube   | —        | 16:9        | Yes           |
+| TikTok    | 2,200    | 9:16        | Yes (60s)     |
 
 ### Module Flow
 

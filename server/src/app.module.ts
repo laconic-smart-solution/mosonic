@@ -19,11 +19,18 @@ import { PipelineModule } from './pipeline/pipeline.module';
 import { RuleModule } from './rule/rule.module';
 import { PostModule } from './post/post.module';
 import { UploadModule } from './upload/upload.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { LineModule } from './line/line.module';
+import { TelegramModule } from './telegram/telegram.module';
+import { ViberModule } from './viber/viber.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
+import { FaqModule } from './faq/faq.module';
 import { CostModule } from './cost/cost.module';
 import { CreditModule } from './credit/credit.module';
 import { PlanModule } from './plan/plan.module';
@@ -32,6 +39,7 @@ import { CampaignModule } from './campaign/campaign.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NewsTriggerModule } from './news-trigger/news-trigger.module';
+import { RedNoteModule } from './rednote/rednote.module';
 import {
   buildRedisConnectionOptions,
   redisEnvFromConfig,
@@ -44,6 +52,8 @@ import {
     AuthModule,
     UsersModule,
     AdminModule,
+    AnnouncementsModule,
+    FaqModule,
     LlmModule,
     PreprocessingModule,
     CostModule,
@@ -60,12 +70,18 @@ import {
     ContentModule,
     UploadModule,
     PostModule,
+    SchedulerModule,
     WebhookModule,
+    LineModule,
+    TelegramModule,
+    ViberModule,
+    WhatsAppModule,
     CampaignModule,
     NewsTriggerModule,
     IntegrationsModule,
     DashboardModule,
     McpModule,
+    RedNoteModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

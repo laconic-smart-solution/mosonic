@@ -167,6 +167,19 @@ enum PipelineLogStatus {
   failed
 }
 
+enum SocialProvider {
+  ZERNIO
+  REDNOTE
+  // Retained for DB enum compatibility only — LINE links use LineConnection, not SocialAccount.
+  LINE
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
 model User {
   userId                 String   @id @default(uuid())
   authServerUserId       String   @unique
@@ -179,17 +192,105 @@ model User {
   status                 UserStatus @default(ACTIVE)
   lastLoginAt            DateTime?
   zernioProfileId        String?  @unique
+  /// @deprecated Prefer SocialAccount rows; kept for dual-write / rollback.
   zernioConnectedAccounts Json    @default("[]")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  userPlans UserPlan[]
+  userPlans           UserPlan[]
+  socialAccounts      SocialAccount[]
+  lineConnection      LineConnection?
+  telegramConnection  TelegramConnection?
+  viberConnection     ViberConnection?
+  whatsappConnection  WhatsAppConnection?
 
   @@index([email])
   @@index([username])
   @@index([role])
   @@index([status])
   @@map("users")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model LineConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  lineUserId  String   @unique
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("line_connections")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model TelegramConnection {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  telegramChatId String   @unique
+  connectedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("telegram_connections")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model ViberConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  viberUserId String   @unique
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("viber_connections")
+}
+
+/// Contact / messaging identity only — never used for content publishing.
+model WhatsAppConnection {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  whatsappWaId String   @unique // digits phone / wa_id
+  connectedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("whatsapp_connections")
+}
+
+model SocialAccount {
+  id                String              @id @default(uuid())
+  userId            String
+  provider          SocialProvider      @default(ZERNIO)
+  channel           String
+  externalAccountId String
+  displayName       String?
+  username          String?
+  avatarUrl         String?
+  status            SocialAccountStatus @default(ACTIVE)
+  metadata          Json?
+  connectedAt       DateTime            @default(now())
+  disconnectedAt    DateTime?
+  lastSyncedAt      DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, provider, channel])
+  @@index([userId, channel])
+  @@index([userId, status])
+  @@index([provider, externalAccountId])
+  @@map("social_accounts")
 }
 
 model Plan {
@@ -782,4 +883,38 @@ model HeygenUserAvatar {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("heygen_user_avatars")
+}
+
+enum AnnouncementStatus {
+  published
+  failed
+}
+
+enum AnnouncementLevel {
+  info
+  warning
+  critical
+}
+
+model Announcement {
+  id                  String             @id @default(uuid())
+  title               String
+  message             String
+  level               AnnouncementLevel  @default(info)
+  status              AnnouncementStatus @default(published)
+  sendInApp           Boolean            @default(true)
+  sendLine            Boolean            @default(false)
+  createdBy           String
+  publishedAt         DateTime           @default(now())
+  inAppRecipientCount Int                @default(0)
+  lineTotal           Int?
+  lineSent            Int?
+  lineFailed          Int?
+  lineFailedIds       String[]           @default([])
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("announcements")
 }

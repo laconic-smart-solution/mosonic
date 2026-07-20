@@ -39,5 +39,13 @@ export interface IUserPlanRepository {
       clearLowBalanceNotified?: boolean;
     },
   ): Promise<UserPlanRecord | null>;
+  /**
+   * Atomically debit credits when balance is sufficient.
+   * Returns null when there is no active plan or remaining < amount.
+   */
+  debitActiveCreditsIfSufficient(
+    userId: string,
+    amount: number,
+  ): Promise<UserPlanRecord | null>;
   markLowBalanceNotified(userPlanId: string): Promise<void>;
 }

@@ -10,6 +10,8 @@ export type UsageSummary = {
   creditsUsed: number
   creditsRemaining: number
   creditsPerMonth: number
+  /** Plan allotment + top-ups for the period (used + remaining, at least plan). */
+  creditsBudget?: number
   percentUsed: number
   billingPeriod: string
   byNodeType: Array<{ nodeType: string; creditsCharged: number; count: number }>

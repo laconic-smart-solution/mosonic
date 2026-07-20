@@ -246,6 +246,7 @@
     "retrying": "กำลังลองใหม่",
     "done": "เสร็จ",
     "completed": "เสร็จสมบูรณ์",
+    "skipped": "ข้าม",
     "failed_final": "ล้มเหลว",
     "failed": "ล้มเหลว",
     "waiting_review": "ตรวจสอบ"
@@ -255,18 +256,13 @@
     "auto": "อัตโนมัติ",
     "autoHint": "รันทุกโหนดโดยไม่หยุด",
     "step": "ทีละขั้น",
-    "stepHint": "เลือกขั้นตอนที่ต้องการหยุดเพื่อตรวจสอบ",
-    "reviewStepsTitle": "ขั้นตอนที่ต้องตรวจสอบ",
-    "reviewStepsHint": "ขั้นตอนที่ไม่เลือกจะรันต่อโดยอัตโนมัติโดยไม่หยุด",
-    "selectAll": "เลือกทั้งหมด",
-    "clearAll": "ล้างทั้งหมด",
-    "noStepsSelected": "เลือกอย่างน้อยหนึ่งขั้นตอนเพื่อตรวจสอบ",
-    "reviewStepCount": "{{selected}} จาก {{total}} ขั้นตอนจะหยุดเพื่อตรวจสอบ",
+    "stepHint": "หยุดที่แต่ละขั้นที่ตรวจสอบได้ แล้วเลือกตรวจสอบหรือข้ามบนแคนวาส",
     "reviewTitle": "ตรวจสอบผลลัพธ์",
     "reviewDialogTitle": "ตรวจสอบผลลัพธ์โหนด",
     "reviewDialogDescription": "ตรวจสอบและแก้ไขผลลัพธ์ของ {{node}} ก่อนดำเนินการต่อ",
-    "clickToReview": "คลิกโหนดนี้เพื่อตรวจสอบผลลัพธ์ที่สร้าง",
+    "clickToReview": "ตรวจสอบผลลัพธ์หรือข้ามเพื่อดำเนินการต่อโดยอัตโนมัติ",
     "openReview": "ตรวจสอบ",
+    "skipReview": "ข้าม",
     "continue": "ดำเนินการต่อ",
     "regenerate": "สร้างใหม่",
     "regenerateWithCredits": "สร้างใหม่ ({{credits}} เครดิต)",
@@ -283,6 +279,8 @@
   },
   "toolbar": {
     "workflowNameAria": "ชื่อเวิร์กโฟลว์",
+    "renameAria": "เปลี่ยนชื่อเวิร์กโฟลว์",
+    "renameHint": "คลิกเพื่อเปลี่ยนชื่อเวิร์กโฟลว์นี้",
     "untitledWorkflow": "เวิร์กโฟลว์ไม่มีชื่อ",
     "rebuildNodes": "สร้างโหนดใหม่",
     "describeWorkflow": "อธิบายเวิร์กโฟลว์",
@@ -382,6 +380,16 @@
     "removedLanes": "ลบสาย: {{lanes}}",
     "videoSettingsSaveFailed": "บันทึกการตั้งค่าวิดีโอไม่ได้ ใช้บันทึกเวิร์กโฟลว์ก่อนรัน"
   },
+  "canvasCredit": {
+    "title": "ค่าใช้จ่ายเมื่อรัน",
+    "total": "{{count}} เครดิต",
+    "balance": "เหลือ {{count}} เครดิต",
+    "calculating": "กำลังคำนวณ…",
+    "error": "ประมาณการไม่ได้",
+    "free": "เวิร์กโฟลว์นี้ไม่มีโหนดที่คิดเครดิต",
+    "show": "แสดงค่าใช้จ่ายเมื่อรัน",
+    "hide": "ซ่อนค่าใช้จ่ายเมื่อรัน"
+  },
   "toast": {
     "saved": "บันทึกเวิร์กโฟลว์เรียบร้อยแล้ว",
     "saveFailed": "บันทึกเวิร์กโฟลว์ไม่ได้ ลองอีกครั้ง",
@@ -402,7 +410,8 @@
     "retryFailed": "ลองใหม่ไม่ได้ ลองอีกครั้ง",
     "skipFailed": "ข้ามไม่ได้ ลองอีกครั้ง",
     "describeWorkflow": "กรุณาอธิบายเวิร์กโฟลว์ที่ต้องการสร้าง",
-    "pipelineStopped": "หยุดไปป์ไลน์แล้ว"
+    "pipelineStopped": "หยุดไปป์ไลน์แล้ว",
+    "pipelineStoppedKeptProgress": "หยุดไปป์ไลน์แล้ว — บันทึกขั้นตอนที่เสร็จแล้วเป็นฉบับร่าง"
   },
   "processing": {
     "generating": "กำลังสร้าง...",
@@ -421,6 +430,7 @@
     "saveBeforeGenerateHint": "บันทึกการแก้เวิร์กโฟลว์หรือใช้การตั้งค่าโหนดก่อนสร้าง ยังแก้พรอมpt นี้ได้",
     "usingWorkflow": "ใช้เวิร์กโฟลว์: {{name}} · {{count}} {{nodesLabel}}",
     "emptyWorkflowHint": "ตั้งค่าเวิร์กโฟลว์ด้วยตัวช่วย Q&A จากนั้นสร้างคอนเทนต์ในแต่ละรอบ",
+    "preparingDefaultWorkflow": "กำลังเตรียมเวิร์กโฟลว์เริ่มต้น…",
     "modeUseCurrentWorkflow": "ใช้เวิร์กโฟลว์ปัจจุบัน",
     "modeGenerateWorkflow": "สร้างเวิร์กโฟลว์อัตโนมัติ",
     "modeTabCurrent": "ปัจจุบัน",
@@ -560,6 +570,13 @@
     "selectAll": "เลือกทั้งหมด",
     "deselectAll": "ยกเลิกทั้งหมด",
     "progress": "ขั้นตอน {{current}} จาก {{total}}",
+    "path": {
+      "chooserDescription": "เริ่มด้วยไปป์ไลน์มาตรฐาน หรือตอบคำถามเพื่อปรับแต่งก่อนสร้าง",
+      "defaultTitle": "ค่าเริ่มต้น",
+      "defaultDescription": "Keyword → Intelligence → Text แล้วแยกเป็น adapt ตามช่องทางและรวมกลับ",
+      "takeQuestionTitle": "ตอบคำถาม",
+      "takeQuestionDescription": "ตอบคำถามสั้นๆ เพื่อปรับแต่งไปป์ไลน์สำหรับรอบนี้"
+    },
     "validation": {
       "selectAtLeastOneChannel": "เลือกอย่างน้อยหนึ่งช่องทาง",
       "selectAtLeastOneLanguage": "เลือกอย่างน้อยหนึ่งภาษาเป้าหมาย"

@@ -22,6 +22,8 @@ import {
 import { ZernioMcpClient } from './zernio/zernio.mcp';
 import { ZernioRestClient } from './zernio/zernio-rest.client';
 import { ZernioOauthStateService } from './zernio-oauth-state.service';
+import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
+import { SocialProvider } from '@prisma/client';
 
 @Injectable()
 export class McpService {
@@ -52,6 +54,10 @@ export class McpService {
     platform: string,
     userId: string,
   ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
+    const channel = platform.trim().toLowerCase();
+    if (isDeprecatedChannelId(channel)) {
+      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+    }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
       throw new BadRequestException(
@@ -64,7 +70,6 @@ export class McpService {
         SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       )) ?? 0;
     const config = await this.creditCalculation.getConfig();
-    const channel = platform.trim().toLowerCase();
     const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
       userId,
       channel,
@@ -80,6 +85,10 @@ export class McpService {
     platform: string,
     userId: string,
   ): Promise<{ connectUrl: string }> {
+    const channel = platform.trim().toLowerCase();
+    if (isDeprecatedChannelId(channel)) {
+      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+    }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
       throw new BadRequestException(
@@ -138,39 +147,61 @@ export class McpService {
   async handleOAuthCallback(query: {
     state?: string;
     platform?: string;
+    /** Zernio standard redirect uses `connected={platform}`, not `platform`. */
+    connected?: string;
     accountId?: string;
+    account_id?: string;
     username?: string;
-  }): Promise<void> {
+  }): Promise<{ platform: string }> {
     const state = query.state;
     if (!state?.trim()) {
       throw new BadRequestException('Missing OAuth state');
     }
     const { userId } = await this.oauthState.verifyState(state);
-    const platform = query.platform?.trim() ?? '';
-    const accountId = query.accountId?.trim() ?? '';
-    if (!platform || !accountId) {
-      throw new BadRequestException(
-        'Missing platform or accountId from Zernio',
+
+    // Zernio docs: standard redirect appends connected, profileId, accountId, username.
+    const platform = (
+      query.platform?.trim() ||
+      query.connected?.trim() ||
+      ''
+    ).toLowerCase();
+    const accountId =
+      query.accountId?.trim() || query.account_id?.trim() || '';
+    const username = query.username?.trim() || undefined;
+
+    if (platform && accountId) {
+      await this.usersService.setZernioConnectedAccount(
+        userId,
+        platform,
+        accountId,
+        username ? { username } : undefined,
+      );
+    } else {
+      this.logger.warn(
+        `Zernio OAuth callback missing platform/accountId for user=${userId} keys=${Object.keys(query).join(',')}; falling back to account sync`,
       );
     }
-
-    await this.usersService.setZernioConnectedAccount(
-      userId,
-      platform,
-      accountId,
-    );
 
     try {
       await this.syncAccounts(userId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Account may still be saved locally from setZernioConnectedAccount above.
       this.logger.warn(
         `Zernio account sync skipped after callback for ${userId}: ${message}`,
       );
+      if (!platform || !accountId) {
+        throw new BadRequestException(
+          'OAuth completed but account details were missing and sync failed',
+        );
+      }
     }
+
+    const resolvedPlatform = platform || query.connected?.trim() || 'account';
     this.logger.log(
-      `Zernio OAuth saved ${platform} for user ${userId} (${query.username ?? ''})`,
+      `Zernio OAuth saved ${resolvedPlatform} for user ${userId} (${username ?? ''})`,
     );
+    return { platform: resolvedPlatform };
   }
 
   async syncAccounts(userId: string): Promise<{
@@ -187,13 +218,58 @@ export class McpService {
     accounts: ConnectedAccountRecord[];
     unlockedChannels: string[];
   }> {
-    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    const unlockedChannels =
-      await this.creditService.listUnlockedSocialChannels(userId);
+    const accounts = (
+      await this.usersService.getAllActiveConnectedAccounts(userId)
+    ).filter(
+      (a) =>
+        !isDeprecatedChannelId(a.channel) &&
+        a.channel.trim().toLowerCase() !== 'line' &&
+        a.provider !== SocialProvider.LINE,
+    );
+    const unlockedChannels = (
+      await this.creditService.listUnlockedSocialChannels(userId)
+    ).filter((ch) => !isDeprecatedChannelId(ch));
     this.logger.log(
       `getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`,
     );
     return { accounts, unlockedChannels };
+  }
+
+  /**
+   * Resolve the Mosonic user's Zernio-connected WhatsApp accountId (SocialAccount / sync cache).
+   */
+  async resolveWhatsAppAccountId(userId: string): Promise<string | null> {
+    const accounts =
+      await this.usersService.getAllActiveConnectedAccounts(userId);
+    const wa = accounts.find(
+      (a) => a.channel.trim().toLowerCase() === 'whatsapp',
+    );
+    return wa?.accountId?.trim() || null;
+  }
+
+  /**
+   * Send WhatsApp text via Zernio inbox (free-form or optional template fallback).
+   */
+  async sendWhatsAppInboxText(params: {
+    userId: string;
+    participantId: string;
+    message: string;
+    templateName?: string;
+    templateLanguage?: string;
+  }): Promise<void> {
+    const accountId = await this.resolveWhatsAppAccountId(params.userId);
+    if (!accountId) {
+      throw new BadRequestException(
+        'No Zernio WhatsApp account connected for this user',
+      );
+    }
+    await this.zernioRest.sendWhatsAppInboxText({
+      accountId,
+      participantId: params.participantId,
+      message: params.message,
+      templateName: params.templateName,
+      templateLanguage: params.templateLanguage,
+    });
   }
 
   async getConnectionCreditQuote(userId: string): Promise<{
@@ -228,7 +304,6 @@ export class McpService {
     );
   }
 
-  /** Resolve stored row when UI uses `twitter` vs Zernio storing `x` (or vice versa). */
   private isChannelConnected(
     accounts: ConnectedAccountRecord[],
     platform: string,
@@ -241,11 +316,8 @@ export class McpService {
     requestChannel: string,
   ): ConnectedAccountRecord | undefined {
     const key = requestChannel.trim().toLowerCase();
-    const keys =
-      key === 'twitter' || key === 'x'
-        ? new Set<string>(['twitter', 'x'])
-        : new Set<string>([key]);
-    return accounts.find((a) => keys.has(a.channel));
+    if (isDeprecatedChannelId(key)) return undefined;
+    return accounts.find((a) => a.channel === key);
   }
 
   async publishCreatePostBatch(
@@ -432,11 +504,27 @@ export class McpService {
         'id',
       ])?.trim();
       if (!channel || !accountId) continue;
+      const username = this.readFirstString(record, [
+        'username',
+        'userName',
+        'handle',
+        'screenName',
+        'screen_name',
+      ]);
+      const displayName = this.readFirstString(record, [
+        'displayName',
+        'display_name',
+        'name',
+        'fullName',
+        'full_name',
+      ]);
       byChannel.set(channel, {
         userId,
         channel,
         accountId,
         connectedAt: new Date(),
+        ...(username ? { username } : {}),
+        ...(displayName ? { displayName } : {}),
       });
     }
     return Array.from(byChannel.values());

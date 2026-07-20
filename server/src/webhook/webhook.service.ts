@@ -8,6 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { EventsService } from '../events/events.service';
+import { postPublishedNotification } from '../events/notification.util';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
   PlatformPostStatus,
@@ -98,6 +100,7 @@ export class WebhookService {
     private readonly events: EventsService,
     private readonly usersService: UsersService,
     private readonly postAnalyticsService: PostAnalyticsService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   /**
@@ -292,6 +295,12 @@ export class WebhookService {
     });
     await this.postAnalyticsService.ensureForPost(savedPost);
 
+    this.notifyPostPublished(post.userId, {
+      uploadId: post.uploadRef,
+      postId: post.postId,
+      channels: post.channels,
+    });
+
     const upload = await this.uploads.findByUploadId(post.uploadRef);
     if (!upload) return;
 
@@ -315,6 +324,33 @@ export class WebhookService {
         withUploadChannels(upload, channels),
       ),
     });
+  }
+
+  private notifyPostPublished(
+    userId: string | null | undefined,
+    args: {
+      uploadId?: string | null;
+      postId: string;
+      channels?: string[] | null;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postPublishedNotification({
+      ...args,
+      titleTemplate: this.config.get<string>('POST_PUBLISHED_NOTIFY_TITLE'),
+      messageTemplate: this.config.get<string>('POST_PUBLISHED_NOTIFY_MESSAGE'),
+    });
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.published',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 
   private async handlePostFailed(payload: Record<string, unknown>): Promise<void> {
@@ -602,10 +638,23 @@ export class WebhookService {
     const platform = String(account?.platform ?? '').trim();
     const accountId = String(account?._id ?? account?.id ?? '').trim();
     if (!platform || !accountId) return;
+    const username =
+      typeof account?.username === 'string' ? account.username.trim() : '';
+    const displayNameRaw =
+      typeof account?.displayName === 'string'
+        ? account.displayName
+        : typeof account?.name === 'string'
+          ? account.name
+          : '';
+    const displayName = displayNameRaw.trim();
     await this.usersService.setZernioConnectedAccount(
       user.userId,
       platform,
       accountId,
+      {
+        ...(username ? { username } : {}),
+        ...(displayName ? { displayName } : {}),
+      },
     );
   }
 

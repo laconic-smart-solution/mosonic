@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventsService } from '../events/events.service';
+import { postPublishedNotification } from '../events/notification.util';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import { McpService } from '../mcp/mcp.service';
 import { PostAnalyticsService } from '../post/post-analytics.service';
 import {
@@ -54,6 +56,7 @@ export class UploadScheduledSyncService {
     private readonly mcpService: McpService,
     private readonly events: EventsService,
     private readonly postAnalyticsService: PostAnalyticsService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   /**
@@ -269,6 +272,13 @@ export class UploadScheduledSyncService {
 
     if (savedPost.status === PostStatus.Published) {
       await this.postAnalyticsService.ensureForPost(savedPost);
+      if (decision.kind === 'mark_published') {
+        this.notifyPostPublished(post.userId, {
+          uploadId: post.uploadRef,
+          postId: post.postId,
+          channels: post.channels,
+        });
+      }
     }
 
     const upload = await this.uploads.findByUploadId(post.uploadRef);
@@ -318,5 +328,32 @@ export class UploadScheduledSyncService {
       publishNowHint,
       scheduledAtHint,
     });
+  }
+
+  private notifyPostPublished(
+    userId: string | null | undefined,
+    args: {
+      uploadId?: string | null;
+      postId: string;
+      channels?: string[] | null;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postPublishedNotification({
+      ...args,
+      titleTemplate: this.config.get<string>('POST_PUBLISHED_NOTIFY_TITLE'),
+      messageTemplate: this.config.get<string>('POST_PUBLISHED_NOTIFY_MESSAGE'),
+    });
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.published',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 }

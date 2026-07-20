@@ -196,12 +196,26 @@ export const adminApi = {
       responseType: "blob",
     }),
 
-  uploadFaqDocument: (file: File) => {
+  uploadFaqDocument: (
+    file: File,
+    options?: { onUploadProgress?: (percent: number) => void },
+  ) => {
     const form = new FormData()
     form.append("file", file)
     return apiClient
       .post("/admin/faq/documents", form, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          if (!options?.onUploadProgress) return
+          const total = event.total ?? 0
+          if (total <= 0) {
+            options.onUploadProgress(0)
+            return
+          }
+          options.onUploadProgress(
+            Math.min(100, Math.round((event.loaded / total) * 100)),
+          )
+        },
       })
       .then((r) => r.data)
   },
@@ -211,4 +225,29 @@ export const adminApi = {
 
   askFaq: (body: { question: string; topK?: number }) =>
     apiClient.post("/admin/faq/ask", body).then((r) => r.data),
+
+  listLineConnections: (params?: {
+    page?: number
+    limit?: number
+    search?: string
+  }) => apiClient.get("/admin/line/connections", { params }).then((r) => r.data),
+
+  sendLineMessage: (userId: string, body: { text: string }) =>
+    apiClient
+      .post(`/admin/line/connections/${userId}/messages`, body)
+      .then((r) => r.data),
+
+  listAnnouncements: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/admin/announcements", { params }).then((r) => r.data),
+
+  publishAnnouncement: (body: {
+    title: string
+    message: string
+    level?: "info" | "warning" | "critical"
+    sendInApp?: boolean
+    sendLine?: boolean
+  }) => apiClient.post("/admin/announcements", body).then((r) => r.data),
+
+  getAnnouncement: (id: string) =>
+    apiClient.get(`/admin/announcements/${id}`).then((r) => r.data),
 }

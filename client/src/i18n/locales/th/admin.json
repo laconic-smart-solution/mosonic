@@ -13,7 +13,86 @@
       "cost": "ค่าใช้จ่าย (USD)",
       "content": "คอนเทนต์",
       "apiUsage": "การใช้ API",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "communication": "การสื่อสาร",
+      "line": "LINE",
+      "announcements": "ประกาศ"
+    }
+  },
+  "communication": {
+    "line": {
+      "title": "ข้อความ LINE",
+      "subtitle": "ส่งข้อความถึงผู้ใช้ที่เชื่อมบัญชี LINE แล้ว",
+      "total": "ผู้ใช้ที่เชื่อมต่อ {{count}} คน",
+      "searchPlaceholder": "ค้นหาอีเมล ชื่อ หรือ LINE id",
+      "search": "ค้นหา",
+      "loading": "กำลังโหลดผู้ใช้ที่เชื่อมต่อ…",
+      "loadError": "โหลดรายการเชื่อมต่อ LINE ไม่สำเร็จ",
+      "empty": "ยังไม่มีผู้ใช้เชื่อมต่อ LINE",
+      "showing": "แสดง {{start}}–{{end}} จาก {{total}}",
+      "send": "ส่งข้อความ",
+      "sending": "กำลังส่ง…",
+      "sendTitle": "ส่งข้อความ LINE",
+      "sendDesc": "ส่งข้อความตรงถึง {{name}}",
+      "messageLabel": "ข้อความ",
+      "messagePlaceholder": "พิมพ์ข้อความ…",
+      "sendHint": "กด Ctrl+Enter เพื่อส่งเร็ว",
+      "charCount": "{{count}} / {{max}}",
+      "noEmail": "ไม่มีอีเมล",
+      "cancel": "ยกเลิก",
+      "sendSuccess": "ส่งข้อความทาง LINE แล้ว",
+      "sendError": "ส่งข้อความ LINE ไม่สำเร็จ",
+      "columns": {
+        "user": "ผู้ใช้",
+        "email": "อีเมล",
+        "connectedAt": "เชื่อมเมื่อ",
+        "actions": "การทำงาน"
+      }
+    },
+    "announcements": {
+      "title": "ประกาศ",
+      "subtitle": "เผยแพร่ประกาศของแพลตฟอร์มในแอป และ/หรือผ่าน LINE",
+      "publish": "เผยแพร่",
+      "publishing": "กำลังเผยแพร่…",
+      "publishTitle": "เผยแพร่ประกาศ",
+      "publishDesc": "ส่งถึงผู้ใช้ที่ใช้งานอยู่ผ่านการแจ้งเตือนในแอป และเลือกส่ง LINE ได้",
+      "titleLabel": "หัวข้อ",
+      "titlePlaceholder": "หัวข้อสั้น ๆ…",
+      "messageLabel": "ข้อความ",
+      "messagePlaceholder": "เขียนประกาศ…",
+      "levelLabel": "ระดับ",
+      "levels": {
+        "info": "ข้อมูล",
+        "warning": "คำเตือน",
+        "critical": "สำคัญมาก"
+      },
+      "channelInApp": "การแจ้งเตือนในแอป",
+      "channelInAppHint": "ส่งการแจ้งเตือนผ่านซ็อกเก็ตถึงผู้ใช้ที่ใช้งานอยู่ทั้งหมด",
+      "channelLine": "บรอดคาสต์ LINE",
+      "channelLineHint": "ส่งข้อความแบบกลุ่มถึงบัญชี LINE ที่เชื่อมต่อทั้งหมด",
+      "channelInAppShort": "ในแอป",
+      "channelLineShort": "LINE",
+      "channelRequired": "ต้องเปิดอย่างน้อยหนึ่งช่องทาง",
+      "charCount": "{{count}} / {{max}}",
+      "cancel": "ยกเลิก",
+      "publishSuccess": "เผยแพร่ประกาศแล้ว",
+      "publishError": "เผยแพร่ประกาศไม่สำเร็จ",
+      "loading": "กำลังโหลดประกาศ…",
+      "loadError": "โหลดประกาศไม่สำเร็จ",
+      "empty": "ยังไม่มีประกาศ",
+      "showing": "แสดง {{start}}–{{end}} จาก {{total}}",
+      "status": {
+        "published": "เผยแพร่แล้ว",
+        "failed": "ล้มเหลว"
+      },
+      "columns": {
+        "title": "หัวข้อ",
+        "message": "ข้อความ",
+        "level": "ระดับ",
+        "channels": "ช่องทาง",
+        "status": "สถานะ",
+        "publishedAt": "เผยแพร่เมื่อ"
+      }
     }
   },
   "dashboard": {
@@ -442,11 +521,34 @@
     "uploading": "กำลังอัปโหลด…",
     "uploadSuccess": "ประมวลผลเอกสารสำเร็จ",
     "uploadError": "อัปโหลดเอกสารไม่สำเร็จ",
+    "uploadDialog": {
+      "title": "อัปโหลดเอกสาร FAQ",
+      "description": "อัปโหลดเอกสารเพื่อสร้าง FAQ และจัดทำดัชนีสำหรับผู้ช่วย",
+      "dropTitle": "ลากไฟล์มาวางที่นี่",
+      "dropHint": "PDF, DOCX, TXT หรือ Markdown · สูงสุด 25 MB",
+      "browse": "เลือกไฟล์",
+      "remove": "ลบ",
+      "submit": "อัปโหลดและสร้าง FAQ",
+      "retry": "ลองอีกครั้ง",
+      "viewDocument": "ดูเอกสาร",
+      "invalidType": "ประเภทไฟล์ไม่รองรับ ใช้ PDF, DOCX, TXT หรือ Markdown",
+      "tooLarge": "ไฟล์ใหญ่เกินไป ขนาดสูงสุด {{maxMb}} MB",
+      "progressIdle": "พร้อมอัปโหลด",
+      "progressUploading": "กำลังอัปโหลดไฟล์…",
+      "progressProcessing": "กำลังสร้าง FAQ และจัดทำดัชนี…",
+      "progressDone": "ประมวลผลเสร็จสิ้น",
+      "progressFailed": "อัปโหลดล้มเหลว",
+      "processingHint": "เอกสารขนาดใหญ่อาจใช้เวลาสักครู่ กรุณาเปิดไดอะล็อกนี้ไว้",
+      "successTitle": "เอกสารพร้อมใช้งาน",
+      "successHint": "สร้าง FAQ {{count}} รายการจาก {{filename}}"
+    },
     "download": "ดาวน์โหลด",
     "downloadError": "ดาวน์โหลดเอกสารไม่สำเร็จ",
     "documentDetail": "รายละเอียดเอกสาร",
     "documentNotFound": "ไม่พบเอกสาร",
     "generatedFaqs": "FAQ ที่สร้างแล้ว",
+    "seeMore": "ดูเพิ่มเติม",
+    "seeLess": "ดูน้อยลง",
     "searchFaqs": "ค้นหา FAQ",
     "viewDocument": "ดูเอกสาร",
     "emptyDocuments": "ยังไม่มีเอกสาร",
@@ -476,6 +578,7 @@
       "sources": "แหล่งอ้างอิง",
       "error": "ไม่สามารถรับคำตอบได้",
       "source": {
+        "faq": "จาก FAQ",
         "llm": "คำตอบจาก AI",
         "no_match": "ไม่พบคำตอบ"
       }

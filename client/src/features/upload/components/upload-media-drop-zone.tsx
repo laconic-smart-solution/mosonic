@@ -12,7 +12,11 @@ import { uploadMediaService } from "@/shared/services/upload-media.service"
 
 import { FileServiceImage, FileServiceVideo } from "./upload-display-media"
 import { UploadMediaDetailDialog } from "./upload-media-detail-dialog"
-import type { MediaTabMode } from "../lib/upload-platform-media"
+import {
+  isImageMediaTab,
+  normalizeMediaTab,
+  type MediaTabMode,
+} from "../lib/upload-platform-media"
 import type { UploadPaletteDragPayload } from "./upload-dnd-payload"
 
 type UploadMediaDropZoneProps = {
@@ -22,16 +26,19 @@ type UploadMediaDropZoneProps = {
   maxImages: number
   activeDrag: UploadPaletteDragPayload | null
   disabled?: boolean
-  carouselIndex?: number
   onRemoveImage: (index: number) => void
   onClear: () => void
   /** Called with URLs after each successful local upload batch (order preserved). */
   onUploadedUrls: (urls: string[]) => void
 }
 
+/** How many collage cells to show before collapsing the rest into +N. */
+const COLLAGE_VISIBLE = 3
+const MEDIA_FRAME_H = "h-56"
+
 function mediaDropVisual(
   mode: MediaTabMode,
-  active: UploadPaletteDragPayload | null
+  active: UploadPaletteDragPayload | null,
 ): "idle" | "accept" | "reject" {
   if (!active) return "idle"
   if (mode === "video") {
@@ -43,16 +50,26 @@ function mediaDropVisual(
 function filterFilesForMode(
   mode: MediaTabMode,
   files: File[],
-  maxExtra: number
+  maxExtra: number,
 ): File[] {
   if (mode === "video") {
     return files.filter((f) => f.type.startsWith("video/")).slice(0, 1)
   }
-  const images = files.filter((f) => f.type.startsWith("image/"))
-  if (mode === "multiple") {
-    return images.slice(0, Math.max(0, maxExtra))
-  }
-  return images.slice(0, 1)
+  return files
+    .filter((f) => f.type.startsWith("image/"))
+    .slice(0, Math.max(0, maxExtra))
+}
+
+function collageGridClass(count: number): string {
+  if (count <= 1) return "grid-cols-1 grid-rows-1"
+  if (count === 2) return "grid-cols-2 grid-rows-1"
+  if (count === 3) return "grid-cols-2 grid-rows-2"
+  return "grid-cols-2 grid-rows-2"
+}
+
+function collageCellClass(count: number, index: number): string {
+  if (count === 3 && index === 0) return "row-span-2"
+  return ""
 }
 
 export function UploadMediaDropZone({
@@ -62,13 +79,14 @@ export function UploadMediaDropZone({
   maxImages,
   activeDrag,
   disabled = false,
-  carouselIndex = 0,
   onRemoveImage,
   onClear,
   onUploadedUrls,
 }: UploadMediaDropZoneProps) {
   const { t } = useTranslation("upload")
-  const visual = mediaDropVisual(mode, disabled ? null : activeDrag)
+  const normalizedMode = normalizeMediaTab(mode)
+  const isImages = isImageMediaTab(mode)
+  const visual = mediaDropVisual(normalizedMode, disabled ? null : activeDrag)
   const { isOver, setNodeRef } = useDroppable({ id: "drop-media", disabled })
   const fileInputId = useId()
   const [uploading, setUploading] = useState(false)
@@ -81,17 +99,13 @@ export function UploadMediaDropZone({
   }, [])
 
   const atCapacity =
-    mode === "multiple" && imageUrls.length >= maxImages && maxImages > 0
+    isImages && maxImages > 0 && imageUrls.length >= maxImages
 
-  const slotsLeft =
-    mode === "multiple" ? Math.max(0, maxImages - imageUrls.length) : 1
+  const slotsLeft = isImages
+    ? Math.max(0, maxImages - imageUrls.length)
+    : 1
 
-  const has =
-    mode === "video"
-      ? Boolean(videoUrl?.trim())
-      : mode === "single"
-        ? imageUrls.length > 0
-        : imageUrls.length > 0
+  const has = mode === "video" ? Boolean(videoUrl?.trim()) : imageUrls.length > 0
 
   const border =
     isOver && visual === "accept" && !atCapacity
@@ -105,9 +119,7 @@ export function UploadMediaDropZone({
   const hint =
     mode === "video"
       ? "Drag video here or upload"
-      : mode === "multiple"
-        ? "Drop images (carousel) or upload"
-        : "Drag image here or upload"
+      : "Drop images or upload"
 
   const accept = mode === "video" ? "video/*" : "image/*"
 
@@ -116,7 +128,7 @@ export function UploadMediaDropZone({
       if (disabled) return
       if (files.length === 0) {
         toast.error(
-          mode === "video" ? "Choose a video file." : "Choose image file(s)."
+          mode === "video" ? "Choose a video file." : "Choose image file(s).",
         )
         return
       }
@@ -134,7 +146,7 @@ export function UploadMediaDropZone({
         setUploading(false)
       }
     },
-    [disabled, mode, onUploadedUrls]
+    [disabled, mode, onUploadedUrls],
   )
 
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,8 +154,8 @@ export function UploadMediaDropZone({
     e.target.value = ""
     if (disabled) return
     if (files.length === 0) return
-    const maxExtra = mode === "multiple" ? slotsLeft : mode === "video" ? 1 : 1
-    const use = filterFilesForMode(mode, files, maxExtra)
+    const maxExtra = mode === "video" ? 1 : slotsLeft
+    const use = filterFilesForMode(normalizedMode, files, maxExtra)
     void runUpload(use)
   }
 
@@ -161,17 +173,21 @@ export function UploadMediaDropZone({
     e.preventDefault()
     e.stopPropagation()
     if (uploading || atCapacity) return
-    const maxExtra = mode === "multiple" ? slotsLeft : mode === "video" ? 1 : 1
-    const use = filterFilesForMode(mode, Array.from(dt.files), maxExtra)
+    const maxExtra = mode === "video" ? 1 : slotsLeft
+    const use = filterFilesForMode(normalizedMode, Array.from(dt.files), maxExtra)
     void runUpload(use)
   }
+
+  const visibleImages = imageUrls.slice(0, COLLAGE_VISIBLE)
+  const overflowCount = Math.max(0, imageUrls.length - COLLAGE_VISIBLE)
+  const collageCount = visibleImages.length
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "group relative min-h-[100px] rounded-md border-[1.5px] p-3 transition-colors",
-        border
+        "group relative rounded-md border-[1.5px] p-3 transition-colors",
+        border,
       )}
       onDragOver={onNativeDragOver}
       onDragEnter={onNativeDragOver}
@@ -182,7 +198,7 @@ export function UploadMediaDropZone({
         type="file"
         className="sr-only"
         accept={accept}
-        multiple={mode === "multiple"}
+        multiple={isImages}
         disabled={disabled}
         onChange={onFileInputChange}
         tabIndex={-1}
@@ -199,15 +215,15 @@ export function UploadMediaDropZone({
           )}
           {mode === "video"
             ? "Video"
-            : mode === "multiple"
-              ? "Images"
-              : "Image"}
+            : imageUrls.length > 1
+              ? `Images (${imageUrls.length})`
+              : "Images"}
         </div>
         {disabled ? (
           <span
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "pointer-events-none h-7 gap-1 px-2 text-[10px] opacity-50"
+              "pointer-events-none h-7 gap-1 px-2 text-[10px] opacity-50",
             )}
             aria-disabled="true"
           >
@@ -218,7 +234,7 @@ export function UploadMediaDropZone({
           <span
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "pointer-events-none h-7 gap-1 px-2 text-[10px] opacity-50"
+              "pointer-events-none h-7 gap-1 px-2 text-[10px] opacity-50",
             )}
             aria-disabled="true"
           >
@@ -231,7 +247,7 @@ export function UploadMediaDropZone({
             onPointerDown={(e) => e.stopPropagation()}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "h-7 cursor-pointer gap-1 px-2 text-[10px]"
+              "h-7 cursor-pointer gap-1 px-2 text-[10px]",
             )}
           >
             <Upload className="size-3" aria-hidden />
@@ -240,104 +256,119 @@ export function UploadMediaDropZone({
         )}
       </div>
 
-      {!has && !uploading ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 py-6 text-center text-[11px] text-muted-foreground">
-          {disabled ? "Media cannot be changed after scheduling" : hint}
-          {atCapacity ? (
-            <span className="text-destructive">Maximum {maxImages} images</span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {uploading && !has ? (
-        <div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-[11px] text-muted-foreground">
-          Uploading…
-        </div>
-      ) : null}
-
-      {mode === "video" && videoUrl ? (
-        <button
-          type="button"
-          className="block w-full cursor-zoom-in overflow-hidden rounded-md border bg-background text-left"
-          onClick={(e) => {
-            e.stopPropagation()
-            openMediaDetail(0)
-          }}
-          aria-label={t("mediaDetail.openHint")}
-        >
-          <FileServiceVideo
-            url={videoUrl}
-            controls
-            muted={false}
-            className="max-h-48 w-full"
-          />
-        </button>
-      ) : null}
-
-      {mode === "single" && imageUrls[0] ? (
-        <button
-          type="button"
-          className="block w-full cursor-zoom-in overflow-hidden rounded-md border text-left transition-opacity hover:opacity-95"
-          onClick={(e) => {
-            e.stopPropagation()
-            openMediaDetail(0)
-          }}
-          aria-label={t("mediaDetail.openHint")}
-        >
-          <FileServiceImage
-            url={imageUrls[0]}
-            alt=""
-            className="max-h-48 w-full object-cover"
-            loadingClassName="max-h-48 w-full min-h-[8rem] rounded-md border"
-          />
-        </button>
-      ) : null}
-
-      {mode === "multiple" && imageUrls.length > 0 ? (
-        <div>
-          <p className="mb-2 text-[10px] text-muted-foreground">
-            {carouselIndex + 1} / {imageUrls.length}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {imageUrls.map((url, i) => (
-              <div
-                key={`${url}-${i}`}
-                className="group/slot relative size-[52px] overflow-hidden rounded-md border"
-              >
-                <button
-                  type="button"
-                  className="block size-full cursor-zoom-in"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openMediaDetail(i)
-                  }}
-                  aria-label={t("mediaDetail.openHint")}
-                >
-                  <FileServiceImage
-                    url={url}
-                    alt=""
-                    className="size-full object-cover"
-                    loadingClassName="size-full"
-                  />
-                </button>
-                {!disabled ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-1 -right-1 size-5 rounded-full p-0 opacity-0 transition-opacity group-hover/slot:opacity-100"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => onRemoveImage(i)}
-                    aria-label={`Remove image ${i + 1}`}
-                  >
-                    <X className="size-2.5" />
-                  </Button>
-                ) : null}
-              </div>
-            ))}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-md border bg-muted/40",
+          MEDIA_FRAME_H,
+        )}
+      >
+        {!has && !uploading ? (
+          <div className="flex size-full flex-col items-center justify-center gap-1 px-3 text-center text-[11px] text-muted-foreground">
+            {disabled ? "Media cannot be changed after scheduling" : hint}
+            {atCapacity ? (
+              <span className="text-destructive">
+                Maximum {maxImages} images
+              </span>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+
+        {uploading && !has ? (
+          <div className="flex size-full items-center justify-center text-[11px] text-muted-foreground">
+            Uploading…
+          </div>
+        ) : null}
+
+        {mode === "video" && videoUrl ? (
+          <button
+            type="button"
+            className="relative block size-full cursor-zoom-in bg-black text-left"
+            onClick={(e) => {
+              e.stopPropagation()
+              openMediaDetail(0)
+            }}
+            aria-label={t("mediaDetail.openHint")}
+          >
+            <FileServiceVideo
+              url={videoUrl}
+              controls
+              muted={false}
+              className="size-full object-contain"
+            />
+          </button>
+        ) : null}
+
+        {isImages && collageCount > 0 ? (
+          <div
+            className={cn(
+              "grid size-full gap-0.5 bg-border",
+              collageGridClass(collageCount),
+            )}
+          >
+            {visibleImages.map((url, i) => {
+              const isLastVisible = i === collageCount - 1
+              const showOverflow = isLastVisible && overflowCount > 0
+              return (
+                <div
+                  key={`${url}-${i}`}
+                  className={cn(
+                    "group/slot relative min-h-0 min-w-0 overflow-hidden bg-muted/60",
+                    collageCellClass(collageCount, i),
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="relative block size-full cursor-zoom-in"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openMediaDetail(showOverflow ? COLLAGE_VISIBLE : i)
+                    }}
+                    aria-label={
+                      showOverflow
+                        ? t("mediaDetail.openOverflow", {
+                            count: overflowCount,
+                            defaultValue: `View ${overflowCount} more images`,
+                          })
+                        : t("mediaDetail.openHint")
+                    }
+                  >
+                    <FileServiceImage
+                      url={url}
+                      alt=""
+                      className={cn(
+                        "size-full",
+                        collageCount > 1 ? "object-cover" : "object-contain",
+                      )}
+                      loadingClassName="size-full"
+                    />
+                    {showOverflow ? (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
+                        +{overflowCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  {!disabled && !showOverflow ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 size-6 rounded-full p-0 opacity-0 shadow-sm transition-opacity group-hover/slot:opacity-100"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onRemoveImage(i)
+                      }}
+                      aria-label={`Remove image ${i + 1}`}
+                    >
+                      <X className="size-3" />
+                    </Button>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
 
       {isOver && visual === "reject" ? (
         <p className="mt-2 text-center text-[11px] text-destructive">
@@ -362,7 +393,7 @@ export function UploadMediaDropZone({
       <UploadMediaDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        mediaTab={mode}
+        mediaTab={normalizedMode}
         imageUrls={imageUrls}
         videoUrl={videoUrl}
         initialImageIndex={detailImageIndex}

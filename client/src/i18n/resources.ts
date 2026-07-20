@@ -8,6 +8,8 @@ import enUsage from "./locales/en/usage.json"
 import enDashboard from "./locales/en/dashboard.json"
 import enHome from "./locales/en/home.json"
 import enMarketing from "./locales/en/marketing.json"
+import enFaq from "./locales/en/faq.json"
+import enAnnouncements from "./locales/en/announcements.json"
 import enNotifications from "./locales/en/notifications.json"
 import enPipeline from "./locales/en/pipeline.json"
 import enPosts from "./locales/en/posts.json"
@@ -26,6 +28,8 @@ import thUsage from "./locales/th/usage.json"
 import thDashboard from "./locales/th/dashboard.json"
 import thHome from "./locales/th/home.json"
 import thMarketing from "./locales/th/marketing.json"
+import thFaq from "./locales/th/faq.json"
+import thAnnouncements from "./locales/th/announcements.json"
 import thNotifications from "./locales/th/notifications.json"
 import thPipeline from "./locales/th/pipeline.json"
 import thPosts from "./locales/th/posts.json"
@@ -44,6 +48,8 @@ import zhUsage from "./locales/zh-CN/usage.json"
 import zhDashboard from "./locales/zh-CN/dashboard.json"
 import zhHome from "./locales/zh-CN/home.json"
 import zhMarketing from "./locales/zh-CN/marketing.json"
+import zhFaq from "./locales/zh-CN/faq.json"
+import zhAnnouncements from "./locales/zh-CN/announcements.json"
 import zhNotifications from "./locales/zh-CN/notifications.json"
 import zhPipeline from "./locales/zh-CN/pipeline.json"
 import zhPosts from "./locales/zh-CN/posts.json"
@@ -58,6 +64,7 @@ export const I18N_NAMESPACES = [
   "auth",
   "home",
   "marketing",
+  "faq",
   "dashboard",
   "rules",
   "workflow",
@@ -67,6 +74,7 @@ export const I18N_NAMESPACES = [
   "posts",
   "credit",
   "usage",
+  "announcements",
   "notifications",
   "settings",
   "admin",
@@ -81,6 +89,7 @@ export const resources = {
     auth: enAuth,
     home: enHome,
     marketing: enMarketing,
+    faq: enFaq,
     dashboard: enDashboard,
     rules: enRules,
     workflow: enWorkflow,
@@ -90,6 +99,7 @@ export const resources = {
     posts: enPosts,
     credit: enCredit,
     usage: enUsage,
+    announcements: enAnnouncements,
     notifications: enNotifications,
     settings: enSettings,
     admin: enAdmin,
@@ -100,6 +110,7 @@ export const resources = {
     auth: thAuth,
     home: thHome,
     marketing: thMarketing,
+    faq: thFaq,
     dashboard: thDashboard,
     rules: thRules,
     workflow: thWorkflow,
@@ -109,6 +120,7 @@ export const resources = {
     posts: thPosts,
     credit: thCredit,
     usage: thUsage,
+    announcements: thAnnouncements,
     notifications: thNotifications,
     settings: thSettings,
     admin: thAdmin,
@@ -119,6 +131,7 @@ export const resources = {
     auth: zhAuth,
     home: zhHome,
     marketing: zhMarketing,
+    faq: zhFaq,
     dashboard: zhDashboard,
     rules: zhRules,
     workflow: zhWorkflow,
@@ -128,6 +141,7 @@ export const resources = {
     posts: zhPosts,
     credit: zhCredit,
     usage: zhUsage,
+    announcements: zhAnnouncements,
     notifications: zhNotifications,
     settings: zhSettings,
     admin: zhAdmin,

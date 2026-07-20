@@ -31,3 +31,14 @@ export function createDefaultWorkflowQAAnswers(
     additionalMessage,
   }
 }
+
+/** Default Generate Workflow path: keyword → intelligence → text (+ branch/adapt/merge when multi-channel). */
+export function createPresetDefaultWorkflowQAAnswers(
+  additionalMessage = "",
+): WorkflowQAAnswers {
+  return {
+    ...createDefaultWorkflowQAAnswers(additionalMessage),
+    useKeywordPlanner: true,
+    useWebSearch: true,
+  }
+}

@@ -33,9 +33,22 @@ describe('McpService', () => {
     getZernioConnectedAccounts: jest.fn(),
     disconnectZernioConnectedAccount: jest.fn(),
     setZernioProfileId: jest.fn(),
+    setZernioConnectedAccount: jest.fn(),
   } as unknown as jest.Mocked<UsersService>;
-  const oauthState = {} as ZernioOauthStateService;
+  const oauthState = {
+    verifyState: jest.fn(),
+  } as unknown as jest.Mocked<ZernioOauthStateService>;
   const config = {} as ConfigService;
+  const creditService = {
+    listUnlockedSocialChannels: jest.fn(),
+    unlockSocialChannel: jest.fn(),
+  };
+  const nodeCreditPriceService = {
+    getActiveCostCredit: jest.fn(),
+  };
+  const creditCalculation = {
+    getConfig: jest.fn(),
+  };
 
   const service = new McpService(
     zernio,
@@ -44,6 +57,9 @@ describe('McpService', () => {
     usersService,
     oauthState,
     config,
+    creditService as never,
+    nodeCreditPriceService as never,
+    creditCalculation as never,
   );
 
   beforeEach(() => {
@@ -120,8 +136,13 @@ describe('McpService', () => {
     } as never);
     zernio.listAccounts.mockResolvedValue([
       { platform: 'Instagram', account_id: 'acc_1' },
-      { channel: 'instagram', accountId: 'acc_2' },
-      { platform: 'facebook', id: 'fb_1' },
+      {
+        channel: 'instagram',
+        accountId: 'acc_2',
+        username: 'ig_user',
+        displayName: 'IG Name',
+      },
+      { platform: 'facebook', id: 'fb_1', name: 'Page One' },
       { platform: '', account_id: 'bad' },
     ]);
 
@@ -133,10 +154,13 @@ describe('McpService', () => {
         expect.objectContaining({
           channel: 'instagram',
           accountId: 'acc_2',
+          username: 'ig_user',
+          displayName: 'IG Name',
         }),
         expect.objectContaining({
           channel: 'facebook',
           accountId: 'fb_1',
+          displayName: 'Page One',
         }),
       ]),
     );
@@ -207,21 +231,6 @@ describe('McpService', () => {
     );
   });
 
-  it('disconnectAccount resolves twitter when stored as x', async () => {
-    usersService.getZernioConnectedAccounts.mockResolvedValue([
-      { channel: 'x', accountId: 'acc_x', connectedAt: new Date() },
-    ]);
-    zernioRest.deleteAccount.mockResolvedValue(undefined);
-
-    await service.disconnectAccount('u1', 'twitter');
-
-    expect(zernioRest.deleteAccount).toHaveBeenCalledWith('acc_x');
-    expect(usersService.disconnectZernioConnectedAccount).toHaveBeenCalledWith(
-      'u1',
-      'x',
-    );
-  });
-
   it('disconnectAccount throws when channel is not connected', async () => {
     usersService.getZernioConnectedAccounts.mockResolvedValue([]);
 
@@ -229,5 +238,70 @@ describe('McpService', () => {
       NotFoundException,
     );
     expect(zernioRest.deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('handleOAuthCallback accepts Zernio connected + accountId redirect params', async () => {
+    oauthState.verifyState.mockResolvedValue({ userId: 'u1' });
+    usersService.findByUserId.mockResolvedValue({
+      userId: 'u1',
+      zernioProfileId: 'prof_1',
+      email: 'user@example.com',
+    } as never);
+    usersService.findOtherUserByZernioProfileId.mockResolvedValue(null);
+    zernio.listAccounts.mockResolvedValue([
+      {
+        _id: 'acc_ig',
+        platform: 'instagram',
+        username: 'brand',
+      },
+    ]);
+    usersService.syncZernioConnectedAccounts.mockResolvedValue([
+      {
+        channel: 'instagram',
+        accountId: 'acc_ig',
+        handle: 'brand',
+        connectedAt: new Date(),
+      },
+    ] as never);
+
+    const result = await service.handleOAuthCallback({
+      state: 'signed-state',
+      connected: 'instagram',
+      accountId: 'acc_ig',
+      username: 'brand',
+    });
+
+    expect(usersService.setZernioConnectedAccount).toHaveBeenCalledWith(
+      'u1',
+      'instagram',
+      'acc_ig',
+      { username: 'brand' },
+    );
+    expect(result).toEqual({ platform: 'instagram' });
+  });
+
+  it('handleOAuthCallback still succeeds when sync fails but account params exist', async () => {
+    oauthState.verifyState.mockResolvedValue({ userId: 'u1' });
+    usersService.findByUserId.mockResolvedValue({
+      userId: 'u1',
+      zernioProfileId: 'prof_1',
+      email: 'user@example.com',
+    } as never);
+    usersService.findOtherUserByZernioProfileId.mockResolvedValue(null);
+    zernio.listAccounts.mockRejectedValue(new Error('zernio unavailable'));
+
+    const result = await service.handleOAuthCallback({
+      state: 'signed-state',
+      connected: 'linkedin',
+      accountId: 'acc_li',
+    });
+
+    expect(usersService.setZernioConnectedAccount).toHaveBeenCalledWith(
+      'u1',
+      'linkedin',
+      'acc_li',
+      undefined,
+    );
+    expect(result).toEqual({ platform: 'linkedin' });
   });
 });

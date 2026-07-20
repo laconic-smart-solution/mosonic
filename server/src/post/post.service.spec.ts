@@ -20,6 +20,16 @@ describe('PostService', () => {
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    findByPostId: jest.fn((postId: string) => {
+      const result = postModel.findOne() as {
+        exec?: () => Promise<unknown>;
+      };
+      if (result && typeof result.exec === 'function') {
+        return result.exec();
+      }
+      return result;
+    }),
+    deleteByPostId: jest.fn().mockResolvedValue(true),
     deleteOne: jest.fn(),
     updateMany: jest.fn(),
     countDocuments: jest.fn(),
@@ -47,12 +57,19 @@ describe('PostService', () => {
     syncFromZernio: jest.fn(),
   };
 
+  const scheduler = {
+    createPostPublish: jest.fn(),
+    reschedulePostPublish: jest.fn(),
+    cancelPostPublish: jest.fn().mockResolvedValue(undefined),
+  };
+
   function service(): PostService {
     return new PostService(
       postModel as never,
       uploadModel as never,
       mcpService as never,
       postAnalyticsService as never,
+      scheduler as never,
     );
   }
 
@@ -81,7 +98,7 @@ describe('PostService', () => {
 
   it('deletePost hard-deletes scheduled post and resets upload channels to pending', async () => {
     const channel = {
-      channel: 'twitter',
+      channel: 'linkedin',
       status: UploadChannelStatus.Scheduled,
       scheduledAt: new Date(),
       publishedAt: null as Date | null,
@@ -102,7 +119,7 @@ describe('PostService', () => {
         status: PostStatus.Scheduled,
         zernioPostId: 'z-sched',
         uploadRef: 'upl-1',
-        channels: ['twitter'],
+        channels: ['linkedin'],
       }),
     });
     postModel.deleteOne.mockReturnValue({
@@ -112,14 +129,21 @@ describe('PostService', () => {
     uploadModel.findOne.mockReturnValue({
       exec: jest.fn().mockResolvedValue(uploadDoc),
     });
+    (uploadModel as { findByUploadId?: jest.Mock }).findByUploadId = jest
+      .fn()
+      .mockResolvedValue(uploadDoc);
+    (uploadModel as { save?: jest.Mock }).save = jest
+      .fn()
+      .mockImplementation(async (doc: unknown) => doc);
 
     const res = await service().deletePost('p-sched', {
       userId: 'u1',
       role: 'CUSTOMER' as never,
     });
 
+    expect(scheduler.cancelPostPublish).toHaveBeenCalledWith('p-sched');
     expect(mcpService.deleteZernioPost).toHaveBeenCalledWith('z-sched');
-    expect(postModel.deleteOne).toHaveBeenCalledWith({ postId: 'p-sched' });
+    expect(postModel.deleteByPostId).toHaveBeenCalledWith('p-sched');
     expect(channel.status).toBe(UploadChannelStatus.Pending);
     expect(channel.scheduledAt).toBeNull();
     expect(channel.failureReason).toBeNull();
@@ -212,7 +236,7 @@ describe('PostService', () => {
         postId: 'p-done',
         userId: 'u1',
         status: PostStatus.Cancelled,
-        channels: ['twitter'],
+        channels: ['linkedin'],
       }),
     });
 
@@ -262,7 +286,7 @@ describe('PostService', () => {
       status: PostStatus.Scheduled,
       zernioPostId: 'z-sched',
       uploadRef: 'upl-1',
-      channels: ['twitter'],
+      channels: ['linkedin'],
       scheduledAt: new Date('2030-01-01T00:00:00.000Z'),
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -270,7 +294,7 @@ describe('PostService', () => {
       uploadId: 'upl-1',
       channels: [
         {
-          channel: 'twitter',
+          channel: 'linkedin',
           status: UploadChannelStatus.Scheduled,
           scheduledAt: new Date('2030-01-01T00:00:00.000Z'),
           publishedAt: null as Date | null,
@@ -496,6 +520,48 @@ describe('PostService', () => {
     if ('local' in detail) {
       expect(detail.local['postId']).toBe('p-local');
       expect(detail.remote).toEqual({ content: 'from zernio' });
+    } else {
+      throw new Error('expected hydrated shape');
+    }
+  });
+
+  it('getPostDetail skips Zernio hydrate for RedNote synthetic post ids', async () => {
+    postModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        postId: 'p-rn',
+        zernioPostId: 'rednote:8894601f-7de7-4113-84aa-425e7384d66a',
+        userId: 'u1',
+        uploadRef: 'upl-rn',
+        channels: ['rednote'],
+        status: PostStatus.Published,
+        toObject: () => ({
+          postId: 'p-rn',
+          zernioPostId: 'rednote:8894601f-7de7-4113-84aa-425e7384d66a',
+          userId: 'u1',
+          uploadRef: 'upl-rn',
+          channels: ['rednote'],
+          status: PostStatus.Published,
+        }),
+      }),
+    });
+    uploadModel.findOne.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      }),
+    });
+
+    const detail = await service().getPostDetail(
+      'p-rn',
+      { userId: 'u1', role: 'CUSTOMER' as never },
+      'zernio',
+    );
+
+    expect(mcpService.getZernioPost).not.toHaveBeenCalled();
+    if ('local' in detail) {
+      expect(detail.local['postId']).toBe('p-rn');
+      expect(detail.remote).toBeNull();
     } else {
       throw new Error('expected hydrated shape');
     }

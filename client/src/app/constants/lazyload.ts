@@ -30,6 +30,7 @@ export const UsagePlansPage = PageLoader(
 )
 export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
 export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
+export const MarketingFaqPage = PageLoader(lazy(() => import("@/features/marketing/pages/faq")))
 
 export const LoginPage = PageLoader(lazy(() => import("@/features/auth/pages/login")))
 export const SignupPage = PageLoader(lazy(() => import("@/features/auth/pages/signup")))
@@ -66,3 +67,14 @@ export const AdminFaqPage = PageLoader(lazy(() => import("@/features/admin/pages
 export const AdminFaqDocumentDetailPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-faq-document-detail")),
 )
+export const AdminLinePage = PageLoader(lazy(() => import("@/features/admin/pages/admin-line")))
+export const AdminAnnouncementsPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-announcements")),
+)
+
+export const AnnouncementsPage = PageLoader(
+  lazy(() => import("@/features/announcements/pages/announcements-page")),
+)
+
+export const SuspendedPage = PageLoader(lazy(() => import("@/features/error/pages/suspended")))
+export const NotFoundPage = PageLoader(lazy(() => import("@/features/error/pages/not-found")))

@@ -8,6 +8,7 @@ import {
   HomePage,
   LandingPage,
   PricingPage,
+  MarketingFaqPage,
   DashboardPage,
   RulesPage,
   NewsTriggerPage,
@@ -43,6 +44,11 @@ import {
   AdminContentDetailPage,
   AdminFaqPage,
   AdminFaqDocumentDetailPage,
+  AdminLinePage,
+  AdminAnnouncementsPage,
+  AnnouncementsPage,
+  SuspendedPage,
+  NotFoundPage,
 } from "../constants/lazyload"
 
 export const router = createBrowserRouter([
@@ -52,6 +58,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <LandingPage /> },
       { path: "/home", element: <HomePage /> },
       { path: "/pricing", element: <PricingPage /> },
+      { path: "/faq", element: <MarketingFaqPage /> },
       { path: "/about", element: <Navigate to="/#about" replace /> },
     ],
   },
@@ -104,6 +111,10 @@ export const router = createBrowserRouter([
     element: <Navigate to="/login" replace />,
   },
   {
+    path: "/suspended",
+    element: <SuspendedPage />,
+  },
+  {
     element: <ProtectedLayout />,
     children: [
       {
@@ -122,6 +133,7 @@ export const router = createBrowserRouter([
           { path: "/upload/:uploadId", element: <UploadPage /> },
           { path: "/posts", element: <PostsPage /> },
           { path: "/posts/:postId", element: <PostDetailPage /> },
+          { path: "/announcements", element: <AnnouncementsPage /> },
           { path: "/settings/accounts", element: <SettingsAccountsPage /> },
           {
             path: "/usage",
@@ -159,8 +171,17 @@ export const router = createBrowserRouter([
           { path: "content/:contentId", element: <AdminContentDetailPage /> },
           { path: "faq", element: <AdminFaqPage /> },
           { path: "faq/documents/:documentId", element: <AdminFaqDocumentDetailPage /> },
+          { path: "communication/line", element: <AdminLinePage /> },
+          {
+            path: "communication/announcements",
+            element: <AdminAnnouncementsPage />,
+          },
         ],
       },
     ],
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />,
   },
 ])

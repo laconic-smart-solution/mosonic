@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { useMemo } from "react"
-import { UserCog, Wallet, GitBranch, Megaphone, Play } from "lucide-react"
+import { BellRing, UserCog, Wallet, GitBranch, Megaphone, Play } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 
@@ -179,6 +179,14 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    id: "announcements",
+    labelKey: "nav.announcements",
+    path: "/announcements",
+    icon: () => (
+      <BellRing className="size-4 shrink-0" strokeWidth={1.65} aria-hidden />
+    ),
+  },
+  {
     id: "usage",
     labelKey: "nav.usage",
     path: "/usage",
@@ -249,6 +257,9 @@ function navItemActive(item: NavItem, pathname: string): boolean {
   }
   if (item.id === "posts") {
     return pathname === "/posts" || pathname.startsWith("/posts/")
+  }
+  if (item.id === "announcements") {
+    return pathname === "/announcements" || pathname.startsWith("/announcements/")
   }
   if (item.id === "usage") {
     return pathname === "/usage" || pathname.startsWith("/usage/")

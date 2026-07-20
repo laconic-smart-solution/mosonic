@@ -83,7 +83,7 @@ export function PageShell({
 
   return (
     <div className={cn(STANDARD_SHELL, className)} style={{ minHeight: "100%" }}>
-      {showBreadcrumb ? <PageBreadcrumb items={items} /> : null}
+      {/* {showBreadcrumb ? <PageBreadcrumb items={items} /> : null} */}
       {children}
     </div>
   )

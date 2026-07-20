@@ -45,13 +45,28 @@ describe('ZernioController', () => {
   });
 
   it('redirects callback success to settings/accounts', async () => {
+    mcpService.handleOAuthCallback.mockResolvedValue({ platform: 'instagram' });
     const redirect = jest.fn();
     await controller.handleCallback(
-      { platform: 'instagram', state: 'x', accountId: 'a1' },
+      { connected: 'instagram', state: 'x', accountId: 'a1' },
       { redirect } as never,
     );
+    expect(mcpService.handleOAuthCallback).toHaveBeenCalledWith({
+      connected: 'instagram',
+      state: 'x',
+      accountId: 'a1',
+    });
     expect(redirect).toHaveBeenCalledWith(
       expect.stringContaining('/settings/accounts?connected=instagram'),
+    );
+  });
+
+  it('redirects callback failure to zernio_error', async () => {
+    mcpService.handleOAuthCallback.mockRejectedValue(new Error('bad state'));
+    const redirect = jest.fn();
+    await controller.handleCallback({ state: 'bad' }, { redirect } as never);
+    expect(redirect).toHaveBeenCalledWith(
+      expect.stringContaining('zernio_error=callback_failed'),
     );
   });
 });

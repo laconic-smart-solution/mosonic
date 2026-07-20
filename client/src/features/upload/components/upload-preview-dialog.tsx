@@ -24,6 +24,7 @@ type Props = {
   bannerVariant: BannerVariant
   publishedAt: string | null
   scheduledAt: string | null
+  failureReason?: string | null
   onConnect?: () => void
   onRetry?: () => void
   showActions?: boolean
@@ -41,6 +42,7 @@ export function UploadPreviewDialog({
   bannerVariant,
   publishedAt,
   scheduledAt,
+  failureReason,
   onConnect,
   onRetry,
   showActions = false,
@@ -70,6 +72,7 @@ export function UploadPreviewDialog({
             variant={bannerVariant}
             publishedAt={publishedAt}
             scheduledAt={scheduledAt}
+            failureReason={failureReason}
             onConnect={onConnect}
             onRetry={onRetry}
             showActions={showActions}

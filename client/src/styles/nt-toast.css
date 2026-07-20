@@ -3,26 +3,18 @@
 @keyframes nt-toast-in {
   from {
     opacity: 0;
-    transform: translateX(28px) scale(0.94);
   }
   to {
     opacity: 1;
-    transform: translateX(0) scale(1);
   }
 }
 
 @keyframes nt-toast-out {
   from {
     opacity: 1;
-    transform: translateX(0) scale(1);
-    max-height: 120px;
-    margin-bottom: 10px;
   }
   to {
     opacity: 0;
-    transform: translateX(36px) scale(0.92);
-    max-height: 0;
-    margin-bottom: 0;
   }
 }
 
@@ -89,11 +81,9 @@
   border-left: 4px solid var(--color-canvas-300);
 }
 
-/* Enter / exit animations */
+/* Enter / exit animations — opacity only so Sonner's --y stacking transform is preserved */
 [data-sonner-toaster].nt-toaster [data-sonner-toast][data-mounted="true"] {
-  --y: translateY(0) !important;
-  opacity: 1;
-  animation: nt-toast-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: nt-toast-in 0.28s ease-out both;
 }
 
 [data-sonner-toaster].nt-toaster [data-sonner-toast][data-removed="true"] {

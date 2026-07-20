@@ -17,6 +17,11 @@ export class GenerateWorkflowResponseDto {
   ruleId!: string;
 }
 
+export class ApplyDefaultWorkflowStructureResponseDto {
+  workflowId!: string;
+  ruleId!: string;
+}
+
 export class RegenerateWorkflowByRuleRequestDto {
   @ValidateNested()
   @Type(() => WorkflowQAAnswersDto)

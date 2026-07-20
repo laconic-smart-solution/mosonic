@@ -13,6 +13,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { randomUuid } from "@/lib/random-uuid"
+import { normalizeHttpUrl, urlDisplayLabel } from "@/lib/strategy-urls"
 
 export interface Attachment {
   id: string
@@ -155,20 +156,26 @@ export function PromptArea({
   }
 
   function addUrl() {
-    const cleaned = urlValue
-      .trim()
-      .replace(/^https?:\/\//, "")
-      .replace(/\/$/, "")
-    if (!cleaned) return
-    setAttachments((prev) => [
-      ...prev,
-      {
+    const parts = urlValue
+      .split(/[\s,]+/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+    if (parts.length === 0) return
+
+    const next: Attachment[] = []
+    for (const part of parts) {
+      const normalized = normalizeHttpUrl(part)
+      if (!normalized) continue
+      next.push({
         id: randomUuid(),
         type: "url",
-        label: cleaned,
-        data: urlValue.trim(),
-      },
-    ])
+        label: urlDisplayLabel(normalized),
+        data: normalized,
+      })
+    }
+    if (next.length === 0) return
+
+    setAttachments((prev) => [...prev, ...next])
     setUrlValue("")
     setUrlOpen(false)
   }
@@ -196,6 +203,15 @@ export function PromptArea({
       onPointerDownCapture={(e) => {
         if (disabled) return
         e.stopPropagation()
+        const target = e.target
+        if (
+          target instanceof Element &&
+          target.closest(
+            "input, textarea, button, a, label, [role='button'], [contenteditable='true']",
+          )
+        ) {
+          return
+        }
         focusTextarea()
       }}
     >
@@ -273,17 +289,32 @@ export function PromptArea({
           >
             <div
               className="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center sm:gap-1.5 sm:px-4"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <input
-                  type="url"
+                  type="text"
                   inputMode="url"
                   autoCapitalize="none"
                   autoCorrect="off"
+                  spellCheck={false}
                   value={urlValue}
                   onChange={(e) => setUrlValue(e.target.value)}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text")
+                    if (!pasted) return
+                    // Allow multi-line / multi-URL paste into the field.
+                    if (/[\s,]/.test(pasted.trim())) {
+                      e.preventDefault()
+                      setUrlValue((prev) =>
+                        [prev, pasted].filter(Boolean).join(" ").trim(),
+                      )
+                    }
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onFocus={(e) => e.stopPropagation()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault()

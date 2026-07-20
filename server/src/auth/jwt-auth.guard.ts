@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -9,8 +10,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { type Request } from 'express';
+import { AuthCookieService } from './auth-cookie.service';
 import { type SsoTokenClaims } from './auth.types';
 import { UsersService } from '../users/users.service';
+import { UserStatus } from '../domain/users/user.types';
+import type { UserRecord } from '../domain/users/user.types';
 
 function envFlagTrue(raw: string | undefined): boolean {
   if (raw === undefined || raw === null) return false;
@@ -26,6 +30,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly config: ConfigService,
     private readonly users: UsersService,
+    private readonly cookies: AuthCookieService,
   ) {
     if (envFlagTrue(this.config.get<string>('SSO_AUTH_DISABLED'))) {
       this.jwks = null;
@@ -75,6 +80,7 @@ export class JwtAuthGuard implements CanActivate {
           `No local user for authServerUserId ${authServerUserId}`,
         );
       }
+      this.assertNotSuspended(localUser, route);
       this.logger.debug(
         `[${route}] Dev impersonation OK authServerUserId=${authServerUserId} localUserId=${localUser.userId}`,
       );
@@ -105,10 +111,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const header = req.headers['authorization'];
-    const token = this.extractBearer(header);
+    const token =
+      this.extractBearer(header) ?? this.cookies.readAccessToken(req);
     if (!token) {
-      this.logger.warn(`[${route}] Missing Bearer token`);
-      throw new UnauthorizedException('Missing Bearer token');
+      this.logger.warn(`[${route}] Missing access token (Bearer or cookie)`);
+      throw new UnauthorizedException('Missing access token');
     }
 
     let claims: SsoTokenClaims;
@@ -154,8 +161,12 @@ export class JwtAuthGuard implements CanActivate {
       this.logger.log(
         `[${route}] User upsert OK authServerUserId=${authServerUserIdRaw} localUserId=${localUser.userId} email=${localUser.email ?? 'n/a'}`,
       );
+      this.assertNotSuspended(localUser, route);
       return true;
     } catch (err) {
+      if (err instanceof ForbiddenException) {
+        throw err;
+      }
       this.logger.error(
         `[${route}] upsertFromSsoClaims failed for authServerUserId=${authServerUserIdRaw}: ${this.formatError(err)}`,
       );
@@ -163,6 +174,20 @@ export class JwtAuthGuard implements CanActivate {
         statusCode: 503,
         error: 'InternalError',
         message: 'Failed to provision local user',
+      });
+    }
+  }
+
+  /** Suspension is a local-only state; block requests even when SSO issued a valid token. */
+  private assertNotSuspended(user: UserRecord, route: string): void {
+    if (user.status === UserStatus.DISABLED) {
+      this.logger.warn(
+        `[${route}] Blocked suspended user localUserId=${user.userId}`,
+      );
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'AccountSuspended',
+        message: 'Your account has been suspended. Please contact support.',
       });
     }
   }

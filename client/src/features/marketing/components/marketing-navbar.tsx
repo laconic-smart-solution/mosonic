@@ -27,10 +27,12 @@ import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
 
 const MARKETING_NAV = [
+  { type: "route" as const, path: "/home", labelKey: "marketing:nav.landing", end: true },
   { type: "hash" as const, hash: "features", labelKey: "marketing:nav.features" },
   { type: "hash" as const, hash: "how-it-works", labelKey: "marketing:nav.howItWorks" },
   { type: "hash" as const, hash: "about", labelKey: "marketing:nav.about" },
   { type: "route" as const, path: "/pricing", labelKey: "marketing:nav.pricing" },
+  { type: "route" as const, path: "/faq", labelKey: "marketing:nav.faq" },
 ]
 
 function marketingNavLinkClass(isActive: boolean, compact = false) {
@@ -81,8 +83,16 @@ function MarketingNavLinks({
           <NavLink
             key={item.path}
             to={item.path}
+            end={"end" in item ? item.end : false}
             onClick={onNavigate}
-            className={({ isActive }) => marketingNavLinkClass(isActive, compact)}
+            className={({ isActive }) =>
+              marketingNavLinkClass(
+                item.path === "/"
+                  ? isActive && !location.hash
+                  : isActive,
+                compact,
+              )
+            }
           >
             {t(item.labelKey)}
           </NavLink>
@@ -96,9 +106,8 @@ export function MarketingNavbar() {
   const { t } = useTranslation(["home", "common", "marketing"])
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const user = useUserStore((s) => s.user)
-  const clearSession = useAuthStore((s) => s.clearSession)
   const clearUser = useUserStore((s) => s.clearUser)
 
   const displayName = user?.name?.trim() ? user.name.trim() : t("home:userStrip.loading")
@@ -110,7 +119,7 @@ export function MarketingNavbar() {
         : t("home:userStrip.account")
 
   function handleLogout() {
-    clearSession()
+    void useAuthStore.getState().logout()
     clearUser()
     navigate("/login", { replace: true })
   }
@@ -167,7 +176,7 @@ export function MarketingNavbar() {
           />
           <ThemeToggle className="size-8 rounded-full hover:bg-foreground/5" />
 
-          {accessToken ? (
+          {isAuthenticated ? (
             <>
               <TopbarCreditBalance className="hidden rounded-full px-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:flex" />
               <span className="hidden max-w-[140px] truncate text-xs font-medium text-muted-foreground lg:inline">
@@ -271,7 +280,7 @@ export function MarketingNavbar() {
               />
             </div>
 
-            {accessToken ? (
+            {isAuthenticated ? (
               <>
                 <Separator />
                 <div className="space-y-3">

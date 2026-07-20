@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { Building2, Camera, Music2, PlayCircle, Share2 } from "lucide-react"
+import { BookOpen, Building2, Camera, Music2, PlayCircle, Share2 } from "lucide-react"
 
 export type AccountChannelDef = {
   /** Stable id for React keys */
@@ -61,5 +61,14 @@ export const ACCOUNT_CHANNELS: readonly AccountChannelDef[] = [
     description: "Vertical video and TikTok-native formats.",
     icon: Music2,
     iconTileClass: "bg-foreground/10 text-foreground",
+  },
+  {
+    id: "rednote",
+    apiKey: "rednote",
+    matchKeys: ["rednote", "xiaohongshu", "xhs"],
+    label: "RedNote",
+    description: "Xiaohongshu notes — QR session connect (not Zernio).",
+    icon: BookOpen,
+    iconTileClass: "bg-[#FF2442]/12 text-[#FF2442]",
   },
 ] as const

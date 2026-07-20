@@ -11,13 +11,22 @@ import { UserRole } from '../users/schemas/user.schema';
 import type { ResolvedContentOutputs } from '../content/content-output.utils';
 import { ContentService } from '../content/content.service';
 import { EventsService } from '../events/events.service';
+import { postScheduledNotification } from '../events/notification.util';
+import { CommsNotifyService } from '../comms/comms-notify.service';
 import { PostService } from '../post/post.service';
 import { McpService } from '../mcp/mcp.service';
 import { getFriendlyZernioPublishError } from '../mcp/zernio/zernio-mcp-publish.util';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   isTikTokPhotoMedia,
   tiktokPhotoCaptionError,
 } from '../mcp/zernio/tiktok-publish.util';
+import { RedNoteService } from '../rednote/rednote.service';
+import { REDNOTE_CHANNEL } from '../domain/users/rednote-metadata.types';
+import { isRedNoteSessionInvalidError } from '../rednote/errors/rednote.errors';
+import type { PublishResult } from '../social/social-publish.types';
+import { partitionPublishWorkByChannel } from './upload-provider-partition.util';
+import { randomUUID } from 'crypto';
 import type { ChannelEntry } from '../rule/schemas/rule.schema';
 import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
 import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
@@ -26,6 +35,7 @@ import type {
   ChannelPublishDto,
   PublishUploadDto,
 } from './dto/publish-upload.dto';
+import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
 import type { PatchUploadChannelBodyDto } from './dto/patch-upload-channel.dto';
 import type { UpdateUploadDto } from './dto/update-upload.dto';
 import type {
@@ -47,7 +57,10 @@ import {
   resolveAutomappedCaption,
   resolveAutomappedMediaUrl,
 } from './upload-channel-publish.util';
-import { laneMediaFromPipelineNodes } from './upload-lane-media.util';
+import {
+  laneMediaFromPipelineNodes,
+  trunkMediaFromPipelineNodes,
+} from './upload-lane-media.util';
 import {
   buildUploadStatusSummary,
   recomputeUploadJobStatus,
@@ -98,16 +111,38 @@ export type UpdateUploadResult = { success: true };
 
 const FAILURE_REASON_MAX = 500;
 
+function scheduleAwarePublishError(err: unknown): string {
+  const raw =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : '';
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes('scheduler') ||
+    msg.includes('econnrefused') ||
+    msg.includes('service unavailable') ||
+    msg.includes('bad gateway')
+  ) {
+    return 'Scheduling service is unavailable. Connect the scheduler and try again.';
+  }
+  return getFriendlyZernioPublishError(err);
+}
+
 @Injectable()
 export class UploadService {
   constructor(
     @Inject(UPLOAD_REPOSITORY)
     private readonly uploads: IUploadRepository,
     private readonly mcpService: McpService,
+    private readonly redNoteService: RedNoteService,
     private readonly events: EventsService,
     private readonly postService: PostService,
     @Inject(forwardRef(() => ContentService))
     private readonly contentService: ContentService,
+    private readonly scheduler: SchedulerService,
+    private readonly comms: CommsNotifyService,
   ) {}
 
   buildChannelEntriesFromPipeline(
@@ -133,10 +168,11 @@ export class UploadService {
         ? parsePipelineNodeOutputString(adaptNode.output)
         : null;
       const map = normalizedRuleChannelMapping(ruleCh);
-      const laneMedia = laneMediaFromPipelineNodes(
-        pipeline.nodes ?? [],
-        lane,
-      );
+      const nodes = pipeline.nodes ?? [];
+      const laneMedia = laneMediaFromPipelineNodes(nodes, lane);
+      const trunkMedia = trunkMediaFromPipelineNodes(nodes);
+      // Per-lane media only; fall back to true trunk (unlaned) nodes — never
+      // flattened resolvedOutputs.image/video (those include other lanes' media).
       const laneResolved: ResolvedContentOutputs = {
         ...resolvedOutputs,
         text:
@@ -149,8 +185,8 @@ export class UploadService {
         summary:
           (typeof adaptOut?.summary === 'string' ? adaptOut.summary : undefined) ??
           resolvedOutputs.summary,
-        image: laneMedia.image ?? resolvedOutputs.image,
-        video: laneMedia.video ?? resolvedOutputs.video,
+        image: laneMedia.image ?? trunkMedia.image,
+        video: laneMedia.video ?? trunkMedia.video,
       };
       const caption = resolveAutomappedCaption(map.caption, laneResolved);
       const mediaUrl = resolveAutomappedMediaUrl(map.media, laneResolved);
@@ -203,14 +239,12 @@ export class UploadService {
   ): UploadChannelEntry {
     const ro = resolvedOutputs ?? {};
     const fallbackCaption = this.fallbackPrimaryCaption(ro);
-    const fallbackMedia = (ro.image?.trim() || ro.video?.trim() || null) as
-      | string
-      | null;
     return {
       channel,
       included: true,
       caption: fallbackCaption,
-      mediaUrl: fallbackMedia,
+      // Do not copy flattened resolved media — it may belong to another lane.
+      mediaUrl: null,
       mediaUrls: [],
       youtubeTitle: null,
       status: UploadChannelStatus.Pending,
@@ -229,7 +263,7 @@ export class UploadService {
     const connectedKeys = new Set(
       (connected.accounts ?? [])
         .map((a) => a.channel?.trim().toLowerCase())
-        .filter(Boolean),
+        .filter((key): key is string => Boolean(key) && !isDeprecatedChannelId(key)),
     );
     if (connectedKeys.size === 0) return upload;
 
@@ -687,13 +721,25 @@ export class UploadService {
           ? title
           : undefined;
 
-      await this.mcpService.updatePost({
-        postId,
-        content,
-        scheduledFor: scheduledIso,
-        title: titleForPost,
-        ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
-      });
+      const hasContentUpdate =
+        hasCaptionUpdate || hasTitleUpdate || hasMediaUpdate;
+      if (hasContentUpdate) {
+        await this.mcpService.updatePost({
+          postId,
+          content,
+          title: titleForPost,
+          ...(hasMediaUpdate ? { mediaUrls: mediaUrlsForPost ?? [] } : {}),
+        });
+      }
+
+      const localPostId = post.postId?.trim();
+      if (scheduledIso && localPostId) {
+        await this.scheduler.reschedulePostPublish(
+          localPostId,
+          scheduledIso,
+          body.timezone ?? undefined,
+        );
+      }
     }
 
     for (const ch of scheduledChannels) {
@@ -825,7 +871,14 @@ export class UploadService {
       if (nonPublishableStatuses.has(row.status)) continue;
 
       const accountId = accountByChannel.get(key)?.trim();
-      if (!accountId) {
+      if (key === REDNOTE_CHANNEL) {
+        const rnStatus = await this.redNoteService.getAccountStatus(auth.userId);
+        if (!rnStatus.connected) {
+          throw new BadRequestException(
+            'RedNote is not connected. Please connect in Settings first.',
+          );
+        }
+      } else if (!accountId) {
         throw new BadRequestException(
           `${row.channel} is not connected. Please connect in Settings first.`,
         );
@@ -861,7 +914,6 @@ export class UploadService {
     }
 
     const channelsSucceeded: string[] = [];
-    const channelKeys = workList.map((w) => w.row.channel.toLowerCase());
 
     for (const w of workList) {
       const chKey = w.row.channel.toLowerCase();
@@ -881,80 +933,184 @@ export class UploadService {
       status: recomputeUploadJobStatus(channels),
     });
 
-    try {
-      const { postId } = await this.mcpService.publishCreatePostBatch(
-        auth.userId,
-        {
-          platforms: workList.map((w) => {
-            const chKey = w.row.channel.toLowerCase();
-            return {
-              platform: chKey,
-              accountId: accountByChannel.get(chKey)!,
-              content: w.caption,
-              mediaUrl: w.mediaUrl,
-              mediaUrls: w.mediaUrls.length ? w.mediaUrls : null,
-              title: w.youtubeTitle,
-            };
-          }),
-          publishNow: body.publishNow,
-          scheduledAt: scheduledIso,
-        },
-      );
+    const publishUploadId = doc.uploadId;
+    const publishRuleRef = doc.ruleRef;
+    const publishContentRef = doc.contentRef;
 
-      await this.postService.createPostFromSuccessfulPublish({
-        userId: publisherUserId,
-        uploadRef: doc.uploadId,
-        ruleRef: doc.ruleRef,
-        contentRef: doc.contentRef,
-        zernioPostId: postId,
-        channels: channelKeys,
-        publishNow: body.publishNow,
-        scheduledAt: scheduledDate,
-      });
+    const { zernioWork, rednoteWork } =
+      partitionPublishWorkByChannel(workList);
 
-      for (const w of workList) {
-        const chKey = w.row.channel.toLowerCase();
-        if (body.publishNow) {
-          w.row.status = UploadChannelStatus.Published;
-          w.row.publishedAt = now;
-          w.row.scheduledAt = null;
-        } else {
+    let zernioPostId: string | null = null;
+
+    const zernioTask = async (): Promise<void> => {
+      if (zernioWork.length === 0) return;
+      let createdLocalPostId: string | null = null;
+      try {
+        const { postId } = await this.mcpService.publishCreatePostBatch(
+          auth.userId,
+          {
+            platforms: zernioWork.map((w) => {
+              const chKey = w.row.channel.toLowerCase();
+              return {
+                platform: chKey,
+                accountId: accountByChannel.get(chKey)!,
+                content: w.caption,
+                mediaUrl: w.mediaUrl,
+                mediaUrls: w.mediaUrls.length ? w.mediaUrls : null,
+                title: w.youtubeTitle,
+              };
+            }),
+            // Timing is owned by Mosonic scheduler; Zernio only gets a draft.
+            publishNow: body.publishNow,
+            scheduledAt: null,
+          },
+        );
+        zernioPostId = postId;
+
+        const { postId: localPostId } =
+          await this.postService.createPostFromSuccessfulPublish({
+            userId: publisherUserId,
+            uploadRef: publishUploadId,
+            ruleRef: publishRuleRef,
+            contentRef: publishContentRef,
+            zernioPostId: postId,
+            channels: zernioWork.map((w) => w.row.channel.toLowerCase()),
+            publishNow: body.publishNow,
+            scheduledAt: scheduledDate,
+          });
+        createdLocalPostId = localPostId;
+
+        if (!body.publishNow && scheduledIso) {
+          await this.scheduler.createPostPublish(
+            localPostId,
+            scheduledIso,
+            body.timezone ?? undefined,
+          );
+        }
+
+        for (const w of zernioWork) {
+          const chKey = w.row.channel.toLowerCase();
+          if (body.publishNow) {
+            w.row.status = UploadChannelStatus.Published;
+            w.row.publishedAt = now;
+            w.row.scheduledAt = null;
+          } else {
+            w.row.status = UploadChannelStatus.Scheduled;
+            w.row.scheduledAt = scheduledDate;
+            w.row.publishedAt = null;
+          }
+          w.row.failureReason = null;
+          channelsSucceeded.push(chKey);
+
+          if (body.publishNow) {
+            this.emitUploadEvent(publishUploadId, 'upload:completed', {
+              uploadId: publishUploadId,
+              channel: chKey,
+              postId: postId || null,
+            });
+          } else {
+            this.emitUploadEvent(publishUploadId, 'upload:scheduled', {
+              uploadId: publishUploadId,
+              channel: chKey,
+              scheduledAt: scheduledDate!.toISOString(),
+              postId: postId || null,
+            });
+          }
+        }
+      } catch (err: unknown) {
+        if (createdLocalPostId) {
+          try {
+            await this.postService.discardOrphanedPost(createdLocalPostId);
+          } catch {
+            // Upload channel is marked failed below; orphan cleanup is best-effort.
+          }
+        }
+        const msg = scheduleAwarePublishError(err);
+        for (const w of zernioWork) {
+          const chKey = w.row.channel.toLowerCase();
+          w.row.status = UploadChannelStatus.Failed;
+          w.row.failureReason = msg;
+          w.row.retryCount = (w.row.retryCount ?? 0) + 1;
+          this.emitUploadEvent(publishUploadId, 'upload:failed', {
+            uploadId: publishUploadId,
+            channel: chKey,
+            message: msg,
+          });
+        }
+      }
+    };
+
+    const rednoteTasks = rednoteWork.map(async (w) => {
+      const chKey = REDNOTE_CHANNEL;
+      let createdLocalPostId: string | null = null;
+      try {
+        if (!body.publishNow) {
+          const { postId: localPostId } =
+            await this.postService.createPostFromSuccessfulPublish({
+              userId: publisherUserId,
+              uploadRef: publishUploadId,
+              ruleRef: publishRuleRef,
+              contentRef: publishContentRef,
+              zernioPostId: `rednote:${randomUUID()}`,
+              channels: [chKey],
+              publishNow: false,
+              scheduledAt: scheduledDate,
+            });
+          createdLocalPostId = localPostId;
+          await this.scheduler.createPostPublish(
+            localPostId,
+            scheduledIso!,
+            body.timezone ?? undefined,
+          );
           w.row.status = UploadChannelStatus.Scheduled;
           w.row.scheduledAt = scheduledDate;
           w.row.publishedAt = null;
-        }
-        w.row.failureReason = null;
-        channelsSucceeded.push(chKey);
-
-        if (body.publishNow) {
-          this.emitUploadEvent(doc.uploadId, 'upload:completed', {
-            uploadId: doc.uploadId,
-            channel: chKey,
-            postId: postId || null,
-          });
-        } else {
-          this.emitUploadEvent(doc.uploadId, 'upload:scheduled', {
-            uploadId: doc.uploadId,
+          w.row.failureReason = null;
+          channelsSucceeded.push(chKey);
+          this.emitUploadEvent(publishUploadId, 'upload:scheduled', {
+            uploadId: publishUploadId,
             channel: chKey,
             scheduledAt: scheduledDate!.toISOString(),
-            postId: postId || null,
+            postId: localPostId,
           });
+          return;
         }
-      }
-    } catch (err: unknown) {
-      const msg = getFriendlyZernioPublishError(err);
-      for (const w of workList) {
-        const chKey = w.row.channel.toLowerCase();
+
+        const localPostId = randomUUID();
+        await this.redNoteService.publishEnqueue({
+          userId: auth.userId,
+          postId: localPostId,
+          uploadId: publishUploadId,
+          caption: w.caption,
+          mediaUrls: w.mediaUrls,
+          scheduledAt: null,
+        });
+      } catch (err: unknown) {
+        if (createdLocalPostId) {
+          try {
+            await this.postService.discardOrphanedPost(createdLocalPostId);
+          } catch {
+            // Best-effort; channel failure reason is set below.
+          }
+        }
+        if (isRedNoteSessionInvalidError(err)) {
+          w.row.failureReason =
+            'Publish failed — could not verify RedNote creator session. Retry, or reconnect in Settings if this persists.';
+        } else {
+          w.row.failureReason = scheduleAwarePublishError(err);
+        }
         w.row.status = UploadChannelStatus.Failed;
-        w.row.failureReason = msg;
         w.row.retryCount = (w.row.retryCount ?? 0) + 1;
-        this.emitUploadEvent(doc.uploadId, 'upload:failed', {
-          uploadId: doc.uploadId,
+        this.emitUploadEvent(publishUploadId, 'upload:failed', {
+          uploadId: publishUploadId,
           channel: chKey,
-          message: msg,
+          message: w.row.failureReason,
         });
       }
-    }
+    });
+
+    await Promise.all([zernioTask(), ...rednoteTasks]);
+    void zernioPostId;
 
     doc = await this.uploads.save({
       ...withUploadChannels(doc, channels),
@@ -962,15 +1118,57 @@ export class UploadService {
     });
 
     const channelsPublished = channelsSucceeded;
-    this.emitUploadEvent(doc.uploadId, 'upload:all_completed', {
-      uploadId: doc.uploadId,
-      publishNow: body.publishNow,
-      scheduledAt: scheduledIso,
-      channelsPublished,
-      summary: buildUploadStatusSummary(channels),
-    });
+    const rednoteStillPublishing = rednoteWork.some(
+      (w) => w.row.status === UploadChannelStatus.Publishing,
+    );
+    if (!rednoteStillPublishing) {
+      this.emitUploadEvent(publishUploadId, 'upload:all_completed', {
+        uploadId: publishUploadId,
+        publishNow: body.publishNow,
+        scheduledAt: scheduledIso,
+        channelsPublished,
+        summary: buildUploadStatusSummary(channels),
+      });
+    }
+
+    if (
+      !body.publishNow &&
+      scheduledIso &&
+      channelsSucceeded.length > 0
+    ) {
+      this.notifyPostScheduled(publisherUserId, {
+        uploadId: publishUploadId,
+        scheduledAt: scheduledIso,
+        channels: channelsSucceeded,
+        timezone: body.timezone ?? undefined,
+      });
+    }
 
     return { success: true };
+  }
+
+  private notifyPostScheduled(
+    userId: string,
+    args: {
+      uploadId: string;
+      scheduledAt: string;
+      channels: string[];
+      timezone?: string;
+    },
+  ): void {
+    const id = userId?.trim();
+    if (!id) return;
+    const body = postScheduledNotification(args);
+    this.events.emitUserNotification({
+      userId: id,
+      sector: 'upload',
+      type: 'post.scheduled',
+      title: body.title,
+      message: body.message,
+      data: body.data,
+      action: body.action,
+    });
+    void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 
   async retryUpload(
@@ -1045,21 +1243,31 @@ export class UploadService {
 
   private resolveRowMediaForPublish(
     row: UploadChannelEntry,
-    ro: ResolvedContentOutputs,
+    _ro: ResolvedContentOutputs,
   ): string[] {
+    const key = row.channel.trim().toLowerCase();
     const urls = this.rowAllMedia(row);
-    if (urls.length > 0) return urls;
-    const fallback = (ro.image?.trim() || ro.video?.trim() || '').trim();
-    return fallback.length > 0 ? [fallback] : [];
+    if (key === 'rednote' || key === 'youtube') {
+      const videos = urls.filter((u) => this.isVideoMediaUrl(u));
+      return videos.length > 0 ? [videos[0]!] : [];
+    }
+    return urls;
   }
 
   private channelRequiresMedia(channelKey: string): boolean {
     const key = channelKey.trim().toLowerCase();
-    return key === 'youtube' || key === 'tiktok';
+    return key === 'youtube' || key === 'tiktok' || key === 'rednote';
   }
 
   private isVideoMediaUrl(url: string): boolean {
-    return /\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(url.trim());
+    const u = url.trim();
+    if (/\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(u)) return true;
+    if (/\/videos\//i.test(u)) return true;
+    return false;
+  }
+
+  private isImageMediaUrl(url: string): boolean {
+    return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url.trim());
   }
 
   private assertChannelMediaForPublish(
@@ -1076,6 +1284,12 @@ export class UploadService {
     }
 
     if (key === 'youtube' && !mediaUrls.some((u) => this.isVideoMediaUrl(u))) {
+      throw new BadRequestException(
+        `${channel} requires a video before publishing.`,
+      );
+    }
+
+    if (key === 'rednote' && !mediaUrls.some((u) => this.isVideoMediaUrl(u))) {
       throw new BadRequestException(
         `${channel} requires a video before publishing.`,
       );
@@ -1140,15 +1354,10 @@ export class UploadService {
       caption = this.fallbackPrimaryCaption(outs);
     }
 
-    let mediaUrl = (c.mediaUrl ?? '').trim() || null;
+    const mediaUrl = (c.mediaUrl ?? '').trim() || null;
     const mediaUrls = [...(c.mediaUrls ?? [])]
       .map((u) => u.trim())
       .filter(Boolean);
-    if (!mediaUrl && !mediaUrls.length) {
-      mediaUrl = (outs.image?.trim() || outs.video?.trim() || null) as
-        | string
-        | null;
-    }
 
     return {
       channel: c.channel,
@@ -1179,14 +1388,8 @@ export class UploadService {
     if (!(row.caption ?? '').trim()) {
       row.caption = this.fallbackPrimaryCaption(outs);
     }
-    const hasMedia =
-      (row.mediaUrl ?? '').trim().length > 0 ||
-      (row.mediaUrls?.some((u) => u?.trim()) ?? false);
-    if (!hasMedia) {
-      row.mediaUrl = (outs.image?.trim() || outs.video?.trim() || null) as
-        | string
-        | null;
-    }
+    // Never auto-fill media from flattened resolvedOutputs — lane-specific
+    // images would leak onto every empty channel.
     if (!Array.isArray(row.mediaUrls)) {
       row.mediaUrls = [];
     }
@@ -1204,6 +1407,88 @@ export class UploadService {
       if (t) return t;
     }
     return '';
+  }
+
+  /** Called by RedNote publish worker when a background job finishes. */
+  async finalizeRedNotePublishOutcome(input: {
+    uploadId: string;
+    userId: string;
+    localPostId: string;
+    result?: PublishResult;
+    error?: unknown;
+  }): Promise<void> {
+    const { uploadId, userId, localPostId, result, error } = input;
+    let doc = await this.uploads.findByUploadId(uploadId);
+    if (!doc) return;
+    if ((doc.userId ?? userId) !== userId) return;
+
+    const channels = uploadChannels(doc);
+    const row = channels.find(
+      (c) => c.channel.trim().toLowerCase() === REDNOTE_CHANNEL,
+    );
+    if (!row || row.status !== UploadChannelStatus.Publishing) return;
+
+    const chKey = REDNOTE_CHANNEL;
+    const now = new Date();
+    const publisherUserId = doc.userId ?? userId;
+
+    if (result?.success && !result.needsManualVerification) {
+      await this.postService.createPostFromSuccessfulPublish({
+        userId: publisherUserId,
+        uploadRef: uploadId,
+        ruleRef: doc.ruleRef,
+        contentRef: doc.contentRef,
+        zernioPostId: result.externalPostRef ?? `rednote:${localPostId}`,
+        channels: [chKey],
+        publishNow: true,
+        scheduledAt: null,
+      });
+
+      row.status = UploadChannelStatus.Published;
+      row.publishedAt = now;
+      row.scheduledAt = null;
+      row.failureReason = null;
+      this.emitUploadEvent(uploadId, 'upload:completed', {
+        uploadId,
+        channel: chKey,
+        postId: result.externalPostRef ?? localPostId,
+        needsManualVerification: false,
+      });
+    } else {
+      if (result?.needsManualVerification) {
+        row.failureReason =
+          'RedNote publish was not confirmed — success page did not appear.';
+      } else if (isRedNoteSessionInvalidError(error)) {
+        row.failureReason =
+          'Publish failed — could not verify RedNote creator session. Retry, or reconnect in Settings if this persists.';
+      } else {
+        row.failureReason =
+          error instanceof Error ? error.message : 'RedNote publish failed';
+      }
+      row.status = UploadChannelStatus.Failed;
+      row.retryCount = (row.retryCount ?? 0) + 1;
+      this.emitUploadEvent(uploadId, 'upload:failed', {
+        uploadId,
+        channel: chKey,
+        message: row.failureReason,
+      });
+    }
+
+    doc = await this.uploads.save({
+      ...withUploadChannels(doc, channels),
+      status: recomputeUploadJobStatus(channels),
+    });
+
+    const channelsPublished = channels
+      .filter((c) => c.status === UploadChannelStatus.Published)
+      .map((c) => c.channel.toLowerCase());
+    this.emitUploadEvent(uploadId, 'upload:all_completed', {
+      uploadId,
+      publishNow: true,
+      scheduledAt: null,
+      channelsPublished,
+      summary: buildUploadStatusSummary(channels),
+    });
   }
 
   private emitUploadEvent(

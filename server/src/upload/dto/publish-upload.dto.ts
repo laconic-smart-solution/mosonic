@@ -27,6 +27,11 @@ export class PublishUploadDto {
   @IsDateString()
   scheduledAt?: string | null;
 
+  /** IANA timezone for schedule metadata (e.g. Asia/Bangkok). */
+  @IsOptional()
+  @IsString()
+  timezone?: string | null;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ChannelPublishDto)

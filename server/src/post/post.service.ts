@@ -23,6 +23,7 @@ import {
   POST_REPOSITORY,
   UPLOAD_REPOSITORY,
 } from '../repositories/tokens';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   UploadChannelStatus,
   type UploadChannelEntry,
@@ -35,6 +36,7 @@ import {
 } from '../upload/upload-record.util';
 import { recomputeUploadJobStatus } from '../upload/upload-status.util';
 import { PostAnalyticsService } from './post-analytics.service';
+import { isZernioRemotePostId } from './is-zernio-remote-post-id.util';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { PostListSort } from './dto/post-list-sort.enum';
 import type { PatchPostDto } from './dto/patch-post.dto';
@@ -79,7 +81,38 @@ export class PostService {
     private readonly uploads: IUploadRepository,
     private readonly mcpService: McpService,
     private readonly postAnalyticsService: PostAnalyticsService,
+    private readonly scheduler: SchedulerService,
   ) {}
+
+  /** Unscoped lookup for internal jobs (scheduler Redis consumer). */
+  findByPostIdInternal(postId: string): Promise<PostRecord | null> {
+    return this.posts.findByPostId(postId.trim());
+  }
+
+  /**
+   * Removes a post that was created during schedule/publish but never became
+   * usable (e.g. Mosonic scheduler registration failed after the draft/post
+   * row was written). Does not mutate upload channel rows.
+   */
+  async discardOrphanedPost(postId: string): Promise<void> {
+    const id = postId.trim();
+    if (!id) return;
+    const post = await this.posts.findByPostId(id);
+    if (!post) return;
+
+    await this.scheduler.cancelPostPublish(id);
+
+    const zernioId = post.zernioPostId?.trim();
+    if (zernioId && isZernioRemotePostId(zernioId)) {
+      try {
+        await this.mcpService.deleteZernioPost(zernioId);
+      } catch {
+        // Best-effort cleanup; upload failure path still reports the schedule error.
+      }
+    }
+
+    await this.posts.deleteByPostId(id);
+  }
 
   private async ensurePostAnalyticsRecord(post: PostRecord): Promise<void> {
     await this.postAnalyticsService.ensureForPost(post);
@@ -432,8 +465,9 @@ export class PostService {
       return analytics ? { ...local, analytics } : local;
     }
     const zid = String(local['zernioPostId'] ?? '').trim();
-    const remote =
-      zid.length > 0 ? await this.mcpService.getZernioPost(zid) : null;
+    const remote = isZernioRemotePostId(zid)
+      ? await this.mcpService.getZernioPost(zid)
+      : null;
     return analytics ? { local, remote, analytics } : { local, remote };
   }
 
@@ -475,7 +509,7 @@ export class PostService {
       );
     }
     const zid = post.zernioPostId?.trim();
-    if (!zid) {
+    if (!zid || !isZernioRemotePostId(zid)) {
       throw new BadRequestException(
         'Post has no remote id; editing is not supported.',
       );
@@ -1079,6 +1113,10 @@ export class PostService {
       post.status === PostStatus.Partial
     ) {
       return await this.unpublishAndCancelPost(post, channels);
+    }
+
+    if (post.status === PostStatus.Scheduled) {
+      await this.scheduler.cancelPostPublish(post.postId);
     }
 
     const zernioId = post.zernioPostId?.trim();

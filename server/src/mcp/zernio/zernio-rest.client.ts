@@ -14,6 +14,7 @@ import {
   zernioMediaItemTypeFromMime,
   type ZernioPresignResult,
 } from './zernio-rest-media.util';
+import { resolveAbsoluteMediaUrlFromConfig } from '../../upload/resolve-absolute-media-url.util';
 
 function axiosErrorHint(err: unknown): string {
   if (!isAxiosError(err)) return '';
@@ -171,6 +172,10 @@ export class ZernioRestClient {
     if (!payload.publishNow && payload.scheduledAt) {
       body.scheduledFor = payload.scheduledAt;
       body.timezone = 'UTC';
+      body.isDraft = false;
+    } else if (!payload.publishNow && !payload.scheduledAt) {
+      // Mosonic scheduler owns timing — keep a Zernio draft until SOCIAL_PUBLISH.
+      body.isDraft = true;
     }
 
     const firstPlat = platforms[0] as Record<string, unknown> | undefined;
@@ -373,57 +378,8 @@ export class ZernioRestClient {
     return 'image';
   }
 
-  /**
-   * Ensures every media URL is absolute (https). Repairs values like `4001/api/file/...`
-   * where `http://192.168.x.x:` was stripped but FILE_SERVICE_URL still has the origin.
-   */
   private resolveAbsoluteMediaHref(raw: string): string {
-    const s = raw.trim();
-    if (!s) return '';
-    if (/^(https?:|blob:|data:)/i.test(s)) return s;
-    if (s.startsWith('//')) return `https:${s}`;
-
-    const fileBase = this.config.get<string>('FILE_SERVICE_URL')?.trim();
-    const publicBase =
-      this.config.get<string>('APP_URL')?.trim() ||
-      this.config.get<string>('PUBLIC_URL')?.trim() ||
-      '';
-
-    const portPathMatch = /^(\d{2,5})(\/api\/.+)$/i.exec(s);
-    if (portPathMatch?.[2] && fileBase) {
-      try {
-        const u = new URL(
-          fileBase.startsWith('http') ? fileBase : `http://${fileBase}`,
-        );
-        return `${u.origin}${portPathMatch[2]}`;
-      } catch {
-        /* fall through */
-      }
-    }
-
-    if (s.startsWith('/') && publicBase) {
-      return `${publicBase.replace(/\/+$/, '')}${s}`;
-    }
-
-    if (fileBase) {
-      try {
-        const base = fileBase.startsWith('http')
-          ? fileBase
-          : `http://${fileBase}`;
-        return new URL(s, base).href;
-      } catch {
-        try {
-          const base = fileBase.startsWith('http')
-            ? fileBase
-            : `http://${fileBase}`;
-          return new URL(s, new URL(base).origin).href;
-        } catch {
-          return s;
-        }
-      }
-    }
-
-    return s;
+    return resolveAbsoluteMediaUrlFromConfig(raw, this.config);
   }
 
   async updatePost(payload: {
@@ -443,11 +399,20 @@ export class ZernioRestClient {
 
     const body: Record<string, unknown> = {};
     if (payload.content !== undefined) body.content = payload.content;
-    if (payload.publishNow === true) body.publishNow = true;
+    if (payload.publishNow === true) {
+      // Mosonic-scheduled posts are created as Zernio drafts (no scheduledFor).
+      // publishNow alone returns 200 but leaves the draft unchanged — must clear isDraft.
+      body.publishNow = true;
+      body.isDraft = false;
+    }
     if (payload.scheduledFor !== undefined) {
       if (payload.scheduledFor !== null) {
         body.scheduledFor = payload.scheduledFor;
         body.timezone = 'UTC';
+        body.isDraft = false;
+      } else {
+        // Clear Zernio-owned schedule (Mosonic scheduler owns timing).
+        body.scheduledFor = null;
       }
     }
     if (payload.title !== undefined) body.title = payload.title;
@@ -653,6 +618,254 @@ export class ZernioRestClient {
           : message || 'Zernio unpublish failed',
       );
     }
+  }
+
+  /**
+   * Search inbox conversations (message text + contact identity / phone).
+   * @see https://docs.zernio.com/messages/search-inbox-conversations
+   */
+  async searchInboxConversations(params: {
+    query: string;
+    platform?: string;
+    accountId?: string;
+    profileId?: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      participantId?: string;
+      accountId?: string;
+      platform?: string;
+    }>
+  > {
+    const query = params.query.trim();
+    if (query.length < 2) return [];
+    try {
+      const res = await this.http.get<{
+        data?: Array<{
+          conversation?: {
+            id?: string;
+            participantId?: string;
+            accountId?: string;
+            platform?: string;
+          };
+          id?: string;
+          participantId?: string;
+          accountId?: string;
+          platform?: string;
+        }>;
+      }>('/inbox/conversations/search', {
+        params: {
+          query,
+          ...(params.platform ? { platform: params.platform } : {}),
+          ...(params.accountId ? { accountId: params.accountId } : {}),
+          ...(params.profileId ? { profileId: params.profileId } : {}),
+          limit: params.limit ?? 20,
+        },
+      });
+      const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+      return rows
+        .map((row) => {
+          const c = row.conversation ?? row;
+          const id = typeof c.id === 'string' ? c.id.trim() : '';
+          if (!id) return null;
+          return {
+            id,
+            ...(typeof c.participantId === 'string'
+              ? { participantId: c.participantId }
+              : {}),
+            ...(typeof c.accountId === 'string'
+              ? { accountId: c.accountId }
+              : {}),
+            ...(typeof c.platform === 'string' ? { platform: c.platform } : {}),
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x != null);
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not search Zernio inbox — ${detail}`
+          : message || 'Zernio inbox search failed',
+      );
+    }
+  }
+
+  /**
+   * Create (or continue) an inbox conversation. WhatsApp requires an approved template
+   * to open / re-open outside the 24h window.
+   * @see https://docs.zernio.com/messages/create-inbox-conversation
+   */
+  async createInboxConversation(payload: {
+    accountId: string;
+    participantId: string;
+    message?: string;
+    templateName?: string;
+    templateLanguage?: string;
+    templateParams?: string[];
+  }): Promise<{ conversationId?: string; messageId?: string }> {
+    const accountId = payload.accountId.trim();
+    const participantId = payload.participantId.trim().replace(/^\+/, '');
+    if (!accountId || !participantId) {
+      throw new Error(
+        'Zernio createInboxConversation requires accountId and participantId',
+      );
+    }
+    const body: Record<string, unknown> = {
+      accountId,
+      participantId,
+    };
+    if (payload.message?.trim()) body.message = payload.message.trim();
+    if (payload.templateName?.trim()) {
+      body.templateName = payload.templateName.trim();
+      body.templateLanguage =
+        payload.templateLanguage?.trim() || 'en';
+      if (payload.templateParams?.length) {
+        body.templateParams = payload.templateParams;
+      }
+    }
+    this.logger.log(
+      `[REST] POST /inbox/conversations accountId=${accountId} participantId=${participantId}`,
+    );
+    try {
+      const res = await this.http.post<{
+        success?: boolean;
+        data?: { conversationId?: string; messageId?: string };
+      }>('/inbox/conversations', body);
+      return {
+        conversationId: res.data?.data?.conversationId,
+        messageId: res.data?.data?.messageId,
+      };
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not create Zernio inbox conversation — ${detail}`
+          : message || 'Zernio create inbox conversation failed',
+      );
+    }
+  }
+
+  /**
+   * Send a free-form (or template) message into an existing inbox conversation.
+   * @see https://docs.zernio.com/messages/send-inbox-message
+   */
+  async sendInboxMessage(payload: {
+    conversationId: string;
+    accountId: string;
+    message: string;
+  }): Promise<void> {
+    const conversationId = payload.conversationId.trim();
+    const accountId = payload.accountId.trim();
+    const message = payload.message.trim();
+    if (!conversationId || !accountId || !message) {
+      throw new Error(
+        'Zernio sendInboxMessage requires conversationId, accountId, and message',
+      );
+    }
+    const path = `/inbox/conversations/${encodeURIComponent(conversationId)}/messages`;
+    this.logger.log(`[REST] POST ${path} accountId=${accountId}`);
+    try {
+      await this.http.post(path, { accountId, message });
+    } catch (err: unknown) {
+      const detail = summarizeZernioAxiosError(err);
+      const messageText = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        detail
+          ? `Could not send Zernio inbox message — ${detail}`
+          : messageText || 'Zernio send inbox message failed',
+      );
+    }
+  }
+
+  /**
+   * Find-or-create WhatsApp inbox thread and send text (free-form inside 24h window;
+   * falls back to optional approved template when outside window / no thread).
+   */
+  async sendWhatsAppInboxText(params: {
+    accountId: string;
+    participantId: string;
+    message: string;
+    templateName?: string;
+    templateLanguage?: string;
+  }): Promise<void> {
+    const accountId = params.accountId.trim();
+    const participantId = params.participantId.trim().replace(/^\+/, '');
+    const message = params.message.trim();
+    if (!accountId || !participantId || !message) {
+      throw new Error(
+        'Zernio WhatsApp send requires accountId, participantId, and message',
+      );
+    }
+
+    const templateName = params.templateName?.trim();
+    const templateLanguage = params.templateLanguage?.trim() || 'en';
+
+    let conversationId: string | undefined;
+    try {
+      const hits = await this.searchInboxConversations({
+        query: participantId,
+        platform: 'whatsapp',
+        accountId,
+        limit: 20,
+      });
+      const exact = hits.find((h) => {
+        const pid = (h.participantId ?? '').replace(/^\+/, '');
+        return pid === participantId || pid.endsWith(participantId);
+      });
+      conversationId = exact?.id ?? hits[0]?.id;
+    } catch (err) {
+      this.logger.warn(
+        `Zernio inbox search before WhatsApp send failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    if (conversationId) {
+      try {
+        await this.sendInboxMessage({ conversationId, accountId, message });
+        return;
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        if (!templateName || !this.isWhatsAppTemplateRequiredError(detail)) {
+          throw err;
+        }
+        this.logger.warn(
+          `Zernio free-form WhatsApp send failed (likely outside 24h window); retrying with template ${templateName}`,
+        );
+      }
+    }
+
+    if (!templateName) {
+      throw new Error(
+        conversationId
+          ? 'WhatsApp free-form send failed and WHATSAPP_ZERNIO_TEMPLATE_NAME is not set'
+          : 'No Zernio WhatsApp conversation found; set WHATSAPP_ZERNIO_TEMPLATE_NAME for cold notify',
+      );
+    }
+
+    await this.createInboxConversation({
+      accountId,
+      participantId,
+      templateName,
+      templateLanguage,
+      templateParams: [message],
+    });
+  }
+
+  private isWhatsAppTemplateRequiredError(detail: string): boolean {
+    const lower = detail.toLowerCase();
+    return (
+      lower.includes('template_required') ||
+      lower.includes('template required') ||
+      lower.includes('24-hour') ||
+      lower.includes('24 hour') ||
+      lower.includes('customer care') ||
+      lower.includes('outside the window')
+    );
   }
 
   /**

@@ -2,14 +2,19 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import * as express from 'express';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { useSystemCaCertificates } from './common/tls-system-ca';
+
+useSystemCaCertificates();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
   });
+  app.use(cookieParser());
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({

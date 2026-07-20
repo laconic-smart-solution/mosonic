@@ -262,9 +262,13 @@ export default function PipelinesPage() {
         onOpenChange={(open) => {
           if (!open) setStopPipelineId(undefined)
         }}
-        onStopped={() => {
+        onStopped={(result) => {
           setStopPipelineId(undefined)
-          toast.success(t("page.toastStopped"))
+          toast.success(
+            result?.keptProgress
+              ? t("page.toastStoppedKeptProgress")
+              : t("page.toastStopped"),
+          )
           void listQuery.refetch()
           void statsQuery.refetch()
         }}

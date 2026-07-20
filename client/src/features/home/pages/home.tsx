@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { toastApiError } from "@/shared/lib/toast-error"
-import { isInsufficientCredits } from "@/shared/lib/api-error"
 
-import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
-import { GenerationCreditHint } from "@/features/credit/components/generation-credit-hint"
 import type { Attachment } from "@/components/core/prompt-area"
 import { HomeHelperLinks } from "@/features/home/components/home-helper-links"
 import { HomePromptBar } from "@/features/home/components/home-prompt-bar"
@@ -27,17 +23,12 @@ import { RuleExtractionProgress } from "@/features/rules/components/rule-extract
 import { CreateRuleWizard } from "@/features/rules/components/create-rule-wizard"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
-import { WorkflowQaWizard } from "@/features/workflow/components/workflow-qa-wizard/workflow-qa-wizard"
-import type { WorkflowQAAnswers } from "@/features/workflow/types/workflow-qa.type"
 import { useContentPageQuery } from "@/shared/queries/content.query"
-import { useGenerationCreditCostsQuery } from "@/shared/queries/credit.query"
 import { useRuleByIdQuery, useRulesPageQuery } from "@/shared/queries/rule.query"
-import { useGenerateWorkflow } from "@/shared/queries/workflow.query"
 import { useSessionBootstrap } from "@/shared/hooks/use-session-bootstrap"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import type { RuleListItem } from "@/shared/services/rule.service"
-import { joinWorkflowRoom } from "@/shared/socket/workflow-events"
 import { ruleChannelNamesToIds } from "@/shared/constants/distribution-channels"
 import { HomeBackdrop } from "../components/home-backdrop"
 
@@ -56,9 +47,8 @@ export default function HomePage() {
   )
   useSessionBootstrap()
   const authHydrated = useAuthStoreHydrated()
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const isAuthenticated = authHydrated && Boolean(accessToken)
-  const generationCostsQuery = useGenerationCreditCostsQuery(isAuthenticated)
+  const sessionReady = useAuthStore((s) => s.isAuthenticated)
+  const isAuthenticated = authHydrated && sessionReady
   const [prompt, setPrompt] = useState("")
   const [focused, setFocused] = useState(false)
   const [hovLeft, setHovLeft] = useState<number | null>(null)
@@ -73,11 +63,7 @@ export default function HomePage() {
   const [ruleWizardOpen, setRuleWizardOpen] = useState(false)
   const [ruleWizardPrompt, setRuleWizardPrompt] = useState("")
   const [ruleWizardKey, setRuleWizardKey] = useState(0)
-  const [qaWizardOpen, setQaWizardOpen] = useState(false)
-  const [qaInitialMessage, setQaInitialMessage] = useState("")
-  const [workflowGenConfirmOpen, setWorkflowGenConfirmOpen] = useState(false)
-  const pendingWorkflowAnswersRef = useRef<WorkflowQAAnswers | null>(null)
-  const pendingWorkflowRuleIdRef = useRef<string | null>(null)
+  const [pendingContentPrompt, setPendingContentPrompt] = useState("")
 
   const rulesPageQuery = useRulesPageQuery(
     {
@@ -106,10 +92,6 @@ export default function HomePage() {
     () => buildHomeRecentSlots(recentContentsQuery.data?.data ?? []),
     [recentContentsQuery.data?.data],
   )
-
-  const generateWorkflow = useGenerateWorkflow()
-
-  const workflowRuleId = selectedRuleId ?? pendingRuleId
 
   const pendingRuleQuery = useRuleByIdQuery<RuleEntity>(
     pendingRuleId ?? undefined,
@@ -148,20 +130,6 @@ export default function HomePage() {
     onCompleted: handleExtractCompleted,
     onFailed: handleExtractFailed,
   })
-
-  const activeRuleChannelIds = useMemo(() => {
-    if (selectedRuleId) {
-      const rule = ruleOptions.find((r) => r.ruleId === selectedRuleId)
-      if (!rule?.channels?.length) return []
-      return ruleChannelNamesToIds(
-        rule.channels.map((channel) => ({ channel })),
-      )
-    }
-    if (pendingRuleId && pendingRuleQuery.data?.channels?.length) {
-      return ruleChannelNamesToIds(pendingRuleQuery.data.channels)
-    }
-    return []
-  }, [pendingRuleId, pendingRuleQuery.data?.channels, ruleOptions, selectedRuleId])
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -215,12 +183,26 @@ export default function HomePage() {
     }
 
     setOrbPulse(false)
-    setQaWizardOpen(true)
-  }, [pendingRuleId, pendingRuleQuery.data, selectedRuleId, t])
+    setPendingRuleId(null)
+    navigate(`/workflow/${pendingRuleId}`, {
+      state: {
+        ruleName: rule.name,
+        contentPrompt: pendingContentPrompt.trim() || undefined,
+      },
+    })
+    setPendingContentPrompt("")
+  }, [
+    navigate,
+    pendingContentPrompt,
+    pendingRuleId,
+    pendingRuleQuery.data,
+    selectedRuleId,
+    t,
+  ])
 
   const promptBusy =
     isAuthenticated &&
-    (isExtracting || generateWorkflow.isPending || Boolean(pendingRuleId))
+    (isExtracting || Boolean(pendingRuleId))
 
   function navigateWithAuth(path: string) {
     if (isAuthenticated) {
@@ -240,13 +222,18 @@ export default function HomePage() {
       return
     }
 
-    setQaInitialMessage(trimmed)
-
     if (selectedRuleId) {
-      setQaWizardOpen(true)
+      const ruleName = ruleOptions.find((r) => r.ruleId === selectedRuleId)?.name
+      navigate(`/workflow/${selectedRuleId}`, {
+        state: {
+          ruleName,
+          contentPrompt: trimmed || undefined,
+        },
+      })
       return
     }
 
+    setPendingContentPrompt(trimmed)
     setRuleWizardPrompt(trimmed)
     setRuleWizardKey((k) => k + 1)
     setRuleWizardOpen(true)
@@ -259,55 +246,6 @@ export default function HomePage() {
   ) {
     setOrbPulse(true)
     void runExtract(text, attachments, intake)
-  }
-
-  function handleQaSubmit(answers: WorkflowQAAnswers) {
-    const ruleId = workflowRuleId
-    if (!ruleId) return
-    pendingWorkflowAnswersRef.current = answers
-    pendingWorkflowRuleIdRef.current = ruleId
-    setQaWizardOpen(false)
-    setWorkflowGenConfirmOpen(true)
-  }
-
-  function executeWorkflowGeneration(
-    answers: WorkflowQAAnswers,
-    ruleId: string,
-  ) {
-    if (!ruleId) return
-    setOrbPulse(true)
-
-    generateWorkflow.mutate(
-      { ruleId, answers },
-      {
-        onSuccess: (data) => {
-          const { workflowId, ruleId: resolvedRuleId } = data
-          joinWorkflowRoom(workflowId)
-          const ruleName =
-            ruleOptions.find((r) => r.ruleId === resolvedRuleId)?.name ??
-            pendingRuleQuery.data?.name
-          pendingWorkflowRuleIdRef.current = null
-          setPendingRuleId(null)
-          navigate(`/workflow/${resolvedRuleId}`, {
-            state: {
-              generating: true,
-              ruleName,
-              contentPrompt: answers.additionalMessage.trim(),
-            },
-          })
-        },
-        onSettled: () => {
-          setOrbPulse(false)
-        },
-        onError: (err) => {
-          if (isInsufficientCredits(err)) {
-            toastApiError(err, "credit:runConfirm.insufficientTitle")
-            return
-          }
-          toastApiError(err, "workflow:errors.generateWorkflowFailed")
-        },
-      },
-    )
   }
 
   function handleSelectRule(ruleId: string) {
@@ -380,12 +318,6 @@ export default function HomePage() {
             disabled={promptBusy}
             submitDisabled={promptBusy}
           />
-          {isAuthenticated && !selectedRuleId ? (
-            <GenerationCreditHint
-              credits={generationCostsQuery.data?.ruleGeneration}
-              className="mt-2"
-            />
-          ) : null}
           <HomeHelperLinks
             rules={ruleOptions}
             showRuleSelector={isAuthenticated}
@@ -405,60 +337,15 @@ export default function HomePage() {
       </div>
 
       {isAuthenticated ? (
-        <>
-          <CreateRuleWizard
-            open={ruleWizardOpen}
-            onOpenChange={setRuleWizardOpen}
-            initialPrompt={ruleWizardPrompt}
-            onPromptChange={setRuleWizardPrompt}
-            promptAreaKey={ruleWizardKey}
-            onExtract={executeRuleGeneration}
-            isExtracting={isExtracting}
-          />
-
-          <WorkflowQaWizard
-            key={workflowRuleId ?? "none"}
-            open={qaWizardOpen}
-            onOpenChange={(open) => {
-              setQaWizardOpen(open)
-              if (!open && !pendingWorkflowAnswersRef.current) {
-                setPendingRuleId(null)
-                setOrbPulse(false)
-              }
-            }}
-            ruleChannelIds={activeRuleChannelIds}
-            initialMessage={qaInitialMessage}
-            isSubmitting={generateWorkflow.isPending}
-            onSubmit={handleQaSubmit}
-          />
-
-          <GenerationCreditConfirmDialog
-            open={workflowGenConfirmOpen}
-            onOpenChange={(open) => {
-              setWorkflowGenConfirmOpen(open)
-              if (!open) {
-                pendingWorkflowAnswersRef.current = null
-                pendingWorkflowRuleIdRef.current = null
-                if (!selectedRuleId) {
-                  setPendingRuleId(null)
-                  setOrbPulse(false)
-                }
-              }
-            }}
-            kind="workflow"
-            isSubmitting={generateWorkflow.isPending}
-            onConfirm={() => {
-              const answers = pendingWorkflowAnswersRef.current
-              const ruleId =
-                pendingWorkflowRuleIdRef.current ?? workflowRuleId
-              if (!answers || !ruleId) return
-              pendingWorkflowAnswersRef.current = null
-              pendingWorkflowRuleIdRef.current = null
-              setWorkflowGenConfirmOpen(false)
-              executeWorkflowGeneration(answers, ruleId)
-            }}
-          />
-        </>
+        <CreateRuleWizard
+          open={ruleWizardOpen}
+          onOpenChange={setRuleWizardOpen}
+          initialPrompt={ruleWizardPrompt}
+          onPromptChange={setRuleWizardPrompt}
+          promptAreaKey={ruleWizardKey}
+          onExtract={executeRuleGeneration}
+          isExtracting={isExtracting}
+        />
       ) : null}
     </div>
   )
