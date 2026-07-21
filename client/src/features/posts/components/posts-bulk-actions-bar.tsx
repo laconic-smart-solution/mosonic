@@ -194,9 +194,9 @@ export function PostsBulkActionsBar({
                 {selectedCount === 1 ? "" : "s"}?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Scheduled and draft posts are removed. Published posts are
-                unpublished where supported; Instagram, TikTok, and Snapchat may
-                remain live.
+                Scheduled and draft posts are cancelled (kept as cancelled).
+                Published posts are unpublished where supported; Instagram,
+                TikTok, and Snapchat may remain live.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

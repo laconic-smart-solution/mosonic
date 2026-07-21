@@ -31,6 +31,7 @@ describe('PostService', () => {
     }),
     deleteByPostId: jest.fn().mockResolvedValue(true),
     deleteOne: jest.fn(),
+    save: jest.fn().mockImplementation(async (doc: unknown) => doc),
     updateMany: jest.fn(),
     countDocuments: jest.fn(),
     aggregate: jest.fn(),
@@ -96,7 +97,7 @@ describe('PostService', () => {
     expect(res).toEqual({ succeeded: 0, failed: 1 });
   });
 
-  it('deletePost hard-deletes scheduled post and resets upload channels to pending', async () => {
+  it('deletePost soft-cancels scheduled post and resets upload channels to pending', async () => {
     const channel = {
       channel: 'linkedin',
       status: UploadChannelStatus.Scheduled,
@@ -112,23 +113,29 @@ describe('PostService', () => {
       save: jest.fn().mockResolvedValue(undefined),
     };
 
-    postModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue({
-        postId: 'p-sched',
-        userId: 'u1',
-        status: PostStatus.Scheduled,
-        zernioPostId: 'z-sched',
-        uploadRef: 'upl-1',
-        channels: ['linkedin'],
-      }),
-    });
-    postModel.deleteOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue({ deletedCount: 1 }),
-    });
+    const scheduledPost = {
+      postId: 'p-sched',
+      userId: 'u1',
+      status: PostStatus.Scheduled,
+      zernioPostId: 'z-sched',
+      uploadRef: 'upl-1',
+      channels: ['linkedin'],
+      platformResults: [
+        {
+          platform: 'linkedin',
+          status: 'scheduled',
+          platformUrl: null,
+          publishedAt: null,
+          failureReason: null,
+        },
+      ],
+      scheduledAt: new Date(),
+      publishedAt: null,
+      failureReason: null,
+    };
+    postModel.findByPostId.mockResolvedValueOnce(scheduledPost);
+    postModel.save.mockImplementation(async (doc: unknown) => doc);
     mcpService.deleteZernioPost.mockResolvedValue({ success: true });
-    uploadModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue(uploadDoc),
-    });
     (uploadModel as { findByUploadId?: jest.Mock }).findByUploadId = jest
       .fn()
       .mockResolvedValue(uploadDoc);
@@ -143,11 +150,19 @@ describe('PostService', () => {
 
     expect(scheduler.cancelPostPublish).toHaveBeenCalledWith('p-sched');
     expect(mcpService.deleteZernioPost).toHaveBeenCalledWith('z-sched');
-    expect(postModel.deleteByPostId).toHaveBeenCalledWith('p-sched');
+    expect(postModel.deleteByPostId).not.toHaveBeenCalled();
+    expect(postModel.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: PostStatus.Cancelled,
+        scheduledAt: null,
+        failureReason: 'Post deleted.',
+      }),
+    );
+    expect(res.removed).toBe(false);
+    expect(res.message).toBe('Post cancelled.');
     expect(channel.status).toBe(UploadChannelStatus.Pending);
     expect(channel.scheduledAt).toBeNull();
     expect(channel.failureReason).toBeNull();
-    expect(res.removed).toBe(true);
   });
 
   it('deletePost unpublishes published post and skips unsupported platforms', async () => {
@@ -202,8 +217,10 @@ describe('PostService', () => {
       save: jest.fn().mockResolvedValue(undefined),
     };
 
-    postModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue(postDoc),
+    postModel.findByPostId.mockResolvedValueOnce(postDoc);
+    postModel.save.mockImplementation(async (doc: unknown) => {
+      Object.assign(postDoc, doc as object);
+      return doc;
     });
     mcpService.unpublishZernioPost.mockImplementation(
       (_id: string, platform: string) => {
@@ -213,9 +230,12 @@ describe('PostService', () => {
         return Promise.resolve({ success: true });
       },
     );
-    uploadModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue(uploadDoc),
-    });
+    (uploadModel as { findByUploadId?: jest.Mock }).findByUploadId = jest
+      .fn()
+      .mockResolvedValue(uploadDoc);
+    (uploadModel as { save?: jest.Mock }).save = jest
+      .fn()
+      .mockImplementation(async (doc: unknown) => doc);
 
     const res = await service().deletePost('p-pub', {
       userId: 'u1',
@@ -227,17 +247,15 @@ describe('PostService', () => {
     expect(postDoc.status).toBe(PostStatus.Cancelled);
     expect(fbChannel.status).toBe(UploadChannelStatus.Pending);
     expect(igChannel.status).toBe(UploadChannelStatus.Published);
-    expect(postDoc.save).toHaveBeenCalled();
+    expect(postModel.save).toHaveBeenCalled();
   });
 
   it('deletePost is idempotent for cancelled posts', async () => {
-    postModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue({
-        postId: 'p-done',
-        userId: 'u1',
-        status: PostStatus.Cancelled,
-        channels: ['linkedin'],
-      }),
+    postModel.findByPostId.mockResolvedValueOnce({
+      postId: 'p-done',
+      userId: 'u1',
+      status: PostStatus.Cancelled,
+      channels: ['linkedin'],
     });
 
     const res = await service().deletePost('p-done', {

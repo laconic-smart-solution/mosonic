@@ -1124,14 +1124,32 @@ export class PostService {
       await this.mcpService.deleteZernioPost(zernioId);
     }
 
-    await this.posts.deleteByPostId(postId);
+    // Soft-delete: keep the row as Cancelled (same as published unpublish path).
+    let platformResults = postPlatformResults(post);
+    if (platformResults.length > 0) {
+      platformResults = platformResults.map((pr) => ({
+        ...pr,
+        status: PlatformPostStatus.Cancelled,
+        publishedAt: null,
+        platformUrl: null,
+        failureReason: null,
+      }));
+    }
+
+    await this.posts.save({
+      ...withPostPlatformResults(post, platformResults),
+      status: PostStatus.Cancelled,
+      scheduledAt: null,
+      publishedAt: null,
+      failureReason: 'Post deleted.',
+    });
     await this.resetUploadChannelsToPending(post.uploadRef, channels);
 
     return {
       success: true,
       skipped: [],
-      message: 'Post deleted.',
-      removed: true,
+      message: 'Post cancelled.',
+      removed: false,
     };
   }
 
