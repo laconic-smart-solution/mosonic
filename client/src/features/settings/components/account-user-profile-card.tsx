@@ -16,12 +16,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { LineConnectDialog } from "@/features/settings/components/line-connect-dialog"
 import { TelegramConnectDialog } from "@/features/settings/components/telegram-connect-dialog"
 import { ViberConnectDialog } from "@/features/settings/components/viber-connect-dialog"
+import { WechatConnectDialog } from "@/features/settings/components/wechat-connect-dialog"
 import { WhatsAppConnectDialog } from "@/features/settings/components/whatsapp-connect-dialog"
 import { cn } from "@/lib/utils"
 import { initialsFromDisplayName } from "@/shared/lib/user-initials"
 import { useLineConnectStatusQuery } from "@/shared/queries/line.query"
 import { useTelegramConnectStatusQuery } from "@/shared/queries/telegram.query"
 import { useViberConnectStatusQuery } from "@/shared/queries/viber.query"
+import { useWechatConnectStatusQuery } from "@/shared/queries/wechat.query"
 import { useWhatsAppConnectStatusQuery } from "@/shared/queries/whatsapp.query"
 import type { User } from "@/shared/types/user.type"
 
@@ -83,6 +85,14 @@ function WhatsAppIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
       <path d="M17.47 14.38c-.29-.14-1.7-.84-1.96-.93-.26-.1-.45-.14-.64.14-.19.29-.74.93-.9 1.12-.17.19-.33.21-.62.07-.29-.14-1.22-.45-2.33-1.43-.86-.77-1.44-1.72-1.61-2.01-.17-.29-.02-.45.12-.59.13-.13.29-.33.43-.5.14-.17.19-.29.29-.48.1-.19.05-.36-.02-.5-.07-.14-.64-1.54-.88-2.11-.23-.55-.47-.48-.64-.48h-.55c-.19 0-.5.07-.76.36-.26.29-1 1-1 2.43s1.02 2.82 1.17 3.01c.14.19 2 3.05 4.85 4.28 1.8.78 2.5.84 3.4.7.55-.08 1.7-.69 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.12-.26-.19-.55-.33zM12.05 21.8h-.01a9.8 9.8 0 0 1-4.99-1.37l-.36-.21-3.71.97 1-3.62-.24-.37a9.78 9.78 0 0 1-1.5-5.22c0-5.41 4.4-9.81 9.82-9.81 2.62 0 5.08 1.02 6.93 2.88a9.74 9.74 0 0 1 2.87 6.93c-.01 5.41-4.41 9.82-9.81 9.82zm8.41-18.23A11.8 11.8 0 0 0 12.04 0C5.45 0 .1 5.35.1 11.94c0 2.1.55 4.15 1.6 5.96L0 24l6.25-1.64a11.9 11.9 0 0 0 5.78 1.47h.01c6.59 0 11.94-5.35 11.95-11.94 0-3.19-1.24-6.19-3.5-8.45z" />
+    </svg>
+  )
+}
+
+function WechatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
+      <path d="M8.69 2.5C4.54 2.5 1.2 5.4 1.2 8.95c0 2.05 1.12 3.9 2.86 5.12l-.72 2.16 2.5-1.25c.78.22 1.6.34 2.45.34.22 0 .43-.01.64-.03-.13-.46-.2-.94-.2-1.44 0-3.5 3.2-6.34 7.14-6.34.22 0 .44.01.65.03C15.8 4.6 12.6 2.5 8.69 2.5zm-2.4 4.05a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zm4.55 0a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM15.88 8.5c-3.4 0-6.16 2.4-6.16 5.36 0 2.96 2.76 5.36 6.16 5.36.72 0 1.4-.1 2.04-.3l2.18 1.1-.62-1.86c1.5-1.06 2.46-2.64 2.46-4.3 0-2.96-2.76-5.36-6.06-5.36zm-2.05 3.55a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5zm4.1 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5z" />
     </svg>
   )
 }
@@ -184,16 +194,19 @@ export function AccountUserProfileCard({
   const [telegramOpen, setTelegramOpen] = useState(false)
   const [viberOpen, setViberOpen] = useState(false)
   const [whatsappOpen, setWhatsappOpen] = useState(false)
+  const [wechatOpen, setWechatOpen] = useState(false)
 
   const lineStatusQuery = useLineConnectStatusQuery({ enabled: true })
   const telegramStatusQuery = useTelegramConnectStatusQuery({ enabled: true })
   const viberStatusQuery = useViberConnectStatusQuery({ enabled: true })
   const whatsappStatusQuery = useWhatsAppConnectStatusQuery({ enabled: true })
+  const wechatStatusQuery = useWechatConnectStatusQuery({ enabled: true })
 
   const lineConnected = lineStatusQuery.data?.connected === true
   const telegramConnected = telegramStatusQuery.data?.connected === true
   const viberConnected = viberStatusQuery.data?.connected === true
   const whatsappConnected = whatsappStatusQuery.data?.connected === true
+  const wechatConnected = wechatStatusQuery.data?.connected === true
 
   if (loading) {
     return (
@@ -340,6 +353,21 @@ export function AccountUserProfileCard({
             manageLabel={t("contact.whatsapp.manage")}
             onAction={() => setWhatsappOpen(true)}
           />
+
+          <MessagingChannelCard
+            accent="#07C160"
+            icon={<WechatIcon className="size-5" />}
+            label={t("contact.wechat.label")}
+            loading={wechatStatusQuery.isLoading}
+            connected={wechatConnected}
+            loadingText={t("contact.wechat.statusLoading")}
+            connectedText={t("contact.wechat.statusConnected")}
+            description={t("contact.wechat.description")}
+            statusBadge={t("contact.wechat.statusBadge")}
+            connectLabel={t("contact.wechat.connect")}
+            manageLabel={t("contact.wechat.manage")}
+            onAction={() => setWechatOpen(true)}
+          />
         </div>
       </section>
 
@@ -347,6 +375,7 @@ export function AccountUserProfileCard({
       <TelegramConnectDialog open={telegramOpen} onOpenChange={setTelegramOpen} />
       <ViberConnectDialog open={viberOpen} onOpenChange={setViberOpen} />
       <WhatsAppConnectDialog open={whatsappOpen} onOpenChange={setWhatsappOpen} />
+      <WechatConnectDialog open={wechatOpen} onOpenChange={setWechatOpen} />
     </>
   )
 }

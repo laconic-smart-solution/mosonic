@@ -8,6 +8,7 @@
 | [setup-viber.md](./setup-viber.md) | Viber Public Account — messaging setup |
 | [setup-whatsapp.md](./setup-whatsapp.md) | WhatsApp — Go `whatsapp-service` / Meta Cloud API |
 | [setup-whatsapp-zernio.md](./setup-whatsapp-zernio.md) | WhatsApp — Zernio inbox API (`WHATSAPP_USE_GOLANG=false`) |
+| [setup-wechat.md](./setup-wechat.md) | WeChat Official Account (公众号) — messaging setup |
 
 
 Communication proxies live under `communication-service/app/{line,telegram,viber,whatsapp}-service/`.
