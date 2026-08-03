@@ -208,9 +208,9 @@ export class GraphMaterializationService {
     const branchConfig = branchNode.config as BranchConfig;
     const abTargets = this.resolveAbTargets(branchConfig, rule.channels ?? []);
     const channels = abTargets.map((t) => t.channel);
-    if (channels.length < 2) {
+    if (channels.length < 1) {
       throw new BadRequestException(
-        'Branch node requires at least two selected channels',
+        'Branch node requires at least one selected channel',
       );
     }
     if (channels.length > this.maxLanes) {

@@ -386,7 +386,7 @@ export class LlmService {
       const apiKey = this.requireApiKeyForProvider(provider);
       const client = new OpenAI({ apiKey });
       const requestedModel = (params.model ?? '').trim();
-      const model = requestedModel || 'gpt-image-1';
+      const model = requestedModel || 'gpt-image-2';
       const isDalle3 = model === 'dall-e-3';
 
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {

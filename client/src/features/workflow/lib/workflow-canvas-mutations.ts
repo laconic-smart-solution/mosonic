@@ -212,6 +212,44 @@ export function deleteBranchCascade({
   )
 }
 
+/**
+ * Drops a node's edges and bridges its predecessor(s) directly to its
+ * successor(s) so deleting a node mid-chain doesn't leave the graph split.
+ * A node with no incoming or no outgoing edge (a chain end) has nothing to
+ * bridge — it's simply removed, same as before.
+ */
+export function bridgeEdgesAcrossRemovedNode(
+  nodeId: string,
+  edges: Edge[],
+): Edge[] {
+  const incoming = edges.filter((e) => e.target === nodeId)
+  const outgoing = edges.filter((e) => e.source === nodeId)
+  const remaining = edges.filter(
+    (e) => e.source !== nodeId && e.target !== nodeId,
+  )
+  if (incoming.length === 0 || outgoing.length === 0) {
+    return remaining
+  }
+
+  const seen = new Set(remaining.map((e) => `${e.source}->${e.target}`))
+  const bridges: Edge[] = []
+  for (const inc of incoming) {
+    for (const out of outgoing) {
+      if (inc.source === out.target) continue
+      const key = `${inc.source}->${out.target}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      bridges.push(
+        buildLaneEdge(inc.source, out.target, {
+          sourceHandle: inc.sourceHandle ?? undefined,
+          targetHandle: out.targetHandle ?? undefined,
+        }),
+      )
+    }
+  }
+  return [...remaining, ...bridges]
+}
+
 function adaptHasLane(node: WfRfNode): boolean {
   return laneKeyFromRfNode(node).length > 0
 }
@@ -459,7 +497,7 @@ export function syncBranchLanesToChannels(
     (e) => !removeIds.has(e.source) && !removeIds.has(e.target),
   )
 
-  if (branchChannels.length >= 2) {
+  if (branchChannels.length >= 1) {
     const spawned = applySpawnLaneAdapts(
       workingNodes,
       workingEdges,
