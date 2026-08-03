@@ -5,6 +5,7 @@ import { NODE_W, PIPE_GAP, type WfRfNode } from "@/features/workflow/data/workfl
 import {
   addNodeAfter,
   applySpawnLaneAdapts,
+  bridgeEdgesAcrossRemovedNode,
   buildPlusEdge,
   insertNodeBetween,
   materializeBranchSubgraph,
@@ -372,5 +373,49 @@ describe("workflow-canvas-mutations", () => {
     const adapts = repaired.filter((n) => n.data.wfType === "adapt")
     expect(adapts).toHaveLength(2)
     expect(adapts.map((n) => n.data.lane).sort()).toEqual(["facebook", "instagram"])
+  })
+
+  it("bridgeEdgesAcrossRemovedNode reconnects predecessor to successor for a mid-chain node", () => {
+    const edges = [
+      { id: "e1", source: "text", target: "image", type: "plus_edge" },
+      { id: "e2", source: "image", target: "merge", type: "plus_edge", targetHandle: "instagram" },
+    ]
+    const result = bridgeEdgesAcrossRemovedNode("image", edges)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      source: "text",
+      target: "merge",
+      targetHandle: "instagram",
+    })
+  })
+
+  it("bridgeEdgesAcrossRemovedNode drops edges cleanly at a chain end (no incoming or no outgoing)", () => {
+    const edges = [{ id: "e1", source: "text", target: "image", type: "plus_edge" }]
+    expect(bridgeEdgesAcrossRemovedNode("image", edges)).toHaveLength(0)
+    expect(bridgeEdgesAcrossRemovedNode("text", edges)).toHaveLength(0)
+  })
+
+  it("bridgeEdgesAcrossRemovedNode fans out bridges for multiple predecessors/successors", () => {
+    const edges = [
+      { id: "e1", source: "a", target: "mid", type: "plus_edge" },
+      { id: "e2", source: "b", target: "mid", type: "plus_edge" },
+      { id: "e3", source: "mid", target: "c", type: "plus_edge" },
+      { id: "e4", source: "mid", target: "d", type: "plus_edge" },
+    ]
+    const result = bridgeEdgesAcrossRemovedNode("mid", edges)
+    const pairs = result.map((e) => `${e.source}->${e.target}`).sort()
+    expect(pairs).toEqual(["a->c", "a->d", "b->c", "b->d"])
+  })
+
+  it("bridgeEdgesAcrossRemovedNode does not duplicate an already-existing bridge", () => {
+    const edges = [
+      { id: "e1", source: "a", target: "mid", type: "plus_edge" },
+      { id: "e2", source: "mid", target: "b", type: "plus_edge" },
+      { id: "e3", source: "a", target: "b", type: "plus_edge" },
+    ]
+    const result = bridgeEdgesAcrossRemovedNode("mid", edges)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.source).toBe("a")
+    expect(result[0]?.target).toBe("b")
   })
 })

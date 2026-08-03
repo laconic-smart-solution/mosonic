@@ -54,6 +54,19 @@ describe('UploadService', () => {
     publishCreatePostBatch: jest.fn(),
     updatePost: jest.fn(),
   };
+  const rulesRepo = {
+    findById: jest.fn(),
+  };
+  const ALL_TEST_CHANNELS_RULE = {
+    channels: [
+      { channel: 'instagram' },
+      { channel: 'facebook' },
+      { channel: 'linkedin' },
+      { channel: 'tiktok' },
+      { channel: 'youtube' },
+      { channel: 'rednote' },
+    ],
+  };
   const redNoteService = {
     publishAndWait: jest.fn(),
     publishEnqueue: jest.fn().mockResolvedValue({ success: true, jobId: 'job-1' }),
@@ -88,6 +101,7 @@ describe('UploadService', () => {
 
   const service = new UploadService(
     uploadModel as never,
+    rulesRepo as never,
     mcpService as never,
     redNoteService as never,
     events as never,
@@ -124,6 +138,7 @@ describe('UploadService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rulesRepo.findById.mockResolvedValue(ALL_TEST_CHANNELS_RULE);
     collectionFindOne.mockResolvedValue(null);
     contentService.autoApproveIfDraftForPublish.mockResolvedValue(undefined);
     postService.findScheduledPostsForUpload.mockResolvedValue([]);
@@ -791,6 +806,43 @@ describe('UploadService', () => {
     expect(keys).toEqual(['instagram', 'linkedin']);
     const linkedin = out.channels.find((c) => c.channel.toLowerCase() === 'linkedin');
     expect(linkedin?.included).toBe(true);
+  });
+
+  it('findByUploadId does not append a connected channel the rule does not list', async () => {
+    const doc = {
+      uploadId: 'u1',
+      contentRef: 'c1',
+      ruleRef: 'rule-1',
+      workflowRef: 'wf-1',
+      userId: 'user-1',
+      channels: [mockChannel({ channel: 'instagram', caption: 'ig' })],
+      resolvedOutputs: { text: 'hello' },
+      status: UploadJobStatus.Pending,
+      markModified: jest.fn(),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    findOne.mockReturnValue({
+      exec: () => Promise.resolve(doc),
+    });
+    // RedNote account is connected, but the campaign rule never listed it.
+    rulesRepo.findById.mockResolvedValue({
+      channels: [{ channel: 'instagram' }],
+    });
+    mcpService.getConnectedAccounts.mockResolvedValue({
+      accounts: [
+        { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
+        { channel: 'rednote', accountId: 'acc_red', connectedAt: new Date() },
+      ],
+    });
+
+    const out = await service.findByUploadId('u1', {
+      userId: 'user-1',
+      role: 'CUSTOMER' as never,
+    });
+
+    const keys = out.channels.map((c) => c.channel.toLowerCase()).sort();
+    expect(keys).toEqual(['instagram']);
+    expect(uploadModel.save).not.toHaveBeenCalled();
   });
 
   it('publishUpload uses persisted included when channel is missing from request', async () => {

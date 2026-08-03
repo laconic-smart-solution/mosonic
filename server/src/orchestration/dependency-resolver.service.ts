@@ -26,6 +26,7 @@ import {
   type WorkflowGraphEdge,
 } from '../workflow/workflow-graph.util';
 import { isNodeBlockedByLanePause } from './lane-pause.util';
+import { withQueueCleanupTimeout } from './queue-cleanup-timeout.util';
 import { OrchestrationService } from './orchestration.service';
 import {
   POLL_CONFIG,
@@ -494,22 +495,30 @@ export class DependencyResolverService {
       this.videoCheckQueue,
       this.legacyPipelineVideoQueue,
     ];
-    for (const queue of queues) {
-      const [waiting, delayed] = await Promise.all([
-        queue.getJobs(['waiting']),
-        queue.getJobs(['delayed']),
-      ]);
-      for (const job of [...waiting, ...delayed]) {
-        if (
-          job.id?.startsWith(prefix) ||
-          (job.data &&
-            'pipelineId' in job.data &&
-            (job.data as NodeJobPayload).pipelineId === pipelineId)
-        ) {
-          await job.remove();
-        }
-      }
-    }
+    await Promise.all(
+      queues.map((queue) =>
+        withQueueCleanupTimeout(
+          `removeQueuedJobsForPipeline(${pipelineId}) on ${queue.name}`,
+          async () => {
+            const [waiting, delayed] = await Promise.all([
+              queue.getJobs(['waiting']),
+              queue.getJobs(['delayed']),
+            ]);
+            for (const job of [...waiting, ...delayed]) {
+              if (
+                job.id?.startsWith(prefix) ||
+                (job.data &&
+                  'pipelineId' in job.data &&
+                  (job.data as NodeJobPayload).pipelineId === pipelineId)
+              ) {
+                await job.remove();
+              }
+            }
+          },
+          this.logger,
+        ),
+      ),
+    );
   }
 
   /** Remove waiting/delayed jobs for a single node (force-skip / cancel mid-run). */
@@ -523,26 +532,34 @@ export class DependencyResolverService {
       this.videoCheckQueue,
       this.legacyPipelineVideoQueue,
     ];
-    for (const queue of queues) {
-      const [waiting, delayed] = await Promise.all([
-        queue.getJobs(['waiting']),
-        queue.getJobs(['delayed']),
-      ]);
-      for (const job of [...waiting, ...delayed]) {
-        const data = job.data as NodeJobPayload | undefined;
-        const matchesData =
-          data &&
-          data.pipelineId === pipelineId &&
-          data.nodeId === nodeId;
-        const matchesId =
-          typeof job.id === 'string' &&
-          (job.id.startsWith(`${pipelineId}__${nodeId}`) ||
-            job.id.includes(`__${nodeId}__`));
-        if (matchesData || matchesId) {
-          await job.remove();
-        }
-      }
-    }
+    await Promise.all(
+      queues.map((queue) =>
+        withQueueCleanupTimeout(
+          `removeQueuedJobsForNode(${pipelineId}, ${nodeId}) on ${queue.name}`,
+          async () => {
+            const [waiting, delayed] = await Promise.all([
+              queue.getJobs(['waiting']),
+              queue.getJobs(['delayed']),
+            ]);
+            for (const job of [...waiting, ...delayed]) {
+              const data = job.data as NodeJobPayload | undefined;
+              const matchesData =
+                data &&
+                data.pipelineId === pipelineId &&
+                data.nodeId === nodeId;
+              const matchesId =
+                typeof job.id === 'string' &&
+                (job.id.startsWith(`${pipelineId}__${nodeId}`) ||
+                  job.id.includes(`__${nodeId}__`));
+              if (matchesData || matchesId) {
+                await job.remove();
+              }
+            }
+          },
+          this.logger,
+        ),
+      ),
+    );
   }
 
   private async countQueuedJobsForPipeline(pipelineId: string): Promise<number> {
