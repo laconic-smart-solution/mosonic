@@ -44,6 +44,7 @@ import {
 import {
   addNodeAfter,
   addNodeFromPaletteDrop,
+  bridgeEdgesAcrossRemovedNode,
   buildPlusEdge,
   deleteBranchCascade,
   insertNodeBetween,
@@ -260,6 +261,17 @@ type WorkflowFlowCanvasProps = {
   /** Fired when nodes/edges change in edit mode (not selection-only). */
   onCanvasEdited?: () => void
   onConfigDraftChange?: (hasUnappliedChanges: boolean) => void
+  /**
+   * Fired once after loading, when the persisted branch lane structure no
+   * longer matches the rule's current channels and was auto-reconciled
+   * (stale lanes dropped, missing lanes spawned). Caller should persist the
+   * given nodes/edges so the fix survives future loads.
+   */
+  onChannelsReconciled?: (
+    nodes: WfRfNode[],
+    edges: Edge[],
+    removedLaneLabels: string[],
+  ) => void
   workflowId?: string
   ruleId?: string
 }
@@ -283,6 +295,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       onSkipReviewNode,
       onCanvasEdited,
       onConfigDraftChange,
+      onChannelsReconciled,
       workflowId,
       ruleId,
     },
@@ -336,6 +349,12 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const suppressEditNotifyRef = useRef(false)
     nodesRef.current = nodes
     edgesRef.current = edges
+    // Read via ref (not a dep) so the hydration effect below doesn't re-run
+    // just because the parent passed a fresh (unmemoized) callback identity.
+    const onChannelsReconciledRef = useRef(onChannelsReconciled)
+    onChannelsReconciledRef.current = onChannelsReconciled
+    // Guards the auto-save so it fires at most once per distinct (apiNodes, channels) load.
+    const reconciledKeyRef = useRef<string | null>(null)
 
     const isMaterializedView = Boolean(rfNodesOverride?.length)
 
@@ -402,9 +421,17 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         skipLayout: true,
       })
       const expanded = expandLegacySingleAdapt(rfNodes, rfEdges, branchChannels)
-      const laidOut = resolveWorkflowLayout(
+      // Rule channels may have changed since this workflow was last saved (e.g. a
+      // channel swapped or removed on the rule): drop lane nodes that no longer
+      // match a current rule channel and spawn adapts for channels missing a lane.
+      const reconciled = syncBranchLanesToChannels(
         expanded.nodes,
         expanded.edges,
+        branchChannels,
+      )
+      const laidOut = resolveWorkflowLayout(
+        reconciled.nodes,
+        reconciled.edges,
         branchChannels,
         persistedLayoutFromApiNodes(apiNodes),
       )
@@ -419,10 +446,34 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       queueMicrotask(() => {
         if (rf.current) applyWorkflowCanvasViewport(rf.current)
       })
+
+      if (!readOnly) {
+        // Dedupe key: only attempt the auto-save once per distinct
+        // (apiNodes snapshot, rule channel set) pairing. Without this, an
+        // effect re-run triggered by the save itself (new query data) or by
+        // an unrelated parent re-render would recompute and re-fire forever.
+        const dedupeKey = `${branchChannels.map((c) => c.id).join(",")}::${apiNodes.length}::${apiNodes.map((n) => `${n.nodeId}:${n.lane ?? ""}`).join("|")}`
+        if (reconciledKeyRef.current !== dedupeKey) {
+          reconciledKeyRef.current = dedupeKey
+          const beforeIds = new Set(expanded.nodes.map((n) => n.id))
+          const afterIds = new Set(reconciled.nodes.map((n) => n.id))
+          const channelsChanged =
+            beforeIds.size !== afterIds.size ||
+            [...beforeIds].some((id) => !afterIds.has(id))
+          if (channelsChanged) {
+            onChannelsReconciledRef.current?.(
+              laidOut.nodes,
+              laidOut.edges,
+              reconciled.removedLaneLabels,
+            )
+          }
+        }
+      }
     }, [
       apiNodes,
       apiEdges,
       branchChannels,
+      readOnly,
       rfEdgesOverride,
       rfNodesOverride,
       setEdges,
@@ -947,11 +998,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           })
         } else {
           setNodes((nds) => nds.filter((entry) => entry.id !== nodeId))
-          setEdges((eds) =>
-            eds.filter(
-              (edge) => edge.source !== nodeId && edge.target !== nodeId,
-            ),
-          )
+          setEdges((eds) => bridgeEdgesAcrossRemovedNode(nodeId, eds))
         }
 
         if (selectedId === nodeId) setSelectedId(null)
