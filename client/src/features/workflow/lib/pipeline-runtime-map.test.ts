@@ -47,6 +47,38 @@ describe("mergePipelineRuntimeMaps", () => {
       previewText: "final",
     })
   })
+
+  it("lets a later 'processing' event update the message set by an earlier 'running' event", () => {
+    // Before the fix, running(50) outranked processing(40), so this update's
+    // status and processingMessage were silently dropped — the card stayed
+    // stuck showing the original generic "running" message forever.
+    const merged = mergePipelineRuntimeMaps(
+      {
+        "node-4": {
+          status: "running",
+          processingMessage: "Generating…",
+        },
+      },
+      {
+        "node-4": {
+          status: "processing",
+          processingMessage: "Uploading image…",
+        },
+      },
+    )
+    expect(merged["node-4"]).toEqual({
+      status: "processing",
+      processingMessage: "Uploading image…",
+    })
+  })
+
+  it("still keeps an in-progress socket status ahead of a stale pending API snapshot", () => {
+    const merged = mergePipelineRuntimeMaps(
+      { "node-5": { status: "processing", processingMessage: "Working…" } },
+      { "node-5": { status: "pending" } },
+    )
+    expect(merged["node-5"].status).toBe("processing")
+  })
 })
 
 describe("mapPipelineRuntimeToCanvas", () => {

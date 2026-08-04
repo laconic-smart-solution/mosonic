@@ -194,4 +194,72 @@ describe("pipelineGraphToRf", () => {
     expect(merge?.id).toBe("merge-1")
     expect(edges.some((e) => e.target === "merge-1")).toBe(true)
   })
+
+  it("seeds each node's status from the real pipeline snapshot, not a hardcoded idle", () => {
+    const snapNodes = [
+      {
+        nodeId: "text-1",
+        type: "text_generation" as const,
+        order: 1,
+        isLocked: true,
+        userPrompt: "",
+        config: {},
+        status: "completed" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+      {
+        nodeId: "adapt-1__instagram",
+        type: "adapt" as const,
+        order: 2,
+        isLocked: false,
+        userPrompt: "",
+        config: {},
+        lane: "instagram",
+        status: "running" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+      {
+        nodeId: "adapt-1__facebook",
+        type: "adapt" as const,
+        order: 3,
+        isLocked: false,
+        userPrompt: "",
+        config: {},
+        lane: "facebook",
+        status: "failed" as const,
+        output: null,
+        retryCount: 0,
+        executedAt: null,
+      },
+    ]
+    const snapEdges = [
+      { from: "text-1", to: "adapt-1__instagram" },
+      { from: "text-1", to: "adapt-1__facebook" },
+      { from: "adapt-1__instagram", to: "merge-1" },
+      { from: "adapt-1__facebook", to: "merge-1" },
+    ]
+
+    const { nodes } = pipelineGraphToRf({
+      nodes: snapNodes,
+      edges: snapEdges,
+      lanes: ["instagram", "facebook"],
+      channelHandles: [
+        { id: "instagram", label: "Instagram" },
+        { id: "facebook", label: "Facebook" },
+      ],
+    })
+
+    expect(nodes.find((n) => n.id === "text-1")?.data.status).toBe("completed")
+    expect(nodes.find((n) => n.id === "adapt-1__instagram")?.data.status).toBe(
+      "running",
+    )
+    // Runtime-status "failed" maps to the display status "failed_final".
+    expect(nodes.find((n) => n.id === "adapt-1__facebook")?.data.status).toBe(
+      "failed_final",
+    )
+  })
 })
