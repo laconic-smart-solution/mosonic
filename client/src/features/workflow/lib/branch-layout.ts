@@ -33,6 +33,17 @@ function laneColor(index: number): string {
   return LANE_COLORS[index % LANE_COLORS.length]!
 }
 
+/**
+ * Seed status for a freshly materialized node from its real pipeline status
+ * (not a hardcoded "idle") so the canvas reflects the true state immediately,
+ * rather than depending entirely on a runtime-map overlay landing before the
+ * user looks at the node (e.g. right after a page reload mid-run, before any
+ * new socket event has fired for an already-running node).
+ */
+function initialRfStatus(status: PipelineNodeSnapshot["status"]): NodeStatus {
+  return status === "failed" ? "failed_final" : status
+}
+
 export function isPreviewEdgeId(id: string): boolean {
   return id.startsWith(PREVIEW_EDGE_PREFIX)
 }
@@ -498,7 +509,7 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
           ? formatLaneNodeLabel(canvasType, displayChannel)
           : meta.label,
         wfType: canvasType,
-        status: "idle" as NodeStatus,
+        status: initialRfStatus(n.status),
         locked: true,
         config: n.config ?? {},
         lane,

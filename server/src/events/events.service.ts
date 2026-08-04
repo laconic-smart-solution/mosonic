@@ -52,7 +52,7 @@ export class EventsService {
 
   /** Convenience for pipeline-scoped channels (orchestration logs, node updates). */
   emitToPipeline(pipelineId: string, event: string, payload: unknown): void {
-    if (this.realtimeBridgeEnabled()) {
+    if (this.realtimeBridgeEnabled() && !this.server) {
       void publishPipelineEventToRedis(
         this.realtimeRedisUrl(),
         pipelineId,
