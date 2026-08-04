@@ -1,5 +1,14 @@
 import type { PipelineNodeSnapshot } from "@/shared/types/pipeline.type"
 
+// Only pending/running/completed/failed/skipped/waiting_review ever come from
+// the REST poll snapshot (buildRuntimeFromPipelineNodes) — streaming/processing/
+// retrying are socket-only sub-states of "in progress". running/streaming/
+// processing/retrying therefore share one tier: none of them should block a
+// fresher socket update from one of the others (e.g. a "processing" event's
+// updated processingMessage getting silently dropped because an earlier
+// "running" event already set that key at a higher priority). The tier still
+// correctly outranks a stale "pending" poll read and is outranked by the
+// terminal states below it.
 const RUNTIME_STATUS_PRIORITY: Record<string, number> = {
   failed_final: 60,
   failed: 58,
@@ -7,9 +16,9 @@ const RUNTIME_STATUS_PRIORITY: Record<string, number> = {
   completed: 55,
   skipped: 53,
   running: 50,
-  streaming: 45,
-  processing: 40,
-  retrying: 35,
+  streaming: 50,
+  processing: 50,
+  retrying: 50,
   pending: 5,
   idle: 0,
 }
