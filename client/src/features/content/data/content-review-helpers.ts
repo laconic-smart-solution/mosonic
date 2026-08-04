@@ -70,6 +70,26 @@ export function mergeNodeOutputLayers(
   }
 }
 
+/**
+ * Drops the user-edited keys a fresh re-run output now supersedes.
+ * mergeNodeOutputLayers layers nodeUserEdits over nodeOutputs, so without
+ * this, a saved edit keeps masking newly generated content after re-run —
+ * the UI looks like the re-run did nothing.
+ */
+export function clearStaleUserEditsAfterRerun(
+  nodeUserEdits: Record<string, Record<string, unknown>>,
+  nodeId: string,
+  freshOutput: Record<string, unknown>
+): Record<string, Record<string, unknown>> {
+  const existing = nodeUserEdits[nodeId]
+  if (!existing) return nodeUserEdits
+  const outputKeys = Object.keys(freshOutput ?? {})
+  if (!outputKeys.some((k) => k in existing)) return nodeUserEdits
+  const nextEntry = { ...existing }
+  for (const k of outputKeys) delete nextEntry[k]
+  return { ...nodeUserEdits, [nodeId]: nextEntry }
+}
+
 /** Last-wins per semantic field along workflow order (for sidebar / legacy flat UI). */
 export function flattenWorkflowNodesToFlatOutputs(
   orderedNodes: Array<{ nodeId: string; type: WorkflowNodeType; order: number }>,
