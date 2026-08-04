@@ -3,9 +3,10 @@ import { LineNotifyService } from '../line/line-notify.service';
 import { TelegramNotifyService } from '../telegram/telegram-notify.service';
 import { ViberNotifyService } from '../viber/viber-notify.service';
 import { WhatsAppNotifyService } from '../whatsapp/whatsapp-notify.service';
+import { WechatNotifyService } from '../wechat/wechat-notify.service';
 
 /**
- * Fan-out to connected messaging channels (LINE, Telegram, Viber, and/or WhatsApp).
+ * Fan-out to connected messaging channels (LINE, Telegram, Viber, WhatsApp, WeChat).
  * Each channel no-ops if the user has not linked that account.
  */
 @Injectable()
@@ -15,6 +16,7 @@ export class CommsNotifyService {
     private readonly telegramNotify: TelegramNotifyService,
     private readonly viberNotify: ViberNotifyService,
     private readonly whatsappNotify: WhatsAppNotifyService,
+    private readonly wechatNotify: WechatNotifyService,
   ) {}
 
   async notifyUser(
@@ -26,6 +28,7 @@ export class CommsNotifyService {
       this.telegramNotify.notifyUser(userId, text),
       this.viberNotify.notifyUser(userId, text),
       this.whatsappNotify.notifyUser(userId, text),
+      this.wechatNotify.notifyUser(userId, text),
     ]);
   }
 }

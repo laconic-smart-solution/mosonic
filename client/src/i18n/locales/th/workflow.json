@@ -398,7 +398,6 @@
   },
   "toasts": {
     "replacedAdaptNodes": "แทนที่โหนด Adapt ที่ไม่ได้กำหนดสายด้วย Adapt ต่อช่องทางจาก Branch",
-    "branchNeedsChannels": "Branch ต้องมีช่องทางกระจายอย่างน้อยสองช่องทางในกฎแคมเปญ",
     "addNodeBeforeSave": "เพิ่มอย่างน้อยหนึ่งโหนดก่อนบันทึก",
     "disconnectedNode": "โหนด {{label}} ไม่ได้เชื่อมกับเวิร์กโฟลว์ กรุณาเชื่อมต่อหรือลบออก",
     "removedDisconnectedNode": "ลบโหนด {{label}} ที่ไม่ได้เชื่อมออกจากเวิร์กโฟลว์แล้ว",

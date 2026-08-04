@@ -398,7 +398,6 @@
   },
   "toasts": {
     "replacedAdaptNodes": "已用 Branch 的每个渠道一个 Adapt 替换未分配分支的 Adapt 节点。",
-    "branchNeedsChannels": "Branch 需要在活动规则中至少两个分发渠道。",
     "addNodeBeforeSave": "保存前请至少添加一个节点。",
     "disconnectedNode": "“{{label}}”节点未连接到工作流，请连接或删除该节点。",
     "removedDisconnectedNode": "已从工作流中移除未连接的“{{label}}”节点。",

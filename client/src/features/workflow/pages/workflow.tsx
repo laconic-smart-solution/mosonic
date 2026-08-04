@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { Edge } from "@xyflow/react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   useLocation,
@@ -997,10 +998,6 @@ export default function WorkflowPage() {
       )
       toast.info(t("toasts.replacedAdaptNodes"))
     }
-    if (branchChannels.length > 0 && branchChannels.length < 2) {
-      toast.error(t("toasts.branchNeedsChannels"))
-      return
-    }
     if (laneErrors.length > 0) {
       toast.error(laneErrors[0])
       return
@@ -1073,6 +1070,34 @@ export default function WorkflowPage() {
         },
       },
     )
+  }
+
+  /**
+   * Auto-fired by the canvas when the persisted branch lane structure no
+   * longer matches the rule's current channels (e.g. the rule's channel was
+   * changed or removed after this workflow was last saved). Persists the
+   * reconciled nodes/edges so the workspace stays in sync with the rule.
+   */
+  function handleChannelsReconciled(
+    reconciledNodes: WfRfNode[],
+    reconciledEdges: Edge[],
+    removedLaneLabels: string[],
+  ) {
+    if (!activeWorkflowId || !ruleId) return
+    if (removedLaneLabels.length > 0) {
+      toast.info(t("canvas.removedLanes", { lanes: removedLaneLabels.join(", ") }))
+    }
+    const payload = rfNodesToApiPayload(
+      normalizeBranchNodesForSave(reconciledNodes),
+      reconciledEdges,
+    )
+    if (payload.nodes.length === 0) return
+    saveNodesMutation.mutate({
+      workflowId: activeWorkflowId,
+      ruleId,
+      nodes: payload.nodes,
+      edges: payload.edges,
+    })
   }
 
   function runStartPipelineMutation(
@@ -1671,6 +1696,7 @@ export default function WorkflowPage() {
             onSkipReviewNode={handleSkipReviewNode}
             onCanvasEdited={() => setCanvasEdited(true)}
             onConfigDraftChange={setConfigDraftDirty}
+            onChannelsReconciled={handleChannelsReconciled}
           />
         )}
         {processingMode === "edit" &&

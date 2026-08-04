@@ -300,6 +300,12 @@ export class PipelineNodeRunnerService {
         pausedNodeId: nodeId,
         pausedLaneId: laneId,
       });
+      // Other sibling nodes may already be queued (e.g. parallel lanes that
+      // fanned out together). Left alone they'd sit in the shared queue until
+      // eventually dequeued, only to self-abort once they see the pipeline
+      // is no longer running — wasted queue churn, and each one re-triggers
+      // this failure handling redundantly. Clean them up now instead.
+      await this.resolver.removeQueuedJobsForPipeline(pipelineId);
     }
 
     this.events.emitToPipeline(pipelineId, 'node:failed_final', {

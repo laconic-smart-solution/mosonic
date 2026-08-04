@@ -403,7 +403,6 @@
   },
   "toasts": {
     "replacedAdaptNodes": "Replaced unassigned Adapt nodes with one Adapt per channel from Branch.",
-    "branchNeedsChannels": "Branch requires at least two distribution channels on the campaign rule.",
     "addNodeBeforeSave": "Add at least one node before saving.",
     "disconnectedNode": "{{label}} is not connected to the workflow. Connect it or delete it.",
     "removedDisconnectedNode": "Removed unconnected {{label}} node from the workflow.",

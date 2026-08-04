@@ -35,7 +35,12 @@ import type {
   ChannelPublishDto,
   PublishUploadDto,
 } from './dto/publish-upload.dto';
-import { isDeprecatedChannelId } from '../workflow/distribution-channels.util';
+import {
+  isDeprecatedChannelId,
+  ruleChannelNamesToIds,
+} from '../workflow/distribution-channels.util';
+import type { IRuleRepository } from '../repositories/interfaces/rule.repository.interface';
+import { RULE_REPOSITORY } from '../repositories/tokens';
 import type { PatchUploadChannelBodyDto } from './dto/patch-upload-channel.dto';
 import type { UpdateUploadDto } from './dto/update-upload.dto';
 import type {
@@ -135,6 +140,8 @@ export class UploadService {
   constructor(
     @Inject(UPLOAD_REPOSITORY)
     private readonly uploads: IUploadRepository,
+    @Inject(RULE_REPOSITORY)
+    private readonly rules: IRuleRepository,
     private readonly mcpService: McpService,
     private readonly redNoteService: RedNoteService,
     private readonly events: EventsService,
@@ -155,7 +162,15 @@ export class UploadService {
       return this.buildChannelEntriesFromRule(ruleChannels, resolvedOutputs);
     }
 
-    return ruleChannels.map((ruleCh) => {
+    // Only the channels this pipeline actually branched for — the rule may
+    // have channels added/changed after this pipeline ran, and those must
+    // not silently appear as upload channels the workflow never produced.
+    const laneSet = new Set(lanes.map((lane) => normalizeLaneId(lane)));
+    const branchedChannels = ruleChannels.filter((ruleCh) =>
+      laneSet.has(normalizeLaneId(ruleCh.channel)),
+    );
+
+    return branchedChannels.map((ruleCh) => {
       const lane = normalizeLaneId(ruleCh.channel);
       const adaptNode = (pipeline.nodes ?? []).find(
         (n) =>
@@ -257,15 +272,26 @@ export class UploadService {
 
   private async ensureChannelsForConnectedAccounts(
     upload: UploadRecord,
-    userId: string,
+    auth: TenancyAuth,
   ): Promise<UploadRecord> {
-    const connected = await this.mcpService.getConnectedAccounts(userId);
+    const connected = await this.mcpService.getConnectedAccounts(auth.userId);
     const connectedKeys = new Set(
       (connected.accounts ?? [])
         .map((a) => a.channel?.trim().toLowerCase())
         .filter((key): key is string => Boolean(key) && !isDeprecatedChannelId(key)),
     );
     if (connectedKeys.size === 0) return upload;
+
+    // A connected account only becomes an upload channel if the campaign rule
+    // actually names that channel — being connected elsewhere (e.g. testing a
+    // RedNote login) must not silently add it to unrelated content.
+    const rule = await this.rules.findById(upload.ruleRef, auth);
+    const ruleChannelIds = new Set(
+      ruleChannelNamesToIds(
+        Array.isArray(rule?.channels) ? (rule.channels as never[]) : [],
+      ),
+    );
+    if (ruleChannelIds.size === 0) return upload;
 
     let channels = uploadChannels(upload);
     const existingKeys = new Set(
@@ -275,7 +301,7 @@ export class UploadService {
     const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
 
     for (const key of connectedKeys) {
-      if (existingKeys.has(key)) continue;
+      if (existingKeys.has(key) || !ruleChannelIds.has(key)) continue;
       const channelName = key[0] ? `${key[0].toUpperCase()}${key.slice(1)}` : key;
       channels = [...channels, this.createDefaultChannelRow(channelName, ro)];
       changed = true;
@@ -383,7 +409,7 @@ export class UploadService {
         ruleRef: params.ruleRef,
         status: recomputeUploadJobStatus(merged),
       });
-      saved = await this.ensureChannelsForConnectedAccounts(saved, auth.userId);
+      saved = await this.ensureChannelsForConnectedAccounts(saved, auth);
       return { uploadId: saved.uploadId };
     }
     return this.createUpload(params);
@@ -449,7 +475,7 @@ export class UploadService {
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth);
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
     const channels = uploadChannels(doc);
     for (const ch of channels) {
@@ -504,7 +530,7 @@ export class UploadService {
     }
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth);
 
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
     let channels = uploadChannels(doc);
@@ -810,7 +836,7 @@ export class UploadService {
     }
     this.assertUploadAccess(reloaded, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(reloaded);
-    doc = await this.ensureChannelsForConnectedAccounts(reloaded, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(reloaded, auth);
 
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
     let channels = uploadChannels(doc);
@@ -1179,7 +1205,7 @@ export class UploadService {
     if (!doc) throw new NotFoundException(`Upload ${uploadId} not found`);
     this.assertUploadAccess(doc, auth, uploadId);
     await this.migrateLegacyChannelsFromMongo(doc);
-    doc = await this.ensureChannelsForConnectedAccounts(doc, auth.userId);
+    doc = await this.ensureChannelsForConnectedAccounts(doc, auth);
 
     const channels = uploadChannels(doc);
     const failed = channels.filter(
