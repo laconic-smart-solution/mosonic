@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,11 @@ import {
   WorkflowNodeConfigFields,
 } from "@/features/workflow/components/workflow-node-config-fields"
 import { WF_NODE_TYPES, type WFNode } from "@/features/workflow/data/workflow-model"
-import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
+import {
+  normalizeLaneId,
+  type BranchChannelHandle,
+  type BranchNodeConfig,
+} from "@/features/workflow/lib/branch-channels"
 
 type WorkflowPropertiesPanelProps = {
   open: boolean
@@ -23,7 +28,8 @@ type WorkflowPropertiesPanelProps = {
   selNode: WFNode | null
   propConfig: Record<string, unknown>
   setPropConfig: (next: Record<string, unknown>) => void
-  resolvedChannels?: BranchChannelHandle[]
+  /** Every channel the Rule defines — the checklist's full option list. */
+  allChannels?: BranchChannelHandle[]
   workflowId?: string
   /** True when this node exists in the saved workflow API payload. */
   nodePersisted?: boolean
@@ -37,7 +43,7 @@ export function WorkflowPropertiesPanel({
   selNode,
   propConfig,
   setPropConfig,
-  resolvedChannels = [],
+  allChannels = [],
   workflowId,
   nodePersisted = false,
   onApply,
@@ -98,8 +104,12 @@ export function WorkflowPropertiesPanel({
           ) : null}
 
           {selNode.type === "branch" ? (
-            resolvedChannels.length > 0 ? (
-              <BranchChannelList channels={resolvedChannels} />
+            allChannels.length > 0 ? (
+              <BranchChannelPicker
+                allChannels={allChannels}
+                config={propConfig as BranchNodeConfig}
+                onChange={setPropConfig}
+              />
             ) : (
               <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
                 {t("properties.branchChannelsHint")}
@@ -144,21 +154,72 @@ export function WorkflowPropertiesPanel({
   )
 }
 
-function BranchChannelList({
-  channels,
+/**
+ * Branching is optional — a workflow may intentionally run fewer channels
+ * than the Rule defines. Unchecking a channel here removes its lane the
+ * moment changes are applied; at least one channel must stay active (a
+ * Branch node with zero lanes doesn't mean anything — delete Branch/Merge
+ * entirely for that instead).
+ */
+function BranchChannelPicker({
+  allChannels,
+  config,
+  onChange,
 }: {
-  channels: BranchChannelHandle[]
+  allChannels: BranchChannelHandle[]
+  config: BranchNodeConfig
+  onChange: (next: Record<string, unknown>) => void
 }) {
   const { t } = useTranslation("workflow")
+  const activeIds = new Set(
+    config?.mode === "wizard_channels" && Array.isArray(config.channels)
+      ? config.channels.map(normalizeLaneId)
+      : allChannels.map((ch) => ch.id),
+  )
+
+  function toggle(channelId: string, checked: boolean) {
+    const nextIds = new Set(activeIds)
+    if (checked) {
+      nextIds.add(channelId)
+    } else {
+      if (nextIds.size <= 1) return
+      nextIds.delete(channelId)
+    }
+    onChange({
+      mode: "wizard_channels",
+      channels: allChannels.map((ch) => ch.id).filter((id) => nextIds.has(id)),
+    } satisfies BranchNodeConfig)
+  }
+
   return (
     <div className="rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-2 dark:border-teal-500/30 dark:bg-teal-950/30">
       <p className="text-[10px] font-bold tracking-wide text-teal-800 uppercase dark:text-teal-300">
         {t("properties.channelLanes")}
       </p>
-      <ul className="mt-1.5 space-y-0.5 text-[11px] text-teal-900 dark:text-teal-100">
-        {channels.map((ch) => (
-          <li key={ch.id}>{ch.label}</li>
-        ))}
+      <p className="mt-0.5 text-[10px] leading-relaxed text-teal-800/80 dark:text-teal-300/80">
+        {t("properties.channelLanesHint")}
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {allChannels.map((ch) => {
+          const checked = activeIds.has(ch.id)
+          const id = `branch-channel-${ch.id}`
+          return (
+            <li key={ch.id}>
+              <label
+                htmlFor={id}
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-teal-900 dark:text-teal-100"
+              >
+                <Checkbox
+                  id={id}
+                  checked={checked}
+                  disabled={checked && activeIds.size <= 1}
+                  onCheckedChange={(next) => toggle(ch.id, Boolean(next))}
+                />
+                {ch.label}
+              </label>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

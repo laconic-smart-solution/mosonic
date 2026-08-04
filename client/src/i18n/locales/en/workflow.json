@@ -307,8 +307,9 @@
   "properties": {
     "title": "Properties",
     "configuration": "Configuration",
-    "branchChannelsHint": "Add at least two distribution channels on the campaign rule to enable branching.",
+    "branchChannelsHint": "Add at least one distribution channel on the campaign rule to enable branching.",
     "channelLanes": "Channel lanes",
+    "channelLanesHint": "Uncheck a channel to stop running it in this workflow. At least one must stay active.",
     "applyHint": "Changes apply to this run only. Save the workflow to persist.",
     "applyChanges": "Apply changes",
     "applyChangesNow": "Apply changes now",

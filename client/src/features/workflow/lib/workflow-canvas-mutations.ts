@@ -361,6 +361,72 @@ export function applySpawnLaneAdapts(
   }
 }
 
+/**
+ * A lane must always route through at least one node (normally Adapt) — a
+ * direct Branch→Merge edge is never a valid state, since nothing downstream
+ * (insert-between, the palette matrix, server-side materialization) expects
+ * it. Deleting the last remaining node in a lane produces exactly that via
+ * bridgeEdgesAcrossRemovedNode's generic predecessor→successor bridge.
+ *
+ * Branching is optional, so this is treated as the user deliberately
+ * dropping that channel from the workflow, not damage to repair: the direct
+ * edge is stripped and the channel is removed from the Branch node's active
+ * selection (switching to an explicit "wizard_channels" config). If that was
+ * the last active channel, Branch/Merge no longer mean anything and are
+ * cascade-removed too, same as deleting the Branch node directly.
+ */
+export function repairDirectBranchMergeEdges(
+  nodes: WfRfNode[],
+  edges: Edge[],
+  branchChannels: BranchChannelHandle[],
+): { nodes: WfRfNode[]; edges: Edge[] } {
+  const branch = findBranchNode(nodes)
+  const merge = findMergeNode(nodes)
+  if (!branch || !merge) return { nodes, edges }
+
+  const directLaneIds = new Set(
+    edges
+      .filter((e) => e.source === branch.id && e.target === merge.id)
+      .map((e) => e.sourceHandle ?? e.targetHandle ?? "")
+      .filter((id): id is string => Boolean(id)),
+  )
+  if (directLaneIds.size === 0) return { nodes, edges }
+
+  const remainingChannels = branchChannels.filter((c) => !directLaneIds.has(c.id))
+
+  if (remainingChannels.length === 0) {
+    const removeIds = collectBranchCascadeDeleteIds(branch.id, nodes, edges)
+    return {
+      nodes: nodes.filter((n) => !removeIds.has(n.id)),
+      edges: edges.filter(
+        (e) => !removeIds.has(e.source) && !removeIds.has(e.target),
+      ),
+    }
+  }
+
+  const strippedEdges = edges.filter(
+    (e) => !(e.source === branch.id && e.target === merge.id),
+  )
+  const remainingIds = remainingChannels.map((c) => c.id)
+  const nextNodes = nodes.map((n) => {
+    if (n.id !== branch.id && n.id !== merge.id) return n
+    const data = workflowNodeData(n)
+    if (!data) return n
+    return {
+      ...n,
+      data: {
+        ...data,
+        channelHandles: remainingChannels,
+        ...(n.id === branch.id
+          ? { config: { mode: "wizard_channels", channels: remainingIds } }
+          : {}),
+      },
+    } as WfRfNode
+  })
+
+  return { nodes: nextNodes, edges: strippedEdges }
+}
+
 export type RepairOrphanLaneAdaptsResult = {
   nodes: WfRfNode[]
   edges: Edge[]
