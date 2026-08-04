@@ -41,7 +41,9 @@ import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import {
   resolveBranchChannels,
   RULE_CHANNELS_BRANCH_CONFIG,
+  type BranchNodeConfig,
 } from "@/features/workflow/lib/branch-channels"
+import { DISTRIBUTION_CHANNELS } from "@/shared/constants/distribution-channels"
 import type { WfRfNode } from "@/features/workflow/data/workflow-model"
 import { pipelineGraphToRf } from "@/features/workflow/lib/branch-layout"
 import {
@@ -120,15 +122,26 @@ type SnapshotBaseline = {
   prompt: string
 }
 
+/**
+ * Ensures every branch node's config is a valid BranchNodeConfig shape
+ * before saving. A deliberate "wizard_channels" selection (fewer channels
+ * than the Rule defines) is preserved; anything else normalizes to the
+ * default "use every Rule channel" mode.
+ */
 function normalizeBranchNodesForSave(nodes: WfRfNode[]): WfRfNode[] {
   return nodes.map((n) => {
     if (n.type === "plus_placeholder") return n
     if (n.type !== "branchNode" && n.data.wfType !== "branch") return n
+    const config = n.data.config as BranchNodeConfig | undefined
+    const normalizedConfig: BranchNodeConfig =
+      config?.mode === "wizard_channels" && Array.isArray(config.channels)
+        ? { mode: "wizard_channels", channels: config.channels }
+        : RULE_CHANNELS_BRANCH_CONFIG
     return {
       ...n,
       data: {
         ...n.data,
-        config: RULE_CHANNELS_BRANCH_CONFIG,
+        config: normalizedConfig,
       },
     } as WfRfNode
   })
@@ -343,9 +356,22 @@ export default function WorkflowPage() {
     processingMode,
   ])
 
+  // Every channel the app publishes to — the checklist's full option list.
+  // Deliberately not limited to the Rule's configured channels: a workflow
+  // can target a channel the Rule doesn't (yet) list, same as the server's
+  // wizard_channels handling allows.
+  const allChannels = DISTRIBUTION_CHANNELS
+
+  // Branching is optional — a workflow may deliberately run fewer channels
+  // than the Rule defines, recorded on the persisted Branch node's config.
+  const branchNodeConfig = useMemo(() => {
+    const branch = apiNodes?.find((n) => n.type === "branch")
+    return (branch?.config as BranchNodeConfig | undefined) ?? null
+  }, [apiNodes])
+
   const branchChannels = useMemo(
-    () => resolveBranchChannels({ mode: "rule_channels" }, ruleQuery.data?.channels),
-    [ruleQuery.data?.channels],
+    () => resolveBranchChannels(branchNodeConfig, ruleQuery.data?.channels),
+    [branchNodeConfig, ruleQuery.data?.channels],
   )
 
   const activePipelineSnap = useMemo(() => {
@@ -1682,7 +1708,7 @@ export default function WorkflowPage() {
             rfNodesOverride={pipelineCanvasOverride?.nodes}
             rfEdgesOverride={pipelineCanvasOverride?.edges}
             branchChannels={branchChannels}
-            resolvedChannels={branchChannels}
+            allChannels={allChannels}
             channelCount={branchChannels.length}
             showEmptyPlaceholder={processingMode === "edit"}
             readOnly={

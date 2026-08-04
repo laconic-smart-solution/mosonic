@@ -38,8 +38,10 @@ import {
   type WfRfNode,
 } from "@/features/workflow/data/workflow-model"
 import {
+  filterChannelsBySelection,
   normalizeLaneId,
   type BranchChannelHandle,
+  type BranchNodeConfig,
 } from "@/features/workflow/lib/branch-channels"
 import {
   addNodeAfter,
@@ -49,6 +51,7 @@ import {
   deleteBranchCascade,
   insertNodeBetween,
   PLACEHOLDER_NODE_ID,
+  repairDirectBranchMergeEdges,
   repairOrphanLaneAdapts,
   syncBranchLanesToChannels,
   replaceInitialPlaceholder,
@@ -249,7 +252,8 @@ type WorkflowFlowCanvasProps = {
   rfNodesOverride?: WfRfNode[]
   rfEdgesOverride?: Edge[]
   branchChannels?: BranchChannelHandle[]
-  resolvedChannels?: BranchChannelHandle[]
+  /** Every channel the Rule defines (superset of branchChannels) — the checklist's full option list. */
+  allChannels?: BranchChannelHandle[]
   channelCount?: number
   showEmptyPlaceholder?: boolean
   readOnly?: boolean
@@ -284,7 +288,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       rfNodesOverride,
       rfEdgesOverride,
       branchChannels = [],
-      resolvedChannels = [],
+      allChannels = [],
       channelCount = 0,
       showEmptyPlaceholder = false,
       readOnly = false,
@@ -997,8 +1001,20 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             setEdges,
           })
         } else {
-          setNodes((nds) => nds.filter((entry) => entry.id !== nodeId))
-          setEdges((eds) => bridgeEdgesAcrossRemovedNode(nodeId, eds))
+          const nextNodes = nodesRef.current.filter(
+            (entry) => entry.id !== nodeId,
+          )
+          const bridgedEdges = bridgeEdgesAcrossRemovedNode(
+            nodeId,
+            edgesRef.current,
+          )
+          const repaired = repairDirectBranchMergeEdges(
+            nextNodes,
+            bridgedEdges,
+            branchChannels,
+          )
+          setNodes(repaired.nodes)
+          setEdges(repaired.edges)
         }
 
         if (selectedId === nodeId) setSelectedId(null)
@@ -1009,6 +1025,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       [
         readOnly,
         nodes,
+        branchChannels,
         selectedId,
         settingsNodeId,
         closePanel,
@@ -1101,7 +1118,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
                 ? undefined
                 : () => deleteNode(node.id),
             onOpenSettings:
-              readOnly || !nodeHasConfigurableSettings(wfType)
+              readOnly ||
+              (!nodeHasConfigurableSettings(wfType) && wfType !== "branch")
                 ? undefined
                 : () => {
                     if (settingsNodeId === node.id) {
@@ -1158,9 +1176,6 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       const selected = currentNodes.find((n) => n.id === settingsNodeId)
       if (selected?.type === "plus_placeholder") return true
       let configToApply: Record<string, unknown> = propConfig
-      if (selected?.data.wfType === "branch") {
-        configToApply = { mode: "rule_channels" }
-      }
       if (selected?.type === "wfNode" && selected.data.wfType === "image") {
         const { config: normalized, sizeAdjusted } =
           normalizeImageCanvasConfig(propConfig)
@@ -1175,10 +1190,14 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       let nextNodes = currentNodes
       let nextEdges = edgesRef.current
       if (selected?.data.wfType === "branch") {
+        const activeChannels = filterChannelsBySelection(
+          allChannels,
+          configToApply as BranchNodeConfig,
+        )
         const synced = syncBranchLanesToChannels(
           currentNodes,
           nextEdges,
-          branchChannels,
+          activeChannels,
         )
         nextNodes = synced.nodes.map((n) => {
           if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
@@ -1230,7 +1249,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       }
       return true
     }, [
-      branchChannels,
+      allChannels,
       onConfigDraftChange,
       propConfig,
       readOnly,
@@ -1388,7 +1407,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             propConfig={propConfig}
             setPropConfig={handlePropConfigChange}
             nodePersisted={selNode ? persistedNodeIds.has(selNode.id) : false}
-            resolvedChannels={resolvedChannels}
+            allChannels={allChannels}
             workflowId={workflowId}
             onApply={applyChanges}
             onReset={() => {

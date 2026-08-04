@@ -9,6 +9,7 @@ import {
   buildPlusEdge,
   insertNodeBetween,
   materializeBranchSubgraph,
+  repairDirectBranchMergeEdges,
   repairOrphanLaneAdapts,
   replaceInitialPlaceholder,
 } from "./workflow-canvas-mutations"
@@ -417,5 +418,178 @@ describe("workflow-canvas-mutations", () => {
     expect(result).toHaveLength(1)
     expect(result[0]?.source).toBe("a")
     expect(result[0]?.target).toBe("b")
+  })
+
+  describe("repairDirectBranchMergeEdges", () => {
+    const channels = [
+      { id: "instagram", label: "Instagram" },
+      { id: "facebook", label: "Facebook" },
+    ]
+
+    function branchNode(): WfRfNode {
+      return {
+        id: "branch",
+        type: "branchNode",
+        position: { x: 320, y: 140 },
+        data: {
+          label: "Branch",
+          wfType: "branch",
+          status: "idle",
+          locked: false,
+          config: {},
+        },
+        draggable: true,
+      }
+    }
+
+    function mergeNode(): WfRfNode {
+      return {
+        id: "merge",
+        type: "mergeNode",
+        position: { x: 900, y: 140 },
+        data: {
+          label: "Merge",
+          wfType: "merge",
+          status: "idle",
+          locked: false,
+          config: {},
+        },
+        draggable: true,
+      }
+    }
+
+    function adaptNode(id: string, lane: string): WfRfNode {
+      return {
+        id,
+        type: "wfNode",
+        position: { x: 600, y: 80 },
+        data: {
+          label: "Adapt",
+          wfType: "adapt",
+          status: "idle",
+          locked: false,
+          config: { laneId: lane },
+          lane,
+        },
+        draggable: true,
+      }
+    }
+
+    it("strips a direct branch->merge edge and deselects that channel (branching is optional, not damage to repair)", () => {
+      // instagram's only lane node (its adapt) was just deleted, leaving
+      // bridgeEdgesAcrossRemovedNode's direct branch->merge bridge in place.
+      const nodes = [
+        textNode("text"),
+        branchNode(),
+        adaptNode("adapt_fb", "facebook"),
+        mergeNode(),
+      ]
+      const edges = [
+        { id: "e1", source: "text", target: "branch", type: "plus_edge" },
+        {
+          id: "e2",
+          source: "branch",
+          target: "merge",
+          sourceHandle: "instagram",
+          targetHandle: "instagram",
+          type: "plus_edge",
+        },
+        {
+          id: "e3",
+          source: "branch",
+          target: "adapt_fb",
+          sourceHandle: "facebook",
+          type: "plus_edge",
+        },
+        {
+          id: "e4",
+          source: "adapt_fb",
+          target: "merge",
+          targetHandle: "facebook",
+          type: "plus_edge",
+        },
+      ]
+
+      const result = repairDirectBranchMergeEdges(nodes, edges, channels)
+
+      expect(
+        result.edges.some((e) => e.source === "branch" && e.target === "merge"),
+      ).toBe(false)
+      // No new adapt is spawned — instagram is deselected, not repaired.
+      const adapts = result.nodes.filter((n) => n.data.wfType === "adapt")
+      expect(adapts.map((n) => n.data.lane)).toEqual(["facebook"])
+
+      const branch = result.nodes.find((n) => n.id === "branch")!
+      expect(branch.data.config).toEqual({
+        mode: "wizard_channels",
+        channels: ["facebook"],
+      })
+      const merge = result.nodes.find((n) => n.id === "merge")!
+      expect(
+        (merge.data.channelHandles as Array<{ id: string }>).map((c) => c.id),
+      ).toEqual(["facebook"])
+      // facebook's existing lane is untouched.
+      expect(result.nodes.some((n) => n.id === "adapt_fb")).toBe(true)
+    })
+
+    it("cascade-removes Branch/Merge when the last active channel is emptied", () => {
+      // A single-lane branch (instagram only); its sole content node was
+      // just deleted, leaving branch directly bridged to merge.
+      const singleChannel = [{ id: "instagram", label: "Instagram" }]
+      const nodes = [textNode("text"), branchNode(), mergeNode()]
+      const edges = [
+        { id: "e1", source: "text", target: "branch", type: "plus_edge" },
+        {
+          id: "e2",
+          source: "branch",
+          target: "merge",
+          sourceHandle: "instagram",
+          targetHandle: "instagram",
+          type: "plus_edge",
+        },
+      ]
+
+      const result = repairDirectBranchMergeEdges(nodes, edges, singleChannel)
+
+      expect(result.nodes.some((n) => n.id === "branch")).toBe(false)
+      expect(result.nodes.some((n) => n.id === "merge")).toBe(false)
+      expect(result.nodes.some((n) => n.id === "text")).toBe(true)
+      expect(result.edges).toHaveLength(0)
+    })
+
+    it("is a no-op when there is no direct branch->merge edge", () => {
+      const nodes = [
+        branchNode(),
+        adaptNode("adapt_ig", "instagram"),
+        mergeNode(),
+      ]
+      const edges = [
+        {
+          id: "e1",
+          source: "branch",
+          target: "adapt_ig",
+          sourceHandle: "instagram",
+          type: "plus_edge",
+        },
+        {
+          id: "e2",
+          source: "adapt_ig",
+          target: "merge",
+          targetHandle: "instagram",
+          type: "plus_edge",
+        },
+      ]
+      const result = repairDirectBranchMergeEdges(nodes, edges, channels)
+      expect(result.nodes).toBe(nodes)
+      expect(result.edges).toBe(edges)
+    })
+
+    it("is a no-op when branch or merge is missing", () => {
+      const nodes = [textNode("text")]
+      const edges = [{ id: "e1", source: "text", target: "text", type: "plus_edge" }]
+      const result = repairDirectBranchMergeEdges(nodes, edges, channels)
+      expect(result.nodes).toBe(nodes)
+      expect(result.edges).toBe(edges)
+    })
   })
 })
