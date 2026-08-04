@@ -42,6 +42,7 @@ import { randomUuid } from "@/lib/random-uuid"
 
 import {
   type OutputKey,
+  clearStaleUserEditsAfterRerun,
   flattenWorkflowNodesToFlatOutputs,
   lastNodeIdForOutputKey,
   mergeNodeOutputLayers,
@@ -424,6 +425,9 @@ export function UploadContentReviewPanel({
           ...prev,
           [p.nodeId]: { ...(prev[p.nodeId] ?? {}), ...p.output },
         }))
+        setNodeUserEdits((prev) =>
+          clearStaleUserEditsAfterRerun(prev, p.nodeId, p.output ?? {})
+        )
         setHasUnsavedChanges(true)
         setApproveEnabled(false)
         setRunState(p.nodeId, emptyRunState())

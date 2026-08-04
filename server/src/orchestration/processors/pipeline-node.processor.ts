@@ -9,6 +9,7 @@ import {
   PIPELINE_NODES_QUEUE,
   pipelineNodeDlqJobId,
 } from '../types/node-job.payload';
+import { isFinalJobAttempt } from './job-attempt.util';
 
 @Processor(PIPELINE_NODES_QUEUE, {
   concurrency: Number(process.env.QUEUE_CONCURRENCY ?? 5),
@@ -47,15 +48,21 @@ export class PipelineNodeProcessor extends WorkerHost {
     if (!job?.data) {
       return;
     }
+    if (!isFinalJobAttempt(job)) {
+      this.logger.warn(
+        `[pipeline:${job.data.pipelineId}] worker job ${job.id} attempt ` +
+          `${job.attemptsMade}/${job.opts.attempts ?? 1} failed for ` +
+          `${job.data.nodeId}, will retry: ${error.message}`,
+      );
+      return;
+    }
     this.logger.error(
       `[pipeline:${job.data.pipelineId}] worker job ${job.id} failed ` +
         `${job.data.nodeId}: ${error.message}`,
     );
     await this.runner.handleFinalFailure(job.data, error);
-    if (job.opts.attempts && job.attemptsMade >= job.opts.attempts) {
-      await this.dlq.add('failed-node', job.data, {
-        jobId: pipelineNodeDlqJobId(String(job.id)),
-      });
-    }
+    await this.dlq.add('failed-node', job.data, {
+      jobId: pipelineNodeDlqJobId(String(job.id)),
+    });
   }
 }
