@@ -372,6 +372,39 @@ export function draftToMediaStorage(
   return { mediaUrl: urls[0] ?? null, mediaUrls: urls }
 }
 
+/**
+ * Whether the persisted row is missing/out of sync with what would actually
+ * be published. Drafts start out "not dirty" even when media/caption were
+ * auto-inferred from the workflow's generated output (see
+ * `draftFromUploadRow`) — that inferred value only lives client-side until
+ * something persists it. Gating the pre-publish PATCH on `draft.dirty` alone
+ * skips that persist step, so publish falls back to the row's still-empty
+ * `mediaUrl`/`mediaUrls` and fails server-side. Compare the would-be patch
+ * body against the row instead of trusting the dirty flag.
+ */
+export function channelNeedsPatchBeforePublish(
+  row: UploadChannelRow,
+  patchBody: PatchUploadChannelBody,
+): boolean {
+  if ((patchBody.caption ?? "") !== (row.caption ?? "")) return true
+  if ((patchBody.mediaUrl ?? null) !== (row.mediaUrl ?? null)) return true
+  const rowUrls = row.mediaUrls ?? []
+  const bodyUrls = patchBody.mediaUrls ?? []
+  if (
+    rowUrls.length !== bodyUrls.length ||
+    rowUrls.some((u, i) => u !== bodyUrls[i])
+  ) {
+    return true
+  }
+  if (
+    "youtubeTitle" in patchBody &&
+    (patchBody.youtubeTitle ?? "") !== (row.youtubeTitle ?? "")
+  ) {
+    return true
+  }
+  return false
+}
+
 export function draftToPatchBody(
   row: UploadChannelRow,
   draft: ChannelDraft,
