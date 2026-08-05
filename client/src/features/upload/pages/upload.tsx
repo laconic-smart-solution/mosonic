@@ -30,6 +30,7 @@ import { UploadTextDropZone } from "@/features/upload/components/upload-text-dro
 import { UploadContentReviewPanel } from "@/features/upload/components/upload-content-review-panel"
 import {
   buildSingleChannelPublishRequest,
+  channelNeedsPatchBeforePublish,
   createEmptyDraft,
   draftFromUploadRow,
   draftToPatchBody,
@@ -1016,17 +1017,17 @@ export default function UploadPage() {
       setShowChannelSchedule(false)
     }
     try {
-      if (activeDraft.dirty) {
-        const patchBody = draftToPatchBody(
-          activeRow,
-          activeDraft,
-          upload.resolvedOutputs,
-          workflowLayers
-        )
+      const activePatchBody = draftToPatchBody(
+        activeRow,
+        activeDraft,
+        upload.resolvedOutputs,
+        workflowLayers
+      )
+      if (channelNeedsPatchBeforePublish(activeRow, activePatchBody)) {
         await patchMutation.mutateAsync({
           uploadId,
           channel: activeRow.channel,
-          body: patchBody,
+          body: activePatchBody,
         })
         setDraft(activeKey, { dirty: false })
       }
@@ -1128,14 +1129,16 @@ export default function UploadPage() {
         const key = ch.channel.toLowerCase()
         const row = channelRowByKey.get(key) ?? liveStatusByChannel[key]
         if (!row) continue
-        const draft = draftsByChannel[key]
-        if (!draft?.dirty) continue
+        const draft =
+          draftsByChannel[key] ??
+          draftFromUploadRow(row, key, upload.resolvedOutputs, workflowLayers)
         const patchBody = draftToPatchBody(
           row,
           draft,
           upload.resolvedOutputs,
           workflowLayers
         )
+        if (!channelNeedsPatchBeforePublish(row, patchBody)) continue
         await patchMutation.mutateAsync({
           uploadId,
           channel: row.channel,

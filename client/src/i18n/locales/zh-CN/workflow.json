@@ -302,8 +302,9 @@
   "properties": {
     "title": "属性",
     "configuration": "配置",
-    "branchChannelsHint": "在活动规则中添加至少两个分发渠道以启用分支。",
+    "branchChannelsHint": "在活动规则中添加至少一个分发渠道以启用分支。",
     "channelLanes": "渠道分支",
+    "channelLanesHint": "取消勾选某个渠道即可停止在此工作流中运行它。至少需保留一个渠道处于启用状态。",
     "applyHint": "更改仅适用于本次运行。保存工作流以持久化。",
     "applyChanges": "应用更改",
     "applyChangesNow": "立即应用更改",
