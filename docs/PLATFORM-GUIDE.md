@@ -453,7 +453,10 @@ The topbar **notification bell** subscribes to Socket room `user:{userId}` and r
 
 ### External integrations
 
-- **API keys:** `POST /integrations/v1/pipelines/start` with `X-API-Key`.
+- **API keys:** `POST /integrations/v1/api-keys` (JWT) mints a key (`ntx_...`). Use `X-API-Key` on:
+  - `POST /integrations/v1/pipelines/start` (scope `pipeline:start`)
+  - `/integrations/v1/competition-event/*` (scope `competition-event`; JWT also accepted for manual testing)
+- Competition-event generate/save/get-by-ref run as the **key owner**. Provision upserts a Mosonic user from the request body (`name`, `email`, `username`, optional `authServerUserId`) and does not update the key owner.
 - **Outbound webhooks:** subscribe to pipeline lifecycle events.
 - **Inbound:** `POST /webhooks/zernio` for platform callbacks.
 
