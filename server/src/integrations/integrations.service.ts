@@ -16,6 +16,9 @@ import {
   WEBHOOK_SUBSCRIPTION_REPOSITORY,
 } from '../repositories/tokens';
 
+export const PIPELINE_START_API_SCOPE = 'pipeline:start';
+export const COMPETITION_EVENT_API_SCOPE = 'competition-event';
+
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -33,7 +36,7 @@ export class IntegrationsService {
       userId,
       name: name.trim(),
       keyHash,
-      scopes: scopes?.length ? scopes : ['pipeline:start'],
+      scopes: scopes?.length ? scopes : [PIPELINE_START_API_SCOPE],
     });
     return { keyId: doc.keyId, apiKey: raw, scopes: doc.scopes };
   }
@@ -53,8 +56,10 @@ export class IntegrationsService {
     if (!key) {
       throw new UnauthorizedException('Invalid API key');
     }
-    if (!key.scopes.includes('pipeline:start')) {
-      throw new BadRequestException('API key missing pipeline:start scope');
+    if (!key.scopes.includes(PIPELINE_START_API_SCOPE)) {
+      throw new BadRequestException(
+        `API key missing ${PIPELINE_START_API_SCOPE} scope`,
+      );
     }
     const auth: TenancyAuth = { userId: key.userId, role: UserRole.CUSTOMER };
     return this.orchestration.startPipeline({

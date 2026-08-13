@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { SocialProvider } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { type SsoTokenClaims } from '../auth/auth.types';
 import {
   REDNOTE_CHANNEL,
@@ -42,6 +44,8 @@ export type { ConnectedAccountRecord };
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
     @Inject(SOCIAL_ACCOUNT_REPOSITORY)
@@ -120,6 +124,158 @@ export class UsersService {
     } catch (err) {
       if (isUniqueViolation(err)) {
         const winner = await this.users.findByAuthServerUserId(authServerUserId);
+        if (winner) return winner;
+      }
+      throw err;
+    }
+  }
+
+  /** Updates Mosonic profile fields for a competition-event team connect flow. */
+  async updateProfileForAuthServerUser(args: {
+    authServerUserId: string;
+    localUserId: string;
+    email: string;
+    username: string;
+    firstName?: string;
+    lastName?: string;
+  }): Promise<UserRecord> {
+    const existing =
+      (await this.users.findByUserId(args.localUserId)) ??
+      (await this.users.findByAuthServerUserId(args.authServerUserId));
+    if (!existing) {
+      const name = [args.firstName, args.lastName].filter(Boolean).join(' ')
+        || args.username;
+      return this.createCompetitionEventUser({
+        name,
+        email: args.email,
+        username: args.username,
+        firstName: args.firstName,
+        lastName: args.lastName,
+        authServerUserId: args.authServerUserId,
+      });
+    }
+
+    const clash = await this.users.findByEmailOrUsernameInsensitive(
+      args.email,
+      args.username,
+    );
+    if (clash && clash.userId !== existing.userId) {
+      throw new BadRequestException(
+        'Email or username is already used by another Mosonic user',
+      );
+    }
+
+    const updated = await this.users.update(existing.userId, {
+      authServerUserId: args.authServerUserId,
+      email: args.email,
+      username: args.username,
+      firstName: args.firstName ?? existing.firstName,
+      lastName: args.lastName ?? existing.lastName,
+    });
+    if (!updated) {
+      throw new NotFoundException(`Failed to update user ${existing.userId}`);
+    }
+    return updated;
+  }
+
+  /**
+   * Service-to-service upsert for competition-event team connect.
+   * Looks up by authServerUserId, then email/username; never uses the API-key owner.
+   */
+  async provisionForCompetitionEvent(args: {
+    name: string;
+    email: string;
+    username: string;
+    authServerUserId?: string;
+  }): Promise<UserRecord> {
+    const name = args.name.trim();
+    const email = args.email.trim().toLowerCase();
+    const username = args.username.trim();
+    const authServerUserId = args.authServerUserId?.trim() || undefined;
+    const parts = name.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] ?? name;
+    const lastName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
+
+    let existing: UserRecord | null = null;
+    if (authServerUserId) {
+      existing = await this.users.findByAuthServerUserId(authServerUserId);
+    }
+    if (!existing) {
+      existing = await this.users.findByEmailOrUsernameInsensitive(
+        email,
+        username,
+      );
+    }
+
+    if (existing) {
+      const clash = await this.users.findByEmailOrUsernameInsensitive(
+        email,
+        username,
+      );
+      if (clash && clash.userId !== existing.userId) {
+        throw new BadRequestException(
+          'Email or username is already used by another Mosonic user',
+        );
+      }
+
+      const updated = await this.users.update(existing.userId, {
+        ...(authServerUserId ? { authServerUserId } : {}),
+        email,
+        username,
+        firstName,
+        lastName,
+      });
+      if (!updated) {
+        throw new NotFoundException(
+          `Failed to update user ${existing.userId}`,
+        );
+      }
+      return updated;
+    }
+
+    return this.createCompetitionEventUser({
+      name,
+      email,
+      username,
+      firstName,
+      lastName,
+      authServerUserId,
+    });
+  }
+
+  private async createCompetitionEventUser(args: {
+    name: string;
+    email: string;
+    username: string;
+    firstName?: string;
+    lastName?: string;
+    authServerUserId?: string;
+  }): Promise<UserRecord> {
+    const authServerUserId =
+      args.authServerUserId?.trim() || `ce-provision:${randomUUID()}`;
+    try {
+      const user = await this.users.create({
+        authServerUserId,
+        email: args.email.trim().toLowerCase(),
+        username: args.username.trim(),
+        firstName: args.firstName,
+        lastName: args.lastName,
+        role: UserRole.CUSTOMER,
+        status: UserStatus.ACTIVE,
+      });
+      await this.assignDefaultPlanForUser(user.userId);
+      this.logger.log(
+        `Created Mosonic user ${user.userId} name=${args.name} email=${user.email ?? 'n/a'} authServerUserId=${authServerUserId}`,
+      );
+      return user;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner =
+          (await this.users.findByAuthServerUserId(authServerUserId)) ??
+          (await this.users.findByEmailOrUsernameInsensitive(
+            args.email,
+            args.username,
+          ));
         if (winner) return winner;
       }
       throw err;

@@ -42,6 +42,7 @@ describe('UsersService Zernio accounts', () => {
     updateManyByAuthServerUserIds: jest.fn(),
     deleteByUserId: jest.fn(),
     listAllUserIds: jest.fn(),
+    listActiveUserIds: jest.fn(),
     listWithZernioAccounts: jest.fn(),
     listForEmailDedupe: jest.fn(),
     findManyByUserIds: jest.fn(),
