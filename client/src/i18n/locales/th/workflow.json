@@ -290,7 +290,8 @@
     "stopPipeline": "หยุดไปป์ไลน์",
     "generateContent": "สร้างเนื้อหา",
     "generateWorkflow": "สร้างเวิร์กโฟลว์",
-    "generateWorkflowAndContent": "สร้างเวิร์กโฟลว์และเนื้อหา"
+    "generateWorkflowAndContent": "สร้างเวิร์กโฟลว์และเนื้อหา",
+    "autoArrange": "จัดเรียงโหนดอัตโนมัติ"
   },
   "palette": {
     "title": "โหนด",

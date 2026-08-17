@@ -579,15 +579,18 @@ export function syncBranchLanesToChannels(
     if (n.id === branch.id) {
       const data = workflowNodeData(n)
       if (!data) return n
+      // Don't force `mode` here: `branchChannels` already carries whatever
+      // selection produced it (Rule channels or an explicit wizard_channels
+      // pick), and this runs on every passive apiNodes reconciliation, not
+      // just user-driven rule-channel changes. Forcing rule_channels here
+      // silently discarded a saved wizard_channels selection on next load,
+      // so the *next* save would drop the user's explicitly picked channels.
       return {
         ...n,
         data: {
           ...data,
           channelHandles: branchChannels,
-          config: {
-            ...(data.config ?? {}),
-            mode: "rule_channels",
-          },
+          config: data.config ?? {},
         },
       } as WfRfNode
     }

@@ -290,7 +290,8 @@
     "stopPipeline": "停止流水线",
     "generateContent": "生成内容",
     "generateWorkflow": "生成工作流",
-    "generateWorkflowAndContent": "生成工作流和内容"
+    "generateWorkflowAndContent": "生成工作流和内容",
+    "autoArrange": "自动排列节点"
   },
   "palette": {
     "title": "节点",

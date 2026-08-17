@@ -14,9 +14,11 @@ import {
 } from "@dnd-kit/core"
 import type { MouseEvent, ReactNode } from "react"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
+import { LayoutGrid } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Background,
+  ControlButton,
   Controls,
   MiniMap,
   Panel,
@@ -66,6 +68,7 @@ import {
 } from "@/features/workflow/lib/workflow-palette-dnd"
 import {
   isPreviewEdgeId,
+  layoutTemplateGraphToRf,
   persistedLayoutFromApiNodes,
   resolveWorkflowLayout,
 } from "@/features/workflow/lib/branch-layout"
@@ -244,6 +247,8 @@ export type WorkflowFlowCanvasHandle = {
   applyOpenPropertiesPanel: () => boolean
   /** Closes the properties panel and clears unapplied config drafts. */
   dismissPropertiesPanel: () => void
+  /** Re-lays out nodes into the standard trunk + swimlane arrangement. */
+  autoArrange: () => void
 }
 
 type WorkflowFlowCanvasProps = {
@@ -580,6 +585,24 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const notifyCanvasEdited = useCallback(() => {
       if (!readOnly && !isMaterializedView) onCanvasEdited?.()
     }, [isMaterializedView, onCanvasEdited, readOnly])
+
+    const autoArrange = useCallback(() => {
+      if (readOnly || isMaterializedView || nodes.length === 0) return
+      const laidOut = layoutTemplateGraphToRf(nodes, edges, branchChannels)
+      setNodes(laidOut.nodes)
+      setEdges(laidOut.edges)
+      notifyCanvasEdited()
+      queueMicrotask(() => void rf.current?.fitView({ padding: 0.15 }))
+    }, [
+      branchChannels,
+      edges,
+      isMaterializedView,
+      nodes,
+      notifyCanvasEdited,
+      readOnly,
+      setEdges,
+      setNodes,
+    ])
 
     const openInitialPopover = useCallback((event: MouseEvent) => {
       setPopover({ mode: "initial", anchor: anchorFromEvent(event) })
@@ -1321,8 +1344,18 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         },
         applyOpenPropertiesPanel,
         dismissPropertiesPanel: closePanel,
+        autoArrange,
       }),
-      [applyOpenPropertiesPanel, branchChannels, closePanel, selectedId, settingsNodeId, setEdges, setNodes],
+      [
+        applyOpenPropertiesPanel,
+        autoArrange,
+        branchChannels,
+        closePanel,
+        selectedId,
+        settingsNodeId,
+        setEdges,
+        setNodes,
+      ],
     )
 
     const showPalette = !readOnly && !isMaterializedView
@@ -1368,7 +1401,19 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             <Controls
               className="border-(--nt-border)! shadow-md!"
               showInteractive={false}
-            />
+            >
+              {!readOnly && !isMaterializedView ? (
+                <ControlButton
+                  type="button"
+                  onClick={autoArrange}
+                  disabled={nodes.length === 0}
+                  title={t("toolbar.autoArrange")}
+                  aria-label={t("toolbar.autoArrange")}
+                >
+                  <LayoutGrid />
+                </ControlButton>
+              ) : null}
+            </Controls>
             <MiniMap
               className="rounded-lg! border! border-(--nt-border)! bg-card! shadow-md!"
               maskColor={flowTheme.minimapMaskColor}
@@ -1408,6 +1453,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             setPropConfig={handlePropConfigChange}
             nodePersisted={selNode ? persistedNodeIds.has(selNode.id) : false}
             allChannels={allChannels}
+            activeChannels={branchChannels}
             workflowId={workflowId}
             onApply={applyChanges}
             onReset={() => {
