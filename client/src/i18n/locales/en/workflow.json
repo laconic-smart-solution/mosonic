@@ -295,7 +295,8 @@
     "stopPipeline": "Stop pipeline",
     "generateContent": "Generate content",
     "generateWorkflow": "Generate workflow",
-    "generateWorkflowAndContent": "Generate workflow & content"
+    "generateWorkflowAndContent": "Generate workflow & content",
+    "autoArrange": "Auto-arrange nodes"
   },
   "palette": {
     "title": "Nodes",

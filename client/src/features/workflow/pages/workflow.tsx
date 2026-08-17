@@ -208,6 +208,8 @@ export default function WorkflowPage() {
   const totalNodesRef = useRef<number | null>(null)
   const pipelineCompletionHandledRef = useRef(false)
   const stuckFinalizeAttemptedRef = useRef(false)
+  /** Only attempt the paused/running auto-resume once per workflow mount. */
+  const autoResumedActivePipelineRef = useRef(false)
   const [canvasEdited, setCanvasEdited] = useState(false)
   const [configDraftDirty, setConfigDraftDirty] = useState(false)
 
@@ -616,6 +618,32 @@ export default function WorkflowPage() {
     }
   }, [pipelinePage, pipelinePageQuery.data])
 
+  /**
+   * Reopening a workflow (no `?pipelineId=` in the URL) always lands in the
+   * plain editor, even if this workflow has a run sitting paused. Paused
+   * runs don't self-recover — a "running" run keeps going, but a paused one
+   * needs a person to hit Retry/Skip — so without this the only way back to
+   * it was the dashboard's Stop action. Adopt the most recent running/paused
+   * pipeline as the live view, same as if the user had never left it.
+   */
+  useEffect(() => {
+    if (autoResumedActivePipelineRef.current) return
+    if (pipelineId) return
+    if (pipelinePage !== 1) return
+    const items = pipelinePageQuery.data?.data
+    if (!items) return
+    autoResumedActivePipelineRef.current = true
+    const active = items.find(
+      (item) => item.status === "running" || item.status === "paused",
+    )
+    if (!active) return
+    setPipelineId(active.pipelineId)
+    setSearchParams((params) => {
+      params.set("pipelineId", active.pipelineId)
+      return params
+    })
+  }, [pipelineId, pipelinePage, pipelinePageQuery.data, setSearchParams])
+
   useEffect(() => {
     stuckFinalizeAttemptedRef.current = false
   }, [pipelineId])
@@ -984,10 +1012,18 @@ export default function WorkflowPage() {
     )
   }
 
-  function resetWorkflowEditStateAfterSave() {
+  /**
+   * `workflowByRuleQuery.data` is a closed-over cache snapshot — right after
+   * a save, the query is only marked stale (invalidated), not yet refetched.
+   * Reading `.data` here synchronously would reapply the pre-save node/edge
+   * list (missing whatever was just saved, e.g. a newly selected Branch
+   * channel) and the canvas would visibly revert. Refetch and wait for the
+   * fresh response before using it as the new source of truth.
+   */
+  async function resetWorkflowEditStateAfterSave() {
     canvasRef.current?.dismissPropertiesPanel()
     setSelectedSnapshotPipelineId(undefined)
-    const wfData = workflowByRuleQuery.data
+    const { data: wfData } = await workflowByRuleQuery.refetch()
     if (wfData?.nodes?.length) {
       setApiNodes(wfData.nodes)
       setApiEdges(wfData.edges ?? [])
@@ -1063,7 +1099,7 @@ export default function WorkflowPage() {
         },
         {
           onSuccess: () => {
-            resetWorkflowEditStateAfterSave()
+            void resetWorkflowEditStateAfterSave()
             if (name) {
               committedWfNameRef.current = name
             }
@@ -1086,10 +1122,9 @@ export default function WorkflowPage() {
       },
       {
         onSuccess: (data) => {
-            resetWorkflowEditStateAfterSave()
           setActiveWorkflowId(data.workflowId)
           if (name) committedWfNameRef.current = name
-          void workflowByRuleQuery.refetch()
+          void resetWorkflowEditStateAfterSave()
           void queryClient.invalidateQueries({
             queryKey: ["pipeline", "estimate"],
           })
@@ -1244,7 +1279,7 @@ export default function WorkflowPage() {
       },
       {
         onSuccess: () => {
-          resetWorkflowEditStateAfterSave()
+          void resetWorkflowEditStateAfterSave()
           startAfterSave()
         },
         onError: () => {

@@ -185,7 +185,7 @@ export function WorkflowUsedPipelinesPanel({
           ) : null}
 
           <ul className="max-h-[min(42vh,320px)] space-y-1.5 overflow-y-auto overscroll-contain px-0.5">
-            {items.map((item) => {
+            {items.filter((item) => item.status !== "failed").map((item) => {
               const selected = selectedPipelineId === item.pipelineId
               return (
                 <li key={item.pipelineId}>
