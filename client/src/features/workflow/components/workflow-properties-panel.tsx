@@ -28,8 +28,10 @@ type WorkflowPropertiesPanelProps = {
   selNode: WFNode | null
   propConfig: Record<string, unknown>
   setPropConfig: (next: Record<string, unknown>) => void
-  /** Every channel the Rule defines — the checklist's full option list. */
+  /** Every channel the app publishes to — the checklist's full option list. */
   allChannels?: BranchChannelHandle[]
+  /** Channels currently active in this workflow (Rule channels, or an explicit wizard_channels selection) — the checklist's initial checked state. */
+  activeChannels?: BranchChannelHandle[]
   workflowId?: string
   /** True when this node exists in the saved workflow API payload. */
   nodePersisted?: boolean
@@ -44,6 +46,7 @@ export function WorkflowPropertiesPanel({
   propConfig,
   setPropConfig,
   allChannels = [],
+  activeChannels,
   workflowId,
   nodePersisted = false,
   onApply,
@@ -107,6 +110,7 @@ export function WorkflowPropertiesPanel({
             allChannels.length > 0 ? (
               <BranchChannelPicker
                 allChannels={allChannels}
+                activeChannels={activeChannels ?? allChannels}
                 config={propConfig as BranchNodeConfig}
                 onChange={setPropConfig}
               />
@@ -163,10 +167,12 @@ export function WorkflowPropertiesPanel({
  */
 function BranchChannelPicker({
   allChannels,
+  activeChannels,
   config,
   onChange,
 }: {
   allChannels: BranchChannelHandle[]
+  activeChannels: BranchChannelHandle[]
   config: BranchNodeConfig
   onChange: (next: Record<string, unknown>) => void
 }) {
@@ -174,7 +180,7 @@ function BranchChannelPicker({
   const activeIds = new Set(
     config?.mode === "wizard_channels" && Array.isArray(config.channels)
       ? config.channels.map(normalizeLaneId)
-      : allChannels.map((ch) => ch.id),
+      : activeChannels.map((ch) => ch.id),
   )
 
   function toggle(channelId: string, checked: boolean) {
@@ -192,35 +198,57 @@ function BranchChannelPicker({
   }
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-2 dark:border-teal-500/30 dark:bg-teal-950/30">
-      <p className="text-[10px] font-bold tracking-wide text-teal-800 uppercase dark:text-teal-300">
-        {t("properties.channelLanes")}
-      </p>
-      <p className="mt-0.5 text-[10px] leading-relaxed text-teal-800/80 dark:text-teal-300/80">
-        {t("properties.channelLanesHint")}
-      </p>
-      <ul className="mt-1.5 space-y-1">
-        {allChannels.map((ch) => {
-          const checked = activeIds.has(ch.id)
-          const id = `branch-channel-${ch.id}`
-          return (
-            <li key={ch.id}>
-              <label
-                htmlFor={id}
-                className="flex cursor-pointer items-center gap-2 text-[11px] text-teal-900 dark:text-teal-100"
-              >
-                <Checkbox
-                  id={id}
-                  checked={checked}
-                  disabled={checked && activeIds.size <= 1}
-                  onCheckedChange={(next) => toggle(ch.id, Boolean(next))}
-                />
-                {ch.label}
-              </label>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
+    <div className="rounded-lg border border-teal-200 bg-teal-50/80 p-3 dark:border-teal-500/30 dark:bg-teal-950/30">
+  {/* Header */}
+  <div className="mb-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
+      {t("properties.channelLanes")}
+    </p>
+
+    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-teal-800/75 dark:text-teal-300/75">
+      {t("properties.channelLanesHint")}
+    </p>
+  </div>
+
+  {/* Channels */}
+  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    {allChannels.map((ch) => {
+      const checked = activeIds.has(ch.id)
+      const id = `branch-channel-${ch.id}`
+      const disabled = checked && activeIds.size <= 1
+
+      return (
+        <li key={ch.id}>
+          <label
+            htmlFor={id}
+            className={[
+              "flex min-h-10 items-center gap-3 rounded-md border px-3 py-2",
+              "text-sm font-medium transition-all",
+              "select-none",
+              checked
+                ? "border-teal-400 bg-white text-teal-900 shadow-sm dark:border-teal-600 dark:bg-teal-900/40 dark:text-teal-100"
+                : "border-teal-200/80 bg-white/60 text-teal-800 hover:border-teal-300 hover:bg-white dark:border-teal-800/60 dark:bg-teal-950/20 dark:text-teal-200 dark:hover:border-teal-700 dark:hover:bg-teal-900/30",
+              disabled
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer",
+            ].join(" ")}
+          >
+            <Checkbox
+              id={id}
+              checked={checked}
+              disabled={disabled}
+              onCheckedChange={(next) => toggle(ch.id, Boolean(next))}
+              className="shrink-0"
+            />
+
+            <span className="min-w-0 truncate">
+              {ch.label}
+            </span>
+          </label>
+        </li>
+      )
+    })}
+  </ul>
+</div>
   )
 }
