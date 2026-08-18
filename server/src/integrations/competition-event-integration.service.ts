@@ -17,15 +17,19 @@ import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import { COMPETITION_EVENT_SYSTEM_PROMPT } from './competition-event-integration.prompt';
 import type {
   CompetitionEventContentByRefResponseDto,
+  CompetitionEventSocialContentResponseDto,
   GenerateCompetitionEventContentDto,
   GenerateCompetitionEventContentResponseDto,
+  GenerateCompetitionEventSocialContentDto,
   SaveCompetitionEventContentDto,
   SaveCompetitionEventContentResponseDto,
 } from './dto/competition-event-integration.dto';
 import { PIPELINE_REPOSITORY } from '../repositories/tokens';
 import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
-import { CONTENT_REPOSITORY } from '../repositories/tokens';
+import { CONTENT_REPOSITORY, WORKFLOW_REPOSITORY } from '../repositories/tokens';
 import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
+import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
+import { OrchestrationService } from '../orchestration/orchestration.service';
 import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
 
 const INTEGRATION_SOURCE = 'competition-event';
@@ -43,6 +47,10 @@ export class CompetitionEventIntegrationService {
     private readonly pipelines: IPipelineRepository,
     @Inject(CONTENT_REPOSITORY)
     private readonly contents: IContentRepository,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
+    @Inject(forwardRef(() => OrchestrationService))
+    private readonly orchestration: OrchestrationService,
   ) {}
 
   async generateFromPrompt(
@@ -128,6 +136,114 @@ export class CompetitionEventIntegrationService {
     return {
       success: true,
       contentId: normalizedId,
+      externalRef,
+    };
+  }
+
+  /** Runs the existing workflow of `ruleId` with the event detail as content prompt. */
+  async generateSocialContent(
+    body: GenerateCompetitionEventSocialContentDto,
+    auth: TenancyAuth,
+  ): Promise<CompetitionEventSocialContentResponseDto> {
+    const ruleId = body.ruleId.trim();
+    const externalRef = body.externalRef.trim();
+    const prompt = body.prompt.trim();
+    const imageUrl = body.imageUrl?.trim() || null;
+    if (!ruleId) {
+      throw new BadRequestException('ruleId must not be empty');
+    }
+    if (!externalRef) {
+      throw new BadRequestException('externalRef must not be empty');
+    }
+    if (!prompt) {
+      throw new BadRequestException('prompt must not be empty');
+    }
+
+    const workflow = await this.workflows.findLatestByRule(ruleId, auth);
+    if (!workflow) {
+      throw new NotFoundException(`No workflow found for rule ${ruleId}`);
+    }
+
+    const { pipelineId } = await this.orchestration.startPipeline({
+      workflowId: workflow.workflowId,
+      ruleId,
+      contentPrompt: prompt,
+      metadata: { source: 'integration' },
+      auth,
+    });
+
+    const pipeline = await this.pipelines.findById(pipelineId, auth);
+    await this.pipelines.updateById(
+      pipelineId,
+      {
+        metadata: {
+          ...(this.asRecord(pipeline?.metadata) ?? {}),
+          integrationSource: INTEGRATION_SOURCE,
+          externalRef,
+          ...(imageUrl ? { externalImageUrl: imageUrl } : {}),
+        },
+      },
+      auth,
+    );
+
+    this.logger.log(
+      `Started competition-event social pipeline ${pipelineId} on rule ${ruleId} for ${externalRef}`,
+    );
+
+    return {
+      pipelineId,
+      workflowId: workflow.workflowId,
+      ruleId,
+      status: pipeline?.status ?? 'running',
+      contentId: null,
+      text: null,
+      imageUrl,
+      externalRef,
+    };
+  }
+
+  /**
+   * Reads a social pipeline started by {@link generateSocialContent}. Once content
+   * exists, the competition-event cover image (when supplied) replaces the
+   * workflow image so Mosonic and the competition-event app show the same photo.
+   */
+  async getSocialContent(
+    pipelineId: string,
+    auth: TenancyAuth,
+  ): Promise<CompetitionEventSocialContentResponseDto> {
+    const id = pipelineId.trim();
+    const pipeline = await this.pipelines.findById(id, auth);
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline ${id} not found`);
+    }
+
+    const metadata = this.asRecord(pipeline.metadata) ?? {};
+    const externalRef = readTrimmed(metadata.externalRef);
+    const coverImageUrl = readTrimmed(metadata.externalImageUrl);
+
+    const content = await this.contents.findLatestByPipeline(id, auth);
+    const merged = content
+      ? { ...this.asRecord(content.outputs), ...this.asRecord(content.userEdits) }
+      : {};
+    const text = readTrimmed(merged.text);
+    const workflowImageUrl = readTrimmed(merged.image);
+
+    if (content && coverImageUrl && workflowImageUrl !== coverImageUrl) {
+      await this.contentService.saveContent(
+        content.contentId,
+        { userEdits: { image: coverImageUrl } },
+        auth,
+      );
+    }
+
+    return {
+      pipelineId: id,
+      workflowId: pipeline.workflowRef,
+      ruleId: pipeline.ruleRef,
+      status: pipeline.status,
+      contentId: content?.contentId ?? null,
+      text,
+      imageUrl: coverImageUrl ?? workflowImageUrl,
       externalRef,
     };
   }
@@ -341,6 +457,10 @@ export class CompetitionEventIntegrationService {
     }
     return value as Record<string, unknown>;
   }
+}
+
+function readTrimmed(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function stripMarkdownFences(raw: string): string {

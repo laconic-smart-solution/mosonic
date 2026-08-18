@@ -21,6 +21,26 @@ export class GenerateCompetitionEventContentDto {
   payload?: Record<string, unknown>;
 }
 
+/** Runs the workflow attached to `ruleId` with the event detail as content prompt. */
+export class GenerateCompetitionEventSocialContentDto {
+  @IsString()
+  @IsNotEmpty()
+  ruleId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  externalRef!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  prompt!: string;
+
+  /** Competition-event cover image; replaces whatever image the workflow produces. */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+}
+
 export class SaveCompetitionEventContentDto {
   @IsInt()
   @Min(1)
@@ -70,6 +90,18 @@ export class SaveCompetitionEventContentResponseDto {
   success!: boolean;
   contentId!: string;
   externalRef!: string;
+}
+
+export class CompetitionEventSocialContentResponseDto {
+  pipelineId!: string;
+  workflowId!: string;
+  ruleId!: string;
+  /** Prisma `PipelineStatus`: running | completed | failed | paused. */
+  status!: string;
+  contentId!: string | null;
+  text!: string | null;
+  imageUrl!: string | null;
+  externalRef!: string | null;
 }
 
 export class CompetitionEventContentByRefResponseDto {
