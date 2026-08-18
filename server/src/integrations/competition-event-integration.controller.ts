@@ -16,6 +16,7 @@ import { ApiKeyOrJwtGuard } from './api-key-or-jwt.guard';
 import { CompetitionEventIntegrationService } from './competition-event-integration.service';
 import {
   GenerateCompetitionEventContentDto,
+  GenerateCompetitionEventSocialContentDto,
   ProvisionCompetitionEventUserDto,
   SaveCompetitionEventContentDto,
 } from './dto/competition-event-integration.dto';
@@ -43,6 +44,25 @@ export class CompetitionEventIntegrationController {
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.competitionEvent.generateFromPrompt(body, auth);
+  }
+
+  @Post('social-content/generate')
+  @UsePipes(bodyPipe)
+  generateSocialContent(
+    @Req() req: Request,
+    @Body() body: GenerateCompetitionEventSocialContentDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.competitionEvent.generateSocialContent(body, auth);
+  }
+
+  @Get('social-content/:pipelineId')
+  getSocialContent(
+    @Req() req: Request,
+    @Param('pipelineId') pipelineId: string,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.competitionEvent.getSocialContent(pipelineId, auth);
   }
 
   @Post('users/provision')
