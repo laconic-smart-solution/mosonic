@@ -72,4 +72,35 @@ describe('AuthController - SSO Exchange', () => {
       'https://mosonic.me/auth/login?error=invalid_or_expired_code',
     );
   });
+
+  describe('verifyOrigin', () => {
+    it('returns identity info without setting any cookies', async () => {
+      eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+        valid: true,
+        email: 'organizer@example.com',
+        redirectPath: '/dashboard',
+      });
+
+      const result = await controller.verifyOrigin({ code: 'xyz123' });
+
+      expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith(
+        'xyz123',
+      );
+      expect(result).toEqual({
+        valid: true,
+        email: 'organizer@example.com',
+        redirectPath: '/dashboard',
+      });
+    });
+
+    it('propagates the error for an invalid or expired code', async () => {
+      eventAppClient.validateExchangeCode.mockRejectedValueOnce(
+        new Error('Code expired'),
+      );
+
+      await expect(
+        controller.verifyOrigin({ code: 'bad-code' }),
+      ).rejects.toThrow('Code expired');
+    });
+  });
 });

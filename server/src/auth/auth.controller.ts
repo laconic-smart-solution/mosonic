@@ -24,6 +24,7 @@ import { AuthChangePasswordDto } from './dto/auth-change-password.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthResendOtpDto } from './dto/auth-resend-otp.dto';
 import { AuthSignupDto } from './dto/auth-signup.dto';
+import { AuthVerifyOriginDto } from './dto/auth-verify-origin.dto';
 import { AuthVerifyOtpDto } from './dto/auth-verify-otp.dto';
 import { EventAppClientService } from './event-app-client.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -80,6 +81,24 @@ export class AuthController {
         `${frontendUrl}/auth/login?error=invalid_or_expired_code`,
       );
     }
+  }
+
+  @Post('verify-origin')
+  @UsePipes(bodyPipe)
+  @ApiOperation({
+    summary: 'Validate a Competition Event exchange code',
+    description:
+      'Confirms a single-use code from the Event App is valid and returns the associated identity. Does not establish a session — the /verify-origin page uses this only to confirm the referral, then checks the existing cookie session via GET /auth/me.',
+  })
+  async verifyOrigin(@Body() body: AuthVerifyOriginDto) {
+    const userInfo = await this.eventAppClient.validateExchangeCode(
+      body.code,
+    );
+    return {
+      valid: true,
+      email: userInfo.email,
+      redirectPath: userInfo.redirectPath ?? null,
+    };
   }
 
   @Post('login')

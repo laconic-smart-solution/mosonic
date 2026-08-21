@@ -51,6 +51,22 @@ export async function verifyOtp(body: {
   return res.data
 }
 
+export type VerifyOriginResponse = {
+  valid: boolean
+  email: string | null
+  redirectPath: string | null
+}
+
+/**
+ * Confirms a single-use code from the Competition Event app is valid.
+ * Does not establish a session on its own — the /verify-origin page still
+ * needs to check for an existing cookie session afterward.
+ */
+export async function verifyOrigin(code: string): Promise<VerifyOriginResponse> {
+  const res = await apiClient.post<VerifyOriginResponse>("/auth/verify-origin", { code })
+  return res.data
+}
+
 /** Change password using the access cookie; Nest clears cookies afterward. */
 export async function changePassword(newPassword: string): Promise<void> {
   await apiClient.post("/auth/change-password", { newPassword })
