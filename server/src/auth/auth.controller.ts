@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -11,7 +12,8 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
   extractAuthCookieTokens,
@@ -23,6 +25,7 @@ import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthResendOtpDto } from './dto/auth-resend-otp.dto';
 import { AuthSignupDto } from './dto/auth-signup.dto';
 import { AuthVerifyOtpDto } from './dto/auth-verify-otp.dto';
+import { EventAppClientService } from './event-app-client.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SsoClientService } from './sso-client.service';
 
@@ -37,8 +40,47 @@ const bodyPipe = new ValidationPipe({
 export class AuthController {
   constructor(
     private readonly sso: SsoClientService,
+    private readonly eventAppClient: EventAppClientService,
     private readonly cookies: AuthCookieService,
+    private readonly config: ConfigService,
   ) {}
+
+  @Get('start')
+  @ApiOperation({
+    summary: 'Initiate SSO authentication from Event App',
+    description:
+      'Validates single-use exchange code from Event App, sends OTP email, and redirects user to Mosonic OTP page',
+  })
+  @ApiQuery({ name: 'code', required: true, description: 'Single-use exchange code' })
+  @ApiQuery({ name: 'redirect_path', required: false, description: 'Destination redirect path' })
+  async startExchange(
+    @Query('code') code: string,
+    @Query('redirect_path') redirectPath: string | undefined,
+    @Res() res: Response,
+  ) {
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL')?.trim().replace(/\/$/, '') ||
+      'http://localhost:5173';
+
+    try {
+      const userInfo = await this.eventAppClient.validateExchangeCode(code);
+      // Trigger OTP email dispatch through SSO service
+      await this.sso.resendOtpByEmail({ email: userInfo.email });
+
+      const targetRedirect =
+        redirectPath || userInfo.redirectPath || '/dashboard';
+      const otpUrl = `${frontendUrl}/auth/otp?email=${encodeURIComponent(
+        userInfo.email,
+      )}&redirectPath=${encodeURIComponent(targetRedirect)}`;
+
+      return res.redirect(302, otpUrl);
+    } catch {
+      return res.redirect(
+        302,
+        `${frontendUrl}/auth/login?error=invalid_or_expired_code`,
+      );
+    }
+  }
 
   @Post('login')
   @UsePipes(bodyPipe)
