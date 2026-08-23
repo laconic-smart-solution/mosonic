@@ -54,9 +54,11 @@ export class AuthController {
   })
   @ApiQuery({ name: 'code', required: true, description: 'Single-use exchange code' })
   @ApiQuery({ name: 'redirect_path', required: false, description: 'Destination redirect path' })
+  @ApiQuery({ name: 'source', required: false, description: 'Referral source tracking' })
   async startExchange(
     @Query('code') code: string,
     @Query('redirect_path') redirectPath: string | undefined,
+    @Query('source') source: string | undefined,
     @Res() res: Response,
   ) {
     const frontendUrl =
@@ -73,8 +75,9 @@ export class AuthController {
       if (!targetRedirect.startsWith('/')) {
         targetRedirect = '/dashboard?source=crabonic';
       }
+      const refSource = source || 'crabonic';
       if (!targetRedirect.includes('source=')) {
-        targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+        targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + `source=${encodeURIComponent(refSource)}`;
       }
 
       const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
