@@ -29,6 +29,7 @@ import {
   SignupPage,
   ForgotPasswordPage,
   VerifyOtpPage,
+  VerifyOriginPage,
   ResetPasswordPage,
   AdminDashboardPage,
   AdminUsersPage,
@@ -105,6 +106,13 @@ export const router = createBrowserRouter([
         <ResetPasswordPage />
       </GuestOnlyRoute>
     ),
+  },
+  {
+    // Competition Event "Open Mosonic" SSO handoff — handles both
+    // authenticated and unauthenticated visitors itself, so it isn't
+    // wrapped in GuestOnlyRoute/ProtectedLayout.
+    path: "/verify-origin",
+    element: <VerifyOriginPage />,
   },
   {
     path: "/admin/login",
