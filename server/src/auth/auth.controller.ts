@@ -70,7 +70,7 @@ export class AuthController {
 
       const targetRedirect =
         redirectPath || userInfo.redirectPath || '/dashboard';
-      const otpUrl = `${frontendUrl}/auth/otp?email=${encodeURIComponent(
+      const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
         userInfo.email,
       )}&redirectPath=${encodeURIComponent(targetRedirect)}`;
 
@@ -78,7 +78,7 @@ export class AuthController {
     } catch {
       return res.redirect(
         302,
-        `${frontendUrl}/auth/login?error=invalid_or_expired_code`,
+        `${frontendUrl}/login?error=invalid_or_expired_code`,
       );
     }
   }
