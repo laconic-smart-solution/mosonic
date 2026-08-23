@@ -44,7 +44,7 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', res);
+    await controller.startExchange('xyz123', '/custom-path', undefined, res);
 
     expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith('xyz123');
     expect(sso.resendOtpByEmail).toHaveBeenCalledWith({
@@ -65,7 +65,7 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('invalid-code', undefined, res);
+    await controller.startExchange('invalid-code', undefined, undefined, res);
 
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
