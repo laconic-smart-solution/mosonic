@@ -52,7 +52,7 @@ describe('AuthController - SSO Exchange', () => {
     });
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
-      'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path',
+      'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path%3Fsource%3Dcrabonic',
     );
   });
 
@@ -89,7 +89,7 @@ describe('AuthController - SSO Exchange', () => {
       expect(result).toEqual({
         valid: true,
         email: 'organizer@example.com',
-        redirectPath: '/dashboard',
+        redirectPath: '/dashboard?source=crabonic',
       });
     });
 

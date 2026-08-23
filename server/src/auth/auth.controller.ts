@@ -68,8 +68,15 @@ export class AuthController {
       // Trigger OTP email dispatch through SSO service
       await this.sso.resendOtpByEmail({ email: userInfo.email });
 
-      const targetRedirect =
-        redirectPath || userInfo.redirectPath || '/dashboard';
+      let targetRedirect =
+        redirectPath || userInfo.redirectPath || '/dashboard?source=crabonic';
+      if (!targetRedirect.startsWith('/')) {
+        targetRedirect = '/dashboard?source=crabonic';
+      }
+      if (!targetRedirect.includes('source=')) {
+        targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+      }
+
       const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
         userInfo.email,
       )}&redirectPath=${encodeURIComponent(targetRedirect)}`;
@@ -94,10 +101,14 @@ export class AuthController {
     const userInfo = await this.eventAppClient.validateExchangeCode(
       body.code,
     );
+    let targetRedirect = userInfo.redirectPath || '/dashboard?source=crabonic';
+    if (!targetRedirect.includes('source=')) {
+      targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+    }
     return {
       valid: true,
       email: userInfo.email,
-      redirectPath: userInfo.redirectPath ?? null,
+      redirectPath: targetRedirect,
     };
   }
 

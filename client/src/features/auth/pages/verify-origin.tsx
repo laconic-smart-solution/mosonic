@@ -24,9 +24,13 @@ export default function VerifyOriginPage() {
     const code = searchParams.get("code")
 
     async function run() {
+      let targetRedirect = "/dashboard?source=crabonic"
       if (code) {
         try {
-          await verifyOrigin(code)
+          const res = await verifyOrigin(code)
+          if (res.redirectPath) {
+            targetRedirect = res.redirectPath
+          }
         } catch {
           // Invalid/expired code — still worth checking for an existing session below.
         }
@@ -34,7 +38,7 @@ export default function VerifyOriginPage() {
 
       try {
         await me()
-        navigate("/dashboard", { replace: true })
+        navigate(targetRedirect, { replace: true })
       } catch {
         navigate("/login", { replace: true })
       }

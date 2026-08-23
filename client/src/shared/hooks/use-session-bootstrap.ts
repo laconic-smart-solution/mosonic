@@ -14,6 +14,18 @@ export function useSessionBootstrap() {
   const user = useUserStore((s) => s.user)
 
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const source = params.get("source")
+      if (source) {
+        sessionStorage.setItem("app_source", source)
+      }
+    } catch {
+      // Ignore if sessionStorage is not accessible
+    }
+  }, [])
+
+  useEffect(() => {
     if (!hydrated || !isAuthenticated || user) {
       return
     }
