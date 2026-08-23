@@ -52,7 +52,7 @@ describe('AuthController - SSO Exchange', () => {
     });
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
-      'https://mosonic.me/auth/otp?email=organizer%40example.com&redirectPath=%2Fcustom-path',
+      'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path',
     );
   });
 
@@ -69,7 +69,7 @@ describe('AuthController - SSO Exchange', () => {
 
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
-      'https://mosonic.me/auth/login?error=invalid_or_expired_code',
+      'https://mosonic.me/login?error=invalid_or_expired_code',
     );
   });
 

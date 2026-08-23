@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -43,9 +43,12 @@ export function VerifyOtpForm({
   const { t } = useTranslation("auth")
   const { t: tv } = useTranslation("validation")
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const establishSession = useAuthStore((s) => s.establishSession)
   const setUser = useUserStore((s) => s.setUser)
+
+  const targetRedirect = searchParams.get("redirectPath") || "/dashboard"
 
   const verifyOtpSchema = useMemo(() => createVerifyOtpSchema(tv), [tv])
   const { secondsLeft, canResend, restart: restartResendCooldown } =
@@ -131,7 +134,7 @@ export function VerifyOtpForm({
 
       toast.success(t("verifyOtp.emailVerified"))
       await refreshQueriesAfterLogin(queryClient)
-      navigate("/dashboard", { replace: true })
+      navigate(targetRedirect, { replace: true })
     },
     onError: (err: unknown) => {
       setAuthFormApiError(form.setError, err, t("verifyOtp.failed"))
