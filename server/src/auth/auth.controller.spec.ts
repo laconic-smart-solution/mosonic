@@ -36,7 +36,7 @@ describe('AuthController - SSO Exchange', () => {
     controller = new AuthController(sso, eventAppClient, cookies, config);
   });
 
-  it('redirects to OTP page on valid code', async () => {
+  it('redirects to OTP page on valid code without an existing session cookie', async () => {
     eventAppClient.validateExchangeCode.mockResolvedValueOnce({
       valid: true,
       email: 'organizer@example.com',
@@ -54,11 +54,31 @@ describe('AuthController - SSO Exchange', () => {
     expect(sso.resendOtpByEmail).toHaveBeenCalledWith({
       email: 'organizer@example.com',
     });
-    expect(cookies.clearTokens).toHaveBeenCalledWith(res);
+    expect(cookies.clearTokens).not.toHaveBeenCalled();
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
       'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path%3Fsource%3Dcrabonic',
     );
+  });
+
+  it('does not clear cookies when the access token is simply missing/expired (inconclusive)', async () => {
+    eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+      valid: true,
+      email: 'organizer@example.com',
+      authServerUserId: 'auth-user-1',
+      redirectPath: '/dashboard',
+    });
+
+    (cookies.readAccessToken as jest.Mock).mockReturnValueOnce(null);
+
+    const req = {} as never;
+    const res = {
+      redirect: jest.fn(),
+    } as never;
+
+    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
+
+    expect(cookies.clearTokens).not.toHaveBeenCalled();
   });
 
   it('preserves the existing session when the exchange code names the same user', async () => {

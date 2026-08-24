@@ -74,10 +74,14 @@ export class AuthController {
       // login for a DIFFERENT account. If we leave it in place, GuestOnlyRoute
       // on the frontend sees an existing session and redirects straight to
       // /dashboard as that OLD user, skipping the OTP page entirely — the new
-      // identity never gets a chance to authenticate. So only clear it when it
-      // actually belongs to someone else; if it's the same person, leave their
-      // session alone so they aren't forced through OTP again.
-      if (!this.isExistingSessionForSameUser(req, userInfo)) {
+      // identity never gets a chance to authenticate. So only clear it when we
+      // can positively confirm it belongs to someone else. If the access token
+      // is simply missing/expired (its TTL is much shorter than the refresh
+      // token's), we can't tell either way — leave the cookies alone and let
+      // the frontend's normal refresh-on-401 flow handle it, rather than
+      // nuking a still-valid refresh token and forcing OTP on every access
+      // token expiry for the SAME user.
+      if (this.isConfirmedDifferentUser(req, userInfo)) {
         this.cookies.clearTokens(res);
       }
 
@@ -231,8 +235,15 @@ export class AuthController {
    * whether to preserve the existing session, not an auth boundary, since
    * establishing a real session always still requires OTP verification
    * against the SSO server via JwtAuthGuard elsewhere.
+   *
+   * Returns true ONLY when there's positive proof of a different identity
+   * (a decodable access token naming someone else). Anything inconclusive —
+   * no access token cookie, an undecodable one — returns false, since the
+   * access token's TTL is much shorter than the refresh token's and we don't
+   * want to treat "access token merely expired" as "different user" and nuke
+   * an otherwise-still-valid refresh token over it.
    */
-  private isExistingSessionForSameUser(
+  private isConfirmedDifferentUser(
     req: Request,
     userInfo: { authServerUserId?: string; email?: string },
   ): boolean {
@@ -244,12 +255,12 @@ export class AuthController {
 
     const existingUserId = (claims.userid ?? claims.sub)?.toString().trim();
     if (existingUserId && userInfo.authServerUserId) {
-      return existingUserId === userInfo.authServerUserId.trim();
+      return existingUserId !== userInfo.authServerUserId.trim();
     }
 
     const existingEmail = claims.email?.toString().trim().toLowerCase();
     if (existingEmail && userInfo.email) {
-      return existingEmail === userInfo.email.trim().toLowerCase();
+      return existingEmail !== userInfo.email.trim().toLowerCase();
     }
 
     return false;
