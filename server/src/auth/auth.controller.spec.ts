@@ -48,7 +48,13 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
 
     expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith('xyz123');
     expect(sso.resendOtpByEmail).toHaveBeenCalledWith({
@@ -76,7 +82,13 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
 
     expect(cookies.clearTokens).not.toHaveBeenCalled();
   });
@@ -98,7 +110,13 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
 
     expect(cookies.clearTokens).not.toHaveBeenCalled();
   });
@@ -120,7 +138,13 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
 
     expect(cookies.clearTokens).toHaveBeenCalledWith(res);
   });
@@ -135,7 +159,13 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('invalid-code', undefined, req, undefined, res);
+    await controller.startExchange(
+      'invalid-code',
+      undefined,
+      req,
+      undefined,
+      res,
+    );
 
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
