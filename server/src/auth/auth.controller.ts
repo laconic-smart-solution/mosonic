@@ -20,6 +20,7 @@ import {
   toAuthSessionDto,
 } from './auth-response.util';
 import { AuthCookieService } from './auth-cookie.service';
+import type { SsoTokenClaims } from './auth.types';
 import { AuthChangePasswordDto } from './dto/auth-change-password.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthResendOtpDto } from './dto/auth-resend-otp.dto';
@@ -57,6 +58,7 @@ export class AuthController {
   async startExchange(
     @Query('code') code: string,
     @Query('redirect_path') redirectPath: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     const frontendUrl =
@@ -65,6 +67,18 @@ export class AuthController {
 
     try {
       const userInfo = await this.eventAppClient.validateExchangeCode(code);
+
+      // The browser may still hold a session cookie from a previous Mosonic
+      // login for a DIFFERENT account. If we leave it in place, GuestOnlyRoute
+      // on the frontend sees an existing session and redirects straight to
+      // /dashboard as that OLD user, skipping the OTP page entirely — the new
+      // identity never gets a chance to authenticate. So only clear it when it
+      // actually belongs to someone else; if it's the same person, leave their
+      // session alone so they aren't forced through OTP again.
+      if (!this.isExistingSessionForSameUser(req, userInfo)) {
+        this.cookies.clearTokens(res);
+      }
+
       // Trigger OTP email dispatch through SSO service
       await this.sso.resendOtpByEmail({ email: userInfo.email });
 
@@ -194,6 +208,55 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@Req() req: Request) {
     return { auth: req.auth };
+  }
+
+  /**
+   * Compares the identity named by a freshly-validated exchange code against
+   * whatever session cookie the browser is currently carrying. Only reads the
+   * token's claims (no signature check) — this is purely a UX decision about
+   * whether to preserve the existing session, not an auth boundary, since
+   * establishing a real session always still requires OTP verification
+   * against the SSO server via JwtAuthGuard elsewhere.
+   */
+  private isExistingSessionForSameUser(
+    req: Request,
+    userInfo: { authServerUserId?: string; email?: string },
+  ): boolean {
+    const token = this.cookies.readAccessToken(req);
+    if (!token) return false;
+
+    const claims = this.decodeJwtPayload(token);
+    if (!claims) return false;
+
+    const existingUserId = (claims.userid ?? claims.sub)?.toString().trim();
+    if (existingUserId && userInfo.authServerUserId) {
+      return existingUserId === userInfo.authServerUserId.trim();
+    }
+
+    const existingEmail = claims.email?.toString().trim().toLowerCase();
+    if (existingEmail && userInfo.email) {
+      return existingEmail === userInfo.email.trim().toLowerCase();
+    }
+
+    return false;
+  }
+
+  /**
+   * Decodes a JWT's payload segment without verifying its signature. Only
+   * used for the same-user UX check above — never for authorization, since
+   * `jose`'s remote-JWKS verification (JwtAuthGuard) is what actually gates
+   * access, and this decode is intentionally kept dependency-free (jose is
+   * ESM-only and awkward to import in this CJS-transformed test suite).
+   */
+  private decodeJwtPayload(token: string): SsoTokenClaims | null {
+    const segment = token.split('.')[1];
+    if (!segment) return null;
+    try {
+      const json = Buffer.from(segment, 'base64url').toString('utf8');
+      return JSON.parse(json) as SsoTokenClaims;
+    } catch {
+      return null;
+    }
   }
 
   private handleAuthResponse(raw: unknown, res: Response) {
