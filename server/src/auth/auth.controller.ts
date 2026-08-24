@@ -55,10 +55,12 @@ export class AuthController {
   })
   @ApiQuery({ name: 'code', required: true, description: 'Single-use exchange code' })
   @ApiQuery({ name: 'redirect_path', required: false, description: 'Destination redirect path' })
+  @ApiQuery({ name: 'source', required: false, description: 'Referral source tracking' })
   async startExchange(
     @Query('code') code: string,
     @Query('redirect_path') redirectPath: string | undefined,
     @Req() req: Request,
+    @Query('source') source: string | undefined,
     @Res() res: Response,
   ) {
     const frontendUrl =
@@ -82,9 +84,17 @@ export class AuthController {
       // Trigger OTP email dispatch through SSO service
       await this.sso.resendOtpByEmail({ email: userInfo.email });
 
-      const targetRedirect =
-        redirectPath || userInfo.redirectPath || '/dashboard';
-      const otpUrl = `${frontendUrl}/auth/otp?email=${encodeURIComponent(
+      let targetRedirect =
+        redirectPath || userInfo.redirectPath || '/dashboard?source=crabonic';
+      if (!targetRedirect.startsWith('/')) {
+        targetRedirect = '/dashboard?source=crabonic';
+      }
+      const refSource = source || 'crabonic';
+      if (!targetRedirect.includes('source=')) {
+        targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + `source=${encodeURIComponent(refSource)}`;
+      }
+
+      const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
         userInfo.email,
       )}&redirectPath=${encodeURIComponent(targetRedirect)}`;
 
@@ -92,7 +102,7 @@ export class AuthController {
     } catch {
       return res.redirect(
         302,
-        `${frontendUrl}/auth/login?error=invalid_or_expired_code`,
+        `${frontendUrl}/login?error=invalid_or_expired_code`,
       );
     }
   }
@@ -108,10 +118,14 @@ export class AuthController {
     const userInfo = await this.eventAppClient.validateExchangeCode(
       body.code,
     );
+    let targetRedirect = userInfo.redirectPath || '/dashboard?source=crabonic';
+    if (!targetRedirect.includes('source=')) {
+      targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+    }
     return {
       valid: true,
       email: userInfo.email,
-      redirectPath: userInfo.redirectPath ?? null,
+      redirectPath: targetRedirect,
     };
   }
 

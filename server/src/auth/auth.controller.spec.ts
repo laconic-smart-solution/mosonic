@@ -48,7 +48,7 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, res);
+    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
 
     expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith('xyz123');
     expect(sso.resendOtpByEmail).toHaveBeenCalledWith({
@@ -57,7 +57,7 @@ describe('AuthController - SSO Exchange', () => {
     expect(cookies.clearTokens).toHaveBeenCalledWith(res);
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
-      'https://mosonic.me/auth/otp?email=organizer%40example.com&redirectPath=%2Fcustom-path',
+      'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path%3Fsource%3Dcrabonic',
     );
   });
 
@@ -78,7 +78,7 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, res);
+    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
 
     expect(cookies.clearTokens).not.toHaveBeenCalled();
   });
@@ -100,7 +100,7 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', req, res);
+    await controller.startExchange('xyz123', '/custom-path', req, undefined, res);
 
     expect(cookies.clearTokens).toHaveBeenCalledWith(res);
   });
@@ -115,11 +115,11 @@ describe('AuthController - SSO Exchange', () => {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('invalid-code', undefined, req, res);
+    await controller.startExchange('invalid-code', undefined, req, undefined, res);
 
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
-      'https://mosonic.me/auth/login?error=invalid_or_expired_code',
+      'https://mosonic.me/login?error=invalid_or_expired_code',
     );
   });
 
@@ -139,7 +139,7 @@ describe('AuthController - SSO Exchange', () => {
       expect(result).toEqual({
         valid: true,
         email: 'organizer@example.com',
-        redirectPath: '/dashboard',
+        redirectPath: '/dashboard?source=crabonic',
       });
     });
 
