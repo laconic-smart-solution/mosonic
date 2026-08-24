@@ -1,8 +1,9 @@
-import { Menu } from "lucide-react"
+import { ArrowLeft, Menu } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router-dom"
 
+import { appConfig } from "@/app/config/app-config"
 import { TopbarSearch } from "@/components/core/topbar-search"
 import { TopbarCreditBalance } from "@/components/core/topbar-credit-balance"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -27,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { T } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
+import { isFromEventApp } from "@/shared/lib/event-app-referral"
 import { initialsFromDisplayName } from "@/shared/lib/user-initials"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import { useUserStore } from "@/shared/stores/user.store"
@@ -53,6 +55,13 @@ export function Topbar() {
 
   const displayName = user?.name?.trim() ? user.name.trim() : t("account")
   const initials = initialsFromDisplayName(user?.name)
+  const showBackToEventApp = isFromEventApp() && !!appConfig.eventAppUrl
+
+  function handleBackToEventApp() {
+    if (appConfig.eventAppUrl) {
+      window.location.href = appConfig.eventAppUrl
+    }
+  }
 
   const label = location.pathname.startsWith("/workflow/")
     ? t("routes.workflow")
@@ -119,6 +128,18 @@ export function Topbar() {
 
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5 lg:gap-2">
           <TopbarSearch compact className="lg:hidden" />
+          {showBackToEventApp && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden gap-1.5 bg-crabonic/10 text-crabonic hover:bg-crabonic/20 hover:text-crabonic-hover sm:flex"
+              onClick={handleBackToEventApp}
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              <span className="hidden md:inline">{t("topbar.backToCrabonic")}</span>
+            </Button>
+          )}
           <TopbarCreditBalance alwaysShowCount className="rounded-md" />
           <LanguageSwitcher className="hidden min-w-[7.5rem] xl:flex" />
           <ThemeToggle className="hidden md:flex" />
@@ -207,6 +228,24 @@ export function Topbar() {
               </p>
               <ThemeToggle className="size-9 rounded-lg border border-border bg-card" />
             </div>
+
+            {showBackToEventApp && (
+              <>
+                <Separator />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 justify-start gap-2 bg-crabonic/10 px-3 text-crabonic hover:bg-crabonic/20 hover:text-crabonic-hover"
+                  onClick={() => {
+                    closeMobileMenu()
+                    handleBackToEventApp()
+                  }}
+                >
+                  <ArrowLeft className="size-4" aria-hidden />
+                  {t("topbar.backToCrabonic")}
+                </Button>
+              </>
+            )}
 
             <Separator />
 

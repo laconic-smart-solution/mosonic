@@ -26,7 +26,8 @@
   "topbar": {
     "menu": "菜单",
     "openMenu": "打开菜单",
-    "theme": "主题"
+    "theme": "主题",
+    "backToCrabonic": "返回 Crabonic"
   },
   "search": {
     "ariaLabel": "搜索页面和路由",

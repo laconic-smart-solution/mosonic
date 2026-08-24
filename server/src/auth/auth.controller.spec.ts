@@ -24,7 +24,10 @@ describe('AuthController - SSO Exchange', () => {
       validateExchangeCode: jest.fn(),
     } as unknown as jest.Mocked<EventAppClientService>;
 
-    cookies = {} as unknown as jest.Mocked<AuthCookieService>;
+    cookies = {
+      readAccessToken: jest.fn().mockReturnValue(null),
+      clearTokens: jest.fn(),
+    } as unknown as jest.Mocked<AuthCookieService>;
 
     config = new ConfigService({
       FRONTEND_URL: 'https://mosonic.me',
@@ -33,27 +36,117 @@ describe('AuthController - SSO Exchange', () => {
     controller = new AuthController(sso, eventAppClient, cookies, config);
   });
 
-  it('redirects to OTP page on valid code', async () => {
+  it('redirects to OTP page on valid code without an existing session cookie', async () => {
     eventAppClient.validateExchangeCode.mockResolvedValueOnce({
       valid: true,
       email: 'organizer@example.com',
       redirectPath: '/dashboard',
     });
 
+    const req = {} as never;
     const res = {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('xyz123', '/custom-path', undefined, res);
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
 
     expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith('xyz123');
     expect(sso.resendOtpByEmail).toHaveBeenCalledWith({
       email: 'organizer@example.com',
     });
+    expect(cookies.clearTokens).not.toHaveBeenCalled();
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
       'https://mosonic.me/verify-otp?email=organizer%40example.com&redirectPath=%2Fcustom-path%3Fsource%3Dcrabonic',
     );
+  });
+
+  it('does not clear cookies when the access token is simply missing/expired (inconclusive)', async () => {
+    eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+      valid: true,
+      email: 'organizer@example.com',
+      authServerUserId: 'auth-user-1',
+      redirectPath: '/dashboard',
+    });
+
+    (cookies.readAccessToken as jest.Mock).mockReturnValueOnce(null);
+
+    const req = {} as never;
+    const res = {
+      redirect: jest.fn(),
+    } as never;
+
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
+
+    expect(cookies.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('preserves the existing session when the exchange code names the same user', async () => {
+    eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+      valid: true,
+      email: 'organizer@example.com',
+      authServerUserId: 'auth-user-1',
+      redirectPath: '/dashboard',
+    });
+
+    const payload = { sub: 'auth-user-1', email: 'organizer@example.com' };
+    const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.sig`;
+    (cookies.readAccessToken as jest.Mock).mockReturnValueOnce(token);
+
+    const req = {} as never;
+    const res = {
+      redirect: jest.fn(),
+    } as never;
+
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
+
+    expect(cookies.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale session belonging to a different user before redirecting to OTP', async () => {
+    eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+      valid: true,
+      email: 'new-user@example.com',
+      authServerUserId: 'auth-user-2',
+      redirectPath: '/dashboard',
+    });
+
+    const payload = { sub: 'auth-user-1', email: 'organizer@example.com' };
+    const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.sig`;
+    (cookies.readAccessToken as jest.Mock).mockReturnValueOnce(token);
+
+    const req = {} as never;
+    const res = {
+      redirect: jest.fn(),
+    } as never;
+
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
+
+    expect(cookies.clearTokens).toHaveBeenCalledWith(res);
   });
 
   it('redirects to login error page on invalid code', async () => {
@@ -61,11 +154,18 @@ describe('AuthController - SSO Exchange', () => {
       new Error('Code expired'),
     );
 
+    const req = {} as never;
     const res = {
       redirect: jest.fn(),
     } as never;
 
-    await controller.startExchange('invalid-code', undefined, undefined, res);
+    await controller.startExchange(
+      'invalid-code',
+      undefined,
+      req,
+      undefined,
+      res,
+    );
 
     expect((res as any).redirect).toHaveBeenCalledWith(
       302,
