@@ -26,7 +26,8 @@
   "topbar": {
     "menu": "เมนู",
     "openMenu": "เปิดเมนู",
-    "theme": "ธีม"
+    "theme": "ธีม",
+    "backToCrabonic": "กลับสู่ Crabonic"
   },
   "search": {
     "ariaLabel": "ค้นหาหน้าและเส้นทาง",

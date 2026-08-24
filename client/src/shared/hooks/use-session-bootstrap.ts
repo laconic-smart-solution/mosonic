@@ -2,6 +2,7 @@ import { useEffect } from "react"
 
 import { me } from "@/features/admin/api/auth-api"
 import { useAuthStoreHydrated } from "@/shared/hooks/use-auth-store-hydrated"
+import { APP_SOURCE_STORAGE_KEY } from "@/shared/lib/event-app-referral"
 import { mapLocalUserToUser } from "@/shared/lib/map-local-user"
 import { parseApiError } from "@/shared/lib/api-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
@@ -18,7 +19,7 @@ export function useSessionBootstrap() {
       const params = new URLSearchParams(window.location.search)
       const source = params.get("source")
       if (source) {
-        sessionStorage.setItem("app_source", source)
+        sessionStorage.setItem(APP_SOURCE_STORAGE_KEY, source)
       }
     } catch {
       // Ignore if sessionStorage is not accessible
