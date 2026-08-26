@@ -129,7 +129,12 @@ export class PrismaCreditLedgerRepository implements ICreditLedgerRepository {
       distinct: ['nodeId'],
     });
     return rows
-      .map((row) => row.nodeId.replace(/^social:/, '').trim().toLowerCase())
+      .map((row) =>
+        row.nodeId
+          .replace(/^social:/, '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
   }
 }

@@ -32,7 +32,9 @@ export function buildEditedOutput(
   if (isMediaReviewNode(nodeType)) {
     const url = mediaUrl?.trim();
     if (!url) {
-      throw new BadRequestException('mediaUrl is required for media node edits');
+      throw new BadRequestException(
+        'mediaUrl is required for media node edits',
+      );
     }
     if (nodeType === WorkflowNodeType.ImageGeneration) {
       return { image: url };
@@ -61,7 +63,12 @@ export function buildEditedOutput(
         return JSON.parse(text) as Record<string, unknown>;
       } catch {
         if (nodeType === WorkflowNodeType.KeywordPlanner) {
-          return { keywords: text.split(/[\n,]+/).map((k) => k.trim()).filter(Boolean) };
+          return {
+            keywords: text
+              .split(/[\n,]+/)
+              .map((k) => k.trim())
+              .filter(Boolean),
+          };
         }
         return { text };
       }

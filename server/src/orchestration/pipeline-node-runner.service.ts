@@ -139,7 +139,11 @@ export class PipelineNodeRunnerService {
 
     const regenPrompt = node.reviewRegeneratePrompt?.trim();
     const nodePrompt = node.userPrompt?.trim();
-    const effectiveContentPrompt = [payload.contentPrompt, nodePrompt, regenPrompt]
+    const effectiveContentPrompt = [
+      payload.contentPrompt,
+      nodePrompt,
+      regenPrompt,
+    ]
       .filter(Boolean)
       .join('\n\n');
 
@@ -148,7 +152,7 @@ export class PipelineNodeRunnerService {
         nodeId: node.nodeId,
         type: node.type as unknown as WorkflowNodeType,
         order: node.order,
-        config: (node.config ?? {}) as WorkflowNodeConfig,
+        config: node.config ?? {},
         workflowRef: payload.workflowId,
       },
       context: {
@@ -282,9 +286,7 @@ export class PipelineNodeRunnerService {
     const failedNode = this.pipelineRepo.getNode(pipeline, nodeId);
     const laneId = failedNode?.lane ?? null;
     const laneScopedContinue =
-      this.laneScopedPause &&
-      laneId &&
-      !isSharedTrunkFailure(pipeline, nodeId);
+      this.laneScopedPause && laneId && !isSharedTrunkFailure(pipeline, nodeId);
 
     if (laneScopedContinue) {
       await this.pipelineRepo.setPipelineStatus(
@@ -296,10 +298,14 @@ export class PipelineNodeRunnerService {
         },
       );
     } else {
-      await this.pipelineRepo.setPipelineStatus(pipelineId, PipelineStatus.Paused, {
-        pausedNodeId: nodeId,
-        pausedLaneId: laneId,
-      });
+      await this.pipelineRepo.setPipelineStatus(
+        pipelineId,
+        PipelineStatus.Paused,
+        {
+          pausedNodeId: nodeId,
+          pausedLaneId: laneId,
+        },
+      );
       // Other sibling nodes may already be queued (e.g. parallel lanes that
       // fanned out together). Left alone they'd sit in the shared queue until
       // eventually dequeued, only to self-abort once they see the pipeline

@@ -65,7 +65,7 @@ export class PipelineService {
       filter.workflowRef = dto.filter.workflowRef;
     }
     if (dto.filter?.status) {
-      filter.status = dto.filter.status as Prisma.EnumPipelineStatusFilter['equals'];
+      filter.status = dto.filter.status;
     }
 
     const { rows: docs, total } = await this.pipelines.findPage(
@@ -98,10 +98,13 @@ export class PipelineService {
         pipelineId: doc.pipelineId,
         workflowRef: doc.workflowRef,
         ruleRef: doc.ruleRef,
-        status: doc.status as PipelineStatus,
+        status: doc.status,
         name:
           doc.name?.trim() ||
-          defaultPipelineName(doc.contentPrompt, new Date(doc.startedAt ?? Date.now())),
+          defaultPipelineName(
+            doc.contentPrompt,
+            new Date(doc.startedAt ?? Date.now()),
+          ),
         contentPrompt: doc.contentPrompt,
         nodeCount: nodes.length,
         nodeTypes: uniquePipelineNodeTypes(nodes),

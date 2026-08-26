@@ -2,17 +2,11 @@ jest.mock('../mcp/mcp.service', () => ({
   McpService: class McpService {},
 }));
 
-import {
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { PostListSort } from './dto/post-list-sort.enum';
 import { PostService } from './post.service';
-import {
-  PlatformPostStatus,
-  PostStatus,
-} from './schemas/post.schema';
+import { PlatformPostStatus, PostStatus } from './schemas/post.schema';
 import { UploadChannelStatus } from '../upload/schemas/upload.schema';
 
 describe('PostService', () => {
@@ -90,10 +84,10 @@ describe('PostService', () => {
     postModel.findOne.mockReturnValue({
       exec: jest.fn().mockResolvedValue(null),
     });
-    const res = await service().bulkCancelScheduled(
-      ['does-not-exist'],
-      { userId: 'u1', role: 'CUSTOMER' as never },
-    );
+    const res = await service().bulkCancelScheduled(['does-not-exist'], {
+      userId: 'u1',
+      role: 'CUSTOMER',
+    });
     expect(res).toEqual({ succeeded: 0, failed: 1 });
   });
 
@@ -145,7 +139,7 @@ describe('PostService', () => {
 
     const res = await service().deletePost('p-sched', {
       userId: 'u1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     expect(scheduler.cancelPostPublish).toHaveBeenCalledWith('p-sched');
@@ -239,7 +233,7 @@ describe('PostService', () => {
 
     const res = await service().deletePost('p-pub', {
       userId: 'u1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     expect(res.removed).toBe(false);
@@ -260,7 +254,7 @@ describe('PostService', () => {
 
     const res = await service().deletePost('p-done', {
       userId: 'u1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     expect(res.message).toContain('already cancelled');
@@ -278,7 +272,10 @@ describe('PostService', () => {
       exec: jest.fn().mockResolvedValue(postDoc),
     });
     await expect(
-      service().retryPost('p-local', { userId: 'u1', role: 'CUSTOMER' as never }),
+      service().retryPost('p-local', {
+        userId: 'u1',
+        role: 'CUSTOMER',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -292,7 +289,10 @@ describe('PostService', () => {
       }),
     });
     await expect(
-      service().publishPost('p-pub', { userId: 'u1', role: 'CUSTOMER' as never }),
+      service().publishPost('p-pub', {
+        userId: 'u1',
+        role: 'CUSTOMER',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(mcpService.updatePost).not.toHaveBeenCalled();
   });
@@ -334,7 +334,7 @@ describe('PostService', () => {
 
     const res = await service().publishPost('p-sched', {
       userId: 'u1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     expect(mcpService.updatePost).toHaveBeenCalledWith({
@@ -364,7 +364,7 @@ describe('PostService', () => {
       service().patchPost(
         'p-local',
         { content: 'x' },
-        { userId: 'u1', role: 'CUSTOMER' as never },
+        { userId: 'u1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(mcpService.updatePost).not.toHaveBeenCalled();
@@ -407,7 +407,7 @@ describe('PostService', () => {
     const res = await service().patchPost(
       'p-local',
       { scheduledAt: '2030-01-15T12:00:00.000Z' },
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.updatePost).toHaveBeenCalledWith({
@@ -431,11 +431,7 @@ describe('PostService', () => {
       exec: jest.fn().mockResolvedValue(saveablePost),
     });
     await expect(
-      service().patchPost(
-        'p-local',
-        {},
-        { userId: 'u1', role: 'CUSTOMER' as never },
-      ),
+      service().patchPost('p-local', {}, { userId: 'u1', role: 'CUSTOMER' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -489,7 +485,7 @@ describe('PostService', () => {
     const res = await service().bulkSchedulePosts(
       ['good', 'bad'],
       '2030-02-01T10:00:00.000Z',
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
     );
 
     expect(res).toEqual({ succeeded: 1, failed: 1 });
@@ -530,7 +526,7 @@ describe('PostService', () => {
 
     const detail = await service().getPostDetail(
       'p-local',
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
       'zernio',
     );
 
@@ -572,7 +568,7 @@ describe('PostService', () => {
 
     const detail = await service().getPostDetail(
       'p-rn',
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
       'zernio',
     );
 
@@ -623,10 +619,10 @@ describe('PostService', () => {
       }),
     });
 
-    const detail = await service().getPostDetail(
-      'p-media',
-      { userId: 'u1', role: 'CUSTOMER' as never },
-    );
+    const detail = await service().getPostDetail('p-media', {
+      userId: 'u1',
+      role: 'CUSTOMER',
+    });
 
     const local = 'local' in detail ? detail.local : detail;
     expect(local['detailCaption']).toBe('Full caption text');
@@ -644,7 +640,7 @@ describe('PostService', () => {
       service().patchPost(
         'missing',
         { content: 'x' },
-        { userId: 'u1', role: 'CUSTOMER' as never },
+        { userId: 'u1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -659,7 +655,7 @@ describe('PostService', () => {
 
     const res = await service().getPostStats({
       userId: 'u1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     expect(res.total).toBe(3);
@@ -708,14 +704,16 @@ describe('PostService', () => {
     });
 
     const res = await service().listPosts(
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
       query,
     );
 
     expect(res.posts).toHaveLength(1);
     const row = res.posts[0] as Record<string, unknown>;
     expect(row['captionPreview']).toBe('hello world');
-    expect(uploadModel.find).toHaveBeenCalledWith({ uploadId: { $in: ['u1'] } });
+    expect(uploadModel.find).toHaveBeenCalledWith({
+      uploadId: { $in: ['u1'] },
+    });
   });
 
   it('listPosts attaches mediaPreviewUrl from upload channel media', async () => {
@@ -763,7 +761,7 @@ describe('PostService', () => {
     });
 
     const res = await service().listPosts(
-      { userId: 'u1', role: 'CUSTOMER' as never },
+      { userId: 'u1', role: 'CUSTOMER' },
       query,
     );
 

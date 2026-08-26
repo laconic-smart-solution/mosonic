@@ -116,10 +116,7 @@ export class RuleController {
   }
 
   @Get(':ruleId/news-trigger')
-  getNewsTriggerSettings(
-    @Req() req: Request,
-    @Param('ruleId') ruleId: string,
-  ) {
+  getNewsTriggerSettings(@Req() req: Request, @Param('ruleId') ruleId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.ruleService.getNewsTriggerSettings(ruleId, auth);
   }

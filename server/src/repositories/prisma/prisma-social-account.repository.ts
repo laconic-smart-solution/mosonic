@@ -37,13 +37,15 @@ export class PrismaSocialAccountRepository implements ISocialAccountRepository {
     provider: SocialProvider,
     channel: string,
   ): Promise<SocialAccountRecord | null> {
-    return this.prisma.socialAccount.findUnique({
-      where: {
-        userId_provider_channel: { userId, provider, channel },
-      },
-    }).then((row) =>
-      row && row.status === SocialAccountStatus.ACTIVE ? row : null,
-    );
+    return this.prisma.socialAccount
+      .findUnique({
+        where: {
+          userId_provider_channel: { userId, provider, channel },
+        },
+      })
+      .then((row) =>
+        row && row.status === SocialAccountStatus.ACTIVE ? row : null,
+      );
   }
 
   upsertActive(input: UpsertSocialAccountInput): Promise<SocialAccountRecord> {
@@ -79,7 +81,9 @@ export class PrismaSocialAccountRepository implements ISocialAccountRepository {
           ? { displayName: input.displayName }
           : {}),
         ...(input.username !== undefined ? { username: input.username } : {}),
-        ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+        ...(input.avatarUrl !== undefined
+          ? { avatarUrl: input.avatarUrl }
+          : {}),
         ...(input.metadata !== undefined
           ? { metadata: input.metadata ?? undefined }
           : {}),

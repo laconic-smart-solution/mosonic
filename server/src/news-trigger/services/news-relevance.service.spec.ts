@@ -59,7 +59,9 @@ describe('NewsRelevanceService keyword pre-filter', () => {
 
 describe('tokenizeNewsKeywords', () => {
   it('splits multi-word and punctuated keywords into tokens', () => {
-    expect(tokenizeNewsKeywords(['SaaS / Technology', 'brand awareness'])).toEqual(
+    expect(
+      tokenizeNewsKeywords(['SaaS / Technology', 'brand awareness']),
+    ).toEqual(
       expect.arrayContaining(['saas', 'technology', 'brand', 'awareness']),
     );
   });

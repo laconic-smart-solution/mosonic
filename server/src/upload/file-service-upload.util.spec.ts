@@ -45,9 +45,9 @@ describe('file-service-upload.util', () => {
     const attempts = buildVideoUploadAttempts(normalized);
     expect(attempts[0]?.fileName).toBe('clip.mp4');
     expect(attempts.some((a) => a.fileName.endsWith('.mov'))).toBe(true);
-    expect(attempts.some((a) => !a.fileName.toLowerCase().endsWith('.mp4'))).toBe(
-      true,
-    );
+    expect(
+      attempts.some((a) => !a.fileName.toLowerCase().endsWith('.mp4')),
+    ).toBe(true);
   });
 
   it('video upload attempts always include a file extension', () => {

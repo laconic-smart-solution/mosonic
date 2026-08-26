@@ -44,10 +44,10 @@ describe('video-credit-node-type.util', () => {
 
     it('resolves video nodes by mode', () => {
       expect(
-        resolveCreditNodeTypeForPipelineNode(
-          WorkflowNodeType.VideoGeneration,
-          { mode: 'presenter', heygenAvatarId: 'a1' },
-        ),
+        resolveCreditNodeTypeForPipelineNode(WorkflowNodeType.VideoGeneration, {
+          mode: 'presenter',
+          heygenAvatarId: 'a1',
+        }),
       ).toBe(VIDEO_GENERATION_PRESENTER_CREDIT_TYPE);
     });
   });

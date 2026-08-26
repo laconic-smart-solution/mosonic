@@ -10,15 +10,20 @@ describe('upload-scheduled-sync.helpers', () => {
     });
 
     it('parses nested post.status strings', () => {
-      expect(
-        interpretZernioPostForSync({ post: { status: 'live' } }),
-      ).toEqual({ kind: 'mark_published', at: expect.any(Date) });
+      expect(interpretZernioPostForSync({ post: { status: 'live' } })).toEqual({
+        kind: 'mark_published',
+        at: expect.any(Date),
+      });
     });
   });
 
   describe('mapWithConcurrencyLimit', () => {
     it('runs all items with bounded concurrency', async () => {
-      const out = await mapWithConcurrencyLimit([1, 2, 3], 2, async (n) => n * 2);
+      const out = await mapWithConcurrencyLimit(
+        [1, 2, 3],
+        2,
+        async (n) => n * 2,
+      );
       expect(out.sort((a, b) => a - b)).toEqual([2, 4, 6]);
     });
   });

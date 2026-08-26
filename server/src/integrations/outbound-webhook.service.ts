@@ -32,15 +32,21 @@ export class OutboundWebhookService {
     event: string,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    let delivery = await this.deliveries.create({
+    const delivery = await this.deliveries.create({
       subscription: { connect: { subscriptionId: sub.subscriptionId } },
       event,
       payload: payload as Prisma.InputJsonValue,
       attempts: 0,
     });
 
-    const body = JSON.stringify({ event, payload, subscriptionId: sub.subscriptionId });
-    const signature = createHmac('sha256', sub.secret).update(body).digest('hex');
+    const body = JSON.stringify({
+      event,
+      payload,
+      subscriptionId: sub.subscriptionId,
+    });
+    const signature = createHmac('sha256', sub.secret)
+      .update(body)
+      .digest('hex');
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {

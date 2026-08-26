@@ -40,20 +40,14 @@ export class IntegrationsV1Controller {
 
   @UseGuards(JwtAuthGuard)
   @Post('webhooks/subscribe')
-  subscribe(
-    @Req() req: Request,
-    @Body() body: SubscribeWebhookDto,
-  ) {
+  subscribe(@Req() req: Request, @Body() body: SubscribeWebhookDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.integrations.subscribeWebhook(auth, body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('api-keys')
-  createKey(
-    @Req() req: Request,
-    @Body() body: CreateApiKeyDto,
-  ) {
+  createKey(@Req() req: Request, @Body() body: CreateApiKeyDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.integrations.createApiKey(auth.userId, body.name, body.scopes);
   }

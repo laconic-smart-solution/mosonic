@@ -61,8 +61,8 @@ function buildLinearWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
   const sorted = [...nodes].sort((a, b) => a.order - b.order);
   const edges: WorkflowGraphEdge[] = [];
   for (let i = 0; i < sorted.length - 1; i += 1) {
-    const from = sorted[i]!;
-    const to = sorted[i + 1]!;
+    const from = sorted[i];
+    const to = sorted[i + 1];
     assertMatrixAllows(from.type, to.type);
     edges.push({ from: from.nodeId, to: to.nodeId });
   }
@@ -83,8 +83,8 @@ function buildGraphWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
     .sort((a, b) => a.order - b.order);
 
   for (let i = 0; i < trunkNodes.length - 1; i += 1) {
-    const from = trunkNodes[i]!;
-    const to = trunkNodes[i + 1]!;
+    const from = trunkNodes[i];
+    const to = trunkNodes[i + 1];
     assertMatrixAllows(from.type, to.type);
     edges.push({ from: from.nodeId, to: to.nodeId });
   }
@@ -100,7 +100,7 @@ function buildGraphWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
 
     if (laneNodes.length === 0) continue;
 
-    const first = laneNodes[0]!;
+    const first = laneNodes[0];
     assertMatrixAllows(branch.type, first.type);
     edges.push({
       from: branch.nodeId,
@@ -109,13 +109,13 @@ function buildGraphWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
     });
 
     for (let i = 0; i < laneNodes.length - 1; i += 1) {
-      const from = laneNodes[i]!;
-      const to = laneNodes[i + 1]!;
+      const from = laneNodes[i];
+      const to = laneNodes[i + 1];
       assertMatrixAllows(from.type, to.type);
       edges.push({ from: from.nodeId, to: to.nodeId });
     }
 
-    const last = laneNodes[laneNodes.length - 1]!;
+    const last = laneNodes[laneNodes.length - 1];
     assertMatrixAllows(last.type, merge.type);
     edges.push({
       from: last.nodeId,
@@ -130,7 +130,9 @@ function buildGraphWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
 /**
  * Builds matrix-valid directed edges for a workflow graph node list.
  */
-export function buildWorkflowEdges(nodes: GraphNodeSpec[]): WorkflowGraphEdge[] {
+export function buildWorkflowEdges(
+  nodes: GraphNodeSpec[],
+): WorkflowGraphEdge[] {
   if (nodes.length <= 1) {
     return [];
   }

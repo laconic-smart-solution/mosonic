@@ -12,6 +12,7 @@ import { normalizeWhitespace } from './text-utils';
 const SUMMARY_SYSTEM = [
   'You summarize marketing and brand inputs for downstream structured extraction.',
   'Summarize all brand strategy, tone, audience, goals, and marketing information from the content.',
+  'When the input includes images, genuinely look at and describe what each one actually shows — subject matter, scene, products, people, composition, color palette, and visual style or mood — as real brand/marketing context, not just a caption. Only after that, separately note any text visible in the image; do not treat text transcription as the main task.',
   'Output plain prose only — no JSON, no markdown fences, no bullet lists unless essential.',
 ].join(' ');
 

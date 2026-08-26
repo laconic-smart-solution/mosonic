@@ -188,7 +188,7 @@ describe('McpService', () => {
     zernioRest.publishCreatePost.mockResolvedValue({
       postId: 'post_1',
       raw: {},
-    } as never);
+    });
 
     await service.publishContent('u1', {
       channels: ['Instagram', ' linkedin '],
@@ -234,9 +234,9 @@ describe('McpService', () => {
   it('disconnectAccount throws when channel is not connected', async () => {
     usersService.getZernioConnectedAccounts.mockResolvedValue([]);
 
-    await expect(service.disconnectAccount('u1', 'linkedin')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.disconnectAccount('u1', 'linkedin'),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(zernioRest.deleteAccount).not.toHaveBeenCalled();
   });
 

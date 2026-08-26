@@ -118,11 +118,7 @@ const FAILURE_REASON_MAX = 500;
 
 function scheduleAwarePublishError(err: unknown): string {
   const raw =
-    err instanceof Error
-      ? err.message
-      : typeof err === 'string'
-        ? err
-        : '';
+    err instanceof Error ? err.message : typeof err === 'string' ? err : '';
   const msg = raw.toLowerCase();
   if (
     msg.includes('scheduler') ||
@@ -198,8 +194,9 @@ export class UploadService {
             ? adaptOut.translatedText
             : undefined) ?? resolvedOutputs.translatedText,
         summary:
-          (typeof adaptOut?.summary === 'string' ? adaptOut.summary : undefined) ??
-          resolvedOutputs.summary,
+          (typeof adaptOut?.summary === 'string'
+            ? adaptOut.summary
+            : undefined) ?? resolvedOutputs.summary,
         image: laneMedia.image ?? trunkMedia.image,
         video: laneMedia.video ?? trunkMedia.video,
       };
@@ -278,7 +275,9 @@ export class UploadService {
     const connectedKeys = new Set(
       (connected.accounts ?? [])
         .map((a) => a.channel?.trim().toLowerCase())
-        .filter((key): key is string => Boolean(key) && !isDeprecatedChannelId(key)),
+        .filter(
+          (key): key is string => Boolean(key) && !isDeprecatedChannelId(key),
+        ),
     );
     if (connectedKeys.size === 0) return upload;
 
@@ -294,15 +293,15 @@ export class UploadService {
     if (ruleChannelIds.size === 0) return upload;
 
     let channels = uploadChannels(upload);
-    const existingKeys = new Set(
-      channels.map((c) => c.channel.toLowerCase()),
-    );
+    const existingKeys = new Set(channels.map((c) => c.channel.toLowerCase()));
     let changed = false;
     const ro = (upload.resolvedOutputs ?? {}) as ResolvedContentOutputs;
 
     for (const key of connectedKeys) {
       if (existingKeys.has(key) || !ruleChannelIds.has(key)) continue;
-      const channelName = key[0] ? `${key[0].toUpperCase()}${key.slice(1)}` : key;
+      const channelName = key[0]
+        ? `${key[0].toUpperCase()}${key.slice(1)}`
+        : key;
       channels = [...channels, this.createDefaultChannelRow(channelName, ro)];
       changed = true;
     }
@@ -373,7 +372,7 @@ export class UploadService {
       ruleRef: params.ruleRef,
       channels: channelsToJson(channels),
       status: UploadJobStatus.Pending,
-      resolvedOutputs: (params.resolvedOutputs ?? {}) as unknown as Prisma.InputJsonValue,
+      resolvedOutputs: params.resolvedOutputs ?? {},
     });
 
     return { uploadId: doc.uploadId };
@@ -404,7 +403,7 @@ export class UploadService {
       );
       let saved = await this.uploads.save({
         ...withUploadChannels(doc, merged),
-        resolvedOutputs: (params.resolvedOutputs ?? {}) as unknown as UploadRecord['resolvedOutputs'],
+        resolvedOutputs: params.resolvedOutputs ?? {},
         workflowRef: params.workflowRef,
         ruleRef: params.ruleRef,
         status: recomputeUploadJobStatus(merged),
@@ -427,7 +426,7 @@ export class UploadService {
     }
     await this.uploads.save({
       ...doc,
-      resolvedOutputs: resolvedOutputs as unknown as UploadRecord['resolvedOutputs'],
+      resolvedOutputs: resolvedOutputs,
     });
   }
 
@@ -533,7 +532,7 @@ export class UploadService {
     doc = await this.ensureChannelsForConnectedAccounts(doc, auth);
 
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
-    let channels = uploadChannels(doc);
+    const channels = uploadChannels(doc);
     for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
@@ -547,8 +546,7 @@ export class UploadService {
       row.included = Boolean(body.included);
     }
     if (body.caption !== undefined) {
-      row.caption =
-        body.caption === null ? '' : ((body.caption as string) ?? '');
+      row.caption = body.caption === null ? '' : (body.caption ?? '');
     }
     if (body.mediaUrl !== undefined) {
       row.mediaUrl = body.mediaUrl;
@@ -613,7 +611,7 @@ export class UploadService {
     await this.migrateLegacyChannelsFromMongo(doc);
 
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
-    let channels = uploadChannels(doc);
+    const channels = uploadChannels(doc);
     for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
@@ -641,11 +639,8 @@ export class UploadService {
     }
 
     if (channelFilter) {
-      const targetChannel = scheduledChannels[0]!;
-      if (
-        hasTitleUpdate &&
-        targetChannel.channel.toLowerCase() !== 'youtube'
-      ) {
+      const targetChannel = scheduledChannels[0];
+      if (hasTitleUpdate && targetChannel.channel.toLowerCase() !== 'youtube') {
         throw new BadRequestException(
           'YouTube title can only be updated for a scheduled YouTube channel.',
         );
@@ -839,7 +834,7 @@ export class UploadService {
     doc = await this.ensureChannelsForConnectedAccounts(reloaded, auth);
 
     const roFallback = (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs;
-    let channels = uploadChannels(doc);
+    const channels = uploadChannels(doc);
     for (const ch of channels) {
       this.coerceLegacyChannelRow(ch, roFallback);
     }
@@ -898,7 +893,9 @@ export class UploadService {
 
       const accountId = accountByChannel.get(key)?.trim();
       if (key === REDNOTE_CHANNEL) {
-        const rnStatus = await this.redNoteService.getAccountStatus(auth.userId);
+        const rnStatus = await this.redNoteService.getAccountStatus(
+          auth.userId,
+        );
         if (!rnStatus.connected) {
           throw new BadRequestException(
             'RedNote is not connected. Please connect in Settings first.',
@@ -936,7 +933,9 @@ export class UploadService {
 
     const publisherUserId = doc.userId ?? auth.userId;
     if (!publisherUserId?.trim()) {
-      throw new BadRequestException('Upload is missing userId for post record.');
+      throw new BadRequestException(
+        'Upload is missing userId for post record.',
+      );
     }
 
     const channelsSucceeded: string[] = [];
@@ -963,8 +962,7 @@ export class UploadService {
     const publishRuleRef = doc.ruleRef;
     const publishContentRef = doc.contentRef;
 
-    const { zernioWork, rednoteWork } =
-      partitionPublishWorkByChannel(workList);
+    const { zernioWork, rednoteWork } = partitionPublishWorkByChannel(workList);
 
     let zernioPostId: string | null = null;
 
@@ -1157,11 +1155,7 @@ export class UploadService {
       });
     }
 
-    if (
-      !body.publishNow &&
-      scheduledIso &&
-      channelsSucceeded.length > 0
-    ) {
+    if (!body.publishNow && scheduledIso && channelsSucceeded.length > 0) {
       this.notifyPostScheduled(publisherUserId, {
         uploadId: publishUploadId,
         scheduledAt: scheduledIso,
@@ -1275,7 +1269,7 @@ export class UploadService {
     const urls = this.rowAllMedia(row);
     if (key === 'rednote' || key === 'youtube') {
       const videos = urls.filter((u) => this.isVideoMediaUrl(u));
-      return videos.length > 0 ? [videos[0]!] : [];
+      return videos.length > 0 ? [videos[0]] : [];
     }
     return urls;
   }
@@ -1357,7 +1351,7 @@ export class UploadService {
     return {
       uploadId: doc.uploadId,
       contentRef: doc.contentRef,
-      status: doc.status as UploadJobStatus,
+      status: doc.status,
       channels: channels.map((c) => this.toChannelDto(c, ro)),
       resolvedOutputs: {
         text: ro.text,

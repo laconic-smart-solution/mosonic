@@ -46,7 +46,10 @@ describe('content-page-dedupe.util', () => {
       },
     ]);
     expect(out).toHaveLength(2);
-    expect(out.map((r) => r.contentId).sort()).toEqual(['control', 'variant-a']);
+    expect(out.map((r) => r.contentId).sort()).toEqual([
+      'control',
+      'variant-a',
+    ]);
   });
 
   it('sorts deduped rows by updatedAt descending', () => {

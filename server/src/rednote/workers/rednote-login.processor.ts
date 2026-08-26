@@ -57,8 +57,9 @@ export class RedNoteLoginProcessor extends WorkerHost {
     await sleep(2000);
 
     const browser = await this.browserService.launch();
-    let meCapture: { getHandle: () => string | undefined; dispose: () => void } |
-      undefined;
+    let meCapture:
+      | { getHandle: () => string | undefined; dispose: () => void }
+      | undefined;
     try {
       const page = await browser.newPage();
       await this.browserService.preparePage(page);
@@ -114,8 +115,7 @@ export class RedNoteLoginProcessor extends WorkerHost {
           await sleep(1500);
           let handle = meCapture.getHandle();
           if (!handle) {
-            handle =
-              await this.browserService.extractLoggedInUserHandle(page);
+            handle = await this.browserService.extractLoggedInUserHandle(page);
           }
 
           await this.users.upsertRedNoteSession(userId, {

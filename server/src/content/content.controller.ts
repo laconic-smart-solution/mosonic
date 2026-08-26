@@ -97,7 +97,11 @@ export class ContentController {
     @Body() body: GenerateNodeDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
-    return await this.contentService.scheduleGenerateNode(contentId, body, auth);
+    return await this.contentService.scheduleGenerateNode(
+      contentId,
+      body,
+      auth,
+    );
   }
 
   @Post(':contentId/ensure-upload')
@@ -110,19 +114,13 @@ export class ContentController {
   }
 
   @Post(':contentId/approve')
-  async approve(
-    @Req() req: Request,
-    @Param('contentId') contentId: string,
-  ) {
+  async approve(@Req() req: Request, @Param('contentId') contentId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.contentService.approveContent(contentId, auth);
   }
 
   @Post(':contentId/reject')
-  async reject(
-    @Req() req: Request,
-    @Param('contentId') contentId: string,
-  ) {
+  async reject(@Req() req: Request, @Param('contentId') contentId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.contentService.rejectContent(contentId, auth);
   }

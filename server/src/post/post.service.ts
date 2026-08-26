@@ -19,10 +19,7 @@ import type { IPostRepository } from '../repositories/interfaces/post.repository
 import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
 import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
 import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
-import {
-  POST_REPOSITORY,
-  UPLOAD_REPOSITORY,
-} from '../repositories/tokens';
+import { POST_REPOSITORY, UPLOAD_REPOSITORY } from '../repositories/tokens';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import {
   UploadChannelStatus,
@@ -178,7 +175,7 @@ export class PostService {
       mergeTenancyWhere({}, auth),
     );
     const total = Object.values(byStatus).reduce((sum, n) => sum + (n ?? 0), 0);
-    return { total, byStatus: byStatus as Partial<Record<PostStatus, number>> };
+    return { total, byStatus: byStatus };
   }
 
   async listPosts(
@@ -312,7 +309,9 @@ export class PostService {
       }
 
       let youtubeTitlePreview: string | null = null;
-      if (postChannels.some((plat) => plat.trim().toLowerCase() === 'youtube')) {
+      if (
+        postChannels.some((plat) => plat.trim().toLowerCase() === 'youtube')
+      ) {
         const ytRow = uploadChannelRows.find(
           (c) => c.channel.trim().toLowerCase() === 'youtube',
         );
@@ -321,7 +320,9 @@ export class PostService {
 
       const trimmed = caption.trim();
       p['captionPreview'] =
-        trimmed.length > CAP_LEN ? `${trimmed.slice(0, CAP_LEN)}…` : trimmed || null;
+        trimmed.length > CAP_LEN
+          ? `${trimmed.slice(0, CAP_LEN)}…`
+          : trimmed || null;
       p['youtubeTitlePreview'] = youtubeTitlePreview;
 
       const mediaPreview = this.resolveListMediaPreview(
@@ -503,7 +504,7 @@ export class PostService {
     if (!post) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    if (!PATCHABLE_POST_STATUSES.has(post.status as PostStatus)) {
+    if (!PATCHABLE_POST_STATUSES.has(post.status)) {
       throw new BadRequestException(
         'This post cannot be edited in its current status.',
       );
@@ -526,7 +527,8 @@ export class PostService {
       ? (dto.content ?? '')
       : await this.resolvePostCaptionForValidation(post);
     const mediaForValidation = hasMediaUpdate
-      ? (mediaUrlsForZernio ?? resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls))
+      ? (mediaUrlsForZernio ??
+        resolvePlatformMediaUrls(dto.mediaUrl, dto.mediaUrls))
       : await this.resolvePostMediaForValidation(post);
 
     for (const plat of post.channels ?? []) {
@@ -564,7 +566,11 @@ export class PostService {
     if (hasScheduled) {
       const d = new Date(dto.scheduledAt!.trim());
       if (!Number.isNaN(d.getTime())) {
-        nextPost = { ...nextPost, scheduledAt: d, status: PostStatus.Scheduled };
+        nextPost = {
+          ...nextPost,
+          scheduledAt: d,
+          status: PostStatus.Scheduled,
+        };
       }
     }
 
@@ -615,9 +621,7 @@ export class PostService {
     const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = channels.find(
-        (c) => c.channel.trim().toLowerCase() === key,
-      );
+      const row = channels.find((c) => c.channel.trim().toLowerCase() === key);
       if (!row) continue;
 
       if (flags.hasContent && dto.content !== undefined) {
@@ -667,9 +671,7 @@ export class PostService {
     const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = channels.find(
-        (c) => c.channel.trim().toLowerCase() === key,
-      );
+      const row = channels.find((c) => c.channel.trim().toLowerCase() === key);
       if (!row) continue;
       const caption = this.rowCaption(row, ro);
       if (caption.trim()) return caption;
@@ -688,9 +690,7 @@ export class PostService {
     const channels = uploadChannels(upload);
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = channels.find(
-        (c) => c.channel.trim().toLowerCase() === key,
-      );
+      const row = channels.find((c) => c.channel.trim().toLowerCase() === key);
       if (!row) continue;
       const urls = this.rowAllMedia(row);
       if (urls.length > 0) return urls;
@@ -715,9 +715,7 @@ export class PostService {
     }
 
     const results = await Promise.allSettled(
-      postIds.map((id) =>
-        this.patchPost(id, { scheduledAt: trimmed }, auth),
-      ),
+      postIds.map((id) => this.patchPost(id, { scheduledAt: trimmed }, auth)),
     );
     return {
       succeeded: results.filter((r) => r.status === 'fulfilled').length,
@@ -725,9 +723,7 @@ export class PostService {
     };
   }
 
-  async findScheduledPostsForUpload(
-    uploadRef: string,
-  ): Promise<PostRecord[]> {
+  async findScheduledPostsForUpload(uploadRef: string): Promise<PostRecord[]> {
     const rows = await this.posts.findByUploadRef(uploadRef, {
       status: PostStatus.Scheduled,
     });
@@ -789,7 +785,7 @@ export class PostService {
     if (!post) throw new NotFoundException(`Post ${postId} not found`);
     this.assertOwnership(post, auth);
 
-    if (!PUBLISHABLE_POST_STATUSES.has(post.status as PostStatus)) {
+    if (!PUBLISHABLE_POST_STATUSES.has(post.status)) {
       throw new BadRequestException(
         'Only pending, scheduled, partial, or failed posts can be published now.',
       );
@@ -828,14 +824,12 @@ export class PostService {
     const work = await this.buildPublishWorkFromPost(post, upload);
 
     try {
-      const { postId: zernioPostId } = await this.mcpService.publishCreatePostBatch(
-        post.userId,
-        {
+      const { postId: zernioPostId } =
+        await this.mcpService.publishCreatePostBatch(post.userId, {
           platforms: work.map((w) => this.workToPlatformPayload(w)),
           publishNow: true,
           scheduledAt: null,
-        },
-      );
+        });
 
       await this.posts.save({
         ...post,
@@ -904,12 +898,16 @@ export class PostService {
 
     await this.ensurePostAnalyticsRecord(saved);
 
-    await this.patchUploadChannelsFromPost(post.uploadRef, channelKeys, (ch) => {
-      ch.status = UploadChannelStatus.Published;
-      ch.publishedAt = now;
-      ch.scheduledAt = null;
-      ch.failureReason = null;
-    });
+    await this.patchUploadChannelsFromPost(
+      post.uploadRef,
+      channelKeys,
+      (ch) => {
+        ch.status = UploadChannelStatus.Published;
+        ch.publishedAt = now;
+        ch.scheduledAt = null;
+        ch.failureReason = null;
+      },
+    );
 
     return { postId: saved.postId };
   }
@@ -926,14 +924,12 @@ export class PostService {
     const work = await this.buildPublishWorkFromPost(post, upload);
 
     try {
-      const { postId: zernioPostId } = await this.mcpService.publishCreatePostBatch(
-        post.userId,
-        {
+      const { postId: zernioPostId } =
+        await this.mcpService.publishCreatePostBatch(post.userId, {
           platforms: work.map((w) => this.workToPlatformPayload(w)),
           publishNow: true,
           scheduledAt: null,
-        },
-      );
+        });
 
       const now = new Date();
       const saved = await this.posts.save({
@@ -978,9 +974,7 @@ export class PostService {
 
     for (const plat of post.channels ?? []) {
       const key = plat.trim().toLowerCase();
-      const row = channels.find(
-        (c) => c.channel.trim().toLowerCase() === key,
-      );
+      const row = channels.find((c) => c.channel.trim().toLowerCase() === key);
       if (!row || row.status === UploadChannelStatus.Skipped) continue;
       const accountId = accountByChannel.get(key)?.trim();
       if (!accountId) {
@@ -996,8 +990,7 @@ export class PostService {
       }
       const mediaUrls = this.rowAllMedia(row);
       const mediaUrl = mediaUrls[0] ?? null;
-      const youtubeTitle =
-        key === 'youtube' ? this.rowYoutubeTitle(row) : null;
+      const youtubeTitle = key === 'youtube' ? this.rowYoutubeTitle(row) : null;
       work.push({
         row,
         accountId,
@@ -1060,7 +1053,7 @@ export class PostService {
         platformUrl: null,
         publishedAt: now,
         failureReason: null,
-      })) as Prisma.InputJsonValue,
+      })),
     });
     await this.ensurePostAnalyticsRecord(created);
     return created;
@@ -1171,7 +1164,7 @@ export class PostService {
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         succeeded += 1;
-        const postId = postIds[index]!;
+        const postId = postIds[index];
         if (result.value.skipped.length > 0) {
           skipped[postId] = result.value.skipped;
         }

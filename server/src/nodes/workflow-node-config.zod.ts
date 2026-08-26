@@ -11,6 +11,7 @@ import {
   NodeFormalityLevel,
   NodeImageQuality,
   NodeImageStyle,
+  NodeImageTemplate,
   NodeMediaSourceType,
   NodeOutputFormat,
   NodeSummaryLength,
@@ -74,14 +75,23 @@ const textConfigSchema = z
 const imageConfigSchema = z
   .object({
     laneId: laneIdSchema,
+    channel: z.string().min(1).optional(),
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     size: z.string().min(1).optional(),
     quality: z
       .enum([NodeImageQuality.Standard, NodeImageQuality.Hd])
       .optional(),
-    style: z
-      .enum([NodeImageStyle.Natural, NodeImageStyle.Vivid])
+    style: z.enum([NodeImageStyle.Natural, NodeImageStyle.Vivid]).optional(),
+    template: z
+      .enum([
+        NodeImageTemplate.Auto,
+        NodeImageTemplate.AdCreative,
+        NodeImageTemplate.ProductMockup,
+        NodeImageTemplate.Infographic,
+        NodeImageTemplate.Photorealistic,
+        NodeImageTemplate.Lifestyle,
+      ])
       .optional(),
     aspectRatio: imageAspectForUi.optional(),
     negativePrompt: z.string().max(2000).optional(),
@@ -152,7 +162,9 @@ function snapToNearestDuration(
   return best;
 }
 
-function snapToSoraDuration(raw: unknown): (typeof SORA_DURATION_LITERALS)[number] {
+function snapToSoraDuration(
+  raw: unknown,
+): (typeof SORA_DURATION_LITERALS)[number] {
   return snapToNearestDuration(
     raw,
     SORA_DURATION_LITERALS,
@@ -176,9 +188,7 @@ const videoModeSchema = z.enum(['cinematic', 'presenter']).optional();
 
 const heygenOrientationSchema = z.enum(['landscape', 'portrait']).optional();
 
-const heygenExpressivenessSchema = z
-  .enum(['low', 'medium', 'high'])
-  .optional();
+const heygenExpressivenessSchema = z.enum(['low', 'medium', 'high']).optional();
 
 const videoConfigObjectSchema = z
   .object({
@@ -281,7 +291,9 @@ export const IntelligenceSearchType = z.enum([
   'all',
   'custom',
 ]);
-export type IntelligenceSearchTypeValue = z.infer<typeof IntelligenceSearchType>;
+export type IntelligenceSearchTypeValue = z.infer<
+  typeof IntelligenceSearchType
+>;
 
 const intelligenceConfigObjectSchema = z
   .object({
@@ -292,8 +304,8 @@ const intelligenceConfigObjectSchema = z
   })
   .strict();
 
-const intelligenceConfigSchema = intelligenceConfigObjectSchema
-  .superRefine((val, ctx) => {
+const intelligenceConfigSchema = intelligenceConfigObjectSchema.superRefine(
+  (val, ctx) => {
     if (val.searchType === 'custom') {
       const p = val.customPrompt?.trim();
       if (!p) {
@@ -304,7 +316,8 @@ const intelligenceConfigSchema = intelligenceConfigObjectSchema
         });
       }
     }
-  });
+  },
+);
 
 function configSchemaShapeKeys(schema: z.ZodTypeAny): string[] {
   if (schema instanceof z.ZodObject) {
@@ -349,6 +362,7 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     model: 'gpt-image-1',
     quality: NodeImageQuality.Standard,
     style: NodeImageStyle.Natural,
+    template: NodeImageTemplate.Auto,
     aspectRatio: NodeAspectRatio.R1x1,
     size: aspectRatioToOpenAiImageSize('1:1', 'gpt-image-1'),
   },
@@ -423,7 +437,7 @@ function mergeWithDefaults(
     out.size = coerceOpenAiImageSize(String(out.size), model);
   }
 
-  return out as WorkflowNodeConfig;
+  return out;
 }
 
 export type ParseWorkflowNodeConfigResult =

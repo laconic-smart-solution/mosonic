@@ -25,16 +25,8 @@ import { ContentService } from './content.service';
     forwardRef(() => UploadModule),
     WorkflowModule,
   ],
-  controllers: [
-    ContentController,
-    FileProxyController,
-    ImageFileController,
-  ],
-  providers: [
-    ContentService,
-    FileProxyService,
-    ImageFileService,
-  ],
+  controllers: [ContentController, FileProxyController, ImageFileController],
+  providers: [ContentService, FileProxyService, ImageFileService],
   exports: [ContentService, FileProxyService],
 })
 export class ContentModule {}

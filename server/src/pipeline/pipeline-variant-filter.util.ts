@@ -1,5 +1,8 @@
 import type { Prisma } from '@prisma/client';
-import type { PipelineNodeExecution, PipelineRecord } from '../domain/pipeline/pipeline.types';
+import type {
+  PipelineNodeExecution,
+  PipelineRecord,
+} from '../domain/pipeline/pipeline.types';
 import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 
 /**

@@ -15,7 +15,10 @@ import { User } from '../users/schemas/user.schema';
 import { CostService } from './cost.service';
 import { UpdateBudgetSettingsDto } from './dto/budget-settings.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
-import { parseDashboardFromIsoDay, parseDashboardToIsoDay } from './dashboard-date.util';
+import {
+  parseDashboardFromIsoDay,
+  parseDashboardToIsoDay,
+} from './dashboard-date.util';
 
 @UseGuards(JwtAuthGuard)
 @Controller('cost')
@@ -23,10 +26,7 @@ export class CostController {
   constructor(private readonly costService: CostService) {}
 
   @Get('dashboard')
-  async getDashboard(
-    @Req() req: Request,
-    @Query() query: DashboardQueryDto,
-  ) {
+  async getDashboard(@Req() req: Request, @Query() query: DashboardQueryDto) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.costService.getDashboard(
       auth.userId,

@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
@@ -75,7 +80,9 @@ export class MediaNodeCompletionService {
     }
     const rule = await this.rules.findById(payload.ruleId);
     if (!rule) {
-      throw new UnprocessableEntityException(`Rule ${payload.ruleId} not found`);
+      throw new UnprocessableEntityException(
+        `Rule ${payload.ruleId} not found`,
+      );
     }
 
     const edges = this.pipelineRepo.getEdgesForPipeline(pipeline);
@@ -90,7 +97,7 @@ export class MediaNodeCompletionService {
       rule: executionRule,
       contentPrompt: payload.contentPrompt,
       previousOutputs,
-      config: (node.config ?? {}) as WorkflowNodeConfig,
+      config: node.config ?? {},
       pipelineId: payload.pipelineId,
       nodeId: payload.nodeId,
     };
@@ -235,10 +242,13 @@ export class MediaNodeCompletionService {
     const nodeConfig = (node.config ?? {}) as WorkflowNodeConfig;
     const mode = getVideoGenerationMode(nodeConfig);
     const videoProvider =
-      context?.videoProvider ??
-      (mode === 'presenter' ? 'heygen' : 'sora');
+      context?.videoProvider ?? (mode === 'presenter' ? 'heygen' : 'sora');
 
-    const logMessage = this.formatVideoFailureMessage(error, videoProvider, context?.stage);
+    const logMessage = this.formatVideoFailureMessage(
+      error,
+      videoProvider,
+      context?.stage,
+    );
     const errorDetail = {
       pipelineId: payload.pipelineId,
       workflowId: payload.workflowId,
@@ -339,7 +349,8 @@ export class MediaNodeCompletionService {
       return;
     }
     const vc = result.videoCost;
-    const isHeygen = vc.model.includes('heygen') || vc.model === 'heygen-presenter';
+    const isHeygen =
+      vc.model.includes('heygen') || vc.model === 'heygen-presenter';
     const dto: RecordCostDto = {
       userId: payload.userId,
       pipelineRef: payload.pipelineId,

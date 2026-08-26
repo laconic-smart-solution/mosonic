@@ -124,12 +124,7 @@ function buildSystemPrompt(
 }
 
 function buildHumanPrompt(sourceOutput: string): string {
-  return [
-    'Summarize the following content:',
-    '',
-    sourceOutput,
-    '',
-  ]
+  return ['Summarize the following content:', '', sourceOutput, '']
     .filter(Boolean)
     .join('\n');
 }

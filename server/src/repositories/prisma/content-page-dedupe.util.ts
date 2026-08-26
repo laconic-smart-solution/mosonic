@@ -16,7 +16,9 @@ export function contentVariantDedupeKey(row: {
   return `${row.pipelineRef}\0${row.variantId ?? ''}`;
 }
 
-export function dedupeContentIndexRows(rows: ContentIndexRow[]): ContentIndexRow[] {
+export function dedupeContentIndexRows(
+  rows: ContentIndexRow[],
+): ContentIndexRow[] {
   const byKey = new Map<string, ContentIndexRow>();
   for (const row of rows) {
     const key = contentVariantDedupeKey(row);

@@ -39,7 +39,10 @@ export function mergeIntakeWithExtracted(
       ...draft.contentGuidelines,
       seoGuidelines: { ...draft.contentGuidelines.seoGuidelines },
     },
-    channels: draft.channels.map((c) => ({ ...c, contentMapping: { ...c.contentMapping } })),
+    channels: draft.channels.map((c) => ({
+      ...c,
+      contentMapping: { ...c.contentMapping },
+    })),
   };
 
   const name = trimmed(intake.brandName);
@@ -144,7 +147,10 @@ function applyPurposeDefaults(
     if (!trimmed(intake.callToAction) && isGuidedFieldOverride(intake)) {
       draft.brand.callToAction = 'Learn more';
     }
-    if (intake.useHashtags === false || intake.contentPurpose === 'internal_comms') {
+    if (
+      intake.useHashtags === false ||
+      intake.contentPurpose === 'internal_comms'
+    ) {
       if (!cleanedStrings(intake.hashtagStrategy)) {
         draft.campaign.hashtagStrategy = [];
       }
@@ -166,11 +172,11 @@ export function hasMeaningfulGuidedIntake(intake: RuleIntakeAnswers): boolean {
   if (intake.mode !== 'guided') return false;
   return Boolean(
     intake.contentPurpose ||
-      (intake.channels && intake.channels.length > 0) ||
-      trimmed(intake.brandName) ||
-      trimmed(intake.audienceDescription) ||
-      trimmed(intake.additionalNotes) ||
-      nonEmptyArray(intake.goals),
+    (intake.channels && intake.channels.length > 0) ||
+    trimmed(intake.brandName) ||
+    trimmed(intake.audienceDescription) ||
+    trimmed(intake.additionalNotes) ||
+    nonEmptyArray(intake.goals),
   );
 }
 

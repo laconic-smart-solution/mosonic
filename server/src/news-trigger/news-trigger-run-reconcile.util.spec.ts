@@ -25,7 +25,8 @@ describe('reconcileRunningManualLog', () => {
               Promise.resolve({
                 runId: 'run-1',
                 completedAt: new Date('2026-05-27T10:00:00Z'),
-                errorMessage: 'Run finished in the queue but the result was not saved. Check worker/API logs and try again.',
+                errorMessage:
+                  'Run finished in the queue but the result was not saved. Check worker/API logs and try again.',
                 pipelinesTriggered: 0,
                 details: [],
               }),

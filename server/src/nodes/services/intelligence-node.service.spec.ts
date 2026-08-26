@@ -41,10 +41,7 @@ describe('IntelligenceNodeService', () => {
       }),
     };
     const events = { emitToPipeline: jest.fn() };
-    const service = new IntelligenceNodeService(
-      llm as never,
-      events as never,
-    );
+    const service = new IntelligenceNodeService(llm as never, events as never);
 
     const input: NodeExecutionInput = {
       pipelineRef: 'p1',

@@ -116,7 +116,9 @@ export class NewsRelevanceService {
       ]);
 
       const text =
-        typeof result.content === 'string' ? result.content : String(result.content);
+        typeof result.content === 'string'
+          ? result.content
+          : String(result.content);
       const parsed = this.safeParse(text);
 
       if (parsed) {

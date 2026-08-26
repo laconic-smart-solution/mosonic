@@ -18,9 +18,7 @@ import type {
   NodeExecutionResult,
   PreviousOutputs,
 } from '../types/node-execution.types';
-import {
-  extractUsageFromAiMessage,
-} from '../langchain-usage.util';
+import { extractUsageFromAiMessage } from '../langchain-usage.util';
 
 type AdaptConfig = {
   channel?: string;
@@ -49,7 +47,8 @@ export class AdaptNodeService {
     const channelEntry =
       rule.channels?.find(
         (c) => c.channel.trim().toLowerCase() === channelKey.toLowerCase(),
-      ) ?? ({
+      ) ??
+      ({
         channel: channelKey,
         priority: 'medium',
         contentStyle: config.contentStyle ?? '',
@@ -77,7 +76,9 @@ export class AdaptNodeService {
       `Channel: ${channelEntry.channel}`,
       `Content style: ${channelEntry.contentStyle || config.contentStyle || 'platform-native'}`,
       `Caption mapping prefers: ${mapping.caption}`,
-      mapping.media ? `Include a note if visual (${mapping.media}) is expected from upstream.` : '',
+      mapping.media
+        ? `Include a note if visual (${mapping.media}) is expected from upstream.`
+        : '',
       '',
       `Brand: ${rule.brand.brandName}`,
       `Tone: ${rule.brand.brandTone.join(', ')}`,

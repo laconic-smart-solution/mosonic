@@ -42,16 +42,20 @@ export function formatIntakeForContext(intake: RuleIntakeAnswers): string {
     lines.push(`Additional notes: ${intake.additionalNotes!.trim()}`);
   }
 
-  if (nonEmpty(intake.brandName)) lines.push(`Brand name: ${intake.brandName!.trim()}`);
-  if (nonEmpty(intake.industry)) lines.push(`Industry: ${intake.industry!.trim()}`);
+  if (nonEmpty(intake.brandName))
+    lines.push(`Brand name: ${intake.brandName!.trim()}`);
+  if (nonEmpty(intake.industry))
+    lines.push(`Industry: ${intake.industry!.trim()}`);
   if (nonEmpty(intake.brandDescription)) {
     lines.push(`Brand description: ${intake.brandDescription!.trim()}`);
   }
   if (nonEmptyArray(intake.brandTone)) {
     lines.push(`Brand tone: ${intake.brandTone!.filter(Boolean).join(', ')}`);
   }
-  if (nonEmpty(intake.brandVoice)) lines.push(`Brand voice: ${intake.brandVoice!.trim()}`);
-  if (nonEmpty(intake.callToAction)) lines.push(`CTA: ${intake.callToAction!.trim()}`);
+  if (nonEmpty(intake.brandVoice))
+    lines.push(`Brand voice: ${intake.brandVoice!.trim()}`);
+  if (nonEmpty(intake.callToAction))
+    lines.push(`CTA: ${intake.callToAction!.trim()}`);
 
   if (nonEmpty(intake.audienceDescription)) {
     lines.push(`Audience: ${intake.audienceDescription!.trim()}`);
@@ -86,10 +90,14 @@ export function formatIntakeForContext(intake: RuleIntakeAnswers): string {
   if (intake.useHashtags === false) {
     lines.push('Hashtags: user disabled — use empty hashtagStrategy.');
   } else if (nonEmptyArray(intake.hashtagStrategy)) {
-    lines.push(`Hashtags: ${intake.hashtagStrategy!.filter(Boolean).join(', ')}`);
+    lines.push(
+      `Hashtags: ${intake.hashtagStrategy!.filter(Boolean).join(', ')}`,
+    );
   }
   if (nonEmptyArray(intake.contentFormats)) {
-    lines.push(`Content formats: ${intake.contentFormats!.filter(Boolean).join(', ')}`);
+    lines.push(
+      `Content formats: ${intake.contentFormats!.filter(Boolean).join(', ')}`,
+    );
   }
   if (intake.postingFrequency) {
     lines.push(`Posting frequency: ${intake.postingFrequency}`);
@@ -101,7 +109,8 @@ export function formatIntakeForContext(intake: RuleIntakeAnswers): string {
   }
 
   if (nonEmptyArray(intake.dos)) lines.push(`Do: ${intake.dos!.join(', ')}`);
-  if (nonEmptyArray(intake.donts)) lines.push(`Do not: ${intake.donts!.join(', ')}`);
+  if (nonEmptyArray(intake.donts))
+    lines.push(`Do not: ${intake.donts!.join(', ')}`);
   if (nonEmptyArray(intake.requiredElements)) {
     lines.push(`Required elements: ${intake.requiredElements!.join(', ')}`);
   }

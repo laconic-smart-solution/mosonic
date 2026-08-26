@@ -30,9 +30,7 @@ import {
   supportsAnalyticsChannel,
 } from './post-analytics.util';
 import { isZernioRemotePostId } from './is-zernio-remote-post-id.util';
-import {
-  PostStatus,
-} from './schemas/post.schema';
+import { PostStatus } from './schemas/post.schema';
 import {
   PlatformMetricSyncStatus,
   PostAnalyticsSyncStatus,
@@ -100,7 +98,7 @@ export class PostAnalyticsService {
     return {
       postId: doc.postId,
       zernioPostId: doc.zernioPostId,
-      syncStatus: doc.syncStatus as PostAnalyticsSyncStatus,
+      syncStatus: doc.syncStatus,
       pulledAt: doc.pulledAt.toISOString(),
       period: {
         from: from.toISOString(),
@@ -121,7 +119,7 @@ export class PostAnalyticsService {
   }
 
   async ensureForPost(post: PostRecord): Promise<PostAnalyticsRecord | null> {
-    if (!isPostMetricsEligible(post.status as PostStatus)) {
+    if (!isPostMetricsEligible(post.status)) {
       return null;
     }
     const zernioPostId = post.zernioPostId?.trim();
@@ -148,10 +146,7 @@ export class PostAnalyticsService {
     });
   }
 
-  private platformUrlFromRaw(
-    raw: unknown,
-    platform: string,
-  ): string | null {
+  private platformUrlFromRaw(raw: unknown, platform: string): string | null {
     if (!raw || typeof raw !== 'object') return null;
     const root = raw as Record<string, unknown>;
     const platformAnalytics = Array.isArray(root.platformAnalytics)
@@ -161,7 +156,12 @@ export class PostAnalyticsService {
     for (const item of platformAnalytics) {
       if (!item || typeof item !== 'object') continue;
       const row = item as Record<string, unknown>;
-      if (String(row.platform ?? '').trim().toLowerCase() !== key) continue;
+      if (
+        String(row.platform ?? '')
+          .trim()
+          .toLowerCase() !== key
+      )
+        continue;
       const url = row.platformPostUrl;
       return typeof url === 'string' && url.trim() ? url.trim() : null;
     }
@@ -243,7 +243,7 @@ export class PostAnalyticsService {
     if (!post) {
       throw new NotFoundException(`Post ${postId} not found`);
     }
-    if (!isPostMetricsEligible(post.status as PostStatus)) {
+    if (!isPostMetricsEligible(post.status)) {
       throw new BadRequestException(
         'Analytics are only available for published or partial posts.',
       );
@@ -254,9 +254,7 @@ export class PostAnalyticsService {
       const looksLikeRedNote =
         /^rednote:/i.test(zernioPostId ?? '') ||
         /xiaohongshu|rednote\.com/i.test(zernioPostId ?? '') ||
-        (post.channels ?? []).some(
-          (c) => c.trim().toLowerCase() === 'rednote',
-        );
+        (post.channels ?? []).some((c) => c.trim().toLowerCase() === 'rednote');
       throw new BadRequestException(
         looksLikeRedNote
           ? 'RedNote does not support analytics.'
@@ -267,7 +265,7 @@ export class PostAnalyticsService {
     await this.ensureForPost(post);
 
     const channels = publishedChannelsFromPost({
-      status: post.status as PostStatus,
+      status: post.status,
       platformResults: postPlatformResults(post),
       channels: post.channels,
     });
@@ -323,7 +321,9 @@ export class PostAnalyticsService {
     return this.toDto(updated);
   }
 
-  private emptyPlatformMetrics(channels: string[]): PostAnalyticsDto['platformMetrics'] {
+  private emptyPlatformMetrics(
+    channels: string[],
+  ): PostAnalyticsDto['platformMetrics'] {
     return channels.map((platform) => ({
       platform,
       metrics: null,
@@ -334,11 +334,11 @@ export class PostAnalyticsService {
   }
 
   async getDtoForPost(post: PostRecord): Promise<PostAnalyticsDto | null> {
-    if (!isPostMetricsEligible(post.status as PostStatus)) {
+    if (!isPostMetricsEligible(post.status)) {
       return null;
     }
     const channels = publishedChannelsFromPost({
-      status: post.status as PostStatus,
+      status: post.status,
       platformResults: postPlatformResults(post),
       channels: post.channels,
     });
@@ -505,8 +505,7 @@ export class PostAnalyticsService {
 
   private async tryAcquireWeeklyLock(instanceId: string): Promise<boolean> {
     const leaseMs =
-      Number(this.config.get('ANALYTICS_WEEKLY_PULL_LOCK_LEASE_MS')) ||
-      600_000;
+      Number(this.config.get('ANALYTICS_WEEKLY_PULL_LOCK_LEASE_MS')) || 600_000;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + leaseMs);
 
@@ -560,7 +559,7 @@ export class PostAnalyticsService {
           continue;
         }
         const channels = publishedChannelsFromPost({
-          status: post.status as PostStatus,
+          status: post.status,
           platformResults: postPlatformResults(post),
           channels: post.channels,
         });

@@ -42,10 +42,12 @@ export class AuthCookieService {
   }
 
   private refreshPath(): string {
-    return this.config.get<string>('AUTH_COOKIE_REFRESH_PATH')?.trim() || '/auth';
+    return (
+      this.config.get<string>('AUTH_COOKIE_REFRESH_PATH')?.trim() || '/auth'
+    );
   }
 
-  private sameSite(): boolean | "lax" | "strict" | "none" {
+  private sameSite(): boolean | 'lax' | 'strict' | 'none' {
     const raw =
       this.config.get<string>('AUTH_COOKIE_SAME_SITE')?.trim().toLowerCase() ||
       'lax';
@@ -92,7 +94,9 @@ export class AuthCookieService {
   }
 
   /** Parse access token from a raw Cookie header (e.g. Socket.IO handshake). */
-  readAccessTokenFromCookieHeader(cookieHeader: string | undefined): string | null {
+  readAccessTokenFromCookieHeader(
+    cookieHeader: string | undefined,
+  ): string | null {
     if (!cookieHeader?.trim()) return null;
     const name = this.accessName();
     for (const part of cookieHeader.split(';')) {

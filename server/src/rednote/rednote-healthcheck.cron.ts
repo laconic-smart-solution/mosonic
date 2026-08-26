@@ -23,9 +23,7 @@ export class RedNoteHealthcheckCron {
 
   @Cron(process.env.REDNOTE_HEALTHCHECK_CRON || '0 */6 * * *')
   async runHealthCheck(): Promise<void> {
-    const ttlHours = Number(
-      this.config.get('REDNOTE_SESSION_TTL_HOURS') ?? 12,
-    );
+    const ttlHours = Number(this.config.get('REDNOTE_SESSION_TTL_HOURS') ?? 12);
     const staleAfterHours = Math.max(1, ttlHours - 2);
     const accounts = await this.socialAccounts.findAllActiveByProvider(
       SocialProvider.REDNOTE,

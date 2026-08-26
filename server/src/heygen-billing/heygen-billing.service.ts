@@ -26,7 +26,11 @@ export class HeygenBillingService {
   ) {}
 
   async getSummary(
-    range: SpendDateRange = parseSpendDateRange(undefined, undefined, DEFAULT_SPEND_DAYS),
+    range: SpendDateRange = parseSpendDateRange(
+      undefined,
+      undefined,
+      DEFAULT_SPEND_DAYS,
+    ),
   ): Promise<ApiProviderBillingSummaryDto> {
     const settings = await this.settings.ensureSettings('heygen');
     const apiKey = this.config.get<string>('HEYGEN_API_KEY')?.trim() ?? '';

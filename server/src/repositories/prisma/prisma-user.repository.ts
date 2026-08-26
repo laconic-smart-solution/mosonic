@@ -170,7 +170,7 @@ export class PrismaUserRepository implements IUserRepository {
     return this.prisma.user.findMany({
       where: { userId: { in: userIds } },
       ...(select ? { select } : {}),
-    }) as Promise<UserRecord[]>;
+    });
   }
 
   async searchAdmin(

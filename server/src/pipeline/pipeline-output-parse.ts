@@ -27,7 +27,10 @@ export function buildNodeOutputMapFromPipeline(
   const nodeOutputs: Record<string, Record<string, unknown>> = {};
   for (const raw of nodes) {
     if (!raw || typeof raw !== 'object') continue;
-    const node = raw as { nodeId?: string; output?: string | Record<string, unknown> | null };
+    const node = raw as {
+      nodeId?: string;
+      output?: string | Record<string, unknown> | null;
+    };
     if (!node.nodeId) continue;
     const parsed = parsePipelineNodeOutputString(node.output ?? null);
     if (parsed && Object.keys(parsed).length > 0) {

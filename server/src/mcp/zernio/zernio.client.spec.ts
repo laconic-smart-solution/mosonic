@@ -18,9 +18,9 @@ describe('pickZernioProfileForUser', () => {
   ];
 
   it('prefers an exact name match', () => {
-    expect(
-      pickZernioProfileForUser(profiles, 'user@example.com')?._id,
-    ).toBe('p2');
+    expect(pickZernioProfileForUser(profiles, 'user@example.com')?._id).toBe(
+      'p2',
+    );
   });
 
   it('falls back to the default profile', () => {

@@ -28,7 +28,10 @@ export function adaptChannelHumanReminder(channel: string): string | null {
 /**
  * Safety net after LLM generation — keeps TikTok adapt output publishable for photo posts.
  */
-export function enforceAdaptChannelLimits(channel: string, text: string): string {
+export function enforceAdaptChannelLimits(
+  channel: string,
+  text: string,
+): string {
   const key = normalizeChannelKey(channel);
   if (key !== 'tiktok') return text;
 

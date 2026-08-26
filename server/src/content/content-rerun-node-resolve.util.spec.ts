@@ -68,9 +68,7 @@ describe('resolveRerunWorkflowNodeId', () => {
   });
 
   it('returns direct match when workflow already uses the requested id', () => {
-    expect(
-      resolveRerunWorkflowNodeId('text', workflowNodes, [], []),
-    ).toEqual({
+    expect(resolveRerunWorkflowNodeId('text', workflowNodes, [], [])).toEqual({
       outputNodeId: 'text',
       workflowNodeId: 'text',
     });
@@ -83,7 +81,13 @@ describe('resolveRerunWorkflowNodeId', () => {
       resolveRerunWorkflowNodeId(
         materializedId,
         [{ nodeId: uuid, type: 'image_generation', config: {} }],
-        [{ nodeId: materializedId, type: 'image_generation', lane: 'facebook' }],
+        [
+          {
+            nodeId: materializedId,
+            type: 'image_generation',
+            lane: 'facebook',
+          },
+        ],
         undefined,
       ),
     ).toEqual({

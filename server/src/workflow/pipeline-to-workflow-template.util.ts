@@ -245,12 +245,7 @@ function resolveTemplateNodeId(
   const group = groups.get(templateId);
   if (!group?.length) return materializedId;
   if (
-    isSharedLaneTemplate(
-      group,
-      lanes,
-      group[0]!.type,
-      heterogeneousLaneEntries,
-    )
+    isSharedLaneTemplate(group, lanes, group[0].type, heterogeneousLaneEntries)
   ) {
     return templateId;
   }
@@ -480,7 +475,9 @@ function ensureLaneAdaptEntries(
 }
 
 /** Keep at most one adapt node per lane (avoids adapt→adapt when collapsing/applying). */
-export function dedupeAdaptNodesPerLane(nodes: GraphNodeSpec[]): GraphNodeSpec[] {
+export function dedupeAdaptNodesPerLane(
+  nodes: GraphNodeSpec[],
+): GraphNodeSpec[] {
   const laneIds = [
     ...new Set(nodes.map(readLaneIdFromSpec).filter((lane) => lane.length > 0)),
   ];
@@ -496,7 +493,7 @@ export function dedupeAdaptNodesPerLane(nodes: GraphNodeSpec[]): GraphNodeSpec[]
     const canonicalId = perLaneTemplateNodeId('adapt', lane);
     const keep =
       adapts.find((n) => n.nodeId === canonicalId) ??
-      [...adapts].sort((a, b) => a.order - b.order)[0]!;
+      [...adapts].sort((a, b) => a.order - b.order)[0];
 
     for (const adapt of adapts) {
       if (adapt.nodeId !== keep.nodeId) toRemove.add(adapt.nodeId);
@@ -549,7 +546,9 @@ function buildLaneTemplateOrder(
     .sort((a, b) => {
       const typeA = groups.get(a)?.[0]?.type ?? WorkflowNodeType.Adapt;
       const typeB = groups.get(b)?.[0]?.type ?? WorkflowNodeType.Adapt;
-      return laneTypePriorityForCollapse(typeA) - laneTypePriorityForCollapse(typeB);
+      return (
+        laneTypePriorityForCollapse(typeA) - laneTypePriorityForCollapse(typeB)
+      );
     });
 
   return [...bestOrder, ...missing];
@@ -605,7 +604,7 @@ function collapseMaterialized(
   }
 
   const fanOutOrder = fanOutSourceId
-    ? trunkNodes.find((t) => t.nodeId === fanOutSourceId)?.order ?? Infinity
+    ? (trunkNodes.find((t) => t.nodeId === fanOutSourceId)?.order ?? Infinity)
     : Infinity;
 
   const preBranchTrunk = trunkNodes
@@ -655,7 +654,7 @@ function collapseMaterialized(
   for (const templateId of laneTemplateOrder) {
     const group = groups.get(templateId);
     if (!group?.length) continue;
-    const representative = group[0]!;
+    const representative = group[0];
     const isShared = isSharedLaneTemplate(
       group,
       lanes,
@@ -768,7 +767,8 @@ function collapseMaterialized(
     if (laneSuffix) {
       const baseId = n.nodeId.split('__')[0];
       const materialized = group?.find(
-        (row) => laneKeyForPipelineNode(row, lanes) === normalizeLaneId(laneSuffix),
+        (row) =>
+          laneKeyForPipelineNode(row, lanes) === normalizeLaneId(laneSuffix),
       );
       if (materialized) {
         const fromMaterialized = layout[materialized.nodeId];

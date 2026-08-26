@@ -25,12 +25,26 @@ describe('workflow-graph.util', () => {
   ];
 
   it('detects cycles', () => {
-    expect(hasCycle(['a', 'b', 'c'], [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'c', to: 'a' }])).toBe(true);
+    expect(
+      hasCycle(
+        ['a', 'b', 'c'],
+        [
+          { from: 'a', to: 'b' },
+          { from: 'b', to: 'c' },
+          { from: 'c', to: 'a' },
+        ],
+      ),
+    ).toBe(true);
     expect(hasCycle(['a', 'b'], [{ from: 'a', to: 'b' }])).toBe(false);
   });
 
   it('finds roots and ancestors', () => {
-    expect(getRoots(dagNodes.map((n) => n.nodeId), dagEdges)).toEqual(['text']);
+    expect(
+      getRoots(
+        dagNodes.map((n) => n.nodeId),
+        dagEdges,
+      ),
+    ).toEqual(['text']);
     expect(getAncestors(dagEdges, 'video')).toEqual(
       new Set(['text', 'image', 'trans']),
     );
@@ -61,7 +75,7 @@ describe('workflow-graph.util', () => {
     expect(
       areAllDependenciesMet('video', pipelineNodes, dagEdges, terminal),
     ).toBe(false);
-    pipelineNodes[2]!.status = 'completed';
+    pipelineNodes[2].status = 'completed';
     expect(
       areAllDependenciesMet('video', pipelineNodes, dagEdges, terminal),
     ).toBe(true);
@@ -214,7 +228,11 @@ describe('workflow-graph.util', () => {
   it('assignOrderFromGraph keeps disconnected nodes after the connected graph', () => {
     const nodes = [
       { nodeId: 'keyword', type: WorkflowNodeType.KeywordPlanner, order: 1 },
-      { nodeId: 'orphan_video', type: WorkflowNodeType.VideoGeneration, order: 2 },
+      {
+        nodeId: 'orphan_video',
+        type: WorkflowNodeType.VideoGeneration,
+        order: 2,
+      },
       { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 3 },
       { nodeId: 'branch', type: WorkflowNodeType.Branch, order: 4 },
     ];
@@ -233,8 +251,16 @@ describe('workflow-graph.util', () => {
     expect(() =>
       validateWorkflowGraph(
         [
-          { nodeId: 'keyword', type: WorkflowNodeType.KeywordPlanner, order: 1 },
-          { nodeId: 'orphan_video', type: WorkflowNodeType.VideoGeneration, order: 2 },
+          {
+            nodeId: 'keyword',
+            type: WorkflowNodeType.KeywordPlanner,
+            order: 1,
+          },
+          {
+            nodeId: 'orphan_video',
+            type: WorkflowNodeType.VideoGeneration,
+            order: 2,
+          },
           { nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 3 },
           { nodeId: 'branch', type: WorkflowNodeType.Branch, order: 4 },
         ],

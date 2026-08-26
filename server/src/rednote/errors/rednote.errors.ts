@@ -1,6 +1,8 @@
 export class RedNoteSessionInvalidError extends Error {
   readonly code = 'REDNOTE_SESSION_INVALID' as const;
-  constructor(message = 'RedNote session is invalid or needs re-authentication') {
+  constructor(
+    message = 'RedNote session is invalid or needs re-authentication',
+  ) {
     super(message);
     this.name = 'RedNoteSessionInvalidError';
   }
@@ -39,7 +41,9 @@ export function isRedNoteSessionInvalidMessage(
 
 export class RedNoteConcurrentPublishError extends Error {
   readonly code = 'REDNOTE_CONCURRENT_PUBLISH' as const;
-  constructor(message = 'Another RedNote publish is in progress for this account') {
+  constructor(
+    message = 'Another RedNote publish is in progress for this account',
+  ) {
     super(message);
     this.name = 'RedNoteConcurrentPublishError';
   }
@@ -55,7 +59,9 @@ export class RedNoteLoginInProgressError extends Error {
 
 export class RedNoteSelectorMismatchError extends Error {
   readonly code = 'REDNOTE_SELECTOR_MISMATCH' as const;
-  constructor(message = 'RedNote page selectors no longer match — UI may have changed') {
+  constructor(
+    message = 'RedNote page selectors no longer match — UI may have changed',
+  ) {
     super(message);
     this.name = 'RedNoteSelectorMismatchError';
   }

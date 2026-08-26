@@ -5,13 +5,13 @@ import type {
   ContentRecord,
   ContentUserEdits,
 } from '../../domain/content/content.types';
-import type { ContentPageItemDto, ContentPageQueryDto } from '../../content/dto/content-page-query.dto';
+import type {
+  ContentPageItemDto,
+  ContentPageQueryDto,
+} from '../../content/dto/content-page-query.dto';
 
 export interface IContentRepository {
-  findById(
-    contentId: string,
-    auth: TenancyAuth,
-  ): Promise<ContentRecord | null>;
+  findById(contentId: string, auth: TenancyAuth): Promise<ContentRecord | null>;
   findByIdLean(
     contentId: string,
     auth: TenancyAuth,
@@ -53,10 +53,7 @@ export interface IContentRepository {
   ): Promise<void>;
   countDrafts(auth: TenancyAuth): Promise<number>;
   countSince(createdAtGte: Date): Promise<number>;
-  findRecent(
-    auth: TenancyAuth,
-    limit: number,
-  ): Promise<ContentRecord[]>;
+  findRecent(auth: TenancyAuth, limit: number): Promise<ContentRecord[]>;
   findPageAdmin(
     filter: Prisma.ContentWhereInput,
     page: number,

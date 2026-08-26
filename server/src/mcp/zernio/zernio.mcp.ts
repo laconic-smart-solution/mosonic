@@ -44,7 +44,10 @@ export class ZernioMcpClient implements OnModuleInit {
   }
 
   private isMcpDisabled(): boolean {
-    const raw = this.config.get<string>('ZERNIO_MCP_DISABLED')?.trim().toLowerCase();
+    const raw = this.config
+      .get<string>('ZERNIO_MCP_DISABLED')
+      ?.trim()
+      .toLowerCase();
     return raw === '1' || raw === 'true' || raw === 'yes';
   }
 
@@ -98,8 +101,7 @@ export class ZernioMcpClient implements OnModuleInit {
     try {
       await this.connect();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : String(err);
+      const message = err instanceof Error ? err.message : String(err);
       this.connectError = message;
       this.connected = false;
       throw new Error(

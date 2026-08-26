@@ -57,10 +57,7 @@ export function computeVideoInitialDelayMs(
   const est = estimatedSeconds ?? 60;
   return Math.min(
     POLL_CONFIG.video.maxInitialDelayMs,
-    Math.max(
-      POLL_CONFIG.video.minInitialDelayMs,
-      Math.round(est * 1000 * 0.8),
-    ),
+    Math.max(POLL_CONFIG.video.minInitialDelayMs, Math.round(est * 1000 * 0.8)),
   );
 }
 

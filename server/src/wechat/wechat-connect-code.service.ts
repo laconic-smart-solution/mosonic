@@ -77,7 +77,7 @@ export class WechatConnectCodeService implements OnModuleDestroy {
     const bytes = randomBytes(length);
     let out = '';
     for (let i = 0; i < length; i++) {
-      out += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
+      out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
     }
     return out;
   }

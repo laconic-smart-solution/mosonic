@@ -64,7 +64,10 @@ export class PipelineNodeReviewService {
       return { success: true, noop: true };
     }
 
-    if (node.type === WorkflowNodeType.Merge || node.type === WorkflowNodeType.Branch) {
+    if (
+      node.type === WorkflowNodeType.Merge ||
+      node.type === WorkflowNodeType.Branch
+    ) {
       throw new BadRequestException('Structural nodes cannot be reviewed');
     }
 

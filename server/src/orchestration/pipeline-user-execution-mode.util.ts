@@ -21,5 +21,7 @@ export function effectiveUserExecutionMode(
 }
 
 export function isStepModeActive(pipeline: PipelineRecord): boolean {
-  return effectiveUserExecutionMode(pipeline) === PipelineUserExecutionMode.Step;
+  return (
+    effectiveUserExecutionMode(pipeline) === PipelineUserExecutionMode.Step
+  );
 }

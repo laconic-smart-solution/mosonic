@@ -24,9 +24,7 @@ export class PrismaWorkflowRepository implements IWorkflowRepository {
     ruleRef: string,
     auth?: TenancyAuth,
   ): Promise<WorkflowRecord | null> {
-    const where = auth
-      ? mergeTenancyWhere({ ruleRef }, auth)
-      : { ruleRef };
+    const where = auth ? mergeTenancyWhere({ ruleRef }, auth) : { ruleRef };
     return this.prisma.workflow.findFirst({
       where,
       orderBy: { createdAt: 'desc' },
@@ -66,7 +64,9 @@ export class PrismaWorkflowRepository implements IWorkflowRepository {
     sortBy: string,
     sortOrder: 'asc' | 'desc',
   ): Promise<{ rows: WorkflowRecord[]; total: number }> {
-    const orderBy = { [sortBy]: sortOrder } as Prisma.WorkflowOrderByWithRelationInput;
+    const orderBy = {
+      [sortBy]: sortOrder,
+    } as Prisma.WorkflowOrderByWithRelationInput;
     const [rows, total] = await Promise.all([
       this.prisma.workflow.findMany({
         where: filter,
@@ -91,7 +91,7 @@ export class PrismaWorkflowRepository implements IWorkflowRepository {
       }),
       this.prisma.workflow.count({ where: filter }),
     ]);
-    return { rows: rows as WorkflowRecord[], total };
+    return { rows: rows, total };
   }
 
   count(where: Prisma.WorkflowWhereInput): Promise<number> {

@@ -116,10 +116,7 @@ export function parseHeygenCallbackId(
 
 function extractHeygenErrorMessage(body: unknown, fallback: string): string {
   if (typeof body === 'object' && body !== null) {
-    if (
-      'message' in body &&
-      typeof (body as { message: unknown }).message === 'string'
-    ) {
+    if ('message' in body && typeof body.message === 'string') {
       return (body as { message: string }).message;
     }
     const nested = (body as { error?: { message?: unknown } }).error;
@@ -151,7 +148,10 @@ export class HeygenAssetsService {
     };
   }
 
-  private async parseHeygenJson<T>(resp: Response, context: string): Promise<T> {
+  private async parseHeygenJson<T>(
+    resp: Response,
+    context: string,
+  ): Promise<T> {
     const text = await resp.text().catch(() => '');
     let body: unknown;
     try {
@@ -221,9 +221,7 @@ export class HeygenAssetsService {
     }>(resp, 'HeyGen photo avatar');
 
     const avatarId =
-      data.data?.avatar_item?.id?.trim() ??
-      data.data?.avatar_id?.trim() ??
-      '';
+      data.data?.avatar_item?.id?.trim() ?? data.data?.avatar_id?.trim() ?? '';
     if (!avatarId) {
       throw new UnprocessableEntityException(
         'HeyGen photo avatar did not return avatar id',
@@ -301,10 +299,7 @@ export class HeygenAssetsService {
     hasMore: boolean;
     nextToken?: string;
   }> {
-    const limit = Math.min(
-      100,
-      Math.max(1, params?.limit ?? 20),
-    );
+    const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
     const query = new URLSearchParams({
       limit: String(limit),
       type: 'public',
@@ -384,8 +379,7 @@ export class HeygenAssetsService {
     }
 
     const buffer = Buffer.from(await resp.arrayBuffer());
-    const contentType =
-      resp.headers.get('content-type')?.trim() || 'audio/wav';
+    const contentType = resp.headers.get('content-type')?.trim() || 'audio/wav';
     return { buffer, contentType };
   }
 
@@ -436,12 +430,9 @@ export class HeygenAssetsService {
       video_id?: string;
     }>(resp, 'HeyGen video submit');
 
-    const videoId =
-      data.data?.video_id?.trim() ?? data.video_id?.trim() ?? '';
+    const videoId = data.data?.video_id?.trim() ?? data.video_id?.trim() ?? '';
     if (!videoId) {
-      throw new UnprocessableEntityException(
-        'HeyGen did not return video_id',
-      );
+      throw new UnprocessableEntityException('HeyGen did not return video_id');
     }
     return { videoId };
   }

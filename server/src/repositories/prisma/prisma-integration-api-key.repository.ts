@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/integration-api-key.repository.interface';
 
 @Injectable()
-export class PrismaIntegrationApiKeyRepository
-  implements IIntegrationApiKeyRepository
-{
+export class PrismaIntegrationApiKeyRepository implements IIntegrationApiKeyRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(

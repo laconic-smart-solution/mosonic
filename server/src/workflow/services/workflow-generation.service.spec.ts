@@ -80,7 +80,29 @@ describe('WorkflowGenerationService', () => {
       WorkflowNodeType.TextGeneration,
       WorkflowNodeType.Branch,
       WorkflowNodeType.Adapt,
+      WorkflowNodeType.ImageGeneration,
       WorkflowNodeType.Merge,
     ]);
+    const image = out.find((n) => n.type === WorkflowNodeType.ImageGeneration);
+    expect(image?.lane).toBe('instagram');
+  });
+
+  it('buildDefaultStructure still adds an image node for a rule channel outside the Q&A wizard set', () => {
+    const configGen = {
+      generateConfigs: jest.fn(),
+    } as unknown as WorkflowConfigGenerationService;
+    const youtubeOnlyRule = {
+      ruleId: 'r2',
+      name: 'Campaign',
+      channels: [
+        { channel: 'youtube', priority: 'high', contentStyle: 'visual' },
+      ],
+    } as Rule;
+
+    const svc = new WorkflowGenerationService(configGen);
+    const out = svc.buildDefaultStructure(youtubeOnlyRule);
+
+    const image = out.find((n) => n.type === WorkflowNodeType.ImageGeneration);
+    expect(image).toBeDefined();
   });
 });

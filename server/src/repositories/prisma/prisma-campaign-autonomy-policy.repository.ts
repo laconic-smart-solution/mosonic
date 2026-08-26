@@ -9,13 +9,13 @@ import type {
 import { mergeTenancyWhere } from './prisma.util';
 
 @Injectable()
-export class PrismaCampaignAutonomyPolicyRepository
-  implements ICampaignAutonomyPolicyRepository
-{
+export class PrismaCampaignAutonomyPolicyRepository implements ICampaignAutonomyPolicyRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findByRuleRef(ruleRef: string): Promise<CampaignAutonomyPolicyRecord | null> {
-    return this.prisma.campaignAutonomyPolicy.findUnique({ where: { ruleRef } });
+    return this.prisma.campaignAutonomyPolicy.findUnique({
+      where: { ruleRef },
+    });
   }
 
   findByRuleRefScoped(

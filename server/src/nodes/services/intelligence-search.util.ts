@@ -69,11 +69,13 @@ Return a structured brief ready to inform content generation.
 
 export function appendAnalyticsContextToPrompt(
   basePrompt: string,
-  ctx: {
-    topPerformers?: unknown[];
-    bottomPerformers?: unknown[];
-    pendingSuggestions?: unknown[];
-  } | undefined,
+  ctx:
+    | {
+        topPerformers?: unknown[];
+        bottomPerformers?: unknown[];
+        pendingSuggestions?: unknown[];
+      }
+    | undefined,
 ): string {
   if (!ctx) {
     return basePrompt;

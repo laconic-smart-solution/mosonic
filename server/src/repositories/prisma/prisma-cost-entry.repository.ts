@@ -108,9 +108,7 @@ export class PrismaCostEntryRepository implements ICostEntryRepository {
     return out;
   }
 
-  async sumForPipelines(
-    pipelineRefs: string[],
-  ): Promise<Map<string, number>> {
+  async sumForPipelines(pipelineRefs: string[]): Promise<Map<string, number>> {
     const rows = await this.prisma.costEntry.groupBy({
       by: ['pipelineRef'],
       where: { pipelineRef: { in: pipelineRefs } },

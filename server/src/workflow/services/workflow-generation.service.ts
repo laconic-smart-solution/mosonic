@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Rule } from '../../rule/schemas/rule.schema';
+import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 import type { WorkflowQAAnswersDto } from '../dto/workflow-qa-answers.dto';
 import {
   buildWorkflowNodes,
@@ -29,9 +31,7 @@ export const DEFAULT_WORKFLOW_STRUCTURE_ANSWERS: WorkflowQAAnswersDto = {
 export class WorkflowGenerationService {
   private readonly logger = new Logger(WorkflowGenerationService.name);
 
-  constructor(
-    private readonly configGen: WorkflowConfigGenerationService,
-  ) {}
+  constructor(private readonly configGen: WorkflowConfigGenerationService) {}
 
   /**
    * Deterministic default graph — no LLM, no AI config enrichment.
@@ -43,6 +43,25 @@ export class WorkflowGenerationService {
       DEFAULT_WORKFLOW_STRUCTURE_ANSWERS,
       ruleChannelIds,
     );
+    if (ruleChannelIds.length > 0) {
+      // The Q&A wizard's `generateImage`/`imageChannels` path only ever
+      // resolves to instagram/facebook/linkedin/tiktok (see
+      // `resolveQaNodeChannels`), so it can silently produce zero image
+      // nodes for a rule outside that set or with >1 channel. The default
+      // structure has no wizard behind it to pick channels, so add the
+      // image node directly, targeting the rule's first channel — this
+      // guarantees at least one lane gets an image node regardless of
+      // which channels the rule actually has.
+      logical.push({
+        nodeId: randomUUID(),
+        type: WorkflowNodeType.ImageGeneration,
+        order: logical.length + 1,
+        isLocked: false,
+        targetChannels: [ruleChannelIds[0]],
+        config: {},
+        userPrompt: '',
+      });
+    }
     const graph = toPersistableGraph(logical, ruleChannelIds);
     this.logger.log(
       `Default workflow structure: nodes=${graph.map((n) => n.type).join(' → ')}`,

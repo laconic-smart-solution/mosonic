@@ -29,7 +29,8 @@ export class PrismaPostAnalyticsRepository implements IPostAnalyticsRepository {
         zernioPostId: String(data.zernioPostId ?? ''),
         ruleRef: String(data.ruleRef ?? ''),
         userId: String(data.userId ?? ''),
-        syncStatus: (data.syncStatus as PostAnalyticsRecord['syncStatus']) ?? 'pending',
+        syncStatus:
+          (data.syncStatus as PostAnalyticsRecord['syncStatus']) ?? 'pending',
         pulledAt: (data.pulledAt as Date) ?? new Date(),
         period: data.period ?? {},
         platformMetrics: data.platformMetrics ?? [],

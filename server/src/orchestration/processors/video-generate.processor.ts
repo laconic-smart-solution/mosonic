@@ -55,8 +55,7 @@ export class VideoGenerateProcessor extends WorkerHost {
         PipelineNodeExecutionStatus.Running,
       );
 
-      const isPresenter =
-        getVideoGenerationMode(input.config) === 'presenter';
+      const isPresenter = getVideoGenerationMode(input.config) === 'presenter';
       videoProvider = isPresenter ? 'heygen' : 'sora';
 
       await this.videoService.emitProcessing(

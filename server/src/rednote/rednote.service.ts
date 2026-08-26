@@ -293,9 +293,7 @@ export class RedNoteService {
     }
 
     const events = new QueueEvents(REDNOTE_PUBLISH_QUEUE, {
-      connection: buildRedisConnectionOptions(
-        redisEnvFromConfig(this.config),
-      ),
+      connection: buildRedisConnectionOptions(redisEnvFromConfig(this.config)),
     });
     try {
       const job = await this.publishQueue.getJob(enqueued.jobId);

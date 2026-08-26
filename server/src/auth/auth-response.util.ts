@@ -82,9 +82,7 @@ function asBoolean(value: unknown): boolean | undefined {
 }
 
 /** Extract access/refresh tokens (+ TTLs) from a normalized SSO auth body. */
-export function extractAuthCookieTokens(
-  raw: unknown,
-): AuthCookieTokens | null {
+export function extractAuthCookieTokens(raw: unknown): AuthCookieTokens | null {
   const normalized = normalizeAuthorizeServerAuthBody(raw);
   const accessToken =
     asString(pick(normalized, ['data', 'token', 'access_token'])) ??

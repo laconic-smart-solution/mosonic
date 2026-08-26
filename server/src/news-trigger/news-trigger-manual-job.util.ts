@@ -1,7 +1,5 @@
 import type { Queue, Job } from 'bullmq';
-import {
-  NEWS_TRIGGER_JOB_PROCESS_SINGLE,
-} from './news-trigger.constants';
+import { NEWS_TRIGGER_JOB_PROCESS_SINGLE } from './news-trigger.constants';
 import type { NewsTriggerManualJobPayload } from './news-trigger.processor';
 
 const MANUAL_JOB_STATES = [

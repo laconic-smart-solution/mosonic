@@ -56,7 +56,9 @@ export class McpService {
   ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
     const channel = platform.trim().toLowerCase();
     if (isDeprecatedChannelId(channel)) {
-      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is not supported`,
+      );
     }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
@@ -87,7 +89,9 @@ export class McpService {
   ): Promise<{ connectUrl: string }> {
     const channel = platform.trim().toLowerCase();
     if (isDeprecatedChannelId(channel)) {
-      throw new BadRequestException(`Publishing channel "${platform}" is not supported`);
+      throw new BadRequestException(
+        `Publishing channel "${platform}" is not supported`,
+      );
     }
     const accounts = await this.usersService.getZernioConnectedAccounts(userId);
     if (this.isChannelConnected(accounts, platform)) {
@@ -165,8 +169,7 @@ export class McpService {
       query.connected?.trim() ||
       ''
     ).toLowerCase();
-    const accountId =
-      query.accountId?.trim() || query.account_id?.trim() || '';
+    const accountId = query.accountId?.trim() || query.account_id?.trim() || '';
     const username = query.username?.trim() || undefined;
 
     if (platform && accountId) {
@@ -281,7 +284,8 @@ export class McpService {
       (await this.nodeCreditPriceService.getActiveCostCredit(
         SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       )) ?? 0;
-    const creditsRemaining = await this.creditService.getCreditsRemaining(userId);
+    const creditsRemaining =
+      await this.creditService.getCreditsRemaining(userId);
     return {
       nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
       creditsEach,
@@ -406,7 +410,7 @@ export class McpService {
       profileId: ctx.profileId,
       platforms: channels.map((channel) => ({
         platform: channel,
-        accountId: ctx.accounts[channel]!.trim(),
+        accountId: ctx.accounts[channel].trim(),
         content: payload.content,
         mediaUrl,
       })),
@@ -435,11 +439,10 @@ export class McpService {
     }
     const existing = user.zernioProfileId?.trim();
     if (existing) {
-      const otherOwner =
-        await this.usersService.findOtherUserByZernioProfileId(
-          existing,
-          userId,
-        );
+      const otherOwner = await this.usersService.findOtherUserByZernioProfileId(
+        existing,
+        userId,
+      );
       if (!otherOwner) {
         return existing;
       }

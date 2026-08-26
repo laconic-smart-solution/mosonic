@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
-import {
-  LANE_NODE_ORDER,
-} from './workflow-node-next-matrix';
+import { LANE_NODE_ORDER } from './workflow-node-next-matrix';
 import { normalizeLaneId } from './workflow-graph.util';
 
 export type GraphNodeSpec = {
@@ -114,7 +112,11 @@ export function expandGraphLaneTemplates(
     (n) => n.type !== WorkflowNodeType.Merge,
   );
 
-  const combined = [...withoutMerge, ...expandedLane, ...(mergeNode ? [mergeNode] : [])];
+  const combined = [
+    ...withoutMerge,
+    ...expandedLane,
+    ...(mergeNode ? [mergeNode] : []),
+  ];
   return combined.map((n, idx) => ({ ...n, order: idx + 1 }));
 }
 

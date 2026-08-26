@@ -337,7 +337,9 @@ export class LineService {
     for (const item of eventsRaw) {
       if (!item || typeof item !== 'object') continue;
       const ev = item as Record<string, unknown>;
-      const type = String(ev.type ?? '').trim().toLowerCase();
+      const type = String(ev.type ?? '')
+        .trim()
+        .toLowerCase();
       const source = ev.source as Record<string, unknown> | undefined;
       const userId =
         typeof source?.userId === 'string' ? source.userId.trim() : '';
@@ -357,7 +359,9 @@ export class LineService {
 
       if (type !== LINE_EVENT_MESSAGE) continue;
       const message = ev.message as Record<string, unknown> | undefined;
-      const messageType = String(message?.type ?? '').trim().toLowerCase();
+      const messageType = String(message?.type ?? '')
+        .trim()
+        .toLowerCase();
       if (messageType !== 'text') continue;
       const text = typeof message?.text === 'string' ? message.text : '';
       const messageId =

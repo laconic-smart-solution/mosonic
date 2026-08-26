@@ -51,7 +51,11 @@ export class WorkflowHeygenService {
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const node = await this.workflowNodes.findVideoNode(workflowId, nodeId, auth);
+    const node = await this.workflowNodes.findVideoNode(
+      workflowId,
+      nodeId,
+      auth,
+    );
     if (!node) {
       throw new NotFoundException(
         `Video node ${nodeId} not found on workflow ${workflowId}`,
@@ -60,7 +64,9 @@ export class WorkflowHeygenService {
     return node;
   }
 
-  private assertImageFile(file: Express.Multer.File | undefined): Express.Multer.File {
+  private assertImageFile(
+    file: Express.Multer.File | undefined,
+  ): Express.Multer.File {
     if (!file?.buffer?.length) {
       throw new BadRequestException('file is required');
     }
@@ -338,7 +344,7 @@ export class WorkflowHeygenService {
     const merged = coerceVideoConfigForPersist({
       ...((node.config ?? {}) as Record<string, unknown>),
       ...patch,
-    } as Record<string, unknown>);
+    });
     let config;
     try {
       config = parseWorkflowNodeConfigOrThrow(
@@ -349,12 +355,7 @@ export class WorkflowHeygenService {
       const message = e instanceof Error ? e.message : String(e);
       throw new BadRequestException(message);
     }
-    await this.workflowNodes.updateConfig(
-      workflowId,
-      nodeId,
-      config as unknown as Prisma.InputJsonValue,
-      auth,
-    );
-    return config as unknown as Record<string, unknown>;
+    await this.workflowNodes.updateConfig(workflowId, nodeId, config, auth);
+    return config;
   }
 }

@@ -178,10 +178,7 @@ export class PipelineController {
   }
 
   @Post(':id/finalize')
-  tryFinalize(
-    @Req() req: Request,
-    @Param('id') pipelineId: string,
-  ) {
+  tryFinalize(@Req() req: Request, @Param('id') pipelineId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.pipelineService.tryFinalizePipeline(pipelineId, auth);
   }

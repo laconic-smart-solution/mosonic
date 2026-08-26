@@ -124,7 +124,7 @@ export class JwtAuthGuard implements CanActivate {
         // NOTE: authorize-server sets iss/aud to null in LCNSsoTokenService today.
         // If that changes, we can add issuer/audience checks via env.
       });
-      claims = payload as unknown as SsoTokenClaims;
+      claims = payload;
     } catch (err) {
       this.logger.warn(
         `[${route}] JWT verification failed: ${this.formatError(err)}`,

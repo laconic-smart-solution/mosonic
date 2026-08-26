@@ -114,6 +114,20 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
   ],
   image: [
     {
+      key: "template",
+      label: fl("image", "template"),
+      control: "select",
+      options: [
+        { label: fo("auto"), value: "auto" },
+        { label: fo("templateAdCreative"), value: "ad_creative" },
+        { label: fo("templateProductMockup"), value: "product_mockup" },
+        { label: fo("templateInfographic"), value: "infographic" },
+        { label: fo("templatePhotorealistic"), value: "photorealistic" },
+        { label: fo("templateLifestyle"), value: "lifestyle" },
+      ],
+      defaultValue: "auto",
+    },
+    {
       key: "style",
       label: fl("image", "style"),
       control: "buttons",

@@ -12,10 +12,7 @@ export class NewsPromptBuilderService {
   }): string {
     const { article, relevance, rule } = params;
 
-    const lines: string[] = [
-      `Based on recent news: "${article.title}"`,
-      '',
-    ];
+    const lines: string[] = [`Based on recent news: "${article.title}"`, ''];
 
     if (relevance.suggestedAngle) {
       lines.push(relevance.suggestedAngle);

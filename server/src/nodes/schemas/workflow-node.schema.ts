@@ -1,7 +1,4 @@
-import {
-  LlmProvider,
-  WorkflowNodeType,
-} from '../workflow-node-llm.enums';
+import { LlmProvider, WorkflowNodeType } from '../workflow-node-llm.enums';
 
 export { WorkflowNodeType, LlmProvider } from '../workflow-node-llm.enums';
 
@@ -20,6 +17,15 @@ export enum NodeImageQuality {
 export enum NodeImageStyle {
   Natural = 'natural',
   Vivid = 'vivid',
+}
+
+export enum NodeImageTemplate {
+  Auto = 'auto',
+  AdCreative = 'ad_creative',
+  ProductMockup = 'product_mockup',
+  Infographic = 'infographic',
+  Photorealistic = 'photorealistic',
+  Lifestyle = 'lifestyle',
 }
 
 export enum NodeAspectRatio {
@@ -64,6 +70,7 @@ export interface WorkflowNodeConfig {
   size?: string;
   quality?: NodeImageQuality;
   style?: NodeImageStyle;
+  template?: NodeImageTemplate;
   duration?: number;
   resolution?: string;
   aspectRatio?: NodeAspectRatio;

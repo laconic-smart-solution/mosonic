@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
 import { ImageGenerationService } from './services/image-generation.service';
+import { ImageTemplateClassifierService } from './services/image-template-classifier.service';
 import { KeywordPlannerService } from './services/keyword-planner.service';
 import { SummarizationService } from './services/summarization.service';
 import { TextGenerationService } from './services/text-generation.service';
@@ -18,6 +19,7 @@ const NODE_SERVICES = [
   KeywordPlannerService,
   TextGenerationService,
   ImageGenerationService,
+  ImageTemplateClassifierService,
   HeygenAssetsService,
   ScriptDurationService,
   VideoGenerationService,

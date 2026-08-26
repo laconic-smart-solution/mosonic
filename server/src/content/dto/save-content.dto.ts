@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 /** Merged into content `outputs` when persisting Generate More results. */
 export class NewOutputsBodyDto {

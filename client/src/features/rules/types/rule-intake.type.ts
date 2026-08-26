@@ -70,26 +70,3 @@ export function createDefaultRuleIntakeAnswers(
     postingFrequency: "weekly",
   }
 }
-
-export function channelIdsToIntakeChannels(
-  ids: string[],
-  existing: RuleIntakeChannel[] = [],
-): RuleIntakeChannel[] {
-  return ids.map((id) => {
-    const prev = existing.find((c) => c.channel === id)
-    return {
-      channel: id,
-      priority: prev?.priority ?? "medium",
-      contentStyle: prev?.contentStyle ?? "",
-    }
-  })
-}
-
-export function intakeChannelsToIds(channels: RuleIntakeChannel[] | undefined): string[] {
-  return channels?.map((c) => c.channel) ?? []
-}
-
-export function toRuleIntakePayload(answers: RuleIntakeAnswers): RuleIntakeAnswers {
-  const { mode, ...rest } = answers
-  return { mode, ...rest }
-}

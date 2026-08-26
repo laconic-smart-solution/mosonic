@@ -163,13 +163,8 @@ export class LlmService {
           ? rec.model.trim()
           : 'gpt-image-1';
       const sizeRaw =
-        typeof rec.size === 'string' && rec.size.trim()
-          ? rec.size.trim()
-          : '';
-      if (
-        sizeRaw &&
-        !isValidOpenAiImageSizeForModel(sizeRaw, model)
-      ) {
+        typeof rec.size === 'string' && rec.size.trim() ? rec.size.trim() : '';
+      if (sizeRaw && !isValidOpenAiImageSizeForModel(sizeRaw, model)) {
         throw new Error(
           `Invalid image size "${sizeRaw}" for model "${model}". Allowed: ${allowedOpenAiImageSizesForModel(model).join(', ')}.`,
         );
@@ -325,7 +320,10 @@ export class LlmService {
   }
 
   /**
-   * OCR / describe image content for rule extraction preprocessing (vision models).
+   * Describe image content for rule extraction preprocessing (vision models).
+   * Visual understanding is the primary task — what the image actually
+   * shows — with any visible text transcribed as a secondary detail, not
+   * the other way around.
    */
   async describeImageForExtraction(
     buffer: Buffer,
@@ -342,13 +340,13 @@ export class LlmService {
     const dataUrl = `data:${mimeType};base64,${b64}`;
     const res = await model.invoke([
       new SystemMessage(
-        'Transcribe any visible text in the image accurately. Briefly summarize non-text visual elements only if they help marketing context. Output plain text only, no JSON.',
+        'Look at the image and describe what it actually shows, for use as marketing/brand strategy context: subject matter, setting or scene, people or products, composition, color palette, lighting, and overall visual style or mood. Note any branding or product-presentation cues. After the visual description, separately transcribe any visible text verbatim, labeled as such. Output plain text only, no JSON.',
       ),
       new HumanMessage({
         content: [
           {
             type: 'text',
-            text: 'Extract all readable text and a short note on visuals if relevant for a marketing strategy document.',
+            text: 'Describe what this image shows and its visual style in detail, then list any readable text separately.',
           },
           {
             type: 'image_url',
@@ -392,9 +390,7 @@ export class LlmService {
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
         model,
         prompt: params.prompt,
-        size: coerceOpenAiImageSize(String(params.size), model) as NonNullable<
-          OpenAI.Images.ImageGenerateParams['size']
-        >,
+        size: coerceOpenAiImageSize(String(params.size), model),
         n: 1,
         response_format: 'b64_json',
       };
@@ -614,9 +610,7 @@ export class LlmService {
           : undefined,
       };
     } catch (error) {
-      throw new Error(
-        `OpenAI web search failed: ${this.formatError(error)}`,
-      );
+      throw new Error(`OpenAI web search failed: ${this.formatError(error)}`);
     }
   }
 

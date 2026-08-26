@@ -72,7 +72,10 @@ export class ZernioController {
     },
     @Res({ passthrough: false }) res: Response,
   ) {
-    const frontend = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    const frontend = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
     try {
       const { platform } = await this.mcpService.handleOAuthCallback(query);
       res.redirect(
@@ -81,7 +84,9 @@ export class ZernioController {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Zernio OAuth callback failed: ${message}`);
-      res.redirect(`${frontend}/settings/accounts?zernio_error=callback_failed`);
+      res.redirect(
+        `${frontend}/settings/accounts?zernio_error=callback_failed`,
+      );
     }
   }
 
@@ -111,4 +116,3 @@ export class ZernioController {
     return { success: true };
   }
 }
-

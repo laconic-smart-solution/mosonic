@@ -15,7 +15,5 @@ export interface SocialProviderAdapter {
     payload: PublishPayload,
   ): Promise<PublishResult>;
   disconnect(account: SocialAccountRecord): Promise<void>;
-  checkHealth(
-    account: SocialAccountRecord,
-  ): Promise<'active' | 'needs_reauth'>;
+  checkHealth(account: SocialAccountRecord): Promise<'active' | 'needs_reauth'>;
 }

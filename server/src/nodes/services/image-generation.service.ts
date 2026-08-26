@@ -7,8 +7,10 @@ import {
   LlmProvider,
   NodeImageQuality,
   NodeImageStyle,
+  NodeImageTemplate,
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
+import { ImageTemplateClassifierService } from './image-template-classifier.service';
 import {
   aspectRatioToOpenAiImageSize,
   coerceOpenAiImageSize,
@@ -29,7 +31,23 @@ type NormalizedImageConfig = {
   size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
   quality: 'standard' | 'hd';
   style: 'natural' | 'vivid';
+  template: NodeImageTemplate;
+  channel?: string;
   negativePrompt?: string;
+};
+
+/** One short composition cue per non-`auto` template, appended to the base prompt. */
+const IMAGE_TEMPLATE_GUIDANCE: Partial<Record<NodeImageTemplate, string>> = {
+  [NodeImageTemplate.AdCreative]:
+    'Composition: social media ad creative with bold, eye-catching layout, mobile-optimized, room for a headline.',
+  [NodeImageTemplate.ProductMockup]:
+    'Composition: clean product shot, studio lighting, minimal or white background, professional product photography.',
+  [NodeImageTemplate.Infographic]:
+    'Composition: infographic layout, clear typography-friendly structure, minimal and professional visual language.',
+  [NodeImageTemplate.Photorealistic]:
+    'Composition: natural photorealistic scene, realistic lighting, high-quality photography.',
+  [NodeImageTemplate.Lifestyle]:
+    'Composition: authentic lifestyle photograph, real people in a natural environment, candid and relatable feel.',
 };
 
 function normalizeImageGenerationConfig(
@@ -57,7 +75,7 @@ function normalizeImageGenerationConfig(
     sizeRaw = aspectRatioToOpenAiImageSize('1:1', model);
   }
 
-  const size = coerceOpenAiImageSize(sizeRaw, model) as NormalizedImageConfig['size'];
+  const size = coerceOpenAiImageSize(sizeRaw, model);
 
   const quality =
     c.quality === NodeImageQuality.Hd ? ('hd' as const) : ('standard' as const);
@@ -71,7 +89,27 @@ function normalizeImageGenerationConfig(
       ? c.negativePrompt.trim()
       : undefined;
 
-  return { provider, model, size, quality, style, negativePrompt };
+  const template = Object.values(NodeImageTemplate).includes(
+    c.template as NodeImageTemplate,
+  )
+    ? (c.template as NodeImageTemplate)
+    : NodeImageTemplate.Auto;
+
+  const channel =
+    typeof c.channel === 'string' && c.channel.trim()
+      ? c.channel.trim()
+      : undefined;
+
+  return {
+    provider,
+    model,
+    size,
+    quality,
+    style,
+    template,
+    channel,
+    negativePrompt,
+  };
 }
 
 function clipTextForPrompt(text: string): string {
@@ -86,6 +124,7 @@ function buildImagePrompt(
   rule: Rule,
   previousText: string,
   config: NormalizedImageConfig,
+  effectiveTemplate: NodeImageTemplate,
 ): string {
   const quoted = clipTextForPrompt(previousText);
 
@@ -105,6 +144,7 @@ function buildImagePrompt(
     '',
     `Style: ${config.style === 'vivid' ? 'Bold, vibrant, eye-catching' : 'Natural, realistic, clean'}`,
     `Quality: ${config.quality === 'hd' ? 'High detail, professional grade' : 'Clean and clear'}`,
+    IMAGE_TEMPLATE_GUIDANCE[effectiveTemplate] ?? '',
     '',
     rule.contentGuidelines.donts.length
       ? `Avoid: ${rule.contentGuidelines.donts.join(', ')}`
@@ -121,7 +161,10 @@ function buildImagePrompt(
 
 @Injectable()
 export class ImageGenerationService {
-  constructor(private readonly llm: LlmService) {}
+  constructor(
+    private readonly llm: LlmService,
+    private readonly templateClassifier: ImageTemplateClassifierService,
+  ) {}
 
   /**
    * Builds a single DALL·E prompt from rule + **node 1 text** (not the raw content brief)
@@ -132,7 +175,32 @@ export class ImageGenerationService {
   ): Promise<{ image: StoredImageOutput }> {
     const { rule, previousOutputs, config, workflowRef } = input;
     const normalized = normalizeImageGenerationConfig(config);
-    const imagePrompt = buildImagePrompt(rule, previousOutputs.text, normalized);
+
+    const channelEntry = normalized.channel
+      ? rule.channels?.find(
+          (c) =>
+            c.channel.trim().toLowerCase() ===
+            normalized.channel!.toLowerCase(),
+        )
+      : undefined;
+
+    const effectiveTemplate =
+      normalized.template === NodeImageTemplate.Auto
+        ? await this.templateClassifier.classify({
+            rule,
+            channel: normalized.channel,
+            contentStyle: channelEntry?.contentStyle,
+            text: previousOutputs.text,
+            provider: normalized.provider,
+          })
+        : normalized.template;
+
+    const imagePrompt = buildImagePrompt(
+      rule,
+      previousOutputs.text,
+      normalized,
+      effectiveTemplate,
+    );
 
     const generated = await this.llm.generateImageBase64({
       provider: normalized.provider,

@@ -41,7 +41,9 @@ export class WorkflowConfigGenerationService {
     }
 
     const prompt = this.buildConfigPrompt(nodes, rule, additionalMessage);
-    const model = this.llm.getChatModel({ temperature: CONFIG_GEN_TEMPERATURE });
+    const model = this.llm.getChatModel({
+      temperature: CONFIG_GEN_TEMPERATURE,
+    });
 
     const res = await model.invoke([
       [
@@ -62,7 +64,10 @@ export class WorkflowConfigGenerationService {
     > = {};
 
     try {
-      const parsed = sharedSafeJsonParse(text) as Record<string, unknown> | null;
+      const parsed = sharedSafeJsonParse(text) as Record<
+        string,
+        unknown
+      > | null;
       if (parsed && typeof parsed === 'object') {
         configByNodeId = parsed as typeof configByNodeId;
       }
@@ -75,9 +80,7 @@ export class WorkflowConfigGenerationService {
     return nodes.map((node) => {
       const ai = configByNodeId[node.nodeId];
       const aiConfig =
-        ai?.config && typeof ai.config === 'object'
-          ? (ai.config as Record<string, unknown>)
-          : undefined;
+        ai?.config && typeof ai.config === 'object' ? ai.config : undefined;
       return {
         ...node,
         userPrompt:

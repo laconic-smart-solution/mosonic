@@ -1,4 +1,8 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -81,7 +85,7 @@ function buildSystemPrompt(
       ? ''
       : [
           'No live intelligence brief was provided for this run.',
-          'Content must still reflect today\'s date above; do not invent outdated campaign years or stale news.',
+          "Content must still reflect today's date above; do not invent outdated campaign years or stale news.",
         ].join(' '),
     '',
     '=== BRAND ===',
@@ -219,9 +223,7 @@ export class TextGenerationService {
    * Brand-grounded copy generation. Use from tests or when you already have
    * `rule` + `contentPrompt` without wrapping in {@link NodeExecutionInput}.
    */
-  async generateText(
-    input: TextGenerationInput,
-  ): Promise<{
+  async generateText(input: TextGenerationInput): Promise<{
     text: string;
     usage?: { inputTokens: number; outputTokens: number };
   }> {
@@ -263,7 +265,7 @@ export class TextGenerationService {
     const normalized = normalizeTextGenerationConfig(input.config ?? {});
     const hasIntelligenceBrief = Boolean(
       input.previousOutputs?.intelligenceBrief?.trim() ||
-        input.previousOutputs?.intelligenceHints?.trim(),
+      input.previousOutputs?.intelligenceHints?.trim(),
     );
     if (!hasIntelligenceBrief) {
       this.logger.warn(
@@ -275,10 +277,7 @@ export class TextGenerationService {
       normalized,
       input.previousOutputs,
     );
-    const humanPrompt = buildHumanPrompt(
-      contentPrompt,
-      input.previousOutputs,
-    );
+    const humanPrompt = buildHumanPrompt(contentPrompt, input.previousOutputs);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,

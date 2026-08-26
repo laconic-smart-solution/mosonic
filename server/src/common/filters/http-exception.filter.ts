@@ -91,7 +91,9 @@ function bodyFromHttpException(exception: HttpException): ApiErrorBody {
   };
 }
 
-function bodyFromPrismaError(err: Prisma.PrismaClientKnownRequestError): ApiErrorBody {
+function bodyFromPrismaError(
+  err: Prisma.PrismaClientKnownRequestError,
+): ApiErrorBody {
   if (err.code === 'P2025') {
     return {
       statusCode: HttpStatus.NOT_FOUND,

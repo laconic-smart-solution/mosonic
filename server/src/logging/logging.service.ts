@@ -2,10 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { PipelineLogRecord } from '../domain/pipeline/pipeline.types';
 import type { IPipelineLogRepository } from '../repositories/interfaces/pipeline-log.repository.interface';
 import { PIPELINE_LOG_REPOSITORY } from '../repositories/tokens';
-import {
-  LogLevel,
-  PipelineLogStatus,
-} from './schemas/pipeline-log.schema';
+import { LogLevel, PipelineLogStatus } from './schemas/pipeline-log.schema';
 import type { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 
 export interface AppendPipelineLogDto {

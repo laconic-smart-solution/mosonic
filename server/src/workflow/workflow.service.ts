@@ -39,9 +39,7 @@ import type {
   WorkflowPageItemDto,
   WorkflowPageQueryDto,
 } from './dto/workflow-page-query.dto';
-import {
-  WorkflowStatus,
-} from './schemas/workflow.schema';
+import { WorkflowStatus } from './schemas/workflow.schema';
 import { WorkflowGenerationService } from './services/workflow-generation.service';
 import { LlmService } from '../llm/llm.service';
 import {
@@ -72,7 +70,10 @@ import {
   dedupeAdaptNodesPerLane,
 } from './pipeline-to-workflow-template.util';
 import type { ApplyPipelineToWorkflowResponseDto } from './dto/apply-pipeline-to-workflow.dto';
-import type { WorkflowRecord, WorkflowNodeRecord } from '../domain/workflow/workflow.types';
+import type {
+  WorkflowRecord,
+  WorkflowNodeRecord,
+} from '../domain/workflow/workflow.types';
 import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
 import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
 import type { IWorkflowNodeRepository } from '../repositories/interfaces/workflow-node.repository.interface';
@@ -110,7 +111,11 @@ export class WorkflowService {
       throw new BadRequestException('ruleId must not be empty');
     }
 
-    return this.regenerateWorkflowByRuleId(ruleId, { answers: body.answers }, auth);
+    return this.regenerateWorkflowByRuleId(
+      ruleId,
+      { answers: body.answers },
+      auth,
+    );
   }
 
   /**
@@ -143,16 +148,15 @@ export class WorkflowService {
     const workflowName = this.workflowNameFromAnswers('', normalizedRuleId);
     const workflow =
       existing ??
-      (await this.createWorkflow(
-        normalizedRuleId,
-        workflowName,
-        auth.userId,
-      ));
+      (await this.createWorkflow(normalizedRuleId, workflowName, auth.userId));
 
     if (existing?.workflowId) {
       await this.workflows.updateById(
         existing.workflowId,
-        { status: WorkflowStatus.Generating, name: existing.name || workflowName },
+        {
+          status: WorkflowStatus.Generating,
+          name: existing.name || workflowName,
+        },
         auth,
       );
     }
@@ -163,16 +167,16 @@ export class WorkflowService {
       auth,
     );
 
-    const generatedNodes =
-      this.workflowGeneration.buildDefaultStructure(rule as never);
-    const { nodeIds, edges: persistedEdges } =
-      await this.persistGeneratedNodes(
-        workflow.workflowId,
-        generatedNodes,
-        auth.userId,
-        auth,
-        ruleChannelIds,
-      );
+    const generatedNodes = this.workflowGeneration.buildDefaultStructure(
+      rule as never,
+    );
+    const { nodeIds, edges: persistedEdges } = await this.persistGeneratedNodes(
+      workflow.workflowId,
+      generatedNodes,
+      auth.userId,
+      auth,
+      ruleChannelIds,
+    );
 
     await this.workflows.appendVersion(
       workflow.workflowId,
@@ -236,18 +240,17 @@ export class WorkflowService {
       WORKFLOW_GENERATION_NODE_TYPE,
     );
 
-    const existing = await this.workflows.findLatestByRule(normalizedRuleId, auth);
+    const existing = await this.workflows.findLatestByRule(
+      normalizedRuleId,
+      auth,
+    );
     const workflowName = this.workflowNameFromAnswers(
       normalizedAnswers.additionalMessage,
       normalizedRuleId,
     );
     const workflow =
       existing ??
-      (await this.createWorkflow(
-        normalizedRuleId,
-        workflowName,
-        auth.userId,
-      ));
+      (await this.createWorkflow(normalizedRuleId, workflowName, auth.userId));
 
     if (existing?.workflowId) {
       await this.workflows.updateById(
@@ -321,7 +324,10 @@ export class WorkflowService {
   } | null> {
     const workflow = await this.workflows.findLatestByRule(ruleId, auth);
     if (!workflow) return null;
-    const nodes = await this.workflowNodes.findByWorkflow(workflow.workflowId, auth);
+    const nodes = await this.workflowNodes.findByWorkflow(
+      workflow.workflowId,
+      auth,
+    );
     return this.mapWorkflowResponse(workflow, nodes);
   }
 
@@ -374,7 +380,7 @@ export class WorkflowService {
       workflow: {
         workflowId: workflow.workflowId,
         name: workflow.name,
-        status: workflow.status as unknown as WorkflowStatus,
+        status: workflow.status,
         ruleRef: workflow.ruleRef,
       },
       nodes: nodeRows,
@@ -417,10 +423,7 @@ export class WorkflowService {
       .map((r) => r.workflowId)
       .filter((id): id is string => Boolean(id?.trim()));
 
-    const nodeTypesByWorkflow = await this.loadNodeTypesForWorkflows(
-      ids,
-      auth,
-    );
+    const nodeTypesByWorkflow = await this.loadNodeTypesForWorkflows(ids, auth);
 
     type WorkflowLean = {
       workflowId?: string;
@@ -460,10 +463,12 @@ export class WorkflowService {
   ): Promise<Map<string, string[]>> {
     const out = new Map<string, string[]>();
     if (!workflowIds.length) return out;
-    const nodes = await this.workflowNodes.findByWorkflowRefs(workflowIds, auth);
+    const nodes = await this.workflowNodes.findByWorkflowRefs(
+      workflowIds,
+      auth,
+    );
     for (const n of nodes) {
-      const ref =
-        typeof n.workflowRef === 'string' ? n.workflowRef.trim() : '';
+      const ref = typeof n.workflowRef === 'string' ? n.workflowRef.trim() : '';
       const type = typeof n.type === 'string' ? n.type : String(n.type ?? '');
       if (!ref || !type) continue;
       const set = new Set(out.get(ref) ?? []);
@@ -612,7 +617,10 @@ export class WorkflowService {
       throw new BadRequestException('ruleId and pipelineId must not be empty');
     }
 
-    const workflow = await this.workflows.findLatestByRule(normalizedRuleId, auth);
+    const workflow = await this.workflows.findLatestByRule(
+      normalizedRuleId,
+      auth,
+    );
     if (!workflow) {
       throw new NotFoundException(
         `No workflow found for rule ${normalizedRuleId}`,
@@ -663,14 +671,18 @@ export class WorkflowService {
             type: String(node.type ?? '') as WorkflowNodeType,
             order: Number(node.order ?? 0),
             isLocked: Boolean(node.isLocked),
-            userPrompt: typeof node.userPrompt === 'string' ? node.userPrompt : '',
+            userPrompt:
+              typeof node.userPrompt === 'string' ? node.userPrompt : '',
             config: (node.config ?? {}) as Record<string, unknown>,
             lane: typeof node.lane === 'string' ? node.lane : null,
           };
         }),
       {
         edges: (pipelineGraph.edges ?? [])
-          .filter((edge) => typeof edge.from === 'string' && typeof edge.to === 'string')
+          .filter(
+            (edge) =>
+              typeof edge.from === 'string' && typeof edge.to === 'string',
+          )
           .map((edge) => ({
             from: edge.from as string,
             to: edge.to as string,
@@ -681,13 +693,10 @@ export class WorkflowService {
               ? { targetHandle: edge.targetHandle }
               : {}),
           })),
-        lanes: (Array.isArray(pipelineGraph.lanes)
+        lanes: Array.isArray(pipelineGraph.lanes)
           ? pipelineGraph.lanes.map((lane) => String(lane))
-          : []) as string[],
-        layout:
-          (pipelineGraph.layout as
-            | Record<string, { x: number; y: number }>
-            | undefined) ?? {},
+          : [],
+        layout: pipelineGraph.layout ?? {},
       },
     );
 
@@ -695,9 +704,8 @@ export class WorkflowService {
     const ruleChannelIds = resolveRuleChannelIds(
       (Array.isArray(rule.channels) ? rule.channels : []) as never[],
     );
-    const pipelineLaneIds = (Array.isArray(pipelineGraph.lanes)
-      ? pipelineGraph.lanes
-      : []
+    const pipelineLaneIds = (
+      Array.isArray(pipelineGraph.lanes) ? pipelineGraph.lanes : []
     ).map((lane) => normalizeLaneId(String(lane)));
     const channelIds = [
       ...new Set(
@@ -771,7 +779,10 @@ export class WorkflowService {
     const nameTrimmed = body.name?.trim();
     const workflowName = nameTrimmed || 'Untitled Workflow';
 
-    let workflow = await this.workflows.findLatestByRule(normalizedRuleId, auth);
+    let workflow = await this.workflows.findLatestByRule(
+      normalizedRuleId,
+      auth,
+    );
 
     if (!workflow) {
       workflow = await this.workflows.create({
@@ -816,7 +827,10 @@ export class WorkflowService {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
 
-    const existingNodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+    const existingNodes = await this.workflowNodes.findByWorkflow(
+      workflowId,
+      auth,
+    );
     const nextOrder = (existingNodes.at(-1)?.order ?? 0) + 1;
     const ownerUserId = workflow.userId ?? auth.userId;
 
@@ -890,10 +904,7 @@ export class WorkflowService {
       isLocked: false,
       ...(typeof n.x === 'number' && Number.isFinite(n.x) ? { x: n.x } : {}),
       ...(typeof n.y === 'number' && Number.isFinite(n.y) ? { y: n.y } : {}),
-      lane:
-        typeof n.lane === 'string' && n.lane.trim()
-          ? n.lane.trim()
-          : null,
+      lane: typeof n.lane === 'string' && n.lane.trim() ? n.lane.trim() : null,
       config: (() => {
         const parsed = parseWorkflowNodeConfig(n.type, n.config ?? {});
         if (!parsed.ok) {
@@ -1206,7 +1217,7 @@ export class WorkflowService {
       templateName: name,
       status: WorkflowStatus.Ready,
       nodes: [],
-      edges: edges as never,
+      edges: edges,
       versions: [],
     });
 
@@ -1251,7 +1262,7 @@ export class WorkflowService {
       templateName: null,
       status: WorkflowStatus.Ready,
       nodes: [],
-      edges: (Array.isArray(template.edges) ? template.edges : []) as never,
+      edges: Array.isArray(template.edges) ? template.edges : [],
       versions: [],
     });
 

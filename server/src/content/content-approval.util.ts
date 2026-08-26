@@ -57,6 +57,6 @@ export function appendApprovalRecord(
   return {
     ...approval,
     records,
-    currentStepIndex: nextIndex ?? (approval.steps?.length ?? 0),
+    currentStepIndex: nextIndex ?? approval.steps?.length ?? 0,
   };
 }

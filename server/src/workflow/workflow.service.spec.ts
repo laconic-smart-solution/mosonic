@@ -147,7 +147,10 @@ describe('WorkflowService.findPage', () => {
       nodeRows: [],
     });
 
-    const out = await service.findPage({ page: 1, limit: 10, filter: { q: 'eta' } }, auth);
+    const out = await service.findPage(
+      { page: 1, limit: 10, filter: { q: 'eta' } },
+      auth,
+    );
 
     expect(workflowNodeModel.distinct).not.toHaveBeenCalled();
     expect(out.total).toBe(3);
@@ -168,7 +171,9 @@ describe('WorkflowService.saveNodesForRule', () => {
     ],
   };
 
-  function makeSaveByRuleService(existingWorkflow: { workflowId: string } | null) {
+  function makeSaveByRuleService(
+    existingWorkflow: { workflowId: string } | null,
+  ) {
     const findOneExec = jest.fn().mockResolvedValue(existingWorkflow);
     const workflowModel = {
       findOne: jest.fn().mockReturnValue({
@@ -186,8 +191,12 @@ describe('WorkflowService.saveNodesForRule', () => {
       }),
     };
     const workflowNodeModel = {
-      deleteMany: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
-      findOneAndUpdate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+      deleteMany: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+      findOneAndUpdate: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
     };
     const ruleService = {
       getRuleById: jest.fn().mockResolvedValue({ ruleId }),
@@ -225,11 +234,7 @@ describe('WorkflowService.saveNodesForRule', () => {
         status: WorkflowStatus.Ready,
       }),
     );
-    expect(saveNodesSpy).toHaveBeenCalledWith(
-      'wf-new',
-      saveBody,
-      auth,
-    );
+    expect(saveNodesSpy).toHaveBeenCalledWith('wf-new', saveBody, auth);
     expect(out).toEqual({ workflowId: 'wf-new', success: true });
   });
 
@@ -293,10 +298,9 @@ describe('WorkflowService.updateWorkflow', () => {
 
     const out = await service.updateWorkflow('wf-1', { name: '   ' }, auth);
 
-    expect(workflowModel.updateOne).toHaveBeenCalledWith(
-      expect.anything(),
-      { $set: { name: 'Untitled Workflow' } },
-    );
+    expect(workflowModel.updateOne).toHaveBeenCalledWith(expect.anything(), {
+      $set: { name: 'Untitled Workflow' },
+    });
     expect(out.name).toBe('Untitled Workflow');
   });
 

@@ -36,7 +36,7 @@ describe('dependency resolver graph helpers', () => {
       { nodeId: 'video', status: PipelineNodeExecutionStatus.Pending },
     ];
     expect(areAllDependenciesMet('video', nodes, edges, terminal)).toBe(false);
-    nodes[1]!.status = PipelineNodeExecutionStatus.Completed;
+    nodes[1].status = PipelineNodeExecutionStatus.Completed;
     expect(areAllDependenciesMet('video', nodes, edges, terminal)).toBe(true);
   });
 
@@ -60,7 +60,12 @@ describe('dependency resolver graph helpers', () => {
     ];
     const edges = buildLinearEdgesFromOrder(nodes);
     expect(edges).toEqual([{ from: 'a', to: 'b' }]);
-    expect(getRoots(nodes.map((n) => n.nodeId), edges)).toEqual(['a']);
+    expect(
+      getRoots(
+        nodes.map((n) => n.nodeId),
+        edges,
+      ),
+    ).toEqual(['a']);
   });
 
   it('detects terminal pipeline', () => {

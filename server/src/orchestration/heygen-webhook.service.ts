@@ -3,9 +3,7 @@ import type { PipelineRecord } from '../domain/pipeline/pipeline.types';
 import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
 import { parseHeygenCallbackId } from '../nodes/services/heygen-assets.service';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
-import {
-  PipelineNodeExecutionStatus,
-} from '../pipeline/schemas/pipeline.schema';
+import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import { MediaNodeCompletionService } from './media-node-completion.service';
@@ -50,7 +48,8 @@ export class HeygenWebhookService {
       (typeof body.callback_id === 'string' && body.callback_id) ||
       (typeof body.data === 'object' &&
         body.data !== null &&
-        typeof (body.data as Record<string, unknown>).callback_id === 'string' &&
+        typeof (body.data as Record<string, unknown>).callback_id ===
+          'string' &&
         (body.data as Record<string, unknown>).callback_id) ||
       '';
 
@@ -86,11 +85,7 @@ export class HeygenWebhookService {
       node.externalJobId ||
       '';
 
-    if (
-      node.externalJobId &&
-      videoId &&
-      node.externalJobId !== videoId
-    ) {
+    if (node.externalJobId && videoId && node.externalJobId !== videoId) {
       this.logger.warn(
         `HeyGen webhook: video_id mismatch pipeline=${pipelineId} node=${nodeId}`,
       );

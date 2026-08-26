@@ -6,7 +6,9 @@ export interface INodeCreditPriceRepository {
   findByNodeType(nodeType: string): Promise<NodeCreditPriceRecord | null>;
   findActiveByNodeType(nodeType: string): Promise<NodeCreditPriceRecord | null>;
   listByNodeTypes(nodeTypes: string[]): Promise<NodeCreditPriceRecord[]>;
-  create(data: Prisma.NodeCreditPriceCreateInput): Promise<NodeCreditPriceRecord>;
+  create(
+    data: Prisma.NodeCreditPriceCreateInput,
+  ): Promise<NodeCreditPriceRecord>;
   upsertByNodeType(
     nodeType: string,
     costUsd: number,

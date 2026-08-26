@@ -397,8 +397,7 @@ function toMultiChannelGraph(
       if (!channels.includes(ch)) continue;
       const copied = copyFromLogical(summaryLogical, {
         laneId: ch,
-        sourceNodeRef:
-          summaryLogical.config.sourceNodeRef ?? 'text_generation',
+        sourceNodeRef: summaryLogical.config.sourceNodeRef ?? 'text_generation',
       });
       nodes.push(
         toGenerated(
@@ -468,9 +467,7 @@ function toMultiChannelGraph(
     );
   }
 
-  nodes.push(
-    toGenerated(WorkflowNodeType.Merge, order++, false, {}, ''),
-  );
+  nodes.push(toGenerated(WorkflowNodeType.Merge, order++, false, {}, ''));
 
   return nodes;
 }

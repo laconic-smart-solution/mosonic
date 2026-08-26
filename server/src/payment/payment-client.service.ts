@@ -54,7 +54,8 @@ export class PaymentClientService {
           ? error.response.data
           : JSON.stringify(error.response?.data ?? error.message);
       throw new BadGatewayException(
-        detail || `Payment service error (${error.response?.status ?? 'unknown'})`,
+        detail ||
+          `Payment service error (${error.response?.status ?? 'unknown'})`,
       );
     }
     throw error;
@@ -62,9 +63,12 @@ export class PaymentClientService {
 
   async get<T>(path: string, createdBy?: string): Promise<T> {
     try {
-      const res = await this.http.get<PaymentApiResponse<T>>(`${this.baseUrl()}${path}`, {
-        headers: this.headers(createdBy),
-      });
+      const res = await this.http.get<PaymentApiResponse<T>>(
+        `${this.baseUrl()}${path}`,
+        {
+          headers: this.headers(createdBy),
+        },
+      );
       return this.unwrap(res.data);
     } catch (error) {
       this.mapError(error);
@@ -73,9 +77,12 @@ export class PaymentClientService {
 
   async getOptional<T>(path: string, createdBy?: string): Promise<T | null> {
     try {
-      const res = await this.http.get<PaymentApiResponse<T>>(`${this.baseUrl()}${path}`, {
-        headers: this.headers(createdBy),
-      });
+      const res = await this.http.get<PaymentApiResponse<T>>(
+        `${this.baseUrl()}${path}`,
+        {
+          headers: this.headers(createdBy),
+        },
+      );
       return this.unwrap(res.data);
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {

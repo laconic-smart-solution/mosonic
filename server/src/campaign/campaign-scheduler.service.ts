@@ -59,7 +59,8 @@ export class CampaignSchedulerService {
         );
         schedule.failureCount += 1;
         schedule.nextRunAt = new Date(
-          Date.now() + Math.min(3600_000 * 2 ** schedule.failureCount, 86_400_000),
+          Date.now() +
+            Math.min(3600_000 * 2 ** schedule.failureCount, 86_400_000),
         );
         await this.schedules.save(schedule);
       }
@@ -155,8 +156,8 @@ export class CampaignSchedulerService {
     }
     if (schedule.contentPromptStrategy === ContentPromptStrategy.Rotate) {
       const idx = Math.floor(Math.random() * prompts.length);
-      return prompts[idx]!;
+      return prompts[idx];
     }
-    return prompts[0]!;
+    return prompts[0];
   }
 }

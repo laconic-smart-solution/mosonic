@@ -10,9 +10,10 @@ type PipelineNodeLike = {
   output: string | null;
 };
 
-function extractMediaFromNode(
-  node: PipelineNodeLike,
-): { image?: string; video?: string } {
+function extractMediaFromNode(node: PipelineNodeLike): {
+  image?: string;
+  video?: string;
+} {
   if (
     node.status !== PipelineNodeExecutionStatus.Completed &&
     node.status !== PipelineNodeExecutionStatus.Skipped

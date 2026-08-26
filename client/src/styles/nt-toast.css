@@ -48,7 +48,7 @@
     0 12px 32px rgba(15, 31, 61, 0.14);
   overflow: hidden;
   outline: none;
-  transition: none;
+  transition: transform 400ms, opacity 400ms, height 400ms, box-shadow 200ms;
 }
 
 .dark [data-sonner-toaster].nt-toaster [data-sonner-toast] {

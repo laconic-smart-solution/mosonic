@@ -30,7 +30,8 @@ export class FixedCostService {
     body: { name?: string; amountUsd?: number; isActive?: boolean },
   ) {
     const row = await this.fixedCosts.updateById(fixedCostId, body);
-    if (!row) throw new NotFoundException(`Fixed cost ${fixedCostId} not found`);
+    if (!row)
+      throw new NotFoundException(`Fixed cost ${fixedCostId} not found`);
     await this.calculation.recalculateOverheadFactor();
     return row;
   }

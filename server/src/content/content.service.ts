@@ -190,10 +190,11 @@ export class ContentService {
     const outputs = mergeResolvedOutputs(
       { ...snapshot, nodeOutputs },
       {
-      ...(pipelineNodesOrdered.length > 0
-        ? { pipelineNodesOrdered }
-        : { workflowNodesOrdered }),
-    });
+        ...(pipelineNodesOrdered.length > 0
+          ? { pipelineNodesOrdered }
+          : { workflowNodesOrdered }),
+      },
+    );
 
     const createdAtRaw = (doc as { createdAt?: Date }).createdAt;
     const updatedAtRaw = (doc as { updatedAt?: Date }).updatedAt;
@@ -224,11 +225,13 @@ export class ContentService {
           }
         : null;
 
-    const pipelineNodesForCredits = parsePipelineNodes(pipeline?.nodes).map((n) => ({
-      nodeId: n.nodeId,
-      type: String(n.type),
-      status: n.status ? String(n.status) : undefined,
-    }));
+    const pipelineNodesForCredits = parsePipelineNodes(pipeline?.nodes).map(
+      (n) => ({
+        nodeId: n.nodeId,
+        type: String(n.type),
+        status: n.status ? String(n.status) : undefined,
+      }),
+    );
     const creditUsage = await this.contentCreditUsage.getUsageForContent(
       auth.userId,
       doc.contentId,
@@ -241,7 +244,7 @@ export class ContentService {
       pipelineRef: doc.pipelineRef,
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
-      status: doc.status as unknown as ContentStatus,
+      status: doc.status,
       outputs,
       nodeOutputs,
       nodeUserEdits: snapshot.nodeUserEdits ?? {},
@@ -589,10 +592,9 @@ export class ContentService {
       content.workflowRef,
       auth,
     );
-    const resolved = mergeResolvedOutputs(
-      this.resolveEditableState(content),
-      { workflowNodesOrdered },
-    );
+    const resolved = mergeResolvedOutputs(this.resolveEditableState(content), {
+      workflowNodesOrdered,
+    });
 
     const previousOutputsFromDb: PreviousOutputs = {
       keywords: resolved.keywords,
@@ -795,7 +797,9 @@ export class ContentService {
           workflowRef: content.workflowRef,
         },
         context: {
-          rule: rule as unknown as Parameters<NodeExecutor['execute']>[0]['context']['rule'],
+          rule: rule as unknown as Parameters<
+            NodeExecutor['execute']
+          >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
         },
@@ -809,7 +813,7 @@ export class ContentService {
         content.contentId,
         content.workflowRef,
         nodeId,
-        result.output as Record<string, unknown>,
+        result.output,
         auth,
       );
     } catch {
@@ -864,11 +868,13 @@ export class ContentService {
           nodeId: wfNode.nodeId,
           type: wfNode.type as unknown as WorkflowNodeType,
           order: wfNode.order,
-          config: this.asRecord(wfNode.config) as WorkflowNodeConfig,
+          config: this.asRecord(wfNode.config),
           workflowRef: content.workflowRef,
         },
         context: {
-          rule: rule as unknown as Parameters<NodeExecutor['execute']>[0]['context']['rule'],
+          rule: rule as unknown as Parameters<
+            NodeExecutor['execute']
+          >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
         },
@@ -883,7 +889,7 @@ export class ContentService {
         content.contentId,
         content.workflowRef,
         outputNodeId,
-        result.output as Record<string, unknown>,
+        result.output,
         auth,
       );
     } catch (error) {
@@ -931,7 +937,7 @@ export class ContentService {
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const status = doc.status as unknown as ContentStatus;
+    const status = doc.status;
     if (status !== ContentStatus.Draft && status !== ContentStatus.InReview) {
       throw new BadRequestException(
         'Only draft or in-review content can be approved',
@@ -991,7 +997,7 @@ export class ContentService {
     if (!doc) {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
-    const status = doc.status as unknown as ContentStatus;
+    const status = doc.status;
     if (status === ContentStatus.Approved) {
       return;
     }
@@ -1128,9 +1134,9 @@ export class ContentService {
     return { success: true };
   }
 
-  buildApprovalFromRule(
-    rule: { approvalPolicy?: Array<{ role: string; required: boolean }> },
-  ) {
+  buildApprovalFromRule(rule: {
+    approvalPolicy?: Array<{ role: string; required: boolean }>;
+  }) {
     const steps = (rule.approvalPolicy ?? []).map((s) => ({
       role: s.role,
       required: s.required !== false,
@@ -1279,10 +1285,9 @@ export class ContentService {
       return {
         outputs: this.asRecord(content.outputs),
         userEdits: this.asRecord(content.userEdits),
-        nodePromptOverrides: this.asRecord(content.nodePromptOverrides) as Record<
-          string,
-          string
-        >,
+        nodePromptOverrides: this.asRecord(
+          content.nodePromptOverrides,
+        ) as Record<string, string>,
         nodeOutputs: this.asRecord(content.nodeOutputs) as Record<
           string,
           Record<string, unknown>
@@ -1303,10 +1308,9 @@ export class ContentService {
     return {
       outputs: this.asRecord(preferred?.outputs),
       userEdits: this.asRecord(preferred?.userEdits),
-      nodePromptOverrides: this.asRecord(preferred?.nodePromptOverrides) as Record<
-        string,
-        string
-      >,
+      nodePromptOverrides: this.asRecord(
+        preferred?.nodePromptOverrides,
+      ) as Record<string, string>,
       nodeOutputs: {},
       nodeUserEdits: {},
     };

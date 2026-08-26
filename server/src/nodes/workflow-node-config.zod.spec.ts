@@ -1,6 +1,7 @@
 import {
   NodeAspectRatio,
   NodeImageQuality,
+  NodeImageTemplate,
   NodeOutputFormat,
   NodeSummaryLength,
   NodeTextTone,
@@ -83,6 +84,35 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.data.size).toBe('1536x1024');
+  });
+
+  it('accepts template and channel on image_generation, defaulting template to auto', () => {
+    const withTemplate = parseWorkflowNodeConfig(
+      WorkflowNodeType.ImageGeneration,
+      {
+        template: 'product_mockup',
+        channel: 'instagram',
+      },
+    );
+    expect(withTemplate.ok).toBe(true);
+    if (!withTemplate.ok) return;
+    expect(withTemplate.data.template).toBe(NodeImageTemplate.ProductMockup);
+    expect(withTemplate.data.channel).toBe('instagram');
+
+    const withoutTemplate = parseWorkflowNodeConfig(
+      WorkflowNodeType.ImageGeneration,
+      {},
+    );
+    expect(withoutTemplate.ok).toBe(true);
+    if (!withoutTemplate.ok) return;
+    expect(withoutTemplate.data.template).toBe(NodeImageTemplate.Auto);
+  });
+
+  it('rejects an invalid template value for image_generation', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
+      template: 'not-a-real-template',
+    });
+    expect(r.ok).toBe(false);
   });
 
   it('parses translation with auto source and preserveFormatting', () => {

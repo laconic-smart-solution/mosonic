@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import type {
   CampaignScheduleRecord,

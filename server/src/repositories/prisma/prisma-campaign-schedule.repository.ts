@@ -9,18 +9,14 @@ import type {
 import { mergeTenancyWhere } from './prisma.util';
 
 @Injectable()
-export class PrismaCampaignScheduleRepository
-  implements ICampaignScheduleRepository
-{
+export class PrismaCampaignScheduleRepository implements ICampaignScheduleRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findByRule(
     ruleRef: string,
     auth?: TenancyAuth,
   ): Promise<CampaignScheduleRecord | null> {
-    const where = auth
-      ? mergeTenancyWhere({ ruleRef }, auth)
-      : { ruleRef };
+    const where = auth ? mergeTenancyWhere({ ruleRef }, auth) : { ruleRef };
     return this.prisma.campaignSchedule.findFirst({ where });
   }
 

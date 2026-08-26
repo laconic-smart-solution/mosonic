@@ -92,7 +92,8 @@ export function extractZernioApiErrorMessage(err: unknown): string | null {
   const data = err.response?.data;
   if (typeof data === 'object' && data !== null) {
     const rec = data as Record<string, unknown>;
-    if (typeof rec.error === 'string' && rec.error.trim()) return rec.error.trim();
+    if (typeof rec.error === 'string' && rec.error.trim())
+      return rec.error.trim();
     if (typeof rec.message === 'string' && rec.message.trim()) {
       return rec.message.trim();
     }
@@ -104,7 +105,9 @@ export function extractZernioApiErrorMessage(err: unknown): string | null {
 /** User-facing errors for publish failures (Zernio / network). */
 export function getFriendlyZernioPublishError(err: unknown): string {
   const apiMsg = extractZernioApiErrorMessage(err);
-  const raw = apiMsg ?? (err instanceof Error ? err.message : typeof err === 'string' ? err : '');
+  const raw =
+    apiMsg ??
+    (err instanceof Error ? err.message : typeof err === 'string' ? err : '');
   const msg = raw.toLowerCase();
 
   if (

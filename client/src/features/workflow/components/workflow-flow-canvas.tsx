@@ -161,6 +161,7 @@ function WorkflowCanvasDropZone({
   return (
     <div
       ref={setNodeRef}
+      data-tour="wf-canvas"
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
       {children}
@@ -1422,7 +1423,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
               pannable
             />
             {workflowId ? (
-              <Panel position="top-left" className="m-3!">
+              <Panel position="top-left" className="m-3!" data-tour="wf-run-cost">
                 <WorkflowCanvasCreditCard
                   estimate={liveEstimate ?? estimateQuery.data}
                   loading={

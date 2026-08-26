@@ -68,7 +68,10 @@ export function parseSpendDateRange(
     })();
 
   if (from.getTime() > to.getTime()) {
-    return { from: parseIsoDateStart(toStr) ?? from, to: parseIsoDateEnd(fromStr) ?? to };
+    return {
+      from: parseIsoDateStart(toStr) ?? from,
+      to: parseIsoDateEnd(fromStr) ?? to,
+    };
   }
 
   return { from, to };
@@ -79,9 +82,7 @@ export function spendDaysInRange(range: SpendDateRange): number {
   fromDay.setHours(0, 0, 0, 0);
   const toDay = new Date(range.to);
   toDay.setHours(0, 0, 0, 0);
-  return (
-    Math.floor((toDay.getTime() - fromDay.getTime()) / 86_400_000) + 1
-  );
+  return Math.floor((toDay.getTime() - fromDay.getTime()) / 86_400_000) + 1;
 }
 
 export function filterDailySpendInRange(

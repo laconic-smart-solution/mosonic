@@ -42,12 +42,15 @@ function displayName(u: {
 export class AdminUsersService {
   constructor(
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
-    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     @Inject(RULE_REPOSITORY) private readonly rules: IRuleRepository,
-    @Inject(WORKFLOW_REPOSITORY) private readonly workflows: IWorkflowRepository,
+    @Inject(WORKFLOW_REPOSITORY)
+    private readonly workflows: IWorkflowRepository,
     @Inject(COST_ENTRY_REPOSITORY)
     private readonly costEntries: ICostEntryRepository,
-    @Inject(USER_PLAN_REPOSITORY) private readonly userPlans: IUserPlanRepository,
+    @Inject(USER_PLAN_REPOSITORY)
+    private readonly userPlans: IUserPlanRepository,
     @Inject(PLAN_REPOSITORY) private readonly plans: IPlanRepository,
   ) {}
 

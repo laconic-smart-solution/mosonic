@@ -71,7 +71,7 @@ describe('AdminAnnouncementsService', () => {
       service.publish({
         title: 'T',
         message: 'M',
-        level: 'info' as never,
+        level: 'info',
         sendInApp: false,
         sendLine: false,
         createdBy: 'admin-1',
@@ -86,7 +86,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'Maintenance',
       message: 'Scheduled downtime tonight',
-      level: 'warning' as never,
+      level: 'warning',
       sendInApp: true,
       sendLine: false,
       createdBy: 'admin-1',
@@ -128,7 +128,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'Promo',
       message: 'Half price credits',
-      level: 'info' as never,
+      level: 'info',
       sendInApp: false,
       sendLine: true,
       createdBy: 'admin-1',
@@ -164,7 +164,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'T',
       message: 'M',
-      level: 'critical' as never,
+      level: 'critical',
       sendInApp: true,
       sendLine: true,
       createdBy: 'admin-1',
@@ -188,7 +188,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'T',
       message: 'M',
-      level: 'info' as never,
+      level: 'info',
       sendInApp: true,
       sendLine: true,
       createdBy: 'admin-1',
@@ -211,7 +211,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'T',
       message: 'M',
-      level: 'info' as never,
+      level: 'info',
       sendInApp: false,
       sendLine: true,
       createdBy: 'admin-1',
@@ -230,7 +230,7 @@ describe('AdminAnnouncementsService', () => {
     const result = await service.publish({
       title: 'T',
       message: 'M',
-      level: 'info' as never,
+      level: 'info',
       sendInApp: false,
       sendLine: true,
       createdBy: 'admin-1',

@@ -55,14 +55,8 @@ export class CreditConfigController {
   }
 
   @Get('config/history')
-  getHistory(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
-    return this.configService.getConfigHistory(
-      Number(page),
-      Number(limit),
-    );
+  getHistory(@Query('page') page = '1', @Query('limit') limit = '20') {
+    return this.configService.getConfigHistory(Number(page), Number(limit));
   }
 
   @Post('recalculate-overhead')

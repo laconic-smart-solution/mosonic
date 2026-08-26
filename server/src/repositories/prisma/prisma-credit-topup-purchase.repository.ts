@@ -5,9 +5,7 @@ import type { CreditTopupPurchaseRecord } from '../../domain/credit/credit.types
 import type { ICreditTopupPurchaseRepository } from '../interfaces/credit-topup-purchase.repository.interface';
 
 @Injectable()
-export class PrismaCreditTopupPurchaseRepository
-  implements ICreditTopupPurchaseRepository
-{
+export class PrismaCreditTopupPurchaseRepository implements ICreditTopupPurchaseRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(

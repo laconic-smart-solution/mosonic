@@ -93,7 +93,9 @@ export class RedNotePublishProcessor extends WorkerHost {
           this.cookieCrypto.decrypt(meta.encryptedCookies),
         ) as CookieParam[];
       } catch {
-        throw new RedNoteSessionInvalidError('Failed to decrypt RedNote cookies');
+        throw new RedNoteSessionInvalidError(
+          'Failed to decrypt RedNote cookies',
+        );
       }
 
       await this.browserService.applyStoredCookies(page, cookies);
@@ -122,7 +124,7 @@ export class RedNotePublishProcessor extends WorkerHost {
       );
 
       tmpPaths.push(await this.downloadVideoToTmp(fetchableVideoUrl));
-      await this.publishVideo(page, tmpPaths[0]!, caption);
+      await this.publishVideo(page, tmpPaths[0], caption);
 
       const publishClicked = await this.browserService.clickPublishButton(page);
       if (!publishClicked) {
@@ -263,9 +265,7 @@ export class RedNotePublishProcessor extends WorkerHost {
       const path = join(tmpdir(), `rednote-${Date.now()}${ext}`);
       const fileStream = createWriteStream(path);
       await pipeline(Readable.fromWeb(res.body as never), fileStream);
-      this.logger.log(
-        `RedNote video downloaded in ${Date.now() - started}ms`,
-      );
+      this.logger.log(`RedNote video downloaded in ${Date.now() - started}ms`);
       return path;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {

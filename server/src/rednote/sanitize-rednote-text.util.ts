@@ -25,10 +25,13 @@ export function sanitizeRedNoteCaption(raw: string): string {
   });
 
   // Single #hashtag tokens
-  text = text.replace(/(^|[\s\n])#([^\s#]+)/g, (_full, lead: string, tag: string) => {
-    const cleaned = sanitizeRedNoteTopicLabel(tag);
-    return cleaned ? `${lead}#${cleaned}` : lead;
-  });
+  text = text.replace(
+    /(^|[\s\n])#([^\s#]+)/g,
+    (_full, lead: string, tag: string) => {
+      const cleaned = sanitizeRedNoteTopicLabel(tag);
+      return cleaned ? `${lead}#${cleaned}` : lead;
+    },
+  );
 
   return text
     .replace(/[ \t]+\n/g, '\n')

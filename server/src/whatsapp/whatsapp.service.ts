@@ -131,8 +131,10 @@ export class WhatsAppService {
   /** Business phone for wa.me QR — E.164 digits, no +. */
   get businessPhone(): string {
     return (
-      this.config.get<string>('WHATSAPP_BUSINESS_PHONE')?.trim().replace(/^\+/, '') ||
-      ''
+      this.config
+        .get<string>('WHATSAPP_BUSINESS_PHONE')
+        ?.trim()
+        .replace(/^\+/, '') || ''
     );
   }
 
@@ -321,8 +323,9 @@ export class WhatsAppService {
           this.config.get<string>('WHATSAPP_ZERNIO_TEMPLATE_NAME')?.trim() ||
           undefined,
         templateLanguage:
-          this.config.get<string>('WHATSAPP_ZERNIO_TEMPLATE_LANGUAGE')?.trim() ||
-          'en',
+          this.config
+            .get<string>('WHATSAPP_ZERNIO_TEMPLATE_LANGUAGE')
+            ?.trim() || 'en',
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -351,7 +354,9 @@ export class WhatsAppService {
       },
     );
 
-    const body = (await res.json().catch(() => ({}))) as WhatsAppServiceEnvelope<{
+    const body = (await res
+      .json()
+      .catch(() => ({}))) as WhatsAppServiceEnvelope<{
       total: number;
       sent: number;
       failed: number;
@@ -420,9 +425,7 @@ export class WhatsAppService {
       const phone = this.businessPhone;
       const chatUrl = phone
         ? `https://wa.me/${phone}${
-            text?.trim()
-              ? `?text=${encodeURIComponent(text.trim())}`
-              : ''
+            text?.trim() ? `?text=${encodeURIComponent(text.trim())}` : ''
           }`
         : '';
       return {

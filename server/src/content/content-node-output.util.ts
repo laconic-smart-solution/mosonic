@@ -20,7 +20,9 @@ function mergeNodeLayers(
   return { ...(ai ?? {}), ...(user ?? {}) };
 }
 
-function adaptTextFromLayer(layer: Record<string, unknown>): string | undefined {
+function adaptTextFromLayer(
+  layer: Record<string, unknown>,
+): string | undefined {
   if (typeof layer.text === 'string' && layer.text.trim()) {
     return layer.text;
   }
@@ -128,7 +130,10 @@ export function flattenNodeOutputsBestEffort(
     if (typeof layer.image === 'string' && layer.image.trim()) {
       out.image = layer.image;
     }
-    if (typeof layer.translatedText === 'string' && layer.translatedText.trim()) {
+    if (
+      typeof layer.translatedText === 'string' &&
+      layer.translatedText.trim()
+    ) {
       out.translatedText = layer.translatedText;
     }
     if (typeof layer.video === 'string' && layer.video.trim()) {

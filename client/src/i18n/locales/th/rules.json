@@ -59,56 +59,6 @@
     "description": "ใส่บริบทแคมเปญ แล้วระบบจะสร้างกฎจากข้อมูลนั้น",
     "placeholder": "อธิบายแบรนด์ กลุ่มเป้าหมาย ช่องทาง และเป้าหมายแคมเปญ..."
   },
-  "qaWizard": {
-    "title": "สร้างกฎแคมเปญ",
-    "progress": "ขั้นตอน {{current}} จาก {{total}}",
-    "yes": "ใช่",
-    "no": "ไม่",
-    "back": "ย้อนกลับ",
-    "next": "ถัดไป",
-    "generate": "สร้างกฎ",
-    "generating": "กำลังสร้าง…",
-    "selectAll": "เลือกทั้งหมด",
-    "deselectAll": "ยกเลิกทั้งหมด",
-    "path": {
-      "guidedTitle": "ตั้งค่าแบบแนะนำ",
-      "guidedDescription": "ตอบคำถามเกี่ยวกับแบรนด์ กลุ่มเป้าหมาย และช่องทาง ยังแนบไฟล์และลิงก์ได้",
-      "expressTitle": "ด่วน",
-      "expressShort": "พรอมต์ + ไฟล์เท่านั้น",
-      "expressDescription": "วางบรีฟหรืออัปโหลดแหล่งข้อมูล เลือกวัตถุประสงค์ได้ (ไม่บังคับ)"
-    },
-    "purpose": {
-      "social_marketing": { "title": "การตลาดโซเชียล", "description": "โพสต์ โฆษณา และแคมเปญบนโซเชียล" },
-      "thought_leadership": { "title": "ผู้นำทางความคิด", "description": "เนื้อหาเชิงวิชาชีพและสร้างความน่าเชื่อถือ" },
-      "internal_comms": { "title": "สื่อสารภายใน", "description": "ประกาศทีม HR หรือองค์กร" },
-      "educational": { "title": "การศึกษา", "description": "สอน อธิบาย และคู่มือ" },
-      "ecommerce": { "title": "อีคอมเมิร์ซ", "description": "โปรโมชันสินค้าและการแปลง" },
-      "other": { "title": "อื่นๆ", "description": "อื่น — อธิบายในหมายเหตุ" }
-    },
-    "languages": {
-      "thai": "ไทย", "english": "อังกฤษ", "japanese": "ญี่ปุ่น", "chinese": "จีน",
-      "korean": "เกาหลี", "spanish": "สเปน", "french": "ฝรั่งเศส", "german": "เยอรมัน"
-    },
-    "validation": {
-      "selectPurpose": "เลือกวัตถุประสงค์ของเนื้อหา",
-      "selectAtLeastOneChannel": "เลือกอย่างน้อยหนึ่งช่องทาง",
-      "selectPrimaryLanguage": "เลือกภาษาหลักของกลุ่มเป้าหมาย"
-    },
-    "review": {
-      "purpose": "วัตถุประสงค์", "brand": "แบรนด์", "audience": "กลุ่มเป้าหมาย",
-      "channels": "ช่องทาง", "sources": "แหล่งข้อมูล", "sourceSummary": "{{count}} ไฟล์แนบ"
-    },
-    "steps": {
-      "purpose": { "title": "เนื้อหานี้เพื่ออะไร?", "description": "กำหนดโทน CTA และแฮชแท็กตอนสกัดกฎ", "notesPlaceholder": "หมายเหตุเพิ่มเติม (ไม่บังคับ)…" },
-      "sources": { "title": "แหล่งข้อมูล", "description": "เพิ่มบรีฟ ลิงก์ เอกสาร หรือรูปแบรนด์ (ไม่บังคับถ้ากรอกขั้นตอนก่อนหน้าแล้ว)", "placeholder": "วางบรีฟหรือแนบ PDF URL รูปภาพ…" },
-      "brand": { "title": "แบรนด์", "description": "ใครเป็นผู้พูด? ว่างไว้เพื่ออนุมานจากแหล่งข้อมูล", "toneLabel": "โทนแบรนด์", "tonePlaceholder": "เช่น เป็นกันเอง มืออาชีพ" },
-      "audience": { "title": "กลุ่มเป้าหมาย", "description": "เนื้อหาควรถึงใคร?", "locationsLabel": "พื้นที่", "locationsPlaceholder": "เช่น ไทย กรุงเทพ", "primaryLanguageLabel": "ภาษาหลัก", "targetLanguagesLabel": "ภาษาเป้าหมาย (ไม่บังคับ)" },
-      "channels": { "title": "ช่องทางเผยแพร่", "description": "จะเผยแพร่ที่ไหน?" },
-      "campaign": { "title": "แคมเปญ", "description": "เป้าหมาย คีย์เวิร์ด และช่วงเวลา", "goalsPlaceholder": "เช่น brand awareness", "keywordsPlaceholder": "เช่น AI marketing", "useHashtags": "รวมแฮชแท็กในกฎ", "hashtagsPlaceholder": "เช่น #Brand", "formatsPlaceholder": "เช่น short post", "startDate": "วันเริ่ม", "endDate": "วันสิ้นสุด" },
-      "guidelines": { "title": "แนวทาง", "description": "ควรทำ ไม่ควรทำ และ SEO", "dosPlaceholder": "เช่น ใช้อีโมจิ", "dontsPlaceholder": "เช่น ไม่พูดถึงคู่แข่ง", "requiredPlaceholder": "เช่น มี CTA เสมอ", "useSeo": "รวมคำแนะนำ SEO", "seoPlaceholder": "เช่น AI content" },
-      "review": { "title": "ตรวจสอบ", "description": "ยืนยันก่อนสกัดกฎ" }
-    }
-  },
   "drawer": {
     "title": "รายการกฎ",
     "description": "เลือกกฎเพื่ออัปเดตแผนผัง",
