@@ -150,6 +150,7 @@ export function WorkflowToolbar({
             type="button"
             variant="outline"
             size="sm"
+            data-tour="wf-save"
             onClick={onSave}
             disabled={isSaving}
           >
@@ -178,6 +179,7 @@ export function WorkflowToolbar({
           <Button
             type="button"
             size="sm"
+            data-tour="wf-run"
             onClick={() => onRun()}
             disabled={generationDisabled}
             className="gap-1.5"

@@ -18,7 +18,9 @@ export class PrismaNodeCreditPriceRepository implements INodeCreditPriceReposito
     return this.prisma.nodeCreditPrice.findUnique({ where: { nodeType } });
   }
 
-  findActiveByNodeType(nodeType: string): Promise<NodeCreditPriceRecord | null> {
+  findActiveByNodeType(
+    nodeType: string,
+  ): Promise<NodeCreditPriceRecord | null> {
     return this.prisma.nodeCreditPrice.findFirst({
       where: { nodeType, isActive: true },
     });
@@ -31,7 +33,9 @@ export class PrismaNodeCreditPriceRepository implements INodeCreditPriceReposito
     });
   }
 
-  create(data: Prisma.NodeCreditPriceCreateInput): Promise<NodeCreditPriceRecord> {
+  create(
+    data: Prisma.NodeCreditPriceCreateInput,
+  ): Promise<NodeCreditPriceRecord> {
     return this.prisma.nodeCreditPrice.create({ data });
   }
 

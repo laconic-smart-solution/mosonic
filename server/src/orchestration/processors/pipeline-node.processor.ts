@@ -1,4 +1,9 @@
-import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import {
+  InjectQueue,
+  OnWorkerEvent,
+  Processor,
+  WorkerHost,
+} from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { DependencyResolverService } from '../dependency-resolver.service';
@@ -44,7 +49,10 @@ export class PipelineNodeProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('failed')
-  async onFailed(job: Job<NodeJobPayload> | undefined, error: Error): Promise<void> {
+  async onFailed(
+    job: Job<NodeJobPayload> | undefined,
+    error: Error,
+  ): Promise<void> {
     if (!job?.data) {
       return;
     }

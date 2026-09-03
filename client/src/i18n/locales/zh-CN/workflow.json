@@ -119,6 +119,8 @@
       "textLength": { "label": "长度" }
     },
     "image": {
+      "template": { "label": "模板" },
+      "designStyle": { "label": "设计风格" },
       "style": { "label": "风格" },
       "aspectRatio": { "label": "宽高比" },
       "quality": { "label": "质量" },
@@ -179,6 +181,11 @@
       "vivid": "鲜明",
       "standard": "标准",
       "hd": "HD",
+      "templateAdCreative": "广告创意",
+      "templateProductMockup": "产品样机",
+      "templateInfographic": "信息图",
+      "templatePhotorealistic": "写实场景",
+      "templateLifestyle": "生活方式照片",
       "cinematic": "电影感",
       "presenter": "数字人",
       "landscape169": "横屏 16:9",
@@ -355,6 +362,14 @@
     "clickOrDrag": "点击或拖拽图像到此处",
     "uploading": "上传中…"
   },
+  "imageTemplateStylePicker": {
+    "loadingTemplates": "正在加载模板…",
+    "loadTemplatesFailed": "无法加载模板。",
+    "noTemplates": "暂无可用模板。",
+    "loadingStyles": "正在加载风格…",
+    "loadStylesFailed": "无法加载风格。",
+    "noStyles": "暂无可用风格。"
+  },
   "voicePicker": {
     "genderAll": "全部",
     "genderMale": "男",
@@ -453,7 +468,48 @@
   "fab": {
     "workflowContents": "工作流内容",
     "goHome": "返回首页",
-    "goToRules": "前往规则"
+    "goToRules": "前往规则",
+    "takeTour": "开始导览"
+  },
+  "tour": {
+    "nav": {
+      "back": "上一步",
+      "close": "关闭",
+      "last": "完成",
+      "next": "下一步",
+      "nextWithProgress": "下一步（{current} / {total}）",
+      "skip": "跳过导览"
+    },
+    "steps": {
+      "wfNodePalette": {
+        "title": "添加节点",
+        "content": "从这里拖动任意节点类型到画布上，构建你的流水线。"
+      },
+      "wfCanvas": {
+        "title": "你的工作流画布",
+        "content": "这里就是流水线所在的地方——连接节点以定义内容如何从一步流转到下一步。"
+      },
+      "wfRunCost": {
+        "title": "运行成本",
+        "content": "在生成内容之前，查看一次运行会消耗多少积分。"
+      },
+      "wfSave": {
+        "title": "保存修改",
+        "content": "保存画布上的修改，避免丢失，并让运行使用最新版本。"
+      },
+      "wfRun": {
+        "title": "生成内容",
+        "content": "对工作流满意后，运行它以生成内容。"
+      },
+      "wfPromptBar": {
+        "title": "描述本次运行",
+        "content": "告诉工作流这次运行应该围绕什么内容。"
+      },
+      "wfUsedPipelines": {
+        "title": "历史运行",
+        "content": "重新打开以前的运行进行查看，或将其结构重新应用到此工作流。"
+      }
+    }
   },
   "errors": {
     "generateWorkflowFailed": "无法生成工作流。请重试。",

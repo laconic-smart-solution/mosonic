@@ -3,7 +3,9 @@ import { OutboundWebhookService } from './outbound-webhook.service';
 describe('OutboundWebhookService', () => {
   it('does not throw when no subscriptions match', async () => {
     const subscriptionModel = {
-      find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+      find: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
     };
     const deliveryModel = { create: jest.fn() };
     const service = new OutboundWebhookService(

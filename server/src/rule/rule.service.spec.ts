@@ -70,9 +70,9 @@ describe('RuleService updates', () => {
 
   it('rejects empty PATCH payloads', async () => {
     const { service } = createService();
-    await expect(
-      service.patchRule('rule-1', {}, auth),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.patchRule('rule-1', {}, auth)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('uses runValidators for PUT replacement updates', async () => {

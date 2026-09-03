@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { safeJsonParse as sharedSafeJsonParse } from '../../common/utils/json-parse.util';
+import { toPromptToon } from '../../common/utils/toon.util';
 import { LlmService } from '../../llm/llm.service';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../../nodes/workflow-node-config.zod';
@@ -41,7 +42,9 @@ export class WorkflowConfigGenerationService {
     }
 
     const prompt = this.buildConfigPrompt(nodes, rule, additionalMessage);
-    const model = this.llm.getChatModel({ temperature: CONFIG_GEN_TEMPERATURE });
+    const model = this.llm.getChatModel({
+      temperature: CONFIG_GEN_TEMPERATURE,
+    });
 
     const res = await model.invoke([
       [
@@ -62,7 +65,10 @@ export class WorkflowConfigGenerationService {
     > = {};
 
     try {
-      const parsed = sharedSafeJsonParse(text) as Record<string, unknown> | null;
+      const parsed = sharedSafeJsonParse(text) as Record<
+        string,
+        unknown
+      > | null;
       if (parsed && typeof parsed === 'object') {
         configByNodeId = parsed as typeof configByNodeId;
       }
@@ -75,9 +81,7 @@ export class WorkflowConfigGenerationService {
     return nodes.map((node) => {
       const ai = configByNodeId[node.nodeId];
       const aiConfig =
-        ai?.config && typeof ai.config === 'object'
-          ? (ai.config as Record<string, unknown>)
-          : undefined;
+        ai?.config && typeof ai.config === 'object' ? ai.config : undefined;
       return {
         ...node,
         userPrompt:
@@ -102,14 +106,14 @@ export class WorkflowConfigGenerationService {
     return [
       'You are configuring a content generation pipeline. Return ONLY a JSON object, no preamble.',
       '',
-      'Brand Rule context:',
-      JSON.stringify(rule, null, 2),
+      'Brand Rule context (TOON format):',
+      toPromptToon(rule),
       '',
       `User's additional instructions for this run:`,
       `"${additionalMessage.replace(/"/g, '\\"')}"`,
       '',
-      'Nodes to configure (do not change type/order/targetChannels — only return userPrompt and config per nodeId):',
-      JSON.stringify(nodeSummaries, null, 2),
+      'Nodes to configure (TOON format; do not change type/order/targetChannels — only return userPrompt and config per nodeId):',
+      toPromptToon(nodeSummaries),
       '',
       'Return JSON shaped exactly as:',
       '{',

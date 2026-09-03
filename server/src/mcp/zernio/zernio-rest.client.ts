@@ -719,8 +719,7 @@ export class ZernioRestClient {
     if (payload.message?.trim()) body.message = payload.message.trim();
     if (payload.templateName?.trim()) {
       body.templateName = payload.templateName.trim();
-      body.templateLanguage =
-        payload.templateLanguage?.trim() || 'en';
+      body.templateLanguage = payload.templateLanguage?.trim() || 'en';
       if (payload.templateParams?.length) {
         body.templateParams = payload.templateParams;
       }

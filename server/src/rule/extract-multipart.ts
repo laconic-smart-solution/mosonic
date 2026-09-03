@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import type { Express } from 'express';
-import { mergeUrlSources, tryNormalizeHttpUrl } from '../preprocessing/url-safety';
+import {
+  mergeUrlSources,
+  tryNormalizeHttpUrl,
+} from '../preprocessing/url-safety';
 import type { RuleExtractRequest } from './extract-request.types';
 import { hasMeaningfulGuidedIntake } from './rule-intake-merge.util';
 import { ruleIntakeAnswersSchema } from './rule-intake.zod';
@@ -31,7 +34,9 @@ export function parseUrlsMultipart(urlsRaw: unknown): string[] {
   }
 }
 
-export function parseIntakeMultipart(intakeRaw: unknown): RuleIntakeAnswers | undefined {
+export function parseIntakeMultipart(
+  intakeRaw: unknown,
+): RuleIntakeAnswers | undefined {
   if (intakeRaw === undefined || intakeRaw === null || intakeRaw === '') {
     return undefined;
   }
@@ -42,7 +47,9 @@ export function parseIntakeMultipart(intakeRaw: unknown): RuleIntakeAnswers | un
     const parsed = JSON.parse(intakeRaw) as unknown;
     const result = ruleIntakeAnswersSchema.safeParse(parsed);
     if (!result.success) {
-      throw new BadRequestException('intake must be a valid RuleIntakeAnswers object');
+      throw new BadRequestException(
+        'intake must be a valid RuleIntakeAnswers object',
+      );
     }
     return result.data;
   } catch (e) {

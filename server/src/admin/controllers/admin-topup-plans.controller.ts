@@ -67,6 +67,10 @@ export class AdminTopupPlansController {
     @Req() req: Request,
   ) {
     const user = req.auth!.localUser as User;
-    return this.paymentService.setTopupPlanActive(code, body.active, user.userId);
+    return this.paymentService.setTopupPlanActive(
+      code,
+      body.active,
+      user.userId,
+    );
   }
 }

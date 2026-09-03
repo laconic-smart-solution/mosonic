@@ -15,9 +15,7 @@ export function resolvePlatformMediaUrls(
   mediaUrl: string | null | undefined,
   mediaUrls: string[] | null | undefined,
 ): string[] {
-  const multi = (mediaUrls ?? [])
-    .map((u) => u.trim())
-    .filter(Boolean);
+  const multi = (mediaUrls ?? []).map((u) => u.trim()).filter(Boolean);
   if (multi.length > 0) return multi;
   const single = (mediaUrl ?? '').trim();
   if (!single) return [];

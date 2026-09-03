@@ -92,9 +92,7 @@ export class ViberWebhookController {
   private assertToken(token: string | undefined): void {
     const expected = this.config.get<string>('VIBER_CALLBACK_TOKEN')?.trim();
     if (!expected) {
-      throw new UnauthorizedException(
-        'VIBER_CALLBACK_TOKEN is not configured',
-      );
+      throw new UnauthorizedException('VIBER_CALLBACK_TOKEN is not configured');
     }
 
     const got = Buffer.from(token?.trim() ?? '');

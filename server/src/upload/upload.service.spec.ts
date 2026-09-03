@@ -69,7 +69,9 @@ describe('UploadService', () => {
   };
   const redNoteService = {
     publishAndWait: jest.fn(),
-    publishEnqueue: jest.fn().mockResolvedValue({ success: true, jobId: 'job-1' }),
+    publishEnqueue: jest
+      .fn()
+      .mockResolvedValue({ success: true, jobId: 'job-1' }),
     getAccountStatus: jest.fn().mockResolvedValue({ connected: true }),
   };
   const events = {
@@ -82,7 +84,9 @@ describe('UploadService', () => {
   };
 
   const postService = {
-    createPostFromSuccessfulPublish: jest.fn().mockResolvedValue({ postId: 'local-post-id' }),
+    createPostFromSuccessfulPublish: jest
+      .fn()
+      .mockResolvedValue({ postId: 'local-post-id' }),
     findScheduledPostsForUpload: jest.fn().mockResolvedValue([]),
     updateScheduledPostsOnUpload: jest.fn().mockResolvedValue(undefined),
     updateScheduledPostForChannel: jest.fn().mockResolvedValue(undefined),
@@ -185,7 +189,7 @@ describe('UploadService', () => {
         publishNow: true,
         channels: [{ channel: 'instagram', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(res).toEqual({ success: true });
@@ -261,7 +265,7 @@ describe('UploadService', () => {
         publishNow: true,
         channels: [{ channel: 'instagram', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).toHaveBeenCalledWith(
@@ -315,7 +319,7 @@ describe('UploadService', () => {
           publishNow: true,
           channels: [{ channel: 'tiktok', included: true }],
         },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -358,7 +362,7 @@ describe('UploadService', () => {
           publishNow: true,
           channels: [{ channel: 'tiktok', included: true }],
         },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toMatchObject({
       message: expect.stringMatching(/90 characters max/),
@@ -382,7 +386,10 @@ describe('UploadService', () => {
           mediaUrls: ['https://example.com/photo.png'],
         }),
       ],
-      resolvedOutputs: { text: 'hello', image: 'https://example.com/photo.png' },
+      resolvedOutputs: {
+        text: 'hello',
+        image: 'https://example.com/photo.png',
+      },
       status: UploadJobStatus.Pending,
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -402,7 +409,7 @@ describe('UploadService', () => {
           publishNow: true,
           channels: [{ channel: 'youtube', included: true }],
         },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -438,7 +445,7 @@ describe('UploadService', () => {
           scheduledAt: new Date(Date.now() - 60_000).toISOString(),
           channels: [{ channel: 'facebook', included: true }],
         },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -479,7 +486,7 @@ describe('UploadService', () => {
         scheduledAt: future,
         channels: [{ channel: 'linkedin', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).toHaveBeenCalledWith(
@@ -534,10 +541,12 @@ describe('UploadService', () => {
         scheduledAt: future,
         channels: [{ channel: 'linkedin', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
-    expect(postService.discardOrphanedPost).toHaveBeenCalledWith('local-post-id');
+    expect(postService.discardOrphanedPost).toHaveBeenCalledWith(
+      'local-post-id',
+    );
     expect(doc.channels[0].status).toBe(UploadChannelStatus.Failed);
     expect(doc.channels[0].failureReason).toMatch(/scheduling service/i);
   });
@@ -567,7 +576,9 @@ describe('UploadService', () => {
       exec: () => Promise.resolve(doc),
     });
     mcpService.getConnectedAccounts.mockResolvedValue({
-      accounts: [{ channel: 'rednote', accountId: 'acc_red', connectedAt: new Date() }],
+      accounts: [
+        { channel: 'rednote', accountId: 'acc_red', connectedAt: new Date() },
+      ],
     });
 
     await service.publishUpload(
@@ -577,7 +588,7 @@ describe('UploadService', () => {
         scheduledAt: future,
         channels: [{ channel: 'rednote', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).not.toHaveBeenCalled();
@@ -640,11 +651,13 @@ describe('UploadService', () => {
           { channel: 'facebook', included: true },
         ],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(doc.channels[0].status).toBe(UploadChannelStatus.Published);
-    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(1);
+    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it('calls Zernio once with all included channels when multiple are selected', async () => {
@@ -686,7 +699,7 @@ describe('UploadService', () => {
           { channel: 'facebook', included: true },
         ],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(1);
@@ -709,7 +722,9 @@ describe('UploadService', () => {
         ],
       }),
     );
-    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(1);
+    expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledTimes(
+      1,
+    );
     expect(postService.createPostFromSuccessfulPublish).toHaveBeenCalledWith(
       expect.objectContaining({
         channels: ['instagram', 'facebook'],
@@ -763,7 +778,7 @@ describe('UploadService', () => {
           { channel: 'facebook', included: true },
         ],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(1);
@@ -799,12 +814,14 @@ describe('UploadService', () => {
 
     const out = await service.findByUploadId('u1', {
       userId: 'user-1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     const keys = out.channels.map((c) => c.channel.toLowerCase()).sort();
     expect(keys).toEqual(['instagram', 'linkedin']);
-    const linkedin = out.channels.find((c) => c.channel.toLowerCase() === 'linkedin');
+    const linkedin = out.channels.find(
+      (c) => c.channel.toLowerCase() === 'linkedin',
+    );
     expect(linkedin?.included).toBe(true);
   });
 
@@ -837,7 +854,7 @@ describe('UploadService', () => {
 
     const out = await service.findByUploadId('u1', {
       userId: 'user-1',
-      role: 'CUSTOMER' as never,
+      role: 'CUSTOMER',
     });
 
     const keys = out.channels.map((c) => c.channel.toLowerCase()).sort();
@@ -882,7 +899,7 @@ describe('UploadService', () => {
         // Only specifying Facebook; Instagram should remain excluded via persisted flag.
         channels: [{ channel: 'facebook', included: true }],
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.publishCreatePostBatch).toHaveBeenCalledTimes(1);
@@ -925,7 +942,7 @@ describe('UploadService', () => {
           publishNow: true,
           channels: [{ channel: 'instagram', included: true }],
         },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -986,7 +1003,7 @@ describe('UploadService', () => {
         scheduledAt: future,
         youtubeTitle: 'New title',
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(postService.updateScheduledPostsOnUpload).toHaveBeenCalledWith(
@@ -1070,7 +1087,7 @@ describe('UploadService', () => {
         caption: 'new ig only',
         scheduledAt: future,
       },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.updatePost).toHaveBeenCalledTimes(1);
@@ -1122,7 +1139,7 @@ describe('UploadService', () => {
       service.updateUpload(
         'u1',
         { caption: 'new caption' },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -1154,7 +1171,7 @@ describe('UploadService', () => {
       service.updateUpload(
         'u1',
         { scheduledAt: new Date(Date.now() - 60_000).toISOString() },
-        { userId: 'user-1', role: 'CUSTOMER' as never },
+        { userId: 'user-1', role: 'CUSTOMER' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -1199,7 +1216,7 @@ describe('UploadService', () => {
     await service.updateUpload(
       'u1',
       { caption: 'shared caption' },
-      { userId: 'user-1', role: 'CUSTOMER' as never },
+      { userId: 'user-1', role: 'CUSTOMER' },
     );
 
     expect(mcpService.updatePost).toHaveBeenCalledTimes(2);
@@ -1488,8 +1505,12 @@ describe('UploadService', () => {
       expect(entries.find((e) => e.channel === 'facebook')?.mediaUrl).toBe(
         'https://cdn.example/fb.jpg',
       );
-      expect(entries.find((e) => e.channel === 'instagram')?.mediaUrl).toBeNull();
-      expect(entries.find((e) => e.channel === 'linkedin')?.mediaUrl).toBeNull();
+      expect(
+        entries.find((e) => e.channel === 'instagram')?.mediaUrl,
+      ).toBeNull();
+      expect(
+        entries.find((e) => e.channel === 'linkedin')?.mediaUrl,
+      ).toBeNull();
     });
   });
 

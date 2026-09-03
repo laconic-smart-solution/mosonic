@@ -46,7 +46,8 @@ export const BILLABLE_NODE_CREDIT_DEFAULTS: ReadonlyArray<{
   { nodeType: 'social_account_connect', costUsd: 0.001 },
 ] as const;
 
-export const SOCIAL_ACCOUNT_CONNECT_NODE_TYPE = 'social_account_connect' as const;
+export const SOCIAL_ACCOUNT_CONNECT_NODE_TYPE =
+  'social_account_connect' as const;
 
 /** Previous default before social unlock cost reduction (used for one-time DB migration). */
 export const SOCIAL_ACCOUNT_CONNECT_LEGACY_COST_USD = 0.01;
@@ -74,6 +75,8 @@ export function isPipelineNodeCreditType(nodeType: string): boolean {
 }
 
 export function defaultCostUsdForNodeType(nodeType: string): number | null {
-  const row = BILLABLE_NODE_CREDIT_DEFAULTS.find((r) => r.nodeType === nodeType);
+  const row = BILLABLE_NODE_CREDIT_DEFAULTS.find(
+    (r) => r.nodeType === nodeType,
+  );
   return row?.costUsd ?? null;
 }

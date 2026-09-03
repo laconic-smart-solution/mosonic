@@ -48,9 +48,6 @@ describe('mergeUrlSources', () => {
         'zenichub.com/en',
         'https://www.adidas.co.th/th',
       ]),
-    ).toEqual([
-      'https://zenichub.com/en',
-      'https://www.adidas.co.th/th',
-    ]);
+    ).toEqual(['https://zenichub.com/en', 'https://www.adidas.co.th/th']);
   });
 });

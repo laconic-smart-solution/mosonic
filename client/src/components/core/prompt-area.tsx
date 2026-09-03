@@ -4,8 +4,6 @@ import {
   ArrowRight,
   ArrowUp,
   Upload,
-  Link as LinkIcon,
-  Image as ImageIcon,
   X,
   FileText,
   Globe,
@@ -32,8 +30,6 @@ export interface PromptAreaProps {
   onBlur?: () => void
   onAttachmentsChange?: (attachments: Attachment[]) => void
   enableFiles?: boolean
-  enableUrls?: boolean
-  enableImages?: boolean
   acceptFileTypes?: string
   className?: string
   /** Disables typing and submit. */
@@ -52,9 +48,7 @@ export function PromptArea({
   onBlur,
   onAttachmentsChange,
   enableFiles = true,
-  enableUrls = true,
-  enableImages = true,
-  acceptFileTypes = ".pdf,.docx,.txt,.md",
+  acceptFileTypes = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp",
   className,
   disabled = false,
   submitDisabled,
@@ -63,8 +57,6 @@ export function PromptArea({
   const [expanded, setExpanded] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState("")
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
-  const [urlOpen, setUrlOpen] = React.useState(false)
-  const [urlValue, setUrlValue] = React.useState("")
 
   const value = controlledValue ?? internalValue
   const containerRef = React.useRef<HTMLDivElement>(null)
@@ -115,7 +107,6 @@ export function PromptArea({
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        setUrlOpen(false)
         if (!hasContent) setExpanded(false)
       }
     }
@@ -155,29 +146,34 @@ export function PromptArea({
     setAttachments((prev) => [...prev, ...next])
   }
 
-  function addUrl() {
-    const parts = urlValue
+  /**
+   * A paste that is nothing but one or more links (no other prose) becomes
+   * URL attachment chips instead of raw text — users don't discover a
+   * separate "add link" affordance, they just paste the link where they're
+   * typing. A paste mixed with ordinary text is left alone: surgically
+   * pulling a URL out of a sentence would be surprising and could drop
+   * words around it.
+   */
+  function handleTextareaPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = e.clipboardData.getData("text")
+    const parts = pasted
       .split(/[\s,]+/)
       .map((p) => p.trim())
       .filter(Boolean)
     if (parts.length === 0) return
 
-    const next: Attachment[] = []
-    for (const part of parts) {
-      const normalized = normalizeHttpUrl(part)
-      if (!normalized) continue
-      next.push({
-        id: randomUuid(),
-        type: "url",
-        label: urlDisplayLabel(normalized),
-        data: normalized,
-      })
-    }
-    if (next.length === 0) return
+    const normalized = parts.map((part) => normalizeHttpUrl(part))
+    if (normalized.some((url) => !url)) return
 
+    e.preventDefault()
+    const next: Attachment[] = normalized.map((url) => ({
+      id: randomUuid(),
+      type: "url",
+      label: urlDisplayLabel(url!),
+      data: url!,
+    }))
     setAttachments((prev) => [...prev, ...next])
-    setUrlValue("")
-    setUrlOpen(false)
+    setExpanded(true)
   }
 
   function removeAttachment(id: string) {
@@ -185,7 +181,6 @@ export function PromptArea({
   }
 
   const fileCount = attachments.filter((a) => a.type === "file").length
-  const urlCount = attachments.filter((a) => a.type === "url").length
 
   return (
     <div
@@ -277,83 +272,6 @@ export function PromptArea({
         )}
       </AnimatePresence>
 
-      <AnimatePresence initial={false}>
-        {expanded && urlOpen && (
-          <motion.div
-            key="url-row"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div
-              className="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center sm:gap-1.5 sm:px-4"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <input
-                  type="text"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={urlValue}
-                  onChange={(e) => setUrlValue(e.target.value)}
-                  onPaste={(e) => {
-                    const pasted = e.clipboardData.getData("text")
-                    if (!pasted) return
-                    // Allow multi-line / multi-URL paste into the field.
-                    if (/[\s,]/.test(pasted.trim())) {
-                      e.preventDefault()
-                      setUrlValue((prev) =>
-                        [prev, pasted].filter(Boolean).join(" ").trim(),
-                      )
-                    }
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onFocus={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      addUrl()
-                    }
-                    if (e.key === "Escape") {
-                      setUrlOpen(false)
-                      setUrlValue("")
-                    }
-                  }}
-                  placeholder="https://example.com"
-                  autoFocus
-                  className="min-w-0 flex-1 rounded-md border border-border bg-card px-2.5 py-2 text-base outline-none transition-colors focus:border-teal-400 sm:py-1.5 sm:text-sm"
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={addUrl}
-                  className="min-h-10 rounded-md bg-navy-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-navy-500 touch-manipulation sm:min-h-0 sm:py-1.5"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUrlOpen(false)
-                    setUrlValue("")
-                  }}
-                  className="min-h-10 rounded-md border border-border px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-muted touch-manipulation sm:min-h-0 sm:py-1.5"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div
         className={cn(
           "flex w-full items-end sm:items-center",
@@ -365,6 +283,7 @@ export function PromptArea({
           value={value}
           onChange={(e) => setValue(e.target.value.slice(0, maxLength))}
           onKeyDown={handleKeyDown}
+          onPaste={handleTextareaPaste}
           disabled={disabled}
           placeholder={disabled ? "Save workflow changes or exit run view first" : placeholder}
           rows={1}
@@ -434,21 +353,6 @@ export function PromptArea({
                   active={fileCount > 0}
                   onClick={() => fileInputRef.current?.click()}
                   label="Upload file"
-                />
-              )}
-              {enableUrls && (
-                <ToolButton
-                  icon={LinkIcon}
-                  active={urlCount > 0 || urlOpen}
-                  onClick={() => setUrlOpen((v) => !v)}
-                  label="Add URL"
-                />
-              )}
-              {enableImages && (
-                <ToolButton
-                  icon={ImageIcon}
-                  onClick={() => fileInputRef.current?.click()}
-                  label="Add image"
                 />
               )}
               <span className="ml-auto mr-1 shrink-0 tabular-nums text-[11px] text-muted-foreground sm:mr-2">

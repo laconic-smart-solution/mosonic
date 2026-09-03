@@ -11,7 +11,9 @@ export function isNodeBlockedByLanePause(
   if (!laneScopedPause || !pipeline.pausedLaneId) {
     return false;
   }
-  const node = parsePipelineNodes(pipeline.nodes).find((n) => n.nodeId === nodeId);
+  const node = parsePipelineNodes(pipeline.nodes).find(
+    (n) => n.nodeId === nodeId,
+  );
   if (!node) {
     return false;
   }

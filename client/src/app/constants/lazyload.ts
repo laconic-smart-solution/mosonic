@@ -58,6 +58,9 @@ export const AdminPlansPage = PageLoader(lazy(() => import("@/features/admin/pag
 export const AdminTopupPlansPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-topup-plans")),
 )
+export const AdminNodeSettingsImagePage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-node-settings-image")),
+)
 export const AdminUsagePage = PageLoader(lazy(() => import("@/features/admin/pages/admin-usage")))
 export const AdminApiUsagePage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-api-usage")),

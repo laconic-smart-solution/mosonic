@@ -351,7 +351,11 @@ export class WechatService {
       if (sceneStr) {
         return await this.getQrCode(sceneStr, undefined, size);
       }
-      return await this.getQrCode(undefined, this.oaUsername || undefined, size);
+      return await this.getQrCode(
+        undefined,
+        this.oaUsername || undefined,
+        size,
+      );
     } catch (err) {
       this.logger.warn(
         `QR via wechat-service failed, using OA deep-link fallback: ${
@@ -369,9 +373,7 @@ export class WechatService {
     }
   }
 
-  async getConnectStatus(
-    userId: string,
-  ): Promise<WechatConnectStatusResponse> {
+  async getConnectStatus(userId: string): Promise<WechatConnectStatusResponse> {
     const existing = await this.connections.findByUserId(userId);
     if (existing) {
       return {
@@ -427,12 +429,7 @@ export class WechatService {
         'Missing WeChat webhook signature query parameters',
       );
     }
-    this.verifyWebhookSignature(
-      this.oaToken,
-      timestamp,
-      nonce,
-      signature,
-    );
+    this.verifyWebhookSignature(this.oaToken, timestamp, nonce, signature);
   }
 
   /**
@@ -457,7 +454,9 @@ export class WechatService {
       typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
     const fromUserName = this.xmlTag(xml, 'FromUserName');
     if (!fromUserName) {
-      throw new BadRequestException('Invalid WeChat webhook XML: missing FromUserName');
+      throw new BadRequestException(
+        'Invalid WeChat webhook XML: missing FromUserName',
+      );
     }
 
     const msgType = this.xmlTag(xml, 'MsgType').toLowerCase();

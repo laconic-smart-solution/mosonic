@@ -2,7 +2,10 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsService } from '../events/events.service';
 import { PayniService } from '../payni/payni.service';
-import { PLAN_PURCHASE_REPOSITORY, PLAN_REPOSITORY } from '../repositories/tokens';
+import {
+  PLAN_PURCHASE_REPOSITORY,
+  PLAN_REPOSITORY,
+} from '../repositories/tokens';
 import { PlanService } from './plan.service';
 import { PlanUpgradeService } from './plan-upgrade.service';
 
@@ -57,9 +60,9 @@ describe('PlanUpgradeService', () => {
       isActive: true,
     });
 
-    await expect(service.initiateUpgrade('user-1', 'ent-1')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.initiateUpgrade('user-1', 'ent-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects downgrade to lower tier', async () => {
@@ -99,7 +102,10 @@ describe('PlanUpgradeService', () => {
     const result = await service.initiateUpgrade('user-1', 'pro-1');
 
     expect(result.instant?.planName).toBe('Professional');
-    expect(planService.assignUserToPlan).toHaveBeenCalledWith('pro-1', 'user-1');
+    expect(planService.assignUserToPlan).toHaveBeenCalledWith(
+      'pro-1',
+      'user-1',
+    );
     expect(planPurchases.create).toHaveBeenCalled();
   });
 
@@ -119,16 +125,22 @@ describe('PlanUpgradeService', () => {
 
     await service.handlePlanPurchaseWebhook('txn-1', 'SUCCESS');
 
-    expect(planPurchases.updateStatus).toHaveBeenCalledWith('purchase-1', 'active');
-    expect(planService.assignUserToPlan).toHaveBeenCalledWith('pro-1', 'user-1');
+    expect(planPurchases.updateStatus).toHaveBeenCalledWith(
+      'purchase-1',
+      'active',
+    );
+    expect(planService.assignUserToPlan).toHaveBeenCalledWith(
+      'pro-1',
+      'user-1',
+    );
     expect(events.emitToRoom).toHaveBeenCalled();
   });
 
   it('throws when target plan missing', async () => {
     plans.findByPlanId.mockResolvedValue(null);
 
-    await expect(service.initiateUpgrade('user-1', 'missing')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.initiateUpgrade('user-1', 'missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

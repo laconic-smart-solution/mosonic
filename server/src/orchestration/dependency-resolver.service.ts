@@ -4,9 +4,15 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
-import type { PipelineRecord, PipelineNodeExecution } from '../domain/pipeline/pipeline.types';
+import type {
+  PipelineRecord,
+  PipelineNodeExecution,
+} from '../domain/pipeline/pipeline.types';
 import { parsePipelineNodes } from '../repositories/prisma/pipeline-nodes.util';
-import { WorkflowNodeType, type WorkflowNodeConfig } from '../nodes/schemas/workflow-node.schema';
+import {
+  WorkflowNodeType,
+  type WorkflowNodeConfig,
+} from '../nodes/schemas/workflow-node.schema';
 import {
   getVideoGenerationMode,
   normalizeVideoConfig,
@@ -77,15 +83,11 @@ export class DependencyResolverService {
       config.get<string>('ORCHESTRATION_USE_GRAPH', 'true').toLowerCase() !==
       'false';
     this.laneScopedPause =
-      config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() ===
-      'true';
+      config.get<string>('LANE_SCOPED_PAUSE', 'false').toLowerCase() === 'true';
     this.reconcileEnabled =
-      config
-        .get<string>('PIPELINE_RECONCILE_ENABLED', 'true')
-        .toLowerCase() !== 'false';
-    this.reconcileBatch = Number(
-      config.get('PIPELINE_RECONCILE_BATCH', 200),
-    );
+      config.get<string>('PIPELINE_RECONCILE_ENABLED', 'true').toLowerCase() !==
+      'false';
+    this.reconcileBatch = Number(config.get('PIPELINE_RECONCILE_BATCH', 200));
   }
 
   /**
@@ -276,9 +278,7 @@ export class DependencyResolverService {
     for (const rootId of roots) {
       const node = this.pipelineRepo.getNode(pipeline, rootId);
       if (node?.status === PipelineNodeExecutionStatus.Pending) {
-        rootCandidates.push(
-          `${rootId}(${node?.type ?? '?'}:pending-root)`,
-        );
+        rootCandidates.push(`${rootId}(${node?.type ?? '?'}:pending-root)`);
       } else {
         rootCandidates.push(
           `${rootId}(${node?.type ?? '?'}:${node?.status ?? 'missing'})`,
@@ -293,9 +293,7 @@ export class DependencyResolverService {
       if (node.status !== PipelineNodeExecutionStatus.Pending) {
         continue;
       }
-      if (
-        areAllDependenciesMet(node.nodeId, nodes, edges, TERMINAL_STATUSES)
-      ) {
+      if (areAllDependenciesMet(node.nodeId, nodes, edges, TERMINAL_STATUSES)) {
         toEnqueue.push(node.nodeId);
       }
     }
@@ -377,14 +375,7 @@ export class DependencyResolverService {
         skippedTargets.push(`${edge.to}(${target.type}:${target.status})`);
         continue;
       }
-      if (
-        areAllDependenciesMet(
-          edge.to,
-          nodes,
-          edges,
-          TERMINAL_STATUSES,
-        )
-      ) {
+      if (areAllDependenciesMet(edge.to, nodes, edges, TERMINAL_STATUSES)) {
         toEnqueue.push(edge.to);
       } else {
         const unmet = getIncoming(edges, edge.to)
@@ -509,7 +500,7 @@ export class DependencyResolverService {
                 job.id?.startsWith(prefix) ||
                 (job.data &&
                   'pipelineId' in job.data &&
-                  (job.data as NodeJobPayload).pipelineId === pipelineId)
+                  job.data.pipelineId === pipelineId)
               ) {
                 await job.remove();
               }
@@ -562,7 +553,9 @@ export class DependencyResolverService {
     );
   }
 
-  private async countQueuedJobsForPipeline(pipelineId: string): Promise<number> {
+  private async countQueuedJobsForPipeline(
+    pipelineId: string,
+  ): Promise<number> {
     const prefix = pipelineJobIdPrefix(pipelineId);
     let count = 0;
     const queues = [
@@ -581,7 +574,7 @@ export class DependencyResolverService {
           job.id?.startsWith(prefix) ||
           (job.data &&
             'pipelineId' in job.data &&
-            (job.data as NodeJobPayload).pipelineId === pipelineId)
+            job.data.pipelineId === pipelineId)
         ) {
           count += 1;
         }
@@ -596,10 +589,7 @@ export class DependencyResolverService {
       .join(' | ');
   }
 
-  private describeNode(
-    pipeline: PipelineRecord,
-    nodeId: string,
-  ): string {
+  private describeNode(pipeline: PipelineRecord, nodeId: string): string {
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
     if (!node) {
       return `${nodeId}(missing)`;
@@ -621,7 +611,10 @@ export class DependencyResolverService {
   ): Promise<void> {
     const pipeline = await this.pipelineRepo.findById(pipelineId);
     if (!pipeline) return;
-    await this.enqueueNode(pipeline, nodeId, { forceRegenerate: true, useReplayJobId: true });
+    await this.enqueueNode(pipeline, nodeId, {
+      forceRegenerate: true,
+      useReplayJobId: true,
+    });
   }
 
   private async enqueueNode(

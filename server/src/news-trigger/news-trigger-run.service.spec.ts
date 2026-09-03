@@ -40,7 +40,9 @@ describe('NewsTriggerRunService', () => {
           useValue: {
             getJob: jest.fn().mockResolvedValue(null),
             getJobs: jest.fn().mockResolvedValue([]),
-            getJobCounts: jest.fn().mockResolvedValue({ waiting: 0, active: 0 }),
+            getJobCounts: jest
+              .fn()
+              .mockResolvedValue({ waiting: 0, active: 0 }),
           },
         },
       ],
@@ -71,9 +73,9 @@ describe('NewsTriggerRunService', () => {
       details: [],
     });
 
-    await expect(
-      service.getRunById('rule-1', 'run-1', auth),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.getRunById('rule-1', 'run-1', auth)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('throws when rule not found', async () => {

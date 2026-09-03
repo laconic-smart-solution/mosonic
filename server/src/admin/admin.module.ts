@@ -10,6 +10,8 @@ import { AdminFaqController } from './controllers/admin-faq.controller';
 import { AdminLineController } from './controllers/admin-line.controller';
 import { AdminTelegramController } from './controllers/admin-telegram.controller';
 import { AdminTopupPlansController } from './controllers/admin-topup-plans.controller';
+import { AdminImageTemplatesController } from './controllers/admin-image-templates.controller';
+import { AdminImageDesignStylesController } from './controllers/admin-image-design-styles.controller';
 import { AdminCostController } from './controllers/admin-cost.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 import { AdminPipelineJobsController } from './controllers/admin-pipeline-jobs.controller';
@@ -24,6 +26,7 @@ import { ApiUsageModule } from '../api-usage/api-usage.module';
 import { ContentModule } from '../content/content.module';
 import { LineModule } from '../line/line.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { UploadModule } from '../upload/upload.module';
 import { AdminContentService } from './services/admin-content.service';
 import { AdminCostService } from './services/admin-cost.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
@@ -33,6 +36,8 @@ import { AdminFaqService } from './services/admin-faq.service';
 import { AdminAnnouncementsService } from './services/admin-announcements.service';
 import { AdminLineService } from './services/admin-line.service';
 import { AdminTelegramService } from './services/admin-telegram.service';
+import { AdminImageTemplatesService } from './services/admin-image-templates.service';
+import { AdminImageDesignStylesService } from './services/admin-image-design-styles.service';
 import { FaqModule } from '../faq/faq.module';
 
 @Module({
@@ -49,6 +54,7 @@ import { FaqModule } from '../faq/faq.module';
     FaqModule,
     LineModule,
     TelegramModule,
+    UploadModule,
     EventsModule,
     forwardRef(() => OrchestrationModule),
   ],
@@ -65,6 +71,8 @@ import { FaqModule } from '../faq/faq.module';
     AdminTelegramController,
     AdminTopupPlansController,
     AdminPipelineJobsController,
+    AdminImageTemplatesController,
+    AdminImageDesignStylesController,
   ],
   providers: [
     AdminAnnouncementsService,
@@ -76,6 +84,8 @@ import { FaqModule } from '../faq/faq.module';
     AdminLineService,
     AdminTelegramService,
     AdminUserProvisioningService,
+    AdminImageTemplatesService,
+    AdminImageDesignStylesService,
   ],
 })
 export class AdminModule {}

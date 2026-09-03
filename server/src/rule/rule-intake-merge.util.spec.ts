@@ -59,7 +59,9 @@ describe('mergeIntakeWithExtracted', () => {
   it('overrides channels from guided intake', () => {
     const intake: RuleIntakeAnswers = {
       mode: 'guided',
-      channels: [{ channel: 'linkedin', priority: 'medium', contentStyle: 'article' }],
+      channels: [
+        { channel: 'linkedin', priority: 'medium', contentStyle: 'article' },
+      ],
     };
     const merged = mergeIntakeWithExtracted(intake, baseDraft());
     expect(merged.channels).toHaveLength(1);

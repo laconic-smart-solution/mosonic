@@ -42,11 +42,16 @@ function inferAuthErrorCode(
   }
   if (
     context === 'otp' ||
-    (status === 400 && (lower.includes('otp') || lower.includes('verification')))
+    (status === 400 &&
+      (lower.includes('otp') || lower.includes('verification')))
   ) {
     return 'InvalidOtp';
   }
-  if (status === 409 || lower.includes('already exists') || lower.includes('duplicate')) {
+  if (
+    status === 409 ||
+    lower.includes('already exists') ||
+    lower.includes('duplicate')
+  ) {
     return 'Conflict';
   }
   if (status === 400) return 'ValidationFailed';
@@ -118,10 +123,18 @@ export function mapSsoAxiosError(
     const errorCode = inferAuthErrorCode(status, message, context);
 
     if (context === 'login' && status === 401) {
-      throwMappedSsoError(401, 'Invalid username or password', 'InvalidCredentials');
+      throwMappedSsoError(
+        401,
+        'Invalid username or password',
+        'InvalidCredentials',
+      );
     }
     if (context === 'refresh' && status === 401) {
-      throwMappedSsoError(401, 'Session expired. Sign in again.', 'InvalidToken');
+      throwMappedSsoError(
+        401,
+        'Session expired. Sign in again.',
+        'InvalidToken',
+      );
     }
     if (context === 'otp' && (status === 400 || status === 401)) {
       throwMappedSsoError(

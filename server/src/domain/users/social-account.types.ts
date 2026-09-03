@@ -1,8 +1,5 @@
 import type { SocialAccount as PrismaSocialAccount } from '@prisma/client';
-import {
-  SocialAccountStatus,
-  SocialProvider,
-} from '@prisma/client';
+import { SocialAccountStatus, SocialProvider } from '@prisma/client';
 
 export { SocialAccountStatus, SocialProvider };
 

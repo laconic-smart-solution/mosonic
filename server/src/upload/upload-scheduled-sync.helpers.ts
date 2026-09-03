@@ -22,7 +22,9 @@ function extractStatusString(parsed: unknown): string {
   return '';
 }
 
-export function interpretZernioPostForSync(parsed: unknown | null): SyncPostDecision {
+export function interpretZernioPostForSync(
+  parsed: unknown | null,
+): SyncPostDecision {
   if (parsed == null) return { kind: 'not_found' };
   const status = extractStatusString(parsed);
   const s = status.trim().toLowerCase();

@@ -1,7 +1,9 @@
 import { CostService } from './cost.service';
 import type { RecordCostDto } from './dto/record-cost.dto';
 
-function dto(p: Partial<RecordCostDto> & Pick<RecordCostDto, 'entryType'>): RecordCostDto {
+function dto(
+  p: Partial<RecordCostDto> & Pick<RecordCostDto, 'entryType'>,
+): RecordCostDto {
   return {
     userId: 'user-1',
     pipelineRef: 'pipe-1',
@@ -9,7 +11,7 @@ function dto(p: Partial<RecordCostDto> & Pick<RecordCostDto, 'entryType'>): Reco
     provider: 'openai',
     providerModel: 'gpt-4o',
     ...p,
-  } as RecordCostDto;
+  };
 }
 
 describe('CostService', () => {

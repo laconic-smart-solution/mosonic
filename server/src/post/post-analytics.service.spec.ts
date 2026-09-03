@@ -1,9 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PostAnalyticsService } from './post-analytics.service';
-import {
-  PlatformPostStatus,
-  PostStatus,
-} from './schemas/post.schema';
+import { PlatformPostStatus, PostStatus } from './schemas/post.schema';
 import {
   PlatformMetricSyncStatus,
   PostAnalyticsSyncStatus,
@@ -125,8 +122,13 @@ describe('PostAnalyticsService', () => {
 
     const out = await service.syncFromZernio('p1');
 
-    expect(zernioRest.getPostAnalytics).toHaveBeenCalledWith('z1', expect.any(Object));
-    expect(out.platformMetrics.some((m) => m.platform === 'facebook')).toBe(false);
+    expect(zernioRest.getPostAnalytics).toHaveBeenCalledWith(
+      'z1',
+      expect.any(Object),
+    );
+    expect(out.platformMetrics.some((m) => m.platform === 'facebook')).toBe(
+      false,
+    );
   });
 
   it('syncFromZernio rejects non-published statuses', async () => {

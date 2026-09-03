@@ -3,6 +3,12 @@ import type { Rule } from '../../rule/schemas/rule.schema';
 import { WorkflowConfigGenerationService } from './workflow-config-generation.service';
 import type { LogicalWorkflowNode } from '../workflow-structure.builder';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+// These tests assert on parsed output, not prompt-internal formatting.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 describe('WorkflowConfigGenerationService', () => {
   const rule = { ruleId: 'r1', name: 'Test Rule' } as Rule;
 
@@ -35,7 +41,7 @@ describe('WorkflowConfigGenerationService', () => {
 
     const svc = new WorkflowConfigGenerationService(
       llm as never,
-      creditBilling as never,
+      creditBilling,
     );
 
     const out = await svc.generateConfigs(logicalNodes, rule, 'Sale post', {
@@ -63,7 +69,7 @@ describe('WorkflowConfigGenerationService', () => {
 
     const svc = new WorkflowConfigGenerationService(
       llm as never,
-      creditBilling as never,
+      creditBilling,
     );
 
     const out = await svc.generateConfigs(logicalNodes, rule, 'Hello');
@@ -100,10 +106,14 @@ describe('WorkflowConfigGenerationService', () => {
 
     const svc = new WorkflowConfigGenerationService(
       llm as never,
-      creditBilling as never,
+      creditBilling,
     );
 
-    const out = await svc.generateConfigs(intelligenceNodes, rule, 'Trend post');
+    const out = await svc.generateConfigs(
+      intelligenceNodes,
+      rule,
+      'Trend post',
+    );
     expect(out[0].userPrompt).toBe('Research latest trends');
     expect(out[0].config.searchType).toBe('all');
     expect(out[0].config.model).toBe('gpt-4o');

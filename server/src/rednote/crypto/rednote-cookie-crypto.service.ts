@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from 'crypto';
 import { RedNoteNotConfiguredError } from '../errors/rednote.errors';
 
 const ALGO = 'aes-256-gcm';
@@ -12,7 +17,9 @@ export class RedNoteCookieCryptoService {
   constructor(private readonly config: ConfigService) {}
 
   private resolveKey(): Buffer {
-    const raw = this.config.get<string>('REDNOTE_COOKIE_ENCRYPTION_KEY')?.trim();
+    const raw = this.config
+      .get<string>('REDNOTE_COOKIE_ENCRYPTION_KEY')
+      ?.trim();
     if (!raw) {
       throw new RedNoteNotConfiguredError();
     }

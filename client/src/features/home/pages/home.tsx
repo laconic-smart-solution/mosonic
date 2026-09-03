@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
@@ -18,9 +18,12 @@ import {
   saveHomePendingPrompt,
 } from "@/features/home/lib/home-pending-prompt"
 import { buildStrategyInput } from "@/lib/strategy-input"
-import type { RuleIntakeAnswers } from "@/features/rules/types/rule-intake.type"
+import {
+  createDefaultRuleIntakeAnswers,
+  type RuleIntakeAnswers,
+} from "@/features/rules/types/rule-intake.type"
 import { RuleExtractionProgress } from "@/features/rules/components/rule-extraction-progress"
-import { CreateRuleWizard } from "@/features/rules/components/create-rule-wizard"
+import { GenerationCreditConfirmDialog } from "@/features/credit/components/generation-credit-confirm-dialog"
 import type { RuleEntity } from "@/features/rules/data/rules-mock"
 import { useRuleExtraction } from "@/features/rules/hooks/use-rule-extraction"
 import { useContentPageQuery } from "@/shared/queries/content.query"
@@ -60,10 +63,12 @@ export default function HomePage() {
   const [ruleOptions, setRuleOptions] = useState<RuleListItem[]>([])
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
   const [pendingRuleId, setPendingRuleId] = useState<string | null>(null)
-  const [ruleWizardOpen, setRuleWizardOpen] = useState(false)
-  const [ruleWizardPrompt, setRuleWizardPrompt] = useState("")
-  const [ruleWizardKey, setRuleWizardKey] = useState(0)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingContentPrompt, setPendingContentPrompt] = useState("")
+  const pendingExtractRef = useRef<{
+    text: string
+    attachments: Attachment[]
+  } | null>(null)
 
   const rulesPageQuery = useRulesPageQuery(
     {
@@ -233,10 +238,9 @@ export default function HomePage() {
       return
     }
 
+    pendingExtractRef.current = { text, attachments }
     setPendingContentPrompt(trimmed)
-    setRuleWizardPrompt(trimmed)
-    setRuleWizardKey((k) => k + 1)
-    setRuleWizardOpen(true)
+    setConfirmOpen(true)
   }
 
   function executeRuleGeneration(
@@ -337,14 +341,25 @@ export default function HomePage() {
       </div>
 
       {isAuthenticated ? (
-        <CreateRuleWizard
-          open={ruleWizardOpen}
-          onOpenChange={setRuleWizardOpen}
-          initialPrompt={ruleWizardPrompt}
-          onPromptChange={setRuleWizardPrompt}
-          promptAreaKey={ruleWizardKey}
-          onExtract={executeRuleGeneration}
-          isExtracting={isExtracting}
+        <GenerationCreditConfirmDialog
+          open={confirmOpen}
+          onOpenChange={(next) => {
+            setConfirmOpen(next)
+            if (!next) pendingExtractRef.current = null
+          }}
+          kind="rule"
+          isSubmitting={isExtracting}
+          onConfirm={() => {
+            const pending = pendingExtractRef.current
+            if (!pending) return
+            executeRuleGeneration(
+              pending.text,
+              pending.attachments,
+              createDefaultRuleIntakeAnswers("express"),
+            )
+            setConfirmOpen(false)
+            pendingExtractRef.current = null
+          }}
         />
       ) : null}
     </div>

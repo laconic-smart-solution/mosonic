@@ -20,9 +20,7 @@ function summarizationSourceRef(
  * Validates linear node order for save / generated workflows (when edges are absent).
  * Graph connectivity and cycles are validated separately via validateWorkflowGraph.
  */
-export function assertValidWorkflowNodeOrder(
-  nodes: WorkflowOrderNode[],
-): void {
+export function assertValidWorkflowNodeOrder(nodes: WorkflowOrderNode[]): void {
   const sorted = [...nodes].sort((a, b) => a.order - b.order);
   const textNodes = sorted.filter(
     (n) => n.type === WorkflowNodeType.TextGeneration,
@@ -100,8 +98,7 @@ export function assertValidWorkflowNodeOrder(
         }
       } else if (ref === 'transcription') {
         const hasTranscriptionBefore = sorted.some(
-          (x) =>
-            x.type === WorkflowNodeType.Transcription && x.order < n.order,
+          (x) => x.type === WorkflowNodeType.Transcription && x.order < n.order,
         );
         if (!hasTranscriptionBefore) {
           throw new BadRequestException(

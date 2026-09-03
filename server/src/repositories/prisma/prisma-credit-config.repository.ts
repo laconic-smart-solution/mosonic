@@ -64,7 +64,7 @@ export class PrismaCreditConfigRepository implements ICreditConfigRepository {
     set: Prisma.CreditConfigUpdateInput,
     unsetKeys: string[],
   ): Promise<void> {
-    const data = { ...set } as Prisma.CreditConfigUpdateInput;
+    const data = { ...set };
     for (const key of unsetKeys) {
       (data as Record<string, unknown>)[key] = undefined;
     }

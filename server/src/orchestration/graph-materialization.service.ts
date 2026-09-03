@@ -32,8 +32,7 @@ export function mergeWorkflowLaneIntoConfig(
 ): Record<string, unknown> {
   const next = { ...config };
   const top = lane?.trim();
-  const existing =
-    typeof next.laneId === 'string' ? next.laneId.trim() : '';
+  const existing = typeof next.laneId === 'string' ? next.laneId.trim() : '';
   if (top && !existing) {
     next.laneId = top;
   }
@@ -87,10 +86,7 @@ const LAYOUT_PIPE_GAP = 48;
 const LAYOUT_LANE_GAP = 140;
 const LAYOUT_CENTER_Y = 140;
 
-function layoutLaneOffsetY(
-  laneIndex: number,
-  laneCount: number,
-): number {
+function layoutLaneOffsetY(laneIndex: number, laneCount: number): number {
   return LAYOUT_CENTER_Y + (laneIndex - (laneCount - 1) / 2) * LAYOUT_LANE_GAP;
 }
 
@@ -181,7 +177,9 @@ export class GraphMaterializationService {
       return this.withoutMaterialization(templateNodes, templateEdges);
     }
 
-    const mergeNode = templateNodes.find((n) => n.type === WorkflowNodeType.Merge);
+    const mergeNode = templateNodes.find(
+      (n) => n.type === WorkflowNodeType.Merge,
+    );
     if (!mergeNode) {
       throw new BadRequestException(
         'Branch workflows require a merge node downstream',
@@ -238,8 +236,8 @@ export class GraphMaterializationService {
     const branchIncoming = getIncoming(effectiveEdges, branchNode.nodeId);
     const mergeOutgoing = getOutgoing(effectiveEdges, mergeNode.nodeId);
 
-    const materializedNodes: MaterializedPipelineNode[] = trunkNodes.map(
-      (n) => this.toPipelineNode(n, null),
+    const materializedNodes: MaterializedPipelineNode[] = trunkNodes.map((n) =>
+      this.toPipelineNode(n, null),
     );
 
     const lanes: string[] = [];
@@ -260,8 +258,13 @@ export class GraphMaterializationService {
       const laneNodes = laneTemplates.map((template, index) => {
         const clonedId = `${template.nodeId}__${lane}`;
         const config = { ...template.config };
-        if (template.type === WorkflowNodeType.Adapt) {
+        if (
+          template.type === WorkflowNodeType.Adapt ||
+          template.type === WorkflowNodeType.ImageGeneration
+        ) {
           config.channel = channel.channel;
+        }
+        if (template.type === WorkflowNodeType.Adapt) {
           config.contentStyle = channel.contentStyle;
         }
         return this.toPipelineNode(
@@ -296,8 +299,8 @@ export class GraphMaterializationService {
         );
       }
 
-      laneEntryIds.push(laneNodes[0]!.nodeId);
-      laneExitIds.push(laneNodes[laneNodes.length - 1]!.nodeId);
+      laneEntryIds.push(laneNodes[0].nodeId);
+      laneExitIds.push(laneNodes[laneNodes.length - 1].nodeId);
       materializedNodes.push(...laneNodes);
     }
 
@@ -361,13 +364,15 @@ export class GraphMaterializationService {
       );
       if (sortedLane.length > 1) {
         for (let i = 0; i < sortedLane.length - 1; i += 1) {
-          const a = sortedLane[i]!;
-          const b = sortedLane[i + 1]!;
+          const a = sortedLane[i];
+          const b = sortedLane[i + 1];
           if (
             !materializedEdges.some((e) => e.from === a && e.to === b) &&
             !materializedEdges.some((e) => e.from === b && e.to === a)
           ) {
-            const hasPath = materializedEdges.some((e) => e.from === a && e.to === b);
+            const hasPath = materializedEdges.some(
+              (e) => e.from === a && e.to === b,
+            );
             if (!hasPath) {
               materializedEdges.push({ from: a, to: b });
             }
@@ -378,7 +383,7 @@ export class GraphMaterializationService {
 
     for (let i = 0; i < laneExitIds.length; i += 1) {
       materializedEdges.push({
-        from: laneExitIds[i]!,
+        from: laneExitIds[i],
         to: mergeNode.nodeId,
       });
     }
@@ -387,7 +392,10 @@ export class GraphMaterializationService {
       materializedEdges.push({ from: mergeNode.nodeId, to: edge.to });
     }
 
-    const orderedNodes = this.reindexOrders(materializedNodes, materializedEdges);
+    const orderedNodes = this.reindexOrders(
+      materializedNodes,
+      materializedEdges,
+    );
 
     return {
       nodes: orderedNodes,

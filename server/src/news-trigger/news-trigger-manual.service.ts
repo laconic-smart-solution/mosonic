@@ -20,7 +20,10 @@ import { RuleStatus } from '../rule/schemas/rule.schema';
 import { EventsService } from '../events/events.service';
 import { WorkflowResolveService } from '../workflow/workflow-resolve.service';
 import { emitNewsRunUpdate } from './news-trigger-run-events';
-import { logNewsTriggerQueueState, workersInApiProcessLabel } from './news-trigger-queue-diagnostics.util';
+import {
+  logNewsTriggerQueueState,
+  workersInApiProcessLabel,
+} from './news-trigger-queue-diagnostics.util';
 import {
   manualRunGroupKey,
   pendingRunStatus,
@@ -74,9 +77,8 @@ export class NewsTriggerManualService {
       throw new BadRequestException('Rule has no associated user.');
     }
 
-    const workflowId = await this.workflowResolve.resolveLatestReadyWorkflowId(
-      ruleId,
-    );
+    const workflowId =
+      await this.workflowResolve.resolveLatestReadyWorkflowId(ruleId);
     if (!workflowId) {
       throw new BadRequestException(
         'No ready workflow found for this campaign. Save a workflow first.',

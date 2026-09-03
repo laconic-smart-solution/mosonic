@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { PrismaService } from '../../database/prisma.service';
-import type { IRuleRepository, RuleRecord } from '../interfaces/rule.repository.interface';
+import type {
+  IRuleRepository,
+  RuleRecord,
+} from '../interfaces/rule.repository.interface';
 import { mergeTenancyWhere } from './prisma.util';
 
 @Injectable()
@@ -27,7 +30,9 @@ export class PrismaRuleRepository implements IRuleRepository {
     sortBy: string,
     sortOrder: 'asc' | 'desc',
   ): Promise<{ rows: RuleRecord[]; total: number }> {
-    const orderBy = { [sortBy]: sortOrder } as Prisma.RuleOrderByWithRelationInput;
+    const orderBy = {
+      [sortBy]: sortOrder,
+    } as Prisma.RuleOrderByWithRelationInput;
     const [rows, total] = await Promise.all([
       this.prisma.rule.findMany({
         where: filter,
@@ -134,9 +139,7 @@ export class PrismaRuleRepository implements IRuleRepository {
       if (nt.country !== country || nt.language !== language) return false;
       if ((nt.category ?? '') !== category) return false;
 
-      const lastAt = nt.lastTriggeredAt
-        ? new Date(nt.lastTriggeredAt)
-        : null;
+      const lastAt = nt.lastTriggeredAt ? new Date(nt.lastTriggeredAt) : null;
       if (!lastAt) return true;
       if (nt.schedule === 'daily') return lastAt < today;
       if (nt.schedule === 'twice_daily') return lastAt < eightHoursAgo;

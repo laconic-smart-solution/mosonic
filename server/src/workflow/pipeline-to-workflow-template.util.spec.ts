@@ -12,11 +12,15 @@ import {
 
 describe('stripLaneSuffix', () => {
   it('strips known lane suffixes', () => {
-    expect(stripLaneSuffix('adapt__instagram', ['instagram', 'linkedin'])).toEqual({
+    expect(
+      stripLaneSuffix('adapt__instagram', ['instagram', 'linkedin']),
+    ).toEqual({
       baseId: 'adapt',
       lane: 'instagram',
     });
-    expect(stripLaneSuffix('img-uuid__linkedin', ['instagram', 'linkedin'])).toEqual({
+    expect(
+      stripLaneSuffix('img-uuid__linkedin', ['instagram', 'linkedin']),
+    ).toEqual({
       baseId: 'img-uuid',
       lane: 'linkedin',
     });
@@ -157,9 +161,9 @@ describe('collapsePipelineToWorkflowTemplate', () => {
       layout,
     });
 
-    expect(collapsed.nodes.some((n) => n.type === WorkflowNodeType.Branch)).toBe(
-      true,
-    );
+    expect(
+      collapsed.nodes.some((n) => n.type === WorkflowNodeType.Branch),
+    ).toBe(true);
     expect(collapsed.nodes.some((n) => n.type === WorkflowNodeType.Merge)).toBe(
       true,
     );
@@ -187,7 +191,9 @@ describe('collapsePipelineToWorkflowTemplate', () => {
         expandedEdges,
       ),
     ).not.toThrow();
-    expect(expandedEdges.some((e) => e.sourceHandle === 'instagram')).toBe(true);
+    expect(expandedEdges.some((e) => e.sourceHandle === 'instagram')).toBe(
+      true,
+    );
     expect(expandedEdges.some((e) => e.sourceHandle === 'linkedin')).toBe(true);
   });
 
@@ -279,14 +285,16 @@ describe('collapsePipelineToWorkflowTemplate', () => {
       collapsed.nodes.filter((n) => n.type === WorkflowNodeType.Adapt),
     ).toHaveLength(4);
     expect(
-      collapsed.nodes.filter((n) => n.type === WorkflowNodeType.ImageGeneration),
+      collapsed.nodes.filter(
+        (n) => n.type === WorkflowNodeType.ImageGeneration,
+      ),
     ).toHaveLength(1);
     expect(
       collapsed.nodes.filter((n) => n.type === WorkflowNodeType.Summarization),
     ).toHaveLength(2);
-    expect(collapsed.nodes.some((n) => n.type === WorkflowNodeType.Branch)).toBe(
-      true,
-    );
+    expect(
+      collapsed.nodes.some((n) => n.type === WorkflowNodeType.Branch),
+    ).toBe(true);
     const expanded = expandGraphLaneTemplates(collapsed.nodes, lanes);
     const expandedEdges = buildWorkflowEdges(expanded);
     expect(
@@ -411,7 +419,9 @@ describe('collapsePipelineToWorkflowTemplate', () => {
       layout: {},
     });
 
-    const adapt = collapsed.nodes.find((n) => n.type === WorkflowNodeType.Adapt);
+    const adapt = collapsed.nodes.find(
+      (n) => n.type === WorkflowNodeType.Adapt,
+    );
     expect(adapt).toBeDefined();
     expect(adapt?.config).not.toHaveProperty('laneId');
     expect(adapt?.lane).toBeNull();

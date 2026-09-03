@@ -235,8 +235,9 @@ export class PlanService implements OnModuleInit {
       if (!plan) continue;
 
       if (plan.priceThb > 0) {
-        const selfServe =
-          await this.planPurchases.hasPurchaseHistory(up.userId);
+        const selfServe = await this.planPurchases.hasPurchaseHistory(
+          up.userId,
+        );
         if (selfServe) {
           const paid = await this.planPurchases.findActiveForUserAndPeriod(
             up.userId,

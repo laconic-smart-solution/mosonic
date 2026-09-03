@@ -40,7 +40,9 @@ function groupSumWithCount(
   return acc;
 }
 
-function dailyTrend(entries: CostEntryRecord[]): Array<{ date: string; costUsd: number }> {
+function dailyTrend(
+  entries: CostEntryRecord[],
+): Array<{ date: string; costUsd: number }> {
   const byDay = new Map<string, number>();
   for (const e of entries) {
     const day = e.createdAt.toISOString().slice(0, 10);

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,12 +9,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Label } from "@/components/ui/label"
 import {
   Modal,
   ModalContent,
   ModalHeader,
   ModalTitle,
 } from "@/components/ui/modal"
+import { Textarea } from "@/components/ui/textarea"
 import {
   type OutputKey,
   cardTitle,
@@ -34,7 +37,7 @@ type RerunConfirmDialogProps = {
   workflowNodes: WorkflowNodesLite
   globalRerunning: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (nodeId: string) => void
+  onSubmit: (nodeId: string, message?: string) => void
 }
 
 export function ContentDetailRerunConfirmDialog({
@@ -50,6 +53,13 @@ export function ContentDetailRerunConfirmDialog({
   const openKey: OutputKey | undefined = openNode
     ? outputKeyForNodeType(openNode.type)
     : undefined
+
+  const [message, setMessage] = useState("")
+
+  // Reset the message whenever a different node's dialog opens (or it closes).
+  useEffect(() => {
+    setMessage("")
+  }, [openNodeId])
 
   return (
     <AlertDialog
@@ -80,13 +90,27 @@ export function ContentDetailRerunConfirmDialog({
             untouched.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="space-y-1.5 py-1">
+          <Label htmlFor="rerun-message" className="text-xs font-medium text-foreground">
+            What should change? (optional)
+          </Label>
+          <Textarea
+            id="rerun-message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="e.g. make the background darker, shorten the caption…"
+            rows={3}
+            disabled={globalRerunning}
+            className="resize-y bg-background text-sm leading-relaxed"
+          />
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={globalRerunning}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={!openNodeId || globalRerunning}
             onClick={(event) => {
               event.preventDefault()
-              if (openNodeId) onSubmit(openNodeId)
+              if (openNodeId) onSubmit(openNodeId, message.trim() || undefined)
             }}
           >
             Re-run node

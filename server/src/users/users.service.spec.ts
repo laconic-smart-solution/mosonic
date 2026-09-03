@@ -134,10 +134,12 @@ describe('UsersService Zernio accounts', () => {
   });
 
   it('setZernioConnectedAccount upserts table and dual-writes JSON', async () => {
-    socialAccounts.upsertActive.mockResolvedValue(activeRow({
-      channel: 'instagram',
-      externalAccountId: 'acc_new',
-    }) as never);
+    socialAccounts.upsertActive.mockResolvedValue(
+      activeRow({
+        channel: 'instagram',
+        externalAccountId: 'acc_new',
+      }),
+    );
     socialAccounts.findActiveByUserAndProvider.mockResolvedValue([
       activeRow({ channel: 'instagram', externalAccountId: 'acc_new' }),
     ] as never);

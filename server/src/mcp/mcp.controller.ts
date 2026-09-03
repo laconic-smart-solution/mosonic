@@ -74,7 +74,9 @@ export class McpController {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`MCP Zernio OAuth callback failed: ${message}`);
-      res.redirect(`${frontend}/settings/accounts?zernio_error=callback_failed`);
+      res.redirect(
+        `${frontend}/settings/accounts?zernio_error=callback_failed`,
+      );
     }
   }
 

@@ -100,7 +100,10 @@ export class UsageService {
       billingPeriod,
     );
 
-    const byNodeTypeMap = new Map<string, { creditsCharged: number; count: number }>();
+    const byNodeTypeMap = new Map<
+      string,
+      { creditsCharged: number; count: number }
+    >();
     const byDayMap = new Map<string, number>();
     let ledgerCreditsUsed = 0;
 
@@ -120,7 +123,7 @@ export class UsageService {
 
     const creditsPerMonth = plan
       ? await this.planService.getCreditsForPlan(plan)
-      : userPlan?.creditsPerMonth ?? 0;
+      : (userPlan?.creditsPerMonth ?? 0);
     const creditsRemaining = Math.max(0, userPlan?.creditsRemaining ?? 0);
     const creditsUsed = userPlan?.creditsUsed ?? ledgerCreditsUsed;
     const creditsBudget = periodCreditBudget({
@@ -218,7 +221,11 @@ export class UsageService {
     };
   }
 
-  async getAdminSummary(query: { from?: string; to?: string; userId?: string }) {
+  async getAdminSummary(query: {
+    from?: string;
+    to?: string;
+    userId?: string;
+  }) {
     const filter = {
       ...this.buildDateFilter(query.from, query.to),
       ...(query.userId ? { userId: query.userId } : {}),
@@ -239,17 +246,27 @@ export class UsageService {
       string,
       { creditsCharged: number; rawCostUsd: number; count: number }
     >();
-    const byDay = new Map<string, { creditsCharged: number; rawCostUsd: number }>();
+    const byDay = new Map<
+      string,
+      { creditsCharged: number; rawCostUsd: number }
+    >();
 
     for (const e of entries) {
       totalCreditsCharged += e.creditsCharged;
       totalRawCostUsd += e.rawCostUsd;
 
       const bump = (
-        map: Map<string, { creditsCharged: number; rawCostUsd: number; count: number }>,
+        map: Map<
+          string,
+          { creditsCharged: number; rawCostUsd: number; count: number }
+        >,
         key: string,
       ) => {
-        const cur = map.get(key) ?? { creditsCharged: 0, rawCostUsd: 0, count: 0 };
+        const cur = map.get(key) ?? {
+          creditsCharged: 0,
+          rawCostUsd: 0,
+          count: 0,
+        };
         cur.creditsCharged += e.creditsCharged;
         cur.rawCostUsd += e.rawCostUsd;
         cur.count += 1;

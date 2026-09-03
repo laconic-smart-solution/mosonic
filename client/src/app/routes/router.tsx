@@ -39,6 +39,7 @@ import {
   AdminNodeCreditsPage,
   AdminPlansPage,
   AdminTopupPlansPage,
+  AdminNodeSettingsImagePage,
   AdminUsagePage,
   AdminApiUsagePage,
   AdminContentPage,
@@ -183,6 +184,10 @@ export const router = createBrowserRouter([
           {
             path: "communication/announcements",
             element: <AdminAnnouncementsPage />,
+          },
+          {
+            path: "node-settings/image",
+            element: <AdminNodeSettingsImagePage />,
           },
         ],
       },

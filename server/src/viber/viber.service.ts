@@ -72,10 +72,8 @@ export class ViberService {
   /** Base URL of viber-service, either direct (:8088) or through the comms gateway. */
   private get baseUrl(): string {
     return (
-      this.config
-        .get<string>('VIBER_SERVICE_URL')
-        ?.trim()
-        .replace(/\/$/, '') ?? 'http://localhost:8088'
+      this.config.get<string>('VIBER_SERVICE_URL')?.trim().replace(/\/$/, '') ??
+      'http://localhost:8088'
     );
   }
 
@@ -136,11 +134,7 @@ export class ViberService {
     };
   }
 
-  async getQrPng(
-    uri?: string,
-    size?: number,
-    start?: string,
-  ): Promise<Buffer> {
+  async getQrPng(uri?: string, size?: number, start?: string): Promise<Buffer> {
     const res = await this.fetchViber(this.qrUrl(uri, size, start));
     if (!res.ok) {
       const body = (await res
@@ -267,9 +261,7 @@ export class ViberService {
     }
   }
 
-  async getConnectStatus(
-    userId: string,
-  ): Promise<ViberConnectStatusResponse> {
+  async getConnectStatus(userId: string): Promise<ViberConnectStatusResponse> {
     const existing = await this.connections.findByUserId(userId);
     if (existing) {
       return {
@@ -381,9 +373,7 @@ export class ViberService {
     const out: ViberInboundEvent[] = [];
 
     if (event === 'subscribed' || event === 'conversation_started') {
-      const userId = String(
-        update.sender?.id ?? update.user?.id ?? '',
-      ).trim();
+      const userId = String(update.sender?.id ?? update.user?.id ?? '').trim();
       if (userId) {
         out.push({ type: VIBER_EVENT_FOLLOW, user_id: userId });
         const context =
@@ -529,8 +519,7 @@ export class ViberService {
       );
     }
 
-    const alreadyLinked =
-      await this.connections.findByViberUserId(viberUserId);
+    const alreadyLinked = await this.connections.findByViberUserId(viberUserId);
     if (alreadyLinked && alreadyLinked.userId !== localUserId) {
       throw new ConflictException(
         'This Viber account is already linked to another Mosonic user.',
@@ -562,10 +551,7 @@ export class ViberService {
     return `${this.baseUrl}/api/v1/qr?${params.toString()}`;
   }
 
-  private async fetchViber(
-    url: string,
-    init?: RequestInit,
-  ): Promise<Response> {
+  private async fetchViber(url: string, init?: RequestInit): Promise<Response> {
     try {
       return await fetch(url, { headers: this.headers(), ...init });
     } catch (err) {

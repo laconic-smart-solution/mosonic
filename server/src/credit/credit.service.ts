@@ -28,10 +28,7 @@ import { CreditCalculationService } from './credit-calculation.service';
 import type { DeductCreditsDto } from './dto/deduct-credits.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';
 import { periodCreditBudget } from './lib/period-credit-budget.util';
-import {
-  PaymentService,
-  type CreditPackage,
-} from '../payment/payment.service';
+import { PaymentService, type CreditPackage } from '../payment/payment.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
 import {
@@ -76,14 +73,19 @@ export class CreditService {
     private readonly whatsappNotify: WhatsAppNotifyService,
   ) {
     const raw = Number(
-      config.get('CREDIT_LOW_BALANCE_THRESHOLD_PCT', DEFAULT_LOW_BALANCE_THRESHOLD_PCT),
+      config.get(
+        'CREDIT_LOW_BALANCE_THRESHOLD_PCT',
+        DEFAULT_LOW_BALANCE_THRESHOLD_PCT,
+      ),
     );
     const pct = Number.isFinite(raw) ? raw : DEFAULT_LOW_BALANCE_THRESHOLD_PCT;
     this.lowBalanceThresholdPct = Math.min(100, Math.max(0, pct)) / 100;
   }
 
   async getPackages(): Promise<CreditPackage[]> {
-    const plans = await this.paymentService.listTopupPlans({ activeOnly: true });
+    const plans = await this.paymentService.listTopupPlans({
+      activeOnly: true,
+    });
     return plans.map((plan) => this.paymentService.toCreditPackage(plan));
   }
 
@@ -142,7 +144,8 @@ export class CreditService {
       return false;
     }
 
-    const purchase = await this.topupPurchases.findByTransactionId(transactionId);
+    const purchase =
+      await this.topupPurchases.findByTransactionId(transactionId);
 
     if (!purchase) {
       return false;
@@ -162,12 +165,18 @@ export class CreditService {
         return true;
       }
 
-      await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'active');
+      await this.topupPurchases.updateStatus(
+        purchase.topupPurchaseId,
+        'active',
+      );
 
-      const updated = await this.userPlans.adjustActiveCredits(purchase.userId, {
-        creditsRemaining: purchase.credits,
-        clearLowBalanceNotified: true,
-      });
+      const updated = await this.userPlans.adjustActiveCredits(
+        purchase.userId,
+        {
+          creditsRemaining: purchase.credits,
+          clearLowBalanceNotified: true,
+        },
+      );
 
       if (!updated) {
         this.logger.error(
@@ -197,7 +206,10 @@ export class CreditService {
     }
 
     if (rawStatus === 'CANCELLED' && purchase.status === 'pending') {
-      await this.topupPurchases.updateStatus(purchase.topupPurchaseId, 'cancelled');
+      await this.topupPurchases.updateStatus(
+        purchase.topupPurchaseId,
+        'cancelled',
+      );
       return true;
     }
 
@@ -257,12 +269,16 @@ export class CreditService {
     reason: string,
   ): Promise<{ creditsRemaining: number; creditsAdded: number }> {
     if (!Number.isInteger(credits) || credits < 1 || credits > 100_000) {
-      throw new BadRequestException('Credits must be an integer between 1 and 100000');
+      throw new BadRequestException(
+        'Credits must be an integer between 1 and 100000',
+      );
     }
 
     const trimmedReason = reason.trim();
     if (trimmedReason.length < 3 || trimmedReason.length > 500) {
-      throw new BadRequestException('Reason must be between 3 and 500 characters');
+      throw new BadRequestException(
+        'Reason must be between 3 and 500 characters',
+      );
     }
 
     const updated = await this.userPlans.adjustActiveCredits(userId, {
@@ -446,7 +462,9 @@ export class CreditService {
     workflowGeneration: number;
   }> {
     const [ruleGeneration, workflowGeneration] = await Promise.all([
-      this.nodeCreditPriceService.getActiveCostCredit(RULE_GENERATION_NODE_TYPE),
+      this.nodeCreditPriceService.getActiveCostCredit(
+        RULE_GENERATION_NODE_TYPE,
+      ),
       this.nodeCreditPriceService.getActiveCostCredit(
         WORKFLOW_GENERATION_NODE_TYPE,
       ),
@@ -678,12 +696,16 @@ export class CreditService {
 
   private emitBalanceUpdated(userPlan: UserPlanRecord): void {
     try {
-      this.events.emitToRoom(userRoom(userPlan.userId), 'credit:balance_updated', {
-        userId: userPlan.userId,
-        creditsRemaining: userPlan.creditsRemaining,
-        creditsUsed: userPlan.creditsUsed,
-        creditsPerMonth: userPlan.creditsPerMonth,
-      });
+      this.events.emitToRoom(
+        userRoom(userPlan.userId),
+        'credit:balance_updated',
+        {
+          userId: userPlan.userId,
+          creditsRemaining: userPlan.creditsRemaining,
+          creditsUsed: userPlan.creditsUsed,
+          creditsPerMonth: userPlan.creditsPerMonth,
+        },
+      );
     } catch {
       // noop — credit layer must not break pipelines
     }

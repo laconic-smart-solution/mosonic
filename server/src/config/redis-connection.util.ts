@@ -50,7 +50,9 @@ function redisOptionsFromUrl(url: string): RedisOptions {
 /**
  * BullMQ / ioredis connection: uses REDIS_URL when set, otherwise host/port/password.
  */
-export function buildRedisConnectionOptions(source: RedisEnvSource): RedisOptions {
+export function buildRedisConnectionOptions(
+  source: RedisEnvSource,
+): RedisOptions {
   const url = source.REDIS_URL?.trim();
   if (url) {
     return withBullMqConnectionDefaults(redisOptionsFromUrl(url));
@@ -68,9 +70,7 @@ export function buildRedisConnectionOptions(source: RedisEnvSource): RedisOption
 }
 
 /** ioredis settings required for BullMQ workers over flaky / remote Redis. */
-function withBullMqConnectionDefaults(
-  options: RedisOptions,
-): RedisOptions {
+function withBullMqConnectionDefaults(options: RedisOptions): RedisOptions {
   return {
     ...options,
     maxRetriesPerRequest: null,

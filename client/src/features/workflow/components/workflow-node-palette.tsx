@@ -74,6 +74,7 @@ export function WorkflowNodePalettePanel({
   const { t } = useTranslation("workflow")
   return (
     <aside
+      data-tour="wf-node-palette"
       className="flex h-full w-[240px] min-w-[240px] shrink-0 flex-col border-r bg-card"
       style={{ borderColor: T.surfaceBorder }}
     >

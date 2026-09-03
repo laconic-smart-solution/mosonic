@@ -57,7 +57,8 @@ function ruleChannelNames(rule: { channels: unknown }): string[] {
 export class AdminContentService {
   constructor(
     @Inject(CONTENT_REPOSITORY) private readonly content: IContentRepository,
-    @Inject(PIPELINE_REPOSITORY) private readonly pipelines: IPipelineRepository,
+    @Inject(PIPELINE_REPOSITORY)
+    private readonly pipelines: IPipelineRepository,
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
     @Inject(COST_ENTRY_REPOSITORY)
     private readonly costEntries: ICostEntryRepository,
@@ -92,9 +93,7 @@ export class AdminContentService {
     const userIds = [
       ...new Set(contents.map((c) => c.userId).filter(Boolean)),
     ] as string[];
-    const pipelineIds = contents
-      .map((c) => c.pipelineRef)
-      .filter(Boolean) as string[];
+    const pipelineIds = contents.map((c) => c.pipelineRef).filter(Boolean);
 
     const ruleRefs = [...new Set(contents.map((c) => c.ruleRef))];
 
@@ -116,7 +115,9 @@ export class AdminContentService {
     const ruleChannelMap = Object.fromEntries(
       rules.map((r) => [r.ruleId, ruleChannelNames(r)]),
     );
-    const ruleNameMap = Object.fromEntries(rules.map((r) => [r.ruleId, r.name]));
+    const ruleNameMap = Object.fromEntries(
+      rules.map((r) => [r.ruleId, r.name]),
+    );
 
     return {
       contents: contents.map((c) => {

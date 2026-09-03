@@ -100,9 +100,7 @@ export class VideoCheckProcessor extends WorkerHost {
     }
 
     if (check.status === 'failed') {
-      const failError = new Error(
-        check.error ?? 'Video generation failed',
-      );
+      const failError = new Error(check.error ?? 'Video generation failed');
       this.logger.error(
         `[video:check] provider reported failed pipeline=${pipelineId} node=${nodeId} provider=${videoProvider} message=${failError.message}`,
       );
@@ -129,7 +127,9 @@ export class VideoCheckProcessor extends WorkerHost {
       );
     } catch (err) {
       const error =
-        err instanceof Error ? err : new Error(String(err ?? 'Complete failed'));
+        err instanceof Error
+          ? err
+          : new Error(String(err ?? 'Complete failed'));
       this.logger.error(
         `[video:check] completion error pipeline=${pipelineId} node=${nodeId} provider=${videoProvider}: ${error.message}`,
         error.stack,
@@ -141,7 +141,9 @@ export class VideoCheckProcessor extends WorkerHost {
     }
   }
 
-  private async scheduleNextCheck(payload: MediaCheckJobPayload): Promise<void> {
+  private async scheduleNextCheck(
+    payload: MediaCheckJobPayload,
+  ): Promise<void> {
     const nextCount = payload.checkCount + 1;
     const intervalMs = videoPollIntervalMs(payload.videoProvider ?? 'sora');
     try {
@@ -149,11 +151,7 @@ export class VideoCheckProcessor extends WorkerHost {
         'video_check',
         { ...payload, checkCount: nextCount },
         {
-          jobId: videoCheckJobId(
-            payload.pipelineId,
-            payload.nodeId,
-            nextCount,
-          ),
+          jobId: videoCheckJobId(payload.pipelineId, payload.nodeId, nextCount),
           delay: intervalMs,
           attempts: 2,
         },

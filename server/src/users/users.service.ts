@@ -123,7 +123,8 @@ export class UsersService {
       return user;
     } catch (err) {
       if (isUniqueViolation(err)) {
-        const winner = await this.users.findByAuthServerUserId(authServerUserId);
+        const winner =
+          await this.users.findByAuthServerUserId(authServerUserId);
         if (winner) return winner;
       }
       throw err;
@@ -143,8 +144,9 @@ export class UsersService {
       (await this.users.findByUserId(args.localUserId)) ??
       (await this.users.findByAuthServerUserId(args.authServerUserId));
     if (!existing) {
-      const name = [args.firstName, args.lastName].filter(Boolean).join(' ')
-        || args.username;
+      const name =
+        [args.firstName, args.lastName].filter(Boolean).join(' ') ||
+        args.username;
       return this.createCompetitionEventUser({
         name,
         email: args.email,
@@ -226,9 +228,7 @@ export class UsersService {
         lastName,
       });
       if (!updated) {
-        throw new NotFoundException(
-          `Failed to update user ${existing.userId}`,
-        );
+        throw new NotFoundException(`Failed to update user ${existing.userId}`);
       }
       return updated;
     }
@@ -566,7 +566,9 @@ export class UsersService {
     );
   }
 
-  async findRedNoteAccount(userId: string): Promise<SocialAccountRecord | null> {
+  async findRedNoteAccount(
+    userId: string,
+  ): Promise<SocialAccountRecord | null> {
     return this.socialAccounts.findActiveByUserProviderChannel(
       userId,
       SocialProvider.REDNOTE,
@@ -605,7 +607,7 @@ export class UsersService {
       displayName: handle ?? null,
       connectedAt: now,
       lastSyncedAt: now,
-      metadata: metadata as unknown as Prisma.InputJsonValue,
+      metadata: metadata,
     });
   }
 
@@ -631,7 +633,7 @@ export class UsersService {
       REDNOTE_CHANNEL,
       {
         status: SocialAccountStatus.ERROR,
-        metadata: next as unknown as Prisma.InputJsonValue,
+        metadata: next,
         disconnectedAt: new Date(),
       },
     );
@@ -654,9 +656,7 @@ export class UsersService {
       REDNOTE_CHANNEL,
       {
         status: SocialAccountStatus.DISCONNECTED,
-        ...(next
-          ? { metadata: next as unknown as Prisma.InputJsonValue }
-          : {}),
+        ...(next ? { metadata: next } : {}),
         disconnectedAt: new Date(),
       },
     );
@@ -676,7 +676,7 @@ export class UsersService {
       REDNOTE_CHANNEL,
       {
         status,
-        metadata: metadata as unknown as Prisma.InputJsonValue,
+        metadata: metadata,
         username: metadata.rednoteUserHandle ?? null,
       },
     );

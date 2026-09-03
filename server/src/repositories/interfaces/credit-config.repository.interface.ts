@@ -21,10 +21,7 @@ export interface ICreditConfigRepository {
     },
     historyEntry: CreditConfigChangeHistoryEntry,
   ): Promise<CreditConfigRecord>;
-  updateOverhead(
-    overheadFactor: number,
-    derivedMargin: number,
-  ): Promise<void>;
+  updateOverhead(overheadFactor: number, derivedMargin: number): Promise<void>;
   migrateLegacyFields(
     set: Prisma.CreditConfigUpdateInput,
     unsetKeys: string[],

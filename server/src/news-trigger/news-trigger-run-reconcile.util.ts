@@ -1,7 +1,10 @@
 import type { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import type { INewsTriggerLogRepository } from '../repositories/interfaces/news-trigger-log.repository.interface';
-import type { NewsTriggerLogLike, NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
+import type {
+  NewsTriggerLogLike,
+  NewsTriggerRunStatusDto,
+} from './news-trigger-run-summary.util';
 import { summarizeNewsTriggerLog } from './news-trigger-run-summary.util';
 import type { NewsTriggerManualJobPayload } from './news-trigger.processor';
 
@@ -25,7 +28,10 @@ export async function reconcileRunningManualLog(
 
   const fresh = await logs.findByRunId(log.runId);
   if (fresh?.completedAt) {
-    return summarizeNewsTriggerLog(fresh as unknown as NewsTriggerLogLike, ruleId);
+    return summarizeNewsTriggerLog(
+      fresh as unknown as NewsTriggerLogLike,
+      ruleId,
+    );
   }
 
   if (bullState === 'completed') {
@@ -41,7 +47,12 @@ export async function reconcileRunningManualLog(
         'Run finished in the queue but the result was not saved. Check worker/API logs and try again.',
     });
     const repaired = await logs.findByRunId(log.runId);
-    return repaired ? summarizeNewsTriggerLog(repaired as unknown as NewsTriggerLogLike, ruleId) : null;
+    return repaired
+      ? summarizeNewsTriggerLog(
+          repaired as unknown as NewsTriggerLogLike,
+          ruleId,
+        )
+      : null;
   }
 
   if (bullState === 'failed') {
@@ -59,7 +70,12 @@ export async function reconcileRunningManualLog(
       errorMessage: reason,
     });
     const repaired = await logs.findByRunId(log.runId);
-    return repaired ? summarizeNewsTriggerLog(repaired as unknown as NewsTriggerLogLike, ruleId) : null;
+    return repaired
+      ? summarizeNewsTriggerLog(
+          repaired as unknown as NewsTriggerLogLike,
+          ruleId,
+        )
+      : null;
   }
 
   return null;

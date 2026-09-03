@@ -153,14 +153,7 @@ export function useRuleExtraction(options: UseRuleExtractionOptions = {}) {
         (a) => a.type === "file" && a.data instanceof File,
       )
       const hasUrl = attachments.some((a) => a.type === "url")
-      const hasGuidedIntake =
-        intake?.mode === "guided" &&
-        Boolean(
-          intake.contentPurpose ||
-            (intake.channels && intake.channels.length > 0) ||
-            intake.brandName?.trim(),
-        )
-      if (!trimmed && !hasFile && !hasUrl && !hasGuidedIntake) return
+      if (!trimmed && !hasFile && !hasUrl) return
 
       for (const a of attachments) {
         if (a.type === "file" && a.data instanceof File) {

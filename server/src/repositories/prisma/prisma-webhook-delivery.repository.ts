@@ -7,9 +7,7 @@ import type {
 } from '../interfaces/webhook-delivery.repository.interface';
 
 @Injectable()
-export class PrismaWebhookDeliveryRepository
-  implements IWebhookDeliveryRepository
-{
+export class PrismaWebhookDeliveryRepository implements IWebhookDeliveryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(

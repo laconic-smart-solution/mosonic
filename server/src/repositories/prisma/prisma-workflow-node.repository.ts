@@ -3,7 +3,10 @@ import type { Prisma, WorkflowNodeType } from '@prisma/client';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { PrismaService } from '../../database/prisma.service';
 import type { WorkflowNodeRecord } from '../../domain/workflow/workflow.types';
-import type { IWorkflowNodeRepository } from '../interfaces/workflow-node.repository.interface';
+import type {
+  IWorkflowNodeRepository,
+  WorkflowNodeQueryOptions,
+} from '../interfaces/workflow-node.repository.interface';
 import { mergeTenancyWhere } from './prisma.util';
 
 @Injectable()
@@ -13,10 +16,12 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
   findByWorkflow(
     workflowRef: string,
     auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
   ): Promise<WorkflowNodeRecord[]> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowRef }, auth)
+    const base = opts?.templateOnly
+      ? { workflowRef, isGenerateMoreOnly: false }
       : { workflowRef };
+    const where = auth ? mergeTenancyWhere(base, auth) : base;
     return this.prisma.workflowNode.findMany({
       where,
       orderBy: { order: 'asc' },
@@ -26,10 +31,12 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
   findByWorkflowRefs(
     workflowRefs: string[],
     auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
   ): Promise<WorkflowNodeRecord[]> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowRef: { in: workflowRefs } }, auth)
+    const base = opts?.templateOnly
+      ? { workflowRef: { in: workflowRefs }, isGenerateMoreOnly: false }
       : { workflowRef: { in: workflowRefs } };
+    const where = auth ? mergeTenancyWhere(base, auth) : base;
     return this.prisma.workflowNode.findMany({ where });
   }
 
@@ -69,9 +76,7 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     type: WorkflowNodeType,
     auth?: TenancyAuth,
   ): Promise<string[]> {
-    const where = auth
-      ? mergeTenancyWhere({ type }, auth)
-      : { type };
+    const where = auth ? mergeTenancyWhere({ type }, auth) : { type };
     const rows = await this.prisma.workflowNode.findMany({
       where,
       select: { workflowRef: true },
@@ -91,7 +96,7 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     if (data.length === 0) return [];
     return this.prisma.workflowNode.findMany({
       where: {
-        workflowRef: data[0]!.workflowRef,
+        workflowRef: data[0].workflowRef,
         nodeId: { in: data.map((d) => d.nodeId).filter(Boolean) as string[] },
       },
     });
@@ -147,22 +152,20 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     auth?: TenancyAuth,
   ): Promise<void> {
     const where = auth
-      ? mergeTenancyWhere(
-          { workflowRef, nodeId: { notIn: keepNodeIds } },
-          auth,
-        )
+      ? mergeTenancyWhere({ workflowRef, nodeId: { notIn: keepNodeIds } }, auth)
       : { workflowRef, nodeId: { notIn: keepNodeIds } };
-    return this.prisma.workflowNode
-      .deleteMany({ where })
-      .then(() => undefined);
+    return this.prisma.workflowNode.deleteMany({ where }).then(() => undefined);
   }
 
-  deleteByWorkflow(workflowRef: string, auth?: TenancyAuth): Promise<void> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowRef }, auth)
+  deleteByWorkflow(
+    workflowRef: string,
+    auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
+  ): Promise<void> {
+    const base = opts?.templateOnly
+      ? { workflowRef, isGenerateMoreOnly: false }
       : { workflowRef };
-    return this.prisma.workflowNode
-      .deleteMany({ where })
-      .then(() => undefined);
+    const where = auth ? mergeTenancyWhere(base, auth) : base;
+    return this.prisma.workflowNode.deleteMany({ where }).then(() => undefined);
   }
 }

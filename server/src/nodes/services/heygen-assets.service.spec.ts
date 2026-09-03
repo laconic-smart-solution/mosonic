@@ -31,7 +31,7 @@ describe('HeygenAssetsService avatar looks', () => {
 
   beforeEach(async () => {
     fetchMock.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const moduleRef = await Test.createTestingModule({
       providers: [

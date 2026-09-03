@@ -122,6 +122,8 @@
       "textLength": { "label": "Length" }
     },
     "image": {
+      "template": { "label": "Template" },
+      "designStyle": { "label": "Design Style" },
       "style": { "label": "Style" },
       "aspectRatio": { "label": "Aspect Ratio" },
       "quality": { "label": "Quality" },
@@ -184,6 +186,11 @@
       "vivid": "Vivid",
       "standard": "Standard",
       "hd": "HD",
+      "templateAdCreative": "Ad Creative",
+      "templateProductMockup": "Product Mockup",
+      "templateInfographic": "Infographic",
+      "templatePhotorealistic": "Photorealistic Scene",
+      "templateLifestyle": "Lifestyle Photo",
       "cinematic": "Cinematic",
       "presenter": "Presenter",
       "landscape169": "Landscape 16:9",
@@ -360,6 +367,14 @@
     "clickOrDrag": "Click or drag image here",
     "uploading": "Uploading…"
   },
+  "imageTemplateStylePicker": {
+    "loadingTemplates": "Loading templates…",
+    "loadTemplatesFailed": "Could not load templates.",
+    "noTemplates": "No templates available.",
+    "loadingStyles": "Loading styles…",
+    "loadStylesFailed": "Could not load styles.",
+    "noStyles": "No styles available."
+  },
   "voicePicker": {
     "genderAll": "All",
     "genderMale": "Male",
@@ -458,7 +473,48 @@
   "fab": {
     "workflowContents": "Workflow Contents",
     "goHome": "Go to Home",
-    "goToRules": "Go to Rules"
+    "goToRules": "Go to Rules",
+    "takeTour": "Take a tour"
+  },
+  "tour": {
+    "nav": {
+      "back": "Back",
+      "close": "Close",
+      "last": "Done",
+      "next": "Next",
+      "nextWithProgress": "Next ({current} of {total})",
+      "skip": "Skip tour"
+    },
+    "steps": {
+      "wfNodePalette": {
+        "title": "Add nodes",
+        "content": "Drag any node type from here onto the canvas to build your pipeline."
+      },
+      "wfCanvas": {
+        "title": "Your workflow canvas",
+        "content": "This is where your pipeline lives — connect nodes to define how content flows from step to step."
+      },
+      "wfRunCost": {
+        "title": "Run cost",
+        "content": "See how many credits a run will cost before you generate content."
+      },
+      "wfSave": {
+        "title": "Save your changes",
+        "content": "Save edits to the canvas so nothing is lost and runs use the latest version."
+      },
+      "wfRun": {
+        "title": "Generate content",
+        "content": "Once you're happy with the workflow, run it to generate content."
+      },
+      "wfPromptBar": {
+        "title": "Describe this run",
+        "content": "Tell the workflow what this specific run should be about."
+      },
+      "wfUsedPipelines": {
+        "title": "Past runs",
+        "content": "Reopen any previous run to inspect it, or reapply its structure to this workflow."
+      }
+    }
   },
   "errors": {
     "generateWorkflowFailed": "Could not generate workflow. Please try again.",

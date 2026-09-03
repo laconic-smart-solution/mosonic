@@ -90,10 +90,11 @@ export function normalizeMediaUploadMeta(
   const ext = extFromName(base);
 
   if (isVideoUpload(base, mime)) {
-    const resolvedExt =
-      ext && VIDEO_EXTENSIONS.has(ext) ? ext : 'mp4';
+    const resolvedExt = ext && VIDEO_EXTENSIONS.has(ext) ? ext : 'mp4';
     const fileName = withExtension(
-      ext && VIDEO_EXTENSIONS.has(ext) ? base : base.replace(/\.[^.]+$/, '') || base,
+      ext && VIDEO_EXTENSIONS.has(ext)
+        ? base
+        : base.replace(/\.[^.]+$/, '') || base,
       resolvedExt,
     );
     const mimeTypeResolved =
@@ -108,7 +109,10 @@ export function normalizeMediaUploadMeta(
     };
   }
 
-  if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+  if (
+    mime.startsWith('image/') ||
+    ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)
+  ) {
     return {
       fileName: base,
       mimeType: mime || 'image/png',

@@ -51,7 +51,9 @@ export class GraphReplanService {
       throw new NotFoundException(`Pipeline ${pipelineId} not found`);
     }
     if (pipeline.status !== PipelineStatus.Paused) {
-      throw new BadRequestException('Replan is only allowed when pipeline is paused');
+      throw new BadRequestException(
+        'Replan is only allowed when pipeline is paused',
+      );
     }
 
     let nodes = [...parsePipelineNodes(pipeline.nodes)];
@@ -85,9 +87,7 @@ export class GraphReplanService {
           throw new BadRequestException('Can only remove pending nodes');
         }
         nodes = nodes.filter((n) => n.nodeId !== op.nodeId);
-        edges = edges.filter(
-          (e) => e.from !== op.nodeId && e.to !== op.nodeId,
-        );
+        edges = edges.filter((e) => e.from !== op.nodeId && e.to !== op.nodeId);
       } else if (op.op === 'insert_node') {
         const after = nodes.find((n) => n.nodeId === op.afterNodeId);
         if (!after) {
@@ -111,14 +111,17 @@ export class GraphReplanService {
           variantId: after.variantId ?? null,
           lastError: null,
           externalJobId: null,
-        } as PipelineNodeExecution);
+        });
         edges.push({ from: op.afterNodeId, to: newId });
-        const outbound = edges.filter((e) => e.from === op.afterNodeId && e.to !== newId);
+        const outbound = edges.filter(
+          (e) => e.from === op.afterNodeId && e.to !== newId,
+        );
         for (const edge of outbound) {
           edges.push({ from: newId, to: edge.to });
         }
         edges = edges.filter(
-          (e) => !(e.from === op.afterNodeId && outbound.some((o) => o.to === e.to)),
+          (e) =>
+            !(e.from === op.afterNodeId && outbound.some((o) => o.to === e.to)),
         );
       }
     }
@@ -130,7 +133,7 @@ export class GraphReplanService {
 
     await this.pipelines.updateById(pipelineId, {
       nodes: nodes as Prisma.InputJsonValue,
-      graph: { ...graph, edges } as Prisma.InputJsonValue,
+      graph: { ...graph, edges },
       status: PipelineStatus.Running,
       pausedNodeId: null,
       pausedLaneId: null,

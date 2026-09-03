@@ -3,15 +3,9 @@ jest.mock('../mcp/mcp.service', () => ({
 }));
 
 import { ConfigService } from '@nestjs/config';
-import {
-  PostStatus,
-  type PostDocument,
-} from '../post/schemas/post.schema';
+import { PostStatus, type PostDocument } from '../post/schemas/post.schema';
 import { UploadScheduledSyncService } from './upload-scheduled-sync.service';
-import {
-  UploadChannelStatus,
-  UploadJobStatus,
-} from './schemas/upload.schema';
+import { UploadChannelStatus, UploadJobStatus } from './schemas/upload.schema';
 
 describe('UploadScheduledSyncService', () => {
   const get = jest.fn();
@@ -39,7 +33,7 @@ describe('UploadScheduledSyncService', () => {
       zid !== null &&
       typeof zid === 'object' &&
       !Array.isArray(zid) &&
-      '$nin' in (zid as object);
+      '$nin' in zid;
     return filter.status === PostStatus.Scheduled && Boolean(hasNin);
   }
 
@@ -56,7 +50,7 @@ describe('UploadScheduledSyncService', () => {
         const idOnly =
           typeof z === 'string' && Object.keys(filter).length === 1;
         if (idOnly && !isLeanScheduledScan(filter)) {
-          const id = (z as string).trim();
+          const id = z.trim();
           return postsForZernioId[id] ?? [];
         }
         if (!isLeanScheduledScan(filter)) {

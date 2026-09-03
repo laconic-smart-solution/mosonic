@@ -8,7 +8,10 @@ import {
   NEWS_TRIGGER_LOG_REPOSITORY,
   RULE_REPOSITORY,
 } from '../repositories/tokens';
-import type { NewsTriggerLogLike, NewsTriggerRunStatusDto } from './news-trigger-run-summary.util';
+import type {
+  NewsTriggerLogLike,
+  NewsTriggerRunStatusDto,
+} from './news-trigger-run-summary.util';
 import {
   manualRunGroupKey,
   pendingRunStatus,
@@ -16,7 +19,10 @@ import {
 } from './news-trigger-run-summary.util';
 import { NEWS_TRIGGER_QUEUE } from './news-trigger.constants';
 import { findManualJobForRun } from './news-trigger-manual-job.util';
-import { logNewsTriggerQueueState, workersInApiProcessLabel } from './news-trigger-queue-diagnostics.util';
+import {
+  logNewsTriggerQueueState,
+  workersInApiProcessLabel,
+} from './news-trigger-queue-diagnostics.util';
 import { reconcileRunningManualLog } from './news-trigger-run-reconcile.util';
 
 @Injectable()
@@ -41,11 +47,16 @@ export class NewsTriggerRunService {
     const log = await this.logs.findLatestByGroup(manualRunGroupKey(ruleId));
 
     if (!log) {
-      this.logger.debug(`[NewsTrigger] getLatestManualRun rule=${ruleId} — no logs`);
+      this.logger.debug(
+        `[NewsTrigger] getLatestManualRun rule=${ruleId} — no logs`,
+      );
       return null;
     }
 
-    const summary = summarizeNewsTriggerLog(log as unknown as NewsTriggerLogLike, ruleId);
+    const summary = summarizeNewsTriggerLog(
+      log as unknown as NewsTriggerLogLike,
+      ruleId,
+    );
     if (summary.status !== 'running') {
       this.logger.debug(
         `[NewsTrigger] getLatestManualRun rule=${ruleId} run=${log.runId} status=${summary.status}`,
@@ -131,7 +142,10 @@ export class NewsTriggerRunService {
       throw new NotFoundException(`Run ${runId} not found for this campaign`);
     }
 
-    return summarizeNewsTriggerLog(log as unknown as NewsTriggerLogLike, ruleId);
+    return summarizeNewsTriggerLog(
+      log as unknown as NewsTriggerLogLike,
+      ruleId,
+    );
   }
 
   private async assertRuleAccess(

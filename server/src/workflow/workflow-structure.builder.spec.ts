@@ -65,10 +65,9 @@ describe('buildWorkflowNodes', () => {
   });
 
   it('prepends keyword_planner before text when enabled alone', () => {
-    const nodes = buildWorkflowNodes(
-      baseAnswers({ useKeywordPlanner: true }),
-      ['instagram'],
-    );
+    const nodes = buildWorkflowNodes(baseAnswers({ useKeywordPlanner: true }), [
+      'instagram',
+    ]);
     expect(nodes.map((n) => n.type)).toEqual([
       WorkflowNodeType.KeywordPlanner,
       WorkflowNodeType.TextGeneration,
@@ -108,10 +107,9 @@ describe('buildWorkflowNodes', () => {
   });
 
   it('auto-applies sole rule channel when image channels omitted', () => {
-    const nodes = buildWorkflowNodes(
-      baseAnswers({ generateImage: true }),
-      ['instagram'],
-    );
+    const nodes = buildWorkflowNodes(baseAnswers({ generateImage: true }), [
+      'instagram',
+    ]);
     expect(nodes[1].targetChannels).toEqual(['instagram']);
   });
 

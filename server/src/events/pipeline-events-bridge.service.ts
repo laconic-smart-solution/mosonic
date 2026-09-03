@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { EventsService } from './events.service';
@@ -84,9 +89,7 @@ export class PipelineEventsBridgeService
     if (!value || typeof value !== 'object') return false;
     const v = value as Record<string, unknown>;
     return (
-      (v.scope === 'pipeline' ||
-        v.scope === 'rule' ||
-        v.scope === 'user') &&
+      (v.scope === 'pipeline' || v.scope === 'rule' || v.scope === 'user') &&
       typeof v.id === 'string' &&
       typeof v.event === 'string'
     );

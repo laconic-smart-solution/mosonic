@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileStack,
+  HelpCircle,
   Home,
   Library,
 } from "lucide-react"
@@ -31,6 +32,11 @@ import { WorkflowFlowSkeleton } from "@/features/workflow/components/workflow-fl
 import { WorkflowGenerationProgress } from "@/features/workflow/components/workflow-generation-progress"
 import { WorkflowContentDrawer } from "@/features/workflow/components/workflow-content-drawer"
 import { WorkflowToolbar } from "@/features/workflow/components/workflow-toolbar"
+import { WorkflowGuideTour } from "@/features/workflow/components/workflow-guide-tour"
+import {
+  hasSeenWorkflowTour,
+  markWorkflowTourSeen,
+} from "@/features/workflow/lib/workflow-tour-seen.storage"
 import { PipelineStopConfirmDialog } from "@/features/pipeline/components/pipeline-stop-confirm-dialog"
 import { WorkflowUsedPipelinesPanel } from "@/features/workflow/components/workflow-used-pipelines-panel"
 import { WorkflowRunConfirmDialog } from "@/features/workflow/components/workflow-run-confirm-dialog"
@@ -212,6 +218,8 @@ export default function WorkflowPage() {
   const autoResumedActivePipelineRef = useRef(false)
   const [canvasEdited, setCanvasEdited] = useState(false)
   const [configDraftDirty, setConfigDraftDirty] = useState(false)
+  const [tourRun, setTourRun] = useState(false)
+  const autoTourAttemptedRef = useRef(false)
 
   const [generationStep, setGenerationStep] = useState<GenerationStep | null>(
     routeState.generating ? "started" : null
@@ -1575,6 +1583,20 @@ export default function WorkflowPage() {
     workflowByRuleQuery.isLoading,
   ])
 
+  /** First-time visitors get the guided tour automatically, once, as soon as the canvas has nodes to point at. */
+  useEffect(() => {
+    if (autoTourAttemptedRef.current) return
+    if (canvasMode !== "ready" || processingMode !== "edit") return
+    autoTourAttemptedRef.current = true
+    if (hasSeenWorkflowTour()) return
+    setTourRun(true)
+  }, [canvasMode, processingMode])
+
+  function handleTourDone() {
+    setTourRun(false)
+    markWorkflowTourSeen()
+  }
+
   /** Wait for materialized pipeline graph before showing template nodes during a run. */
   const pipelineCanvasLoading = useMemo(() => {
     if (!pipelineId && processingMode !== "processing") return false
@@ -1763,7 +1785,10 @@ export default function WorkflowPage() {
         {processingMode === "edit" &&
         (canvasMode === "empty" || canvasMode === "ready") ? (
           <div className="absolute bottom-0 left-1/2 z-40 w-full max-w-[760px] -translate-x-1/2 px-4 pb-4">
-            <div className="relative w-full space-y-2 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
+            <div
+            data-tour="wf-prompt-bar"
+            className="relative w-full space-y-2 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur"
+          >
               {promptBarCollapsed ? (
                 <button
                   type="button"
@@ -1873,6 +1898,17 @@ export default function WorkflowPage() {
       ) : null}
 
       <div className="pointer-events-none fixed right-6 bottom-6 z-30 flex flex-col gap-2">
+        {processingMode === "edit" && canvasMode === "ready" ? (
+          <button
+            type="button"
+            className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
+            style={{ borderColor: T.surfaceBorder, color: T.textPrimary }}
+            onClick={() => setTourRun(true)}
+            title={t("fab.takeTour")}
+          >
+            <HelpCircle className="size-4" />
+          </button>
+        ) : null}
         <button
           type="button"
           className="pointer-events-auto flex size-10 items-center justify-center rounded-full border bg-card shadow-sm"
@@ -1981,6 +2017,8 @@ export default function WorkflowPage() {
           }
         }}
       />
+
+      <WorkflowGuideTour run={tourRun} onDone={handleTourDone} />
 
       <WorkflowContentDrawer
         open={contentDrawerOpen}

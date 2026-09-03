@@ -4,6 +4,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -50,6 +51,12 @@ export class RerunNodeDto {
   @IsOptional()
   @IsString()
   updatedPrompt?: string;
+
+  /** Follow-up instruction for this specific re-run (e.g. "make the background darker"). Overrides the pipeline's original content prompt for this run only. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string;
 
   @IsOptional()
   @ValidateNested()

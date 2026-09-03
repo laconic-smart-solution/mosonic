@@ -141,8 +141,7 @@ export class ContentCreditUsageService {
       if (netCredits === 0) continue;
       const nodes = nodesByType.get(nodeType) ?? [];
       const chargeable = nodes.filter(
-        (n) =>
-          !n.status || n.status === PipelineNodeExecutionStatus.Completed,
+        (n) => !n.status || n.status === PipelineNodeExecutionStatus.Completed,
       );
       const targets = chargeable.length > 0 ? chargeable : nodes;
       if (targets.length === 0) continue;
@@ -150,7 +149,7 @@ export class ContentCreditUsageService {
       const each = netCredits / targets.length;
       let allocated = 0;
       for (let i = 0; i < targets.length; i++) {
-        const node = targets[i]!;
+        const node = targets[i];
         const slice =
           i === targets.length - 1
             ? netCredits - allocated

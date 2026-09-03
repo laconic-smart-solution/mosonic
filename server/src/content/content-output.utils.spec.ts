@@ -58,9 +58,7 @@ describe('mergeResolvedOutputs', () => {
         },
       },
       {
-        workflowNodesOrdered: [
-          { nodeId: 'adapt_tpl', type: 'adapt' },
-        ],
+        workflowNodesOrdered: [{ nodeId: 'adapt_tpl', type: 'adapt' }],
         pipelineNodesOrdered: [
           { nodeId: 'adapt__facebook', type: 'adapt', order: 1 },
         ],

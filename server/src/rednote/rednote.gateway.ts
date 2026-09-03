@@ -79,7 +79,7 @@ export class RedNoteGateway implements OnGatewayInit, OnGatewayConnection {
         payload &&
         typeof payload === 'object' &&
         'image' in payload &&
-        typeof (payload as { image: unknown }).image === 'string'
+        typeof payload.image === 'string'
           ? (payload as { image: string }).image
           : null;
       if (image) this.lastQrByUser.set(userId, image);
@@ -92,11 +92,8 @@ export class RedNoteGateway implements OnGatewayInit, OnGatewayConnection {
       return;
     }
     const room = rednoteLoginRoom(userId);
-    const size =
-      this.server.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
-    this.logger.debug(
-      `RedNote emit ${event} room=${room} listeners=${size}`,
-    );
+    const size = this.server.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
+    this.logger.debug(`RedNote emit ${event} room=${room} listeners=${size}`);
     this.server.to(room).emit(event, payload);
   }
 

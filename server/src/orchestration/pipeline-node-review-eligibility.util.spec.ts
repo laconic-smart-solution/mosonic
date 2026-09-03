@@ -7,9 +7,7 @@ import {
   validateAndNormalizeReviewNodeIds,
 } from './pipeline-node-review-eligibility.util';
 
-function mockPipeline(
-  overrides: Partial<PipelineRecord> = {},
-): PipelineRecord {
+function mockPipeline(overrides: Partial<PipelineRecord> = {}): PipelineRecord {
   return {
     pipelineId: 'p1',
     userId: 'u1',

@@ -10,7 +10,9 @@ describe('RedNoteCookieCryptoService', () => {
   const crypto = new RedNoteCookieCryptoService(config);
 
   it('round-trips plaintext', () => {
-    const plain = JSON.stringify([{ name: 'sid', value: 'abc', domain: '.xhs.com' }]);
+    const plain = JSON.stringify([
+      { name: 'sid', value: 'abc', domain: '.xhs.com' },
+    ]);
     const enc = crypto.encrypt(plain);
     expect(enc).not.toContain('abc');
     expect(crypto.decrypt(enc)).toBe(plain);

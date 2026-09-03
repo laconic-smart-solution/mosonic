@@ -8,7 +8,10 @@ import {
 } from '../schemas/workflow-node.schema';
 import { extractUsageFromAiMessage } from '../langchain-usage.util';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
-import type { NodeExecutionInput, NodeExecutionResult } from '../types/node-execution.types';
+import type {
+  NodeExecutionInput,
+  NodeExecutionResult,
+} from '../types/node-execution.types';
 
 type NormalizedKeywordPlannerConfig = {
   provider?: LlmProvider;

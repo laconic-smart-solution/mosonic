@@ -45,7 +45,9 @@ export class UsersBootstrap implements OnModuleInit {
       ?.trim();
     const username = this.config.get<string>('DEFAULT_ADMIN_USERNAME')?.trim();
     const email = this.config.get<string>('DEFAULT_ADMIN_EMAIL')?.trim();
-    const firstName = this.config.get<string>('DEFAULT_ADMIN_FIRST_NAME')?.trim();
+    const firstName = this.config
+      .get<string>('DEFAULT_ADMIN_FIRST_NAME')
+      ?.trim();
     const lastName = this.config.get<string>('DEFAULT_ADMIN_LAST_NAME')?.trim();
 
     if (!authServerUserId) {
@@ -80,8 +82,6 @@ export class UsersBootstrap implements OnModuleInit {
       role: UserRole.ADMIN,
     });
 
-    this.log.log(
-      `Default admin created: authServerUserId=${authServerUserId}`,
-    );
+    this.log.log(`Default admin created: authServerUserId=${authServerUserId}`);
   }
 }

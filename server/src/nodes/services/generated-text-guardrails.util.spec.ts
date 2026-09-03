@@ -18,10 +18,11 @@ describe('sanitizeGeneratedPostText', () => {
       'Final line.',
     ].join('\n');
     expect(sanitizeGeneratedPostText(input)).toBe(
-      ['Meet Zernio: developer-friendly social media API.', '', 'Final line.'].join(
-        '\n',
-      ),
+      [
+        'Meet Zernio: developer-friendly social media API.',
+        '',
+        'Final line.',
+      ].join('\n'),
     );
   });
 });
-

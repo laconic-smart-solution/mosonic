@@ -128,6 +128,7 @@ export function WorkflowUsedPipelinesPanel({
 
   return (
     <aside
+      data-tour="wf-used-pipelines"
       className="pointer-events-auto absolute top-3 right-3 z-20 flex w-[min(calc(100%-1.5rem),360px)] max-w-[360px] flex-col rounded-xl border border-border bg-card/98 shadow-lg backdrop-blur-sm"
       aria-label={t("usedPipelines.aria")}
     >

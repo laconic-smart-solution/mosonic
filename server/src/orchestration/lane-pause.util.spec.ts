@@ -5,8 +5,16 @@ describe('lane-pause.util', () => {
   const pipeline = {
     pausedLaneId: 'instagram',
     nodes: [
-      { nodeId: 'a', lane: 'instagram', status: PipelineNodeExecutionStatus.Pending },
-      { nodeId: 'b', lane: 'facebook', status: PipelineNodeExecutionStatus.Pending },
+      {
+        nodeId: 'a',
+        lane: 'instagram',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
+      {
+        nodeId: 'b',
+        lane: 'facebook',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
     ],
   } as never;
 

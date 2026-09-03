@@ -1,4 +1,7 @@
-import { InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { EventsService } from '../events/events.service';
@@ -26,9 +29,9 @@ describe('WebhookService', () => {
 
   it('verifySignature throws when secret is missing', () => {
     const svc = makeService(undefined);
-    expect(() =>
-      svc.verifySignature('abc', Buffer.from('{}')),
-    ).toThrow(InternalServerErrorException);
+    expect(() => svc.verifySignature('abc', Buffer.from('{}'))).toThrow(
+      InternalServerErrorException,
+    );
   });
 
   it('verifySignature throws when signature header is missing', () => {
@@ -73,7 +76,7 @@ describe('WebhookService', () => {
     const findByUploadId = jest.fn();
     const svc = new WebhookService(
       config,
-      { tryRecord } as never,
+      { tryRecord },
       { findByUploadId } as never,
       {} as never,
       {} as EventsService,

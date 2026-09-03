@@ -46,7 +46,9 @@ async function fetchCostsPage(
     error?: { message?: string };
   };
   if (!res.ok) {
-    throw new Error(body.error?.message ?? `OpenAI costs API HTTP ${res.status}`);
+    throw new Error(
+      body.error?.message ?? `OpenAI costs API HTTP ${res.status}`,
+    );
   }
   return body;
 }

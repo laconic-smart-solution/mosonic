@@ -44,7 +44,9 @@ describe('NodeCreditPriceService video credit split migration', () => {
         {
           provide: CreditCalculationService,
           useValue: {
-            calculateCredits: jest.fn().mockResolvedValue({ creditsCharged: 48 }),
+            calculateCredits: jest
+              .fn()
+              .mockResolvedValue({ creditsCharged: 48 }),
             getConfig: jest.fn().mockResolvedValue({
               creditPriceUsd: 0.01,
               marginTarget: 3,
@@ -109,7 +111,9 @@ describe('NodeCreditPriceService video credit split migration', () => {
     await service.seedDefaults();
 
     expect(create).not.toHaveBeenCalledWith(
-      expect.objectContaining({ nodeType: VIDEO_GENERATION_PRESENTER_CREDIT_TYPE }),
+      expect.objectContaining({
+        nodeType: VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
+      }),
     );
     expect(setActiveByNodeType).toHaveBeenCalledWith(
       LEGACY_VIDEO_GENERATION_CREDIT_TYPE,

@@ -59,7 +59,7 @@ export function isSupportedSuggestionField(field: string): boolean {
 
 function asStringArray(v: unknown): string[] | null {
   if (Array.isArray(v)) {
-    const out = v.filter((x) => typeof x === 'string') as string[];
+    const out = v.filter((x) => typeof x === 'string');
     if (out.length === v.length) return out;
     return null;
   }
@@ -89,13 +89,14 @@ function parseChannelField(raw: string): {
   channelKey: string;
   sub: 'priority' | 'contentStyle';
 } | null {
-  const chBracket = /^channels\[([^\]]+)\]\.(priority|contentStyle)$/.exec(
-    raw,
-  );
+  const chBracket = /^channels\[([^\]]+)\]\.(priority|contentStyle)$/.exec(raw);
   const chDot = /^channels\.([^.]+)\.(priority|contentStyle)$/.exec(raw);
   const m = chBracket ?? chDot;
   if (!m) return null;
-  return { channelKey: m[1].trim().toLowerCase(), sub: m[2] as 'priority' | 'contentStyle' };
+  return {
+    channelKey: m[1].trim().toLowerCase(),
+    sub: m[2] as 'priority' | 'contentStyle',
+  };
 }
 
 /**
@@ -154,12 +155,12 @@ export function buildSuggestionUpdateDto(
     if (key === 'brandTone') {
       const arr = asStringArray(suggestedValue);
       if (!arr) throw new BadRequestException('brandTone must be string[]');
-      return { brand: { brandTone: arr } as UpdateRuleDto['brand'] };
+      return { brand: { brandTone: arr } };
     }
     const s = asString(suggestedValue);
     if (!s) throw new BadRequestException(`${key} must be a string`);
     return {
-      brand: { [key]: s } as UpdateRuleDto['brand'],
+      brand: { [key]: s },
     };
   }
 
@@ -176,7 +177,7 @@ export function buildSuggestionUpdateDto(
       return {
         campaign: {
           postingFrequency: suggestedValue,
-        } as UpdateRuleDto['campaign'],
+        },
       };
     }
     const arr = asStringArray(suggestedValue);
@@ -184,7 +185,7 @@ export function buildSuggestionUpdateDto(
       throw new BadRequestException(`${key} must be string[]`);
     }
     return {
-      campaign: { [key]: arr } as UpdateRuleDto['campaign'],
+      campaign: { [key]: arr },
     };
   }
 

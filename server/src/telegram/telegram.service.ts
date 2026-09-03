@@ -152,9 +152,7 @@ export class TelegramService {
     size?: number,
     start?: string,
   ): Promise<Buffer> {
-    const res = await this.fetchTelegram(
-      this.qrUrl(botUsername, size, start),
-    );
+    const res = await this.fetchTelegram(this.qrUrl(botUsername, size, start));
     if (!res.ok) {
       const body = (await res
         .json()
@@ -207,7 +205,9 @@ export class TelegramService {
       },
     );
 
-    const body = (await res.json().catch(() => ({}))) as TelegramServiceEnvelope<{
+    const body = (await res
+      .json()
+      .catch(() => ({}))) as TelegramServiceEnvelope<{
       total: number;
       sent: number;
       failed: number;
@@ -355,9 +355,10 @@ export class TelegramService {
     });
   }
 
-  async getUpdates(offset: number, timeoutSec = 25): Promise<
-    Array<{ update_id: number } & Record<string, unknown>>
-  > {
+  async getUpdates(
+    offset: number,
+    timeoutSec = 25,
+  ): Promise<Array<{ update_id: number } & Record<string, unknown>>> {
     return this.callBotApi('getUpdates', {
       offset,
       timeout: timeoutSec,
@@ -463,7 +464,9 @@ export class TelegramService {
   private async handleFollow(telegramChatId: string): Promise<void> {
     try {
       await this.sendText(telegramChatId, this.welcomeMessage);
-      this.logger.log(`Sent welcome message to Telegram chat ${telegramChatId}`);
+      this.logger.log(
+        `Sent welcome message to Telegram chat ${telegramChatId}`,
+      );
     } catch (err) {
       this.logger.error(
         `Failed to welcome Telegram chat ${telegramChatId}: ${

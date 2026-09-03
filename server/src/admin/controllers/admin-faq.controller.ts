@@ -39,10 +39,7 @@ export class AdminFaqController {
   constructor(private readonly service: AdminFaqService) {}
 
   @Get('documents')
-  listDocuments(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
+  listDocuments(@Query('page') page = '1', @Query('limit') limit = '20') {
     return this.service.listDocuments({
       page: Number(page),
       limit: Number(limit),

@@ -7,8 +7,7 @@ export const AutonomyMode = {
   FullAuto: PrismaCampaignAutonomyMode.full_auto,
 } as const;
 
-export type AutonomyMode =
-  (typeof AutonomyMode)[keyof typeof AutonomyMode];
+export type AutonomyMode = (typeof AutonomyMode)[keyof typeof AutonomyMode];
 
 export interface QuietHours {
   start: string;

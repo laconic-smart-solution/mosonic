@@ -6,10 +6,7 @@ import { postPublishedNotification } from '../events/notification.util';
 import { CommsNotifyService } from '../comms/comms-notify.service';
 import { McpService } from '../mcp/mcp.service';
 import { PostAnalyticsService } from '../post/post-analytics.service';
-import {
-  PlatformPostStatus,
-  PostStatus,
-} from '../post/schemas/post.schema';
+import { PlatformPostStatus, PostStatus } from '../post/schemas/post.schema';
 import type { IPostRepository } from '../repositories/interfaces/post.repository.interface';
 import type { PostRecord } from '../repositories/interfaces/post.repository.interface';
 import type { ISyncLockRepository } from '../repositories/interfaces/sync-lock.repository.interface';
@@ -74,7 +71,9 @@ export class UploadScheduledSyncService {
       .toLowerCase();
     if (enabledRaw === 'false' || enabledRaw === '0') return;
 
-    const instanceId = this.config.get<string>('ZERNIO_SYNC_INSTANCE_ID')?.trim();
+    const instanceId = this.config
+      .get<string>('ZERNIO_SYNC_INSTANCE_ID')
+      ?.trim();
     if (instanceId) {
       const acquired = await this.tryAcquireSyncLock(instanceId);
       if (!acquired) return;
@@ -91,7 +90,8 @@ export class UploadScheduledSyncService {
       const docs = await this.posts.findScheduledWithZernioId();
 
       for (const p of docs) {
-        const id = typeof p.zernioPostId === 'string' ? p.zernioPostId.trim() : '';
+        const id =
+          typeof p.zernioPostId === 'string' ? p.zernioPostId.trim() : '';
         if (id && !postIdsWithZernio.includes(id)) {
           postIdsWithZernio.push(id);
         }
@@ -103,30 +103,36 @@ export class UploadScheduledSyncService {
       return;
     }
 
-    await mapWithConcurrencyLimit(postIdsWithZernio, concurrency, async (zPid) => {
-      let parsed: unknown | null;
-      try {
-        parsed = await this.mcpService.getZernioPost(zPid);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `scheduled sync: getZernioPost ${zPid} threw (will retry next run): ${msg}`,
-        );
-        return;
-      }
-
-      const decision = interpretZernioPostForSync(parsed);
-
-      try {
-        const postRows = await this.posts.findAllByZernioPostId(zPid);
-        for (const post of postRows) {
-          await this.applyDecisionForPost(post, zPid, decision);
+    await mapWithConcurrencyLimit(
+      postIdsWithZernio,
+      concurrency,
+      async (zPid) => {
+        let parsed: unknown | null;
+        try {
+          parsed = await this.mcpService.getZernioPost(zPid);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `scheduled sync: getZernioPost ${zPid} threw (will retry next run): ${msg}`,
+          );
+          return;
         }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`scheduled sync: apply posts ${zPid} failed: ${msg}`);
-      }
-    });
+
+        const decision = interpretZernioPostForSync(parsed);
+
+        try {
+          const postRows = await this.posts.findAllByZernioPostId(zPid);
+          for (const post of postRows) {
+            await this.applyDecisionForPost(post, zPid, decision);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `scheduled sync: apply posts ${zPid} failed: ${msg}`,
+          );
+        }
+      },
+    );
   }
 
   private async tryAcquireSyncLock(instanceId: string): Promise<boolean> {
@@ -179,7 +185,7 @@ export class UploadScheduledSyncService {
     const at =
       remaining.scheduledAt instanceof Date
         ? remaining.scheduledAt
-        : new Date(remaining.scheduledAt as string);
+        : new Date(remaining.scheduledAt);
     return at.toISOString();
   }
 
@@ -194,7 +200,10 @@ export class UploadScheduledSyncService {
     });
 
     const status = saved.status;
-    if (status === UploadJobStatus.Completed || status === UploadJobStatus.Partial) {
+    if (
+      status === UploadJobStatus.Completed ||
+      status === UploadJobStatus.Partial
+    ) {
       const channelsPublished = uploadChannels(saved)
         .filter((c) => c.status === UploadChannelStatus.Published)
         .map((c) => c.channel.toLowerCase());
@@ -322,7 +331,9 @@ export class UploadScheduledSyncService {
 
     if (!uploadTouched) return;
 
-    scheduledAtHint = this.remainingScheduledHint(withUploadChannels(upload, channels));
+    scheduledAtHint = this.remainingScheduledHint(
+      withUploadChannels(upload, channels),
+    );
 
     await this.saveUploadEmitAll(withUploadChannels(upload, channels), {
       publishNowHint,

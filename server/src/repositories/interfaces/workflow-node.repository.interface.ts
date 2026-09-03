@@ -2,14 +2,19 @@ import type { Prisma, WorkflowNodeType } from '@prisma/client';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import type { WorkflowNodeRecord } from '../../domain/workflow/workflow.types';
 
+/** `templateOnly: true` excludes ad-hoc "Generate more" nodes (see `WorkflowNode.isGenerateMoreOnly`). */
+export type WorkflowNodeQueryOptions = { templateOnly?: boolean };
+
 export interface IWorkflowNodeRepository {
   findByWorkflow(
     workflowRef: string,
     auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
   ): Promise<WorkflowNodeRecord[]>;
   findByWorkflowRefs(
     workflowRefs: string[],
     auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
   ): Promise<WorkflowNodeRecord[]>;
   findByWorkflowAndNodeId(
     workflowRef: string,
@@ -47,5 +52,9 @@ export interface IWorkflowNodeRepository {
     keepNodeIds: string[],
     auth?: TenancyAuth,
   ): Promise<void>;
-  deleteByWorkflow(workflowRef: string, auth?: TenancyAuth): Promise<void>;
+  deleteByWorkflow(
+    workflowRef: string,
+    auth?: TenancyAuth,
+    opts?: WorkflowNodeQueryOptions,
+  ): Promise<void>;
 }

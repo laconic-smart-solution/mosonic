@@ -1,4 +1,8 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { EventsService } from '../../events/events.service';
@@ -163,9 +167,7 @@ export function normalizeVideoConfig(
   const sizeForApi: OpenAI.Videos.VideoCreateParams['size'] = (() => {
     const wantsHd = resolution === '1080p' && isSoraPro;
     const portrait =
-      aspectRatio === '9:16' ||
-      aspectRatio === '4:5' ||
-      aspectRatio === '1:1';
+      aspectRatio === '9:16' || aspectRatio === '4:5' || aspectRatio === '1:1';
     if (portrait) {
       return wantsHd ? '1024x1792' : '720x1280';
     }
@@ -236,9 +238,7 @@ export function buildVideoPrompt(
     '',
     '=== VIDEO OUTPUT CONSTRAINTS (mandatory) ===',
     ...VIDEO_OUTPUT_GUARDRAILS,
-    config.negativePrompt
-      ? `Additionally avoid: ${config.negativePrompt}`
-      : '',
+    config.negativePrompt ? `Additionally avoid: ${config.negativePrompt}` : '',
     'Professional marketing video quality.',
   ]
     .filter(Boolean)
@@ -271,7 +271,9 @@ export function buildPresenterScript(
   return script;
 }
 
-export function mapHeygenVideoStatus(status: HeygenVideoStatus): VideoJobStatus {
+export function mapHeygenVideoStatus(
+  status: HeygenVideoStatus,
+): VideoJobStatus {
   if (status === 'completed') return 'completed';
   if (status === 'failed') return 'failed';
   return 'processing';
@@ -396,7 +398,10 @@ export class VideoGenerationService {
 
     try {
       const result = await attemptUpload('video/mp4');
-      return await this.maybeMirrorVideoUploadToPublicUploads(result, 'video/mp4');
+      return await this.maybeMirrorVideoUploadToPublicUploads(
+        result,
+        'video/mp4',
+      );
     } catch (error) {
       if (error instanceof Error && error.message.includes('status 400')) {
         const result = await attemptUpload('application/octet-stream');
@@ -442,9 +447,7 @@ export class VideoGenerationService {
     return result;
   }
 
-  private assertPresenterConfig(
-    config: WorkflowNodeConfig,
-  ): {
+  private assertPresenterConfig(config: WorkflowNodeConfig): {
     avatarId: string;
     voiceId: string;
     orientation: 'landscape' | 'portrait';
@@ -490,7 +493,7 @@ export class VideoGenerationService {
   async submitPresenterVideoJob(
     input: VideoGenerationInput & { pipelineId: string; nodeId: string },
   ): Promise<VideoSubmitResult> {
-    const config = (input.config ?? {}) as WorkflowNodeConfig;
+    const config = input.config ?? {};
     const presenter = this.assertPresenterConfig(config);
     const rawScript = buildPresenterScript(
       input.previousOutputs ?? {},
@@ -597,8 +600,10 @@ export class VideoGenerationService {
       'video/mp4',
     );
 
-    const config = (input.config ?? {}) as WorkflowNodeConfig;
-    const presenterDuration = normalizePresenterDurationSeconds(config.duration);
+    const config = input.config ?? {};
+    const presenterDuration = normalizePresenterDurationSeconds(
+      config.duration,
+    );
     this.logger.log(
       `[VideoGen] presenter complete: target=${presenterDuration}s heygen=${status.duration ?? 'unknown'}s`,
     );
@@ -633,7 +638,9 @@ export class VideoGenerationService {
 
     while (check.status === 'processing') {
       if (attempts >= maxAttempts) {
-        throw new Error('Presenter video generation timed out after 30 minutes.');
+        throw new Error(
+          'Presenter video generation timed out after 30 minutes.',
+        );
       }
       await new Promise((resolve) =>
         setTimeout(resolve, INLINE_POLL_INTERVAL_MS),
@@ -703,7 +710,8 @@ export class VideoGenerationService {
       return {
         status,
         error:
-          result.error?.message || 'Sora video generation failed. Please retry.',
+          result.error?.message ||
+          'Sora video generation failed. Please retry.',
       };
     }
     return { status };
@@ -781,7 +789,9 @@ export class VideoGenerationService {
     }
 
     if (check.status === 'failed') {
-      throw new Error(check.error ?? 'Sora video generation failed. Please retry.');
+      throw new Error(
+        check.error ?? 'Sora video generation failed. Please retry.',
+      );
     }
 
     const completed = await this.completeVideoJob(externalJobId, {
@@ -797,7 +807,7 @@ export class VideoGenerationService {
         'Video generation requires `rule` on NodeExecutionInput',
       );
     }
-    const config = (input.config ?? {}) as WorkflowNodeConfig;
+    const config = input.config ?? {};
     const execInput = {
       rule: input.rule,
       contentPrompt: input.contentPrompt ?? '',
