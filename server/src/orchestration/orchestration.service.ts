@@ -184,9 +184,12 @@ export class OrchestrationService {
     if (!rule) {
       throw new NotFoundException(`Rule ${input.ruleId} not found`);
     }
+    // A new pipeline run executes only the reusable template — "Generate
+    // more" nodes added from a past content review must not re-run here.
     const nodes = await this.workflowNodes.findByWorkflow(
       workflow.workflowId,
       input.auth,
+      { templateOnly: true },
     );
     if (nodes.length === 0) {
       throw new BadRequestException('Workflow has no nodes to execute');
@@ -658,6 +661,7 @@ export class OrchestrationService {
     const nodes = await this.workflowNodes.findByWorkflow(
       workflow.workflowId,
       input.auth,
+      { templateOnly: true },
     );
 
     if (!input.ruleId) {

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toPromptToon } from '../../common/utils/toon.util';
 import { safeJsonParse } from '../../common/utils/json-parse.util';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -6,6 +7,7 @@ import {
   LlmProvider,
   NodeImageTemplate,
 } from '../schemas/workflow-node.schema';
+import { ImageTemplateResolverService } from './image-template-resolver.service';
 
 const CLASSIFIABLE_TEMPLATES: NodeImageTemplate[] = [
   NodeImageTemplate.AdCreative,
@@ -30,6 +32,8 @@ type ClassifyInput = {
   channel?: string;
   contentStyle?: string;
   text: string;
+  /** The user's own instruction for this image (if any) — the strongest signal when present. */
+  userPrompt?: string;
   provider?: LlmProvider;
 };
 
@@ -43,14 +47,28 @@ type ClassifyInput = {
 export class ImageTemplateClassifierService {
   private readonly logger = new Logger(ImageTemplateClassifierService.name);
 
-  constructor(private readonly llm: LlmService) {}
+  constructor(
+    private readonly llm: LlmService,
+    private readonly templateResolver: ImageTemplateResolverService,
+  ) {}
 
   async classify(input: ClassifyInput): Promise<NodeImageTemplate> {
-    const { rule, channel, contentStyle, text, provider } = input;
+    const { rule, channel, contentStyle, text, userPrompt, provider } = input;
+    const trimmedUserPrompt = userPrompt?.trim();
+
+    const definitions = await this.templateResolver.listActiveDefinitions();
 
     const prompt = [
       'Choose the single best image template for this marketing image.',
+      '',
+      'Templates and when to use them:',
+      toPromptToon(definitions),
+      '',
       `Allowed values: ${CLASSIFIABLE_TEMPLATES.join(', ')}.`,
+      '',
+      trimmedUserPrompt
+        ? `User's explicit request for this image: "${clip(trimmedUserPrompt)}" — treat this as the strongest signal for template choice; it overrides the tone of the content below when the two disagree.`
+        : '',
       '',
       `Brand industry: ${rule.brand.industry}`,
       `Brand tone: ${rule.brand.brandTone.join(', ')}`,

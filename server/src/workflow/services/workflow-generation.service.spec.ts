@@ -4,6 +4,11 @@ import type { WorkflowQAAnswersDto } from '../dto/workflow-qa-answers.dto';
 import type { Rule } from '../../rule/schemas/rule.schema';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 describe('WorkflowGenerationService', () => {
   const answers: WorkflowQAAnswersDto = {
     useWebSearch: false,

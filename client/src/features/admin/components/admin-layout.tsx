@@ -12,7 +12,9 @@ import {
   MessageCircleQuestion,
   MessagesSquare,
   Plug,
+  Settings2,
   ShoppingBag,
+  Sparkles,
   Users,
   Workflow,
 } from "lucide-react"
@@ -70,6 +72,14 @@ const COMMUNICATION_CHILDREN: {
   },
 ]
 
+const NODE_SETTINGS_CHILDREN: {
+  key: "nodeSettingsImage"
+  href: string
+  icon: LucideIcon
+}[] = [
+  { key: "nodeSettingsImage", href: "/admin/node-settings/image", icon: Sparkles },
+]
+
 function pathActive(pathname: string, href: string) {
   if (pathname === href) return true
   return pathname.startsWith(`${href}/`)
@@ -79,6 +89,7 @@ export function AdminLayout() {
   const { t } = useTranslation("admin")
   const { pathname } = useLocation()
   const communicationActive = pathname.startsWith("/admin/communication")
+  const nodeSettingsActive = pathname.startsWith("/admin/node-settings")
 
   return (
     <div className="flex h-dvh min-h-0 w-full max-w-[100vw] overflow-hidden">
@@ -130,6 +141,49 @@ export function AdminLayout() {
               <AccordionContent className="px-0 pb-0 [&_a]:no-underline">
                 <div className="mt-0.5 flex flex-col gap-0.5 border-l border-border ml-4 pl-2">
                   {COMMUNICATION_CHILDREN.map((item) => {
+                    const active = pathActive(pathname, item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <item.icon className="size-4 shrink-0" aria-hidden />
+                        {t(`layout.nav.${item.key}`)}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <Accordion
+            className="rounded-none border-0"
+            defaultValue={nodeSettingsActive ? ["node-settings"] : undefined}
+          >
+            <AccordionItem value="node-settings" className="border-0 data-open:bg-transparent">
+              <AccordionTrigger
+                className={cn(
+                  "rounded-lg px-3 py-2 hover:no-underline **:data-[slot=accordion-trigger-icon]:size-3.5",
+                  nodeSettingsActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <Settings2 className="size-4 shrink-0" aria-hidden />
+                  {t("layout.nav.nodeSettings")}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-0 pb-0 [&_a]:no-underline">
+                <div className="mt-0.5 flex flex-col gap-0.5 border-l border-border ml-4 pl-2">
+                  {NODE_SETTINGS_CHILDREN.map((item) => {
                     const active = pathActive(pathname, item.href)
                     return (
                       <Link

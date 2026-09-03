@@ -93,6 +93,7 @@ const imageConfigSchema = z
         NodeImageTemplate.Lifestyle,
       ])
       .optional(),
+    designStyle: z.string().min(1).optional(),
     aspectRatio: imageAspectForUi.optional(),
     negativePrompt: z.string().max(2000).optional(),
   })
@@ -363,6 +364,7 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     quality: NodeImageQuality.Standard,
     style: NodeImageStyle.Natural,
     template: NodeImageTemplate.Auto,
+    designStyle: 'auto',
     aspectRatio: NodeAspectRatio.R1x1,
     size: aspectRatioToOpenAiImageSize('1:1', 'gpt-image-1'),
   },

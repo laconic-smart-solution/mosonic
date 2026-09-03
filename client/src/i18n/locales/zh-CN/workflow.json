@@ -120,6 +120,7 @@
     },
     "image": {
       "template": { "label": "模板" },
+      "designStyle": { "label": "设计风格" },
       "style": { "label": "风格" },
       "aspectRatio": { "label": "宽高比" },
       "quality": { "label": "质量" },
@@ -360,6 +361,14 @@
     "voiceSaveFailed": "无法保存语音。请保存工作流后重试。",
     "clickOrDrag": "点击或拖拽图像到此处",
     "uploading": "上传中…"
+  },
+  "imageTemplateStylePicker": {
+    "loadingTemplates": "正在加载模板…",
+    "loadTemplatesFailed": "无法加载模板。",
+    "noTemplates": "暂无可用模板。",
+    "loadingStyles": "正在加载风格…",
+    "loadStylesFailed": "无法加载风格。",
+    "noStyles": "暂无可用风格。"
   },
   "voicePicker": {
     "genderAll": "全部",

@@ -71,6 +71,8 @@ export interface WorkflowNodeConfig {
   quality?: NodeImageQuality;
   style?: NodeImageStyle;
   template?: NodeImageTemplate;
+  /** Design style key from `image_design_styles`, or "auto" to let ImageStyleSelectorService pick one. */
+  designStyle?: string;
   duration?: number;
   resolution?: string;
   aspectRatio?: NodeAspectRatio;

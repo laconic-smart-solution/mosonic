@@ -17,7 +17,9 @@
       "faq": "FAQ",
       "communication": "Communication",
       "line": "LINE",
-      "announcements": "Announcements"
+      "announcements": "Announcements",
+      "nodeSettings": "Node Settings",
+      "nodeSettingsImage": "Image"
     }
   },
   "communication": {
@@ -554,6 +556,58 @@
       "sortOrder": "Sort order",
       "active": "Active"
     }
+  },
+  "nodeSettingsImage": {
+    "title": "Image node settings",
+    "subtitle": "Manage the templates and design styles offered by the image_generation node.",
+    "tabs": {
+      "templates": "Templates",
+      "styles": "Design styles"
+    },
+    "templates": {
+      "hint": "Templates determine WHAT kind of image is generated.",
+      "create": "New template",
+      "createTitle": "Create template",
+      "editTitle": "Edit template",
+      "empty": "No templates yet.",
+      "loadError": "Could not load templates.",
+      "saveError": "Could not save template.",
+      "deleteError": "Could not delete template.",
+      "deleteConfirm": "Delete template \"{{name}}\"?"
+    },
+    "styles": {
+      "hint": "Design styles determine HOW the image looks — the AI picks one automatically unless a user selects one manually.",
+      "create": "New style",
+      "createTitle": "Create style",
+      "editTitle": "Edit style",
+      "empty": "No styles yet.",
+      "loadError": "Could not load styles.",
+      "saveError": "Could not save style.",
+      "deleteError": "Could not delete style.",
+      "deleteConfirm": "Delete style \"{{name}}\"?"
+    },
+    "columns": {
+      "image": "Image",
+      "key": "Key",
+      "name": "Name",
+      "description": "Description",
+      "status": "Status"
+    },
+    "fields": {
+      "key": "Key",
+      "name": "Name",
+      "description": "Description",
+      "prompt": "Prompt",
+      "image": "Reference image",
+      "active": "Active",
+      "uploadImage": "Upload",
+      "replaceImage": "Replace",
+      "noImage": "No image",
+      "uploadFailed": "Upload failed. Try again."
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "loading": "Loading…"
   },
   "faq": {
     "title": "FAQ knowledge base",

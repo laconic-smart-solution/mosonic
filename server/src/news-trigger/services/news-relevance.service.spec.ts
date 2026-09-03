@@ -5,6 +5,12 @@ import {
 import type { PickedArticle } from './news-picker.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+// This spec never exercises the TOON code path, so a stub is enough.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 describe('NewsRelevanceService keyword pre-filter', () => {
   const service = new NewsRelevanceService({} as never);
 

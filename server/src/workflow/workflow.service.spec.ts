@@ -2,6 +2,11 @@ jest.mock('../rule/rule.service', () => ({
   RuleService: class RuleService {},
 }));
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+jest.mock('../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '../users/schemas/user.schema';
 import type { TenancyAuth } from '../auth/tenancy.types';

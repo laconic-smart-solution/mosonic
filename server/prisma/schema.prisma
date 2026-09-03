@@ -392,6 +392,34 @@ model ServiceRate {
   @@map("service_rates")
 }
 
+model ImageTemplate {
+  imageTemplateId String   @id @default(uuid())
+  key             String   @unique
+  name            String
+  description     String
+  prompt          String
+  imageUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("image_templates")
+}
+
+model ImageDesignStyle {
+  imageDesignStyleId String   @id @default(uuid())
+  key                String   @unique
+  name               String
+  description        String
+  prompt             String
+  imageUrl           String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("image_design_styles")
+}
+
 model NodeCreditPrice {
   nodeCreditPriceId String   @id @default(uuid())
   nodeType          String   @unique
@@ -506,19 +534,23 @@ model Workflow {
 }
 
 model WorkflowNode {
-  nodeId      String           @id @default(uuid())
-  workflowRef String
-  userId      String?
-  type        WorkflowNodeType
-  order       Int
-  isLocked    Boolean          @default(true)
-  userPrompt  String?
-  config      Json             @default("{}")
-  lane        String?
-  x           Float?
-  y           Float?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  nodeId             String           @id @default(uuid())
+  workflowRef        String
+  userId             String?
+  type               WorkflowNodeType
+  order              Int
+  isLocked           Boolean          @default(true)
+  userPrompt         String?
+  config             Json             @default("{}")
+  lane               String?
+  x                  Float?
+  y                  Float?
+  // True for a one-off node added via "Generate more" on the content page —
+  // never part of the reusable workflow template (excluded from the canvas
+  // and from future pipeline runs).
+  isGenerateMoreOnly Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   workflow Workflow @relation(fields: [workflowRef], references: [workflowId], onDelete: Cascade)
 

@@ -198,6 +198,7 @@ export class WorkflowService {
     const nodes = await this.workflowNodes.findByWorkflow(
       workflow.workflowId,
       auth,
+      { templateOnly: true },
     );
     this.events.emitToWorkflow(workflow.workflowId, 'workflow:completed', {
       workflowId: workflow.workflowId,
@@ -296,7 +297,9 @@ export class WorkflowService {
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth, {
+      templateOnly: true,
+    });
     return this.mapWorkflowResponse(workflow, nodes);
   }
 
@@ -327,6 +330,7 @@ export class WorkflowService {
     const nodes = await this.workflowNodes.findByWorkflow(
       workflow.workflowId,
       auth,
+      { templateOnly: true },
     );
     return this.mapWorkflowResponse(workflow, nodes);
   }
@@ -466,6 +470,7 @@ export class WorkflowService {
     const nodes = await this.workflowNodes.findByWorkflowRefs(
       workflowIds,
       auth,
+      { templateOnly: true },
     );
     for (const n of nodes) {
       const ref = typeof n.workflowRef === 'string' ? n.workflowRef.trim() : '';
@@ -809,8 +814,11 @@ export class WorkflowService {
   }
 
   /**
-   * Appends a single node to an existing workflow (e.g. Generate More).
-   * Does not re-run full saveNodes validation; caller must pass an allowed type.
+   * Creates a one-off "Generate more" node for a single piece of content.
+   * Deliberately does NOT touch the workflow's own `nodes`/`version` —
+   * this node is tagged `isGenerateMoreOnly` and stays invisible to the
+   * canvas and to future pipeline runs of this workflow (see
+   * `WorkflowNodeQueryOptions.templateOnly` on the node repository).
    */
   async appendWorkflowNode(
     workflowId: string,
@@ -841,25 +849,10 @@ export class WorkflowService {
       type: args.type,
       order: nextOrder,
       isLocked: false,
+      isGenerateMoreOnly: true,
       userPrompt: args.userPrompt?.trim() ?? '',
       config: (args.config ?? {}) as never,
     });
-
-    const nextVersion = (workflow.version ?? 1) + 1;
-    const nextNodeIds = [...(workflow.nodes ?? []), args.nodeId];
-    await this.workflows.appendVersion(
-      workflowId,
-      {
-        versionNumber: nextVersion,
-        nodes: nextNodeIds,
-        createdAt: new Date(),
-      },
-      {
-        nodes: nextNodeIds,
-        version: nextVersion,
-      },
-      auth,
-    );
 
     return { nodeId: args.nodeId, order: nextOrder };
   }
@@ -1000,7 +993,9 @@ export class WorkflowService {
         billingPeriod: currentBillingPeriod(),
       });
 
-      const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+      const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth, {
+        templateOnly: true,
+      });
 
       this.events.emitToWorkflow(workflowId, 'workflow:completed', {
         workflowId,
@@ -1155,7 +1150,11 @@ export class WorkflowService {
     validateWorkflowGraph(forValidation, edges);
     assertEdgesRespectMatrix(forValidation, edges);
 
-    await this.workflowNodes.deleteByWorkflow(workflowId, auth);
+    // Regenerating the workflow's structure must not wipe ad-hoc "Generate
+    // more" nodes that already-approved content depends on for rerun/output.
+    await this.workflowNodes.deleteByWorkflow(workflowId, auth, {
+      templateOnly: true,
+    });
     for (const n of graphNodes) {
       await this.workflowNodes.create({
         workflow: { connect: { workflowId } },
@@ -1206,7 +1205,10 @@ export class WorkflowService {
     if (!source) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
     }
-    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth);
+    // A reusable template must never inherit one-off "Generate more" nodes.
+    const nodes = await this.workflowNodes.findByWorkflow(workflowId, auth, {
+      templateOnly: true,
+    });
     const edges = Array.isArray(source.edges) ? source.edges : [];
 
     const clone = await this.workflows.create({

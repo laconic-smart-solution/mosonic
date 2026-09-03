@@ -150,6 +150,34 @@ export const adminApi = {
       .patch(`/admin/topup-plans/${encodeURIComponent(code)}/active`, { active })
       .then((r) => r.data),
 
+  listImageTemplates: () =>
+    apiClient.get("/admin/image-templates").then((r) => r.data),
+
+  // Multipart form data: key/name/description/prompt/isActive fields plus an
+  // optional "image" file — the server uploads it and resolves imageUrl itself.
+  createImageTemplate: (formData: FormData) =>
+    apiClient.post("/admin/image-templates", formData).then((r) => r.data),
+
+  updateImageTemplate: (id: string, formData: FormData) =>
+    apiClient.put(`/admin/image-templates/${id}`, formData).then((r) => r.data),
+
+  deleteImageTemplate: (id: string) =>
+    apiClient.delete(`/admin/image-templates/${id}`).then((r) => r.data),
+
+  listImageDesignStyles: () =>
+    apiClient.get("/admin/image-design-styles").then((r) => r.data),
+
+  createImageDesignStyle: (formData: FormData) =>
+    apiClient.post("/admin/image-design-styles", formData).then((r) => r.data),
+
+  updateImageDesignStyle: (id: string, formData: FormData) =>
+    apiClient
+      .put(`/admin/image-design-styles/${id}`, formData)
+      .then((r) => r.data),
+
+  deleteImageDesignStyle: (id: string) =>
+    apiClient.delete(`/admin/image-design-styles/${id}`).then((r) => r.data),
+
   getUsageHistory: (params?: Record<string, string | number | undefined>) =>
     apiClient.get("/admin/usage/history", { params }).then((r) => r.data),
 

@@ -1,3 +1,4 @@
+import { toPromptToon } from '../../common/utils/toon.util';
 import type { Rule } from '../../rule/schemas/rule.schema';
 import type { IntelligenceSearchTypeValue } from '../workflow-node-config.zod';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
@@ -82,14 +83,14 @@ export function appendAnalyticsContextToPrompt(
   }
   const parts: string[] = [];
   if (ctx.topPerformers?.length) {
-    parts.push(`Top performers: ${JSON.stringify(ctx.topPerformers)}`);
+    parts.push(`Top performers:\n${toPromptToon(ctx.topPerformers)}`);
   }
   if (ctx.bottomPerformers?.length) {
-    parts.push(`Underperformers: ${JSON.stringify(ctx.bottomPerformers)}`);
+    parts.push(`Underperformers:\n${toPromptToon(ctx.bottomPerformers)}`);
   }
   if (ctx.pendingSuggestions?.length) {
     parts.push(
-      `Pending suggestions (read-only): ${JSON.stringify(ctx.pendingSuggestions)}`,
+      `Pending suggestions (read-only):\n${toPromptToon(ctx.pendingSuggestions)}`,
     );
   }
   if (parts.length === 0) {

@@ -53,6 +53,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/websockets": "^11.1.19",
     "@prisma/client": "6",
+    "@toon-format/toon": "^4.1.1",
     "axios": "^1.16.0",
     "bullmq": "^5.76.9",
     "cheerio": "^1.2.0",

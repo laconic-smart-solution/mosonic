@@ -16,7 +16,9 @@
       "faq": "FAQ",
       "communication": "การสื่อสาร",
       "line": "LINE",
-      "announcements": "ประกาศ"
+      "announcements": "ประกาศ",
+      "nodeSettings": "ตั้งค่าโหนด",
+      "nodeSettingsImage": "รูปภาพ"
     }
   },
   "communication": {
@@ -507,6 +509,58 @@
     "colCost": "ต้นทุน (USD)",
     "prev": "ก่อนหน้า",
     "next": "ถัดไป"
+  },
+  "nodeSettingsImage": {
+    "title": "ตั้งค่าโหนดรูปภาพ",
+    "subtitle": "จัดการเทมเพลตและสไตล์การออกแบบของโหนด image_generation",
+    "tabs": {
+      "templates": "เทมเพลต",
+      "styles": "สไตล์การออกแบบ"
+    },
+    "templates": {
+      "hint": "เทมเพลตกำหนดว่าจะสร้างภาพประเภทใด",
+      "create": "เทมเพลตใหม่",
+      "createTitle": "สร้างเทมเพลต",
+      "editTitle": "แก้ไขเทมเพลต",
+      "empty": "ยังไม่มีเทมเพลต",
+      "loadError": "โหลดเทมเพลตไม่ได้",
+      "saveError": "บันทึกเทมเพลตไม่ได้",
+      "deleteError": "ลบเทมเพลตไม่ได้",
+      "deleteConfirm": "ลบเทมเพลต \"{{name}}\" ใช่หรือไม่?"
+    },
+    "styles": {
+      "hint": "สไตล์การออกแบบกำหนดว่าภาพจะมีลักษณะอย่างไร — AI จะเลือกให้อัตโนมัติเว้นแต่ผู้ใช้เลือกเอง",
+      "create": "สไตล์ใหม่",
+      "createTitle": "สร้างสไตล์",
+      "editTitle": "แก้ไขสไตล์",
+      "empty": "ยังไม่มีสไตล์",
+      "loadError": "โหลดสไตล์ไม่ได้",
+      "saveError": "บันทึกสไตล์ไม่ได้",
+      "deleteError": "ลบสไตล์ไม่ได้",
+      "deleteConfirm": "ลบสไตล์ \"{{name}}\" ใช่หรือไม่?"
+    },
+    "columns": {
+      "image": "รูปภาพ",
+      "key": "คีย์",
+      "name": "ชื่อ",
+      "description": "คำอธิบาย",
+      "status": "สถานะ"
+    },
+    "fields": {
+      "key": "คีย์",
+      "name": "ชื่อ",
+      "description": "คำอธิบาย",
+      "prompt": "พรอมพต์",
+      "image": "รูปอ้างอิง",
+      "active": "เปิดใช้งาน",
+      "uploadImage": "อัปโหลด",
+      "replaceImage": "แทนที่",
+      "noImage": "ไม่มีรูป",
+      "uploadFailed": "อัปโหลดไม่สำเร็จ ลองอีกครั้ง"
+    },
+    "active": "เปิดใช้งาน",
+    "inactive": "ปิดใช้งาน",
+    "loading": "กำลังโหลด…"
   },
   "faq": {
     "title": "ฐานความรู้ FAQ",

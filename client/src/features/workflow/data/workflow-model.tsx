@@ -331,6 +331,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       return {
         model,
         template: "auto",
+        designStyle: "auto",
         style: "natural",
         aspectRatio: "1:1",
         quality: "standard",

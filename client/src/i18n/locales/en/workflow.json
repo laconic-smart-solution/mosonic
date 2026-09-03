@@ -123,6 +123,7 @@
     },
     "image": {
       "template": { "label": "Template" },
+      "designStyle": { "label": "Design Style" },
       "style": { "label": "Style" },
       "aspectRatio": { "label": "Aspect Ratio" },
       "quality": { "label": "Quality" },
@@ -365,6 +366,14 @@
     "voiceSaveFailed": "Voice could not be saved. Save the workflow and try again.",
     "clickOrDrag": "Click or drag image here",
     "uploading": "Uploading…"
+  },
+  "imageTemplateStylePicker": {
+    "loadingTemplates": "Loading templates…",
+    "loadTemplatesFailed": "Could not load templates.",
+    "noTemplates": "No templates available.",
+    "loadingStyles": "Loading styles…",
+    "loadStylesFailed": "Could not load styles.",
+    "noStyles": "No styles available."
   },
   "voicePicker": {
     "genderAll": "All",

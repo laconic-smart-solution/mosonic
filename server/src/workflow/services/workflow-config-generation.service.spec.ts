@@ -3,6 +3,12 @@ import type { Rule } from '../../rule/schemas/rule.schema';
 import { WorkflowConfigGenerationService } from './workflow-config-generation.service';
 import type { LogicalWorkflowNode } from '../workflow-structure.builder';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+// These tests assert on parsed output, not prompt-internal formatting.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 describe('WorkflowConfigGenerationService', () => {
   const rule = { ruleId: 'r1', name: 'Test Rule' } as Rule;
 

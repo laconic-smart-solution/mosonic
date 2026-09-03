@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toPromptToon } from '../../common/utils/toon.util';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
 import { PickedArticle } from './news-picker.service';
@@ -104,8 +105,8 @@ export class NewsRelevanceService {
       `Source: ${article.sourceId}`,
       `Published: ${article.pubDate}`,
       '',
-      '=== BRAND RULE ===',
-      JSON.stringify(ruleSummary, null, 2),
+      '=== BRAND RULE (TOON format) ===',
+      toPromptToon(ruleSummary),
     ].join('\n');
 
     try {

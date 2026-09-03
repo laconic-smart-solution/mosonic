@@ -413,6 +413,7 @@ export class ContentService {
             lane: pipelineNode.lane,
             x: null,
             y: null,
+            isGenerateMoreOnly: false,
             createdAt: new Date(),
             updatedAt: new Date(),
           } satisfies WorkflowNodeRecord)
@@ -852,12 +853,15 @@ export class ContentService {
       wfNode,
       outputNodeId,
       rule,
+      dto,
       previousOutputs,
       auth,
       creditsCharged,
     } = args;
     const userId = auth.userId;
-    const contentPrompt = pipeline.contentPrompt;
+    // A follow-up message for this specific re-run overrides the pipeline's
+    // original content prompt for this run only — the workflow/pipeline itself is untouched.
+    const contentPrompt = dto.message?.trim() || pipeline.contentPrompt;
     try {
       const totalNodes = await this.workflowNodes.countByWorkflow(
         content.workflowRef,

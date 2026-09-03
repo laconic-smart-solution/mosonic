@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { WorkflowVideoPresenterSettings } from "@/features/workflow/components/workflow-video-presenter-settings"
+import { WorkflowImageTemplateStylePicker } from "@/features/workflow/components/workflow-image-template-style-picker"
 import {
   effectiveVideoMode,
   VIDEO_CINEMATIC_UI_ENABLED,
@@ -113,30 +114,6 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
     },
   ],
   image: [
-    {
-      key: "template",
-      label: fl("image", "template"),
-      control: "select",
-      options: [
-        { label: fo("auto"), value: "auto" },
-        { label: fo("templateAdCreative"), value: "ad_creative" },
-        { label: fo("templateProductMockup"), value: "product_mockup" },
-        { label: fo("templateInfographic"), value: "infographic" },
-        { label: fo("templatePhotorealistic"), value: "photorealistic" },
-        { label: fo("templateLifestyle"), value: "lifestyle" },
-      ],
-      defaultValue: "auto",
-    },
-    {
-      key: "style",
-      label: fl("image", "style"),
-      control: "buttons",
-      options: [
-        { label: fo("natural"), value: "natural" },
-        { label: fo("vivid"), value: "vivid" },
-      ],
-      defaultValue: "natural",
-    },
     {
       key: "aspectRatio",
       label: fl("image", "aspectRatio"),
@@ -622,6 +599,13 @@ export function WorkflowNodeConfigFields({
           onPatch={(patch) => patchConfig(patch)}
           compact={compact}
           persistToServer={persistPresenterToServer}
+        />
+      ) : null}
+      {canvasType === "image" ? (
+        <WorkflowImageTemplateStylePicker
+          config={config}
+          onPatch={(patch) => patchConfig(patch)}
+          compact={compact}
         />
       ) : null}
       {configFields.map((field) =>
