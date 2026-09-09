@@ -37,26 +37,16 @@ describe('WorkflowConfigGenerationService', () => {
         }),
       }),
     };
-    const creditBilling = { recordAndDeduct: jest.fn() };
 
-    const svc = new WorkflowConfigGenerationService(
-      llm as never,
-      creditBilling,
-    );
+    const svc = new WorkflowConfigGenerationService(llm as never);
 
-    const out = await svc.generateConfigs(logicalNodes, rule, 'Sale post', {
-      userId: 'u1',
-      workflowId: 'w1',
-    });
+    const out = await svc.generateConfigs(logicalNodes, rule, 'Sale post');
 
     expect(out[0].userPrompt).toBe('Write a catchy caption');
     expect(out[0].config).toMatchObject({
       tone: 'casual',
       outputFormat: 'caption',
     });
-    expect(creditBilling.recordAndDeduct).toHaveBeenCalledWith(
-      expect.objectContaining({ nodeId: 'workflow-config-generation' }),
-    );
   });
 
   it('returns nodes unchanged when JSON parse fails', async () => {

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { UserRole } from '../../domain/users/user.types';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { PrismaService } from '../../database/prisma.service';
 import type {
@@ -13,8 +14,53 @@ export class PrismaRuleRepository implements IRuleRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findById(ruleId: string, auth?: TenancyAuth): Promise<RuleRecord | null> {
-    const where = auth ? mergeTenancyWhere({ ruleId }, auth) : { ruleId };
-    return this.prisma.rule.findFirst({ where });
+    if (!auth || auth.role === UserRole.ADMIN) {
+      return this.prisma.rule.findFirst({ where: { ruleId } });
+    }
+    return this.prisma.rule.findFirst({
+      where: {
+        ruleId,
+        OR: [
+          { userId: auth.userId },
+          { isSystem: true, status: 'active' },
+        ],
+      },
+    });
+  }
+
+  findSystemTemplates(category?: string): Promise<RuleRecord[]> {
+    return this.prisma.rule.findMany({
+      where: {
+        isSystem: true,
+        isTemplate: true,
+        status: 'active',
+        ...(category ? { templateCategory: category } : {}),
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  listTemplates(auth?: TenancyAuth, category?: string): Promise<RuleRecord[]> {
+    if (!auth || auth.role === UserRole.ADMIN) {
+      return this.prisma.rule.findMany({
+        where: {
+          isTemplate: true,
+          status: 'active',
+          ...(category ? { templateCategory: category } : {}),
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
+    return this.prisma.rule.findMany({
+      where: {
+        isTemplate: true,
+        status: 'active',
+        ...(category ? { templateCategory: category } : {}),
+        OR: [{ isSystem: true }, { userId: auth.userId }],
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
   }
 
   findByIds(ruleIds: string[]): Promise<RuleRecord[]> {
@@ -62,6 +108,16 @@ export class PrismaRuleRepository implements IRuleRepository {
     const existing = await this.prisma.rule.findFirst({ where });
     if (!existing) return null;
     return this.prisma.rule.update({ where: { ruleId }, data });
+  }
+
+  async deleteById(
+    ruleId: string,
+    auth?: TenancyAuth,
+  ): Promise<RuleRecord | null> {
+    const where = auth ? mergeTenancyWhere({ ruleId }, auth) : { ruleId };
+    const existing = await this.prisma.rule.findFirst({ where });
+    if (!existing) return null;
+    return this.prisma.rule.delete({ where: { ruleId } });
   }
 
   updateNewsTrigger(

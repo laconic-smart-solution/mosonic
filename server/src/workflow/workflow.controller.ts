@@ -13,7 +13,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiKeyOrJwtGuard } from '../integrations/api-key-or-jwt.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
 import {
@@ -43,7 +43,7 @@ import {
 } from './dto/update-workflow.dto';
 import { WorkflowService } from './workflow.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(ApiKeyOrJwtGuard)
 @Controller('workflow')
 export class WorkflowController {
   constructor(private readonly workflowService: WorkflowService) {}

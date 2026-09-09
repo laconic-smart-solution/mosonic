@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Inject,
   Injectable,
@@ -7,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { UserRole } from '../domain/users/user.types';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
 import { randomUUID } from 'node:crypto';
@@ -228,6 +230,14 @@ export class RuleService {
     }
   }
 
+  async listSystemTemplates(category?: string): Promise<RuleRecord[]> {
+    return this.rules.findSystemTemplates(category);
+  }
+
+  async listTemplates(auth: TenancyAuth, category?: string): Promise<RuleRecord[]> {
+    return this.rules.listTemplates(auth, category);
+  }
+
   async getRuleById(ruleId: string, auth: TenancyAuth): Promise<RuleRecord> {
     const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
@@ -262,6 +272,9 @@ export class RuleService {
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
+    }
     const dto = buildSuggestionUpdateDto(
       existing as unknown as Pick<
         RuleDocument,
@@ -281,6 +294,9 @@ export class RuleService {
     const existing = await this.rules.findById(ruleId, auth);
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
     }
 
     const data: Prisma.RuleUpdateInput = {};
@@ -362,6 +378,14 @@ export class RuleService {
     dto: ReplaceRuleDto,
     auth: TenancyAuth,
   ): Promise<RuleRecord> {
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
+    }
+
     const updated = await this.rules.updateById(
       ruleId,
       {
@@ -379,6 +403,19 @@ export class RuleService {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
     return updated;
+  }
+
+  async deleteRule(ruleId: string, auth: TenancyAuth): Promise<void> {
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot delete a system rule template');
+    }
+    if (this.rules.deleteById) {
+      await this.rules.deleteById(ruleId, auth);
+    }
   }
 
   async findPage(
