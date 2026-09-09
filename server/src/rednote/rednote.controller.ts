@@ -19,12 +19,6 @@ import { ConflictException } from '@nestjs/common';
 export class RedNoteController {
   constructor(private readonly rednote: RedNoteService) {}
 
-  @Post('unlock')
-  async unlock(@Req() req: Request) {
-    const user = req.auth!.localUser as User;
-    return this.rednote.unlock(user.userId);
-  }
-
   @Post('connect')
   async connect(@Req() req: Request) {
     const user = req.auth!.localUser as User;

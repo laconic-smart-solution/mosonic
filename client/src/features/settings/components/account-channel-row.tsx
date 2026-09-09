@@ -1,7 +1,7 @@
-import { Link2, Loader2, LockOpen, Unlink } from "lucide-react"
+import { Link2, Loader2, Lock, Unlink } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router-dom"
 
-import { formatCreditAmount } from "@/components/core/credit-usage-badge"
 import { Button } from "@/components/ui/button"
 import type { AccountChannelDef } from "@/features/settings/constants/account-channels"
 import { formatConnectedAccountLabel } from "@/features/settings/lib/connected-account-label"
@@ -12,31 +12,26 @@ import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 type AccountChannelRowProps = {
   def: AccountChannelDef
   connected: ZernioConnectedAccount | undefined
-  unlocked: boolean
+  allowed: boolean
   needsReauth?: boolean
-  onUnlock: (apiKey: string) => void
   onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
-  unlockPending: boolean
   connectPending: boolean
   disconnectPending: boolean
-  creditsEach?: number
 }
 
 export function AccountChannelRow({
   def,
   connected,
-  unlocked,
+  allowed,
   needsReauth = false,
-  onUnlock,
   onConnect,
   onDisconnect,
-  unlockPending,
   connectPending,
   disconnectPending,
-  creditsEach = 0,
 }: AccountChannelRowProps) {
   const { t } = useTranslation("settings")
+  const navigate = useNavigate()
   const Icon = def.icon
   const isLinked = Boolean(connected) && !needsReauth
   const disconnectKey = connected?.channel.trim().toLowerCase() ?? def.apiKey
@@ -44,10 +39,7 @@ export function AccountChannelRow({
   const platformDescription = t(`channels.${def.id}.description`)
   const connectedLabel =
     isLinked && connected ? formatConnectedAccountLabel(connected) : null
-  const unlockCostLabel =
-    !isLinked && !unlocked && !needsReauth && creditsEach > 0
-      ? t("channels.unlockCost", { count: formatCreditAmount(creditsEach) })
-      : null
+  const planLocked = !isLinked && !needsReauth && !allowed
 
   return (
     <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
@@ -74,9 +66,10 @@ export function AccountChannelRow({
               <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 {t("channels.connected")}
               </span>
-            ) : unlocked ? (
-              <span className="text-xs font-medium text-sky-700 dark:text-sky-400">
-                {t("channels.unlocked")}
+            ) : planLocked ? (
+              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Lock className="size-3" aria-hidden />
+                {t("channels.planLocked")}
               </span>
             ) : (
               <span className="text-xs text-muted-foreground">{t("channels.notConnected")}</span>
@@ -94,8 +87,10 @@ export function AccountChannelRow({
               {platformDescription}
             </p>
           )}
-          {unlockCostLabel ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">{unlockCostLabel}</p>
+          {planLocked ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {t("channels.planLockedDesc")}
+            </p>
           ) : null}
         </div>
       </div>
@@ -135,7 +130,19 @@ export function AccountChannelRow({
             )}
             {t("channels.disconnect")}
           </Button>
-        ) : unlocked ? (
+        ) : planLocked ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-w-[104px] gap-1.5"
+            onClick={() => navigate("/usage/plans")}
+            aria-label={t("channels.upgradePlanAria", { channel: label })}
+          >
+            <Lock className="size-3.5" aria-hidden />
+            {t("channels.upgradePlan")}
+          </Button>
+        ) : (
           <Button
             type="button"
             variant="outline"
@@ -152,35 +159,6 @@ export function AccountChannelRow({
               <Link2 className="size-3.5" aria-hidden />
             )}
             {t("channels.connect")}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="min-w-[104px] gap-1.5"
-            style={{ borderColor: T.accentBorder }}
-            disabled={unlockPending}
-            onClick={() => onUnlock(def.apiKey)}
-            aria-label={
-              creditsEach > 0
-                ? t("channels.unlockAriaWithCost", {
-                    channel: label,
-                    count: formatCreditAmount(creditsEach),
-                  })
-                : t("channels.unlockAria", { channel: label })
-            }
-          >
-            {unlockPending ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            ) : (
-              <LockOpen className="size-3.5" aria-hidden />
-            )}
-            {creditsEach > 0
-              ? t("channels.unlockWithCredits", {
-                  count: formatCreditAmount(creditsEach),
-                })
-              : t("channels.unlock")}
           </Button>
         )}
       </div>

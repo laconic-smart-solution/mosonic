@@ -6,6 +6,7 @@ import { PageShell } from "@/components/app/page-shell"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
 import {
   Table,
   TableBody,
@@ -44,6 +46,7 @@ type PlanRow = {
   isActive: boolean
   description?: string
   features?: string[]
+  allowedChannels?: string[]
   activeUsers?: number
 }
 
@@ -67,6 +70,7 @@ export default function AdminPlansPage() {
     description: "",
     features: "",
     isActive: true,
+    allowedChannels: ACCOUNT_CHANNELS.map((c) => c.id),
   })
 
   const { data: planUsers } = useAdminPlanUsers(usersPlanId ?? undefined)
@@ -86,6 +90,7 @@ export default function AdminPlansPage() {
       description: "",
       features: "",
       isActive: true,
+      allowedChannels: ACCOUNT_CHANNELS.map((c) => c.id),
     })
     setDrawerOpen(true)
   }
@@ -101,8 +106,18 @@ export default function AdminPlansPage() {
       description: plan.description ?? "",
       features: (plan.features ?? []).join("\n"),
       isActive: plan.isActive,
+      allowedChannels: plan.allowedChannels ?? [],
     })
     setDrawerOpen(true)
+  }
+
+  const toggleChannel = (channelId: string) => {
+    setForm((f) => ({
+      ...f,
+      allowedChannels: f.allowedChannels.includes(channelId)
+        ? f.allowedChannels.filter((id) => id !== channelId)
+        : [...f.allowedChannels, channelId],
+    }))
   }
 
   const openUsers = (plan: PlanRow) => {
@@ -121,6 +136,7 @@ export default function AdminPlansPage() {
         .map((s) => s.trim())
         .filter(Boolean),
       isActive: form.isActive,
+      allowedChannels: form.allowedChannels,
     }
     if (hasOverride && Number.isFinite(Number(form.creditsOverride))) {
       body.creditsOverride = Math.max(0, Math.floor(Number(form.creditsOverride)))
@@ -298,6 +314,29 @@ export default function AdminPlansPage() {
                   rows={4}
                   placeholder={t("plans.featuresPlaceholder")}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("plans.fieldAllowedChannels")}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t("plans.allowedChannelsHint")}
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {ACCOUNT_CHANNELS.map((channel) => {
+                    const inputId = `plan-channel-${channel.id}`
+                    return (
+                      <div key={channel.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={inputId}
+                          checked={form.allowedChannels.includes(channel.id)}
+                          onCheckedChange={() => toggleChannel(channel.id)}
+                        />
+                        <Label htmlFor={inputId} className="cursor-pointer font-normal">
+                          {channel.label}
+                        </Label>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Switch

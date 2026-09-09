@@ -22,6 +22,13 @@ export class PrismaCreditTopupPurchaseRepository implements ICreditTopupPurchase
     });
   }
 
+  findByUserId(userId: string): Promise<CreditTopupPurchaseRecord[]> {
+    return this.prisma.creditTopupPurchase.findMany({
+      where: { userId },
+      orderBy: { purchaseDate: 'desc' },
+    });
+  }
+
   async updateStatus(
     topupPurchaseId: string,
     status: CreditTopupPurchaseStatus,

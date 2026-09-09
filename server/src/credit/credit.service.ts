@@ -33,7 +33,6 @@ import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
 import {
   RULE_GENERATION_NODE_TYPE,
-  SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
   WORKFLOW_GENERATION_NODE_TYPE,
 } from './lib/billable-node-credit-types';
 import type { PaymentStatusDto } from './dto/payment-status.dto';
@@ -473,87 +472,6 @@ export class CreditService {
       ruleGeneration: ruleGeneration ?? 0,
       workflowGeneration: workflowGeneration ?? 0,
     };
-  }
-
-  socialUnlockNodeIds(channel: string): string[] {
-    const key = channel.trim().toLowerCase();
-    return [`social:${key}`];
-  }
-
-  async hasSocialChannelUnlock(
-    userId: string,
-    channel: string,
-  ): Promise<boolean> {
-    return await this.ledger.hasUserSocialChannelUnlock(
-      userId,
-      this.socialUnlockNodeIds(channel),
-    );
-  }
-
-  async listUnlockedSocialChannels(userId: string): Promise<string[]> {
-    return await this.ledger.listUserSocialChannelUnlocks(userId);
-  }
-
-  /**
-   * Unlock a publishing channel slot (idempotent). Charges credits on first
-   * unlock; persists via ledger so disconnect does not require re-unlock.
-   */
-  async unlockSocialChannel(args: {
-    userId: string;
-    channel: string;
-    credits: number;
-    creditPriceUsd: number;
-  }): Promise<{ alreadyUnlocked: boolean }> {
-    const channel = args.channel.trim().toLowerCase();
-    const nodeIds = this.socialUnlockNodeIds(channel);
-    const alreadyUnlocked = await this.ledger.hasUserSocialChannelUnlock(
-      args.userId,
-      nodeIds,
-    );
-    if (alreadyUnlocked) {
-      return { alreadyUnlocked: true };
-    }
-
-    if (args.credits > 0) {
-      await this.assertCreditsForNodeType(
-        args.userId,
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      );
-    }
-
-    await this.ledger.create({
-      userId: args.userId,
-      pipelineRef: 'social-connect',
-      nodeId: `social:${channel}`,
-      nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      provider: 'system',
-      model: 'system',
-      rawCostUsd: 0,
-      overheadUsd: 0,
-      marginAppliedUsd: 0,
-      creditPriceUsdSnapshot: args.creditPriceUsd,
-      creditsCharged: Math.max(0, args.credits),
-      billingPeriod: currentBillingPeriod(),
-    });
-
-    if (args.credits > 0) {
-      const updated = await this.debitOrThrow(args.userId, args.credits);
-
-      await this.maybeEmitLowBalance(updated);
-      this.emitBalanceUpdated(updated);
-    }
-
-    return { alreadyUnlocked: false };
-  }
-
-  /** @deprecated Use `unlockSocialChannel` */
-  async chargeSocialAccountConnect(args: {
-    userId: string;
-    channel: string;
-    credits: number;
-    creditPriceUsd: number;
-  }): Promise<void> {
-    await this.unlockSocialChannel(args);
   }
 
   /**

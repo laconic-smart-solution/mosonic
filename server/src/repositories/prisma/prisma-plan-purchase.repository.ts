@@ -27,6 +27,13 @@ export class PrismaPlanPurchaseRepository implements IPlanPurchaseRepository {
     });
   }
 
+  findByUserId(userId: string): Promise<PlanPurchaseRecord[]> {
+    return this.prisma.planPurchase.findMany({
+      where: { userId },
+      orderBy: { purchaseDate: 'desc' },
+    });
+  }
+
   findActiveForUserAndPeriod(
     userId: string,
     billingPeriod: Date,

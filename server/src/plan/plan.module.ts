@@ -6,6 +6,7 @@ import { PayniModule } from '../payni/payni.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { PlanController } from './plan.controller';
 import { PublicPlanController } from './public-plan.controller';
+import { PlanChannelAccessService } from './plan-channel-access.service';
 import { PlanUpgradeService } from './plan-upgrade.service';
 import { PlanService } from './plan.service';
 
@@ -18,7 +19,7 @@ import { PlanService } from './plan.service';
     RepositoriesModule,
   ],
   controllers: [PlanController, PublicPlanController],
-  providers: [PlanService, PlanUpgradeService],
-  exports: [PlanService, PlanUpgradeService],
+  providers: [PlanService, PlanUpgradeService, PlanChannelAccessService],
+  exports: [PlanService, PlanUpgradeService, PlanChannelAccessService],
 })
 export class PlanModule {}

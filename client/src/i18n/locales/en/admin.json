@@ -496,6 +496,8 @@
     "fieldFeatures": "Features (one per line)",
     "featuresPlaceholder": "Feature 1\nFeature 2",
     "fieldActive": "Active",
+    "fieldAllowedChannels": "Publishing channels",
+    "allowedChannelsHint": "Channels users on this plan can connect and publish to.",
     "save": "Save plan"
   },
   "usage": {

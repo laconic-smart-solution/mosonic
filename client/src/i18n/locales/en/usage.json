@@ -5,7 +5,8 @@
     "label": "Billing sections",
     "overview": "Overview",
     "topup": "Top up",
-    "plans": "Plans"
+    "plans": "Plans",
+    "history": "Purchase history"
   },
   "planBanner": {
     "plan": "Plan",
@@ -70,5 +71,21 @@
     "7d": "Last 7 days",
     "30d": "Last 30 days",
     "all": "All time"
+  },
+  "purchaseHistory": {
+    "title": "Purchase history",
+    "subtitle": "Credit top-ups and plan purchases, newest first.",
+    "date": "Date",
+    "type": "Type",
+    "typeTopup": "Top-up",
+    "typePlan": "Plan",
+    "item": "Item",
+    "credits": "Credits",
+    "amount": "Amount",
+    "status": "Status",
+    "statusActive": "Completed",
+    "statusPending": "Pending",
+    "statusCancelled": "Cancelled",
+    "empty": "No purchases yet."
   }
 }

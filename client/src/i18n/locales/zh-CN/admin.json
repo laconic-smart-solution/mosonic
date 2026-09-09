@@ -481,6 +481,8 @@
     "fieldFeatures": "功能 (每行一项)",
     "featuresPlaceholder": "功能 1",
     "fieldActive": "启用",
+    "fieldAllowedChannels": "发布渠道",
+    "allowedChannelsHint": "此套餐的用户可以连接并发布的渠道。",
     "save": "保存套餐"
   },
   "usage": {

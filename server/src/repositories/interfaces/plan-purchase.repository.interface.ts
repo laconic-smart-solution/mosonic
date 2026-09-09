@@ -7,6 +7,8 @@ export interface IPlanPurchaseRepository {
     transactionId: string,
   ): Promise<PlanPurchaseRecord | null>;
   findPendingByUserId(userId: string): Promise<PlanPurchaseRecord | null>;
+  /** All purchases for a user, newest first — small per-user volume, no pagination needed at this layer. */
+  findByUserId(userId: string): Promise<PlanPurchaseRecord[]>;
   findActiveForUserAndPeriod(
     userId: string,
     billingPeriod: Date,

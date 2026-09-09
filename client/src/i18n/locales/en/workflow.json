@@ -342,6 +342,11 @@
     "retry": "Retry",
     "skip": "Skip"
   },
+  "deleteZone": {
+    "hint": "Drop here to delete",
+    "release": "Release to delete",
+    "notDeletable": "This node can't be deleted"
+  },
   "presenter": {
     "saveWorkflowFirst": "Save the workflow before uploading avatars.",
     "saveWorkflowToSync": "Save the workflow to upload new avatars or sync presenter settings to the server. You can still pick avatars and voices locally.",

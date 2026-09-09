@@ -23,12 +23,12 @@ export function findConnectedForChannel(
   return undefined
 }
 
-export function isChannelUnlocked(
+export function isChannelAllowedByPlan(
   def: AccountChannelDef,
-  unlockedChannels: readonly string[] | undefined,
+  allowedChannels: readonly string[] | undefined,
 ): boolean {
-  const unlocked = new Set(
-    (unlockedChannels ?? []).map((channel) => channel.trim().toLowerCase()),
+  const allowed = new Set(
+    (allowedChannels ?? []).map((channel) => channel.trim().toLowerCase()),
   )
-  return def.matchKeys.some((key) => unlocked.has(key))
+  return def.matchKeys.some((key) => allowed.has(key))
 }

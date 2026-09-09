@@ -28,6 +28,9 @@ export const UsageTopupPage = PageLoader(
 export const UsagePlansPage = PageLoader(
   lazy(() => import("@/features/usage/pages/usage-plans-page")),
 )
+export const UsagePurchaseHistoryPage = PageLoader(
+  lazy(() => import("@/features/usage/pages/usage-purchase-history-page")),
+)
 export const LandingPage = PageLoader(lazy(() => import("@/features/marketing/pages/landing")))
 export const PricingPage = PageLoader(lazy(() => import("@/features/marketing/pages/pricing")))
 export const MarketingFaqPage = PageLoader(lazy(() => import("@/features/marketing/pages/faq")))

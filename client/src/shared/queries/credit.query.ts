@@ -5,7 +5,6 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { useAuthStore } from "@/shared/stores/auth.store"
 import type { TopupCreditsPayload } from "@/shared/types/credit.type"
 import { usageQueryKeys } from "./usage.query"
-import { zernioQueryKeys } from "./zernio.query"
 
 export const creditQueryKeys = {
   packages: ["credit", "packages"] as const,
@@ -41,7 +40,6 @@ export function useCreditTopupMutation() {
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "review-estimate"] })
       void queryClient.invalidateQueries({ queryKey: creditQueryKeys.generationCosts })
-      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
     },
     onError: (err) => {
       toastApiError(err, "credit:topup.error")

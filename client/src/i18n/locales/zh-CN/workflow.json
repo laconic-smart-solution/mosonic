@@ -337,6 +337,11 @@
     "retry": "重试",
     "skip": "跳过"
   },
+  "deleteZone": {
+    "hint": "拖到此处删除",
+    "release": "松开以删除",
+    "notDeletable": "该节点无法删除"
+  },
   "presenter": {
     "saveWorkflowFirst": "上传形象前请先保存工作流。",
     "saveWorkflowToSync": "保存工作流后可上传新形象或将数字人设置同步到服务器。您仍可在本地选择形象和语音。",
