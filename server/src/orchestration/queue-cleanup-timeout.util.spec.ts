@@ -40,7 +40,12 @@ describe('withQueueCleanupTimeout', () => {
   it('resolves within the timeout even when the work never settles (e.g. Redis unreachable)', async () => {
     const neverResolves = new Promise<void>(() => {});
     const start = Date.now();
-    await withQueueCleanupTimeout('stuck-queue', () => neverResolves, logger, 30);
+    await withQueueCleanupTimeout(
+      'stuck-queue',
+      () => neverResolves,
+      logger,
+      30,
+    );
     expect(Date.now() - start).toBeLessThan(1000);
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('timed out after 30ms'),

@@ -78,7 +78,7 @@ function parsePlatformRows(
   postPayload: Record<string, unknown> | undefined,
 ): Record<string, unknown>[] {
   const platforms = Array.isArray(postPayload?.platforms)
-    ? (postPayload!.platforms as unknown[])
+    ? (postPayload.platforms as unknown[])
     : [];
   return platforms.filter(
     (p): p is Record<string, unknown> => p !== null && typeof p === 'object',
@@ -193,7 +193,7 @@ export class WebhookService {
     const at =
       remaining.scheduledAt instanceof Date
         ? remaining.scheduledAt
-        : new Date(remaining.scheduledAt as string);
+        : new Date(remaining.scheduledAt);
     return at.toISOString();
   }
 
@@ -208,7 +208,10 @@ export class WebhookService {
     });
 
     const status = saved.status;
-    if (status === UploadJobStatus.Completed || status === UploadJobStatus.Partial) {
+    if (
+      status === UploadJobStatus.Completed ||
+      status === UploadJobStatus.Partial
+    ) {
       const channelsPublished = uploadChannels(saved)
         .filter((c) => c.status === UploadChannelStatus.Published)
         .map((c) => c.channel.toLowerCase());
@@ -245,9 +248,7 @@ export class WebhookService {
             .toLowerCase() === platform,
       );
       const url =
-        typeof row?.url === 'string' && row.url.trim()
-          ? row.url.trim()
-          : null;
+        typeof row?.url === 'string' && row.url.trim() ? row.url.trim() : null;
       const publishedAt =
         row?.publishedAt !== undefined && row?.publishedAt !== null
           ? parseDate(row.publishedAt)
@@ -304,7 +305,7 @@ export class WebhookService {
     const upload = await this.uploads.findByUploadId(post.uploadRef);
     if (!upload) return;
 
-    let channels = uploadChannels(upload);
+    const channels = uploadChannels(upload);
     for (const ch of channels) {
       if (!keys.has(this.rowKey(ch))) continue;
       if (ch.status === UploadChannelStatus.Skipped) continue;
@@ -353,7 +354,9 @@ export class WebhookService {
     void this.comms.notifyUser(id, `${body.title} — ${body.message}`);
   }
 
-  private async handlePostFailed(payload: Record<string, unknown>): Promise<void> {
+  private async handlePostFailed(
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
     const post = await this.posts.findByZernioPostId(zernioPostId);
@@ -398,7 +401,9 @@ export class WebhookService {
     await this.saveUploadEmitAll(withUploadChannels(upload, channels), {});
   }
 
-  private async handlePostPartial(payload: Record<string, unknown>): Promise<void> {
+  private async handlePostPartial(
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     const zernioPostId = extractPostId(payload.post);
     if (!zernioPostId) return;
     const post = await this.posts.findByZernioPostId(zernioPostId);
@@ -427,9 +432,7 @@ export class WebhookService {
             ? row.error.trim()
             : null;
         const url =
-          typeof row.url === 'string' && row.url.trim()
-            ? row.url.trim()
-            : null;
+          typeof row.url === 'string' && row.url.trim() ? row.url.trim() : null;
         return {
           platform,
           status: PlatformPostStatus.Published,

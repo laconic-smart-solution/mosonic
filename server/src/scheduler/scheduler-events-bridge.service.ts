@@ -92,7 +92,10 @@ export class SchedulerEventsBridgeService
       this.logger.warn(`SOCIAL_PUBLISH: post ${postId} not found`);
       return;
     }
-    if (post.status === PostStatus.Published || post.status === PostStatus.Cancelled) {
+    if (
+      post.status === PostStatus.Published ||
+      post.status === PostStatus.Cancelled
+    ) {
       this.logger.log(
         `SOCIAL_PUBLISH: skip post ${postId} status=${post.status}`,
       );

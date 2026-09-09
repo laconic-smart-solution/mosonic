@@ -1,7 +1,4 @@
-import {
-  UploadChannelStatus,
-  UploadJobStatus,
-} from '../schemas/upload.schema';
+import { UploadChannelStatus, UploadJobStatus } from '../schemas/upload.schema';
 
 export type UploadChannelStatusDto = {
   channel: string;

@@ -19,7 +19,7 @@ describe('ZernioRestClient', () => {
       interceptors: { response: { use: jest.fn() } },
     };
     jest.spyOn(axios, 'create').mockReturnValue(mockHttp as never);
-    jest.spyOn(axios, 'put').mockResolvedValue({ status: 200 } as never);
+    jest.spyOn(axios, 'put').mockResolvedValue({ status: 200 });
   });
 
   afterEach(() => {
@@ -42,7 +42,7 @@ describe('ZernioRestClient', () => {
       status: 200,
       headers: { get: () => 'image/png' },
       arrayBuffer: async () => new Uint8Array([137, 80]).buffer,
-    }) as unknown as typeof fetch;
+    });
 
     mockHttp.post.mockImplementation((path: string) => {
       if (path === '/media/presign') {
@@ -112,7 +112,7 @@ describe('ZernioRestClient', () => {
       headers: { get: () => 'image/jpeg' },
       arrayBuffer: async () =>
         new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]).buffer,
-    }) as unknown as typeof fetch;
+    });
 
     mockHttp.post.mockImplementation((path: string) => {
       if (path === '/media/presign') {
@@ -174,9 +174,8 @@ describe('ZernioRestClient', () => {
       status: 200,
       headers: { get: () => 'application/octet-stream' },
       arrayBuffer: async () =>
-        new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-          .buffer,
-    }) as unknown as typeof fetch;
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).buffer,
+    });
 
     mockHttp.post.mockImplementation((path: string, body?: unknown) => {
       if (path === '/media/presign') {
@@ -210,7 +209,9 @@ describe('ZernioRestClient', () => {
       scheduledAt: null,
     });
 
-    const presignCall = mockHttp.post.mock.calls.find((c) => c[0] === '/media/presign');
+    const presignCall = mockHttp.post.mock.calls.find(
+      (c) => c[0] === '/media/presign',
+    );
     expect(presignCall).toBeDefined();
     const presignBody = presignCall![1] as Record<string, unknown>;
     expect(presignBody.contentType).toBe('image/png');
@@ -235,8 +236,7 @@ describe('ZernioRestClient', () => {
           platform: 'instagram',
           accountId: 'acc1',
           content: 'Hi',
-          mediaUrl:
-            'https://storage.googleapis.com/my-bucket/existing.png',
+          mediaUrl: 'https://storage.googleapis.com/my-bucket/existing.png',
         },
       ],
       publishNow: true,

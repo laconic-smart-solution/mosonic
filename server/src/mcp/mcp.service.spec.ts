@@ -1,5 +1,10 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import type { ModuleRef } from '@nestjs/core';
 import type { UsersService } from '../users/users.service';
 import { McpService } from './mcp.service';
 import { buildZernioProfileNameForUser } from './zernio/zernio.client';
@@ -39,16 +44,12 @@ describe('McpService', () => {
     verifyState: jest.fn(),
   } as unknown as jest.Mocked<ZernioOauthStateService>;
   const config = {} as ConfigService;
-  const creditService = {
-    listUnlockedSocialChannels: jest.fn(),
-    unlockSocialChannel: jest.fn(),
+  const planChannelAccess = {
+    isChannelAllowed: jest.fn().mockResolvedValue(true),
   };
-  const nodeCreditPriceService = {
-    getActiveCostCredit: jest.fn(),
-  };
-  const creditCalculation = {
-    getConfig: jest.fn(),
-  };
+  const moduleRef = {
+    get: jest.fn().mockReturnValue(planChannelAccess),
+  } as unknown as jest.Mocked<ModuleRef>;
 
   const service = new McpService(
     zernio,
@@ -57,14 +58,36 @@ describe('McpService', () => {
     usersService,
     oauthState,
     config,
-    creditService as never,
-    nodeCreditPriceService as never,
-    creditCalculation as never,
+    moduleRef,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
     usersService.findOtherUserByZernioProfileId.mockResolvedValue(null);
+  });
+
+  it('connectChannel throws when the current plan does not include the channel', async () => {
+    usersService.getZernioConnectedAccounts.mockResolvedValue([]);
+    planChannelAccess.isChannelAllowed.mockResolvedValue(false);
+
+    await expect(
+      service.connectChannel('instagram', 'u1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(planChannelAccess.isChannelAllowed).toHaveBeenCalledWith(
+      'u1',
+      'instagram',
+    );
+  });
+
+  it('connectChannel throws when the channel is already connected, before checking plan access', async () => {
+    usersService.getZernioConnectedAccounts.mockResolvedValue([
+      { channel: 'instagram', accountId: 'acc_ig', connectedAt: new Date() },
+    ]);
+
+    await expect(
+      service.connectChannel('instagram', 'u1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(planChannelAccess.isChannelAllowed).not.toHaveBeenCalled();
   });
 
   it('syncAccounts creates a dedicated Zernio profile when none is stored locally', async () => {
@@ -188,7 +211,7 @@ describe('McpService', () => {
     zernioRest.publishCreatePost.mockResolvedValue({
       postId: 'post_1',
       raw: {},
-    } as never);
+    });
 
     await service.publishContent('u1', {
       channels: ['Instagram', ' linkedin '],
@@ -234,9 +257,9 @@ describe('McpService', () => {
   it('disconnectAccount throws when channel is not connected', async () => {
     usersService.getZernioConnectedAccounts.mockResolvedValue([]);
 
-    await expect(service.disconnectAccount('u1', 'linkedin')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.disconnectAccount('u1', 'linkedin'),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(zernioRest.deleteAccount).not.toHaveBeenCalled();
   });
 

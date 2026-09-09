@@ -10,7 +10,7 @@ export type AppliedSuggestionPatch = {
 
 /** Deep-merge partial UpdateRuleDto fields into a plain rule object (execution-only). */
 function applyUpdateDtoToRule(base: Rule, dto: UpdateRuleDto): Rule {
-  const next = structuredClone(base) as Rule;
+  const next = structuredClone(base);
   if (dto.brand) {
     next.brand = { ...next.brand, ...dto.brand };
   }
@@ -28,10 +28,10 @@ function applyUpdateDtoToRule(base: Rule, dto: UpdateRuleDto): Rule {
  * Does not persist — overlay lives on the pipeline document only.
  */
 export function mergeRuleWithOverlay(
-  base: Rule | RuleDocument,
+  base: Rule,
   patches: AppliedSuggestionPatch[],
 ): Rule {
-  const plain = structuredClone(base as Rule);
+  const plain = structuredClone(base);
   let merged = plain;
   for (const patch of patches) {
     const dto = buildSuggestionUpdateDto(

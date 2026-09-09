@@ -113,7 +113,8 @@ export class CreditCalculationService {
       overheadFactor,
     };
 
-    const history = (raw.changeHistory ?? []) as unknown as LegacyHistoryEntry[];
+    const history = (raw.changeHistory ??
+      []) as unknown as LegacyHistoryEntry[];
     const needsHistoryFix = history.some(
       (entry) => entry.creditPriceUsd == null || entry.marginTarget == null,
     );
@@ -121,7 +122,8 @@ export class CreditCalculationService {
     const set: Record<string, unknown> = {};
     if (raw.creditPriceUsd == null) set.creditPriceUsd = creditPriceUsd;
     if (raw.marginTarget == null) set.marginTarget = marginTarget;
-    if (raw.basicUsersPerMonth == null) set.basicUsersPerMonth = basicUsersPerMonth;
+    if (raw.basicUsersPerMonth == null)
+      set.basicUsersPerMonth = basicUsersPerMonth;
     if (raw.overheadFactor == null) set.overheadFactor = overheadFactor;
     if (raw.derivedMargin == null) set.derivedMargin = derivedMargin;
     if (needsHistoryFix) {

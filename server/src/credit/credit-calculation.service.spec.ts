@@ -71,7 +71,10 @@ describe('CreditCalculationService', () => {
             findOne: jest.fn().mockReturnValue({
               lean: () => ({
                 exec: () =>
-                  Promise.resolve({ avgPricePerCall: 0.01, serviceType: 'text' }),
+                  Promise.resolve({
+                    avgPricePerCall: 0.01,
+                    serviceType: 'text',
+                  }),
               }),
             }),
           },

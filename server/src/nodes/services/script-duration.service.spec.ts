@@ -24,9 +24,7 @@ describe('ScriptDurationService', () => {
           provide: ConfigService,
           useValue: {
             get: (key: string) =>
-              key === 'SCRIPT_REWRITE_OPENAI_MODEL'
-                ? 'gpt-4o-mini'
-                : undefined,
+              key === 'SCRIPT_REWRITE_OPENAI_MODEL' ? 'gpt-4o-mini' : undefined,
           },
         },
       ],

@@ -13,10 +13,7 @@ describe('tiktok-publish.util', () => {
     expect(isTikTokPhotoMedia(['https://x.com/a.png'])).toBe(true);
     expect(isTikTokPhotoMedia(['https://x.com/a.mp4'])).toBe(false);
     expect(
-      isTikTokPhotoMedia([
-        'https://x.com/a.png',
-        'https://x.com/b.jpg',
-      ]),
+      isTikTokPhotoMedia(['https://x.com/a.png', 'https://x.com/b.jpg']),
     ).toBe(true);
   });
 
@@ -38,12 +35,9 @@ describe('tiktok-publish.util', () => {
     ).toThrow(/90 characters max/);
 
     expect(() =>
-      assertTikTokPhotoCaptionForPublish(
-        'tiktok',
-        'x'.repeat(200),
-        null,
-        ['https://x.com/v.mp4'],
-      ),
+      assertTikTokPhotoCaptionForPublish('tiktok', 'x'.repeat(200), null, [
+        'https://x.com/v.mp4',
+      ]),
     ).not.toThrow();
   });
 });

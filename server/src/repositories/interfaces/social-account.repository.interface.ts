@@ -1,4 +1,8 @@
-import type { Prisma, SocialAccountStatus, SocialProvider } from '@prisma/client';
+import type {
+  Prisma,
+  SocialAccountStatus,
+  SocialProvider,
+} from '@prisma/client';
 import type { SocialAccountRecord } from '../../domain/users/social-account.types';
 
 export type UpsertSocialAccountInput = {

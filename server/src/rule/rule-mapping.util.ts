@@ -5,7 +5,9 @@ import {
 } from './schemas/rule.schema';
 
 /** Legacy rules without nested mapping: behave like text caption, no mapped media slot. */
-export function normalizedRuleChannelMapping(entry: Pick<ChannelEntry, 'contentMapping'>): {
+export function normalizedRuleChannelMapping(
+  entry: Pick<ChannelEntry, 'contentMapping'>,
+): {
   caption: CaptionMappingSource;
   media: ChannelMediaMapping | null;
 } {

@@ -21,6 +21,8 @@ export type RerunNodeBody = {
   updatedConfig?: Record<string, unknown>
   /** @deprecated Use `updatedConfig` instead. */
   updatedPrompt?: string
+  /** Follow-up instruction for this specific re-run, e.g. "make the background darker". */
+  message?: string
   previousOutputs?: Partial<ContentOutputs>
 }
 

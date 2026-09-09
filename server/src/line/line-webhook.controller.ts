@@ -68,7 +68,9 @@ export class LineWebhookController {
 
     const rawBody = req.rawBody;
     if (!Buffer.isBuffer(rawBody)) {
-      throw new BadRequestException('Raw body required for LINE signature verification');
+      throw new BadRequestException(
+        'Raw body required for LINE signature verification',
+      );
     }
     const signature = req.headers['x-line-signature'];
     const headerValue = Array.isArray(signature) ? signature[0] : signature;

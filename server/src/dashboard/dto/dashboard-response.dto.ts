@@ -54,4 +54,3 @@ export type DashboardResponseDto = {
   weeklyPerformance: DashboardWeeklyPerformanceDto;
   recentActivity: DashboardRecentActivityDto[];
 };
-

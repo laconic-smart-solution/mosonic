@@ -20,10 +20,9 @@ export function pipelineStartedNotification(args: {
   action?: NotificationAction;
 } {
   const { pipelineId, ruleRef, workflowRef, totalNodes } = args;
-  const href =
-    ruleRef?.trim()
-      ? `/workflow/${ruleRef.trim()}?pipelineId=${pipelineId}`
-      : `/pipelines`;
+  const href = ruleRef?.trim()
+    ? `/workflow/${ruleRef.trim()}?pipelineId=${pipelineId}`
+    : `/pipelines`;
   return {
     title: 'Pipeline started',
     message: `Running ${totalNodes} node${totalNodes === 1 ? '' : 's'}…`,
@@ -224,9 +223,7 @@ export function workflowCompletedNotification(args: {
   action?: NotificationAction;
 } {
   const { workflowId, ruleRef } = args;
-  const href = ruleRef?.trim()
-    ? `/workflow/${ruleRef.trim()}`
-    : '/workflows';
+  const href = ruleRef?.trim() ? `/workflow/${ruleRef.trim()}` : '/workflows';
   return {
     title: 'Workflow ready',
     message: 'AI generated your workflow structure.',
@@ -292,7 +289,10 @@ export function formatScheduleInstant(
     }).format(d);
     return formatted.replace(',', '');
   } catch {
-    return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
+    return d
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d{3}Z$/, ' UTC');
   }
 }
 
@@ -302,7 +302,7 @@ export function renderNotifyTemplate(
   vars: Record<string, string>,
 ): string {
   return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
-    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key]! : '';
+    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : '';
   });
 }
 

@@ -318,6 +318,8 @@ model Plan {
   isActive        Boolean  @default(true)
   description     String?
   features        String[] @default([])
+  /** Publishable channel keys this plan grants (facebook/instagram/youtube/linkedin/tiktok/rednote). */
+  allowedChannels String[] @default([])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -390,6 +392,34 @@ model ServiceRate {
 
   @@unique([serviceType, provider, model])
   @@map("service_rates")
+}
+
+model ImageTemplate {
+  imageTemplateId String   @id @default(uuid())
+  key             String   @unique
+  name            String
+  description     String
+  prompt          String
+  imageUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("image_templates")
+}
+
+model ImageDesignStyle {
+  imageDesignStyleId String   @id @default(uuid())
+  key                String   @unique
+  name               String
+  description        String
+  prompt             String
+  imageUrl           String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("image_design_styles")
 }
 
 model NodeCreditPrice {
@@ -506,19 +536,23 @@ model Workflow {
 }
 
 model WorkflowNode {
-  nodeId      String           @id @default(uuid())
-  workflowRef String
-  userId      String?
-  type        WorkflowNodeType
-  order       Int
-  isLocked    Boolean          @default(true)
-  userPrompt  String?
-  config      Json             @default("{}")
-  lane        String?
-  x           Float?
-  y           Float?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  nodeId             String           @id @default(uuid())
+  workflowRef        String
+  userId             String?
+  type               WorkflowNodeType
+  order              Int
+  isLocked           Boolean          @default(true)
+  userPrompt         String?
+  config             Json             @default("{}")
+  lane               String?
+  x                  Float?
+  y                  Float?
+  // True for a one-off node added via "Generate more" on the content page —
+  // never part of the reusable workflow template (excluded from the canvas
+  // and from future pipeline runs).
+  isGenerateMoreOnly Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   workflow Workflow @relation(fields: [workflowRef], references: [workflowId], onDelete: Cascade)
 
@@ -530,6 +564,9 @@ model WorkflowNode {
 model Rule {
   ruleId           String     @id @default(uuid())
   userId           String?
+  isSystem         Boolean    @default(false)
+  isTemplate       Boolean    @default(false)
+  templateCategory String?
   name             String
   brand            Json       @default("{}")
   audience         Json       @default("{}")
@@ -549,6 +586,7 @@ model Rule {
   @@index([name])
   @@index([status, updatedAt(sort: Desc)])
   @@index([userId, updatedAt(sort: Desc)])
+  @@index([isSystem, isTemplate, status])
   @@map("rules")
 }
 

@@ -307,7 +307,7 @@ export class NodeExecutor {
     if (!input.userId || !input.ruleId) {
       return null;
     }
-    const cfg = (input.node.config ?? {}) as WorkflowNodeConfig;
+    const cfg = input.node.config ?? {};
     const provider = this.providerFromConfig(cfg);
     const base: Pick<
       RecordCostDto,

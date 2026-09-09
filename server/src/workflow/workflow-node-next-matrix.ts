@@ -28,11 +28,7 @@ export const WORKFLOW_NEXT_MATRIX = {
     'translation',
     'merge',
   ],
-  video_generation: [
-    'video_generation',
-    'translation',
-    'merge',
-  ],
+  video_generation: ['video_generation', 'translation', 'merge'],
   summarization: [
     'summarization',
     'image_generation',
@@ -48,27 +44,27 @@ export const WORKFLOW_NEXT_MATRIX = {
     'merge',
   ],
   merge: [],
-} as const
+} as const;
 
 export const ENRICHMENT_TYPE_ORDER = [
   'transcription',
   'keyword_planner',
   'intelligence',
-] as const
+] as const;
 
 export const TRUNK_TAIL_AFTER_TEXT_ORDER = [
   'summarization',
   'translation',
   'image_generation',
   'video_generation',
-] as const
+] as const;
 
 export const LANE_NODE_ORDER = [
   'summarization',
   'translation',
   'image_generation',
   'video_generation',
-] as const
+] as const;
 
 export const WORKFLOW_TYPE_TO_CANVAS: Record<string, string> = {
   keyword_planner: 'keywords',
@@ -82,7 +78,7 @@ export const WORKFLOW_TYPE_TO_CANVAS: Record<string, string> = {
   adapt: 'adapt',
   merge: 'merge',
   intelligence: 'intelligence',
-}
+};
 
 export type PlusPopoverKey =
   | 'keywords'
@@ -95,20 +91,19 @@ export type PlusPopoverKey =
   | 'video'
   | 'summarization'
   | 'translation'
-  | 'merge'
+  | 'merge';
 
 export function canvasNextMatrix(): Record<
   PlusPopoverKey,
   readonly PlusPopoverKey[]
 > {
-  const out: Partial<Record<PlusPopoverKey, PlusPopoverKey[]>> = {}
+  const out: Partial<Record<PlusPopoverKey, PlusPopoverKey[]>> = {};
   for (const [fromWf, targets] of Object.entries(WORKFLOW_NEXT_MATRIX)) {
     const fromCanvas = (WORKFLOW_TYPE_TO_CANVAS[fromWf] ??
-      fromWf) as PlusPopoverKey
+      fromWf) as PlusPopoverKey;
     out[fromCanvas] = targets.map(
-      (t) =>
-        (WORKFLOW_TYPE_TO_CANVAS[t] ?? t) as PlusPopoverKey,
-    )
+      (t) => (WORKFLOW_TYPE_TO_CANVAS[t] ?? t) as PlusPopoverKey,
+    );
   }
-  return out as Record<PlusPopoverKey, readonly PlusPopoverKey[]>
+  return out as Record<PlusPopoverKey, readonly PlusPopoverKey[]>;
 }

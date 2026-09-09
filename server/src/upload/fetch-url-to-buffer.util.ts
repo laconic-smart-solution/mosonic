@@ -16,7 +16,8 @@ export async function fetchUrlToBuffer(
       );
     }
     const contentType =
-      response.headers.get('content-type')?.trim() || 'application/octet-stream';
+      response.headers.get('content-type')?.trim() ||
+      'application/octet-stream';
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!buffer.length) {
       throw new Error('Fetched URL returned empty body');

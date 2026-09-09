@@ -27,7 +27,9 @@ const LABEL_BY_ID = new Map(
 );
 
 const ID_BY_LABEL = new Map(
-  DISTRIBUTION_CHANNELS.map((c) => [c.label.trim().toLowerCase(), c.id] as const),
+  DISTRIBUTION_CHANNELS.map(
+    (c) => [c.label.trim().toLowerCase(), c.id] as const,
+  ),
 );
 
 export function normalizeChannelId(channel: string): string {
@@ -47,7 +49,9 @@ export function resolveDistributionChannelId(channel: string): string {
 
 export function channelLabel(channelId: string): string {
   const id = normalizeChannelId(channelId);
-  return LABEL_BY_ID.get(id) ?? (id ? id.charAt(0).toUpperCase() + id.slice(1) : id);
+  return (
+    LABEL_BY_ID.get(id) ?? (id ? id.charAt(0).toUpperCase() + id.slice(1) : id)
+  );
 }
 
 export function channelIdsToChannelEntries(

@@ -101,9 +101,10 @@ export class NewsTriggerProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('active')
-  onActive(job: Job<NewsTriggerGroupJobPayload | NewsTriggerManualJobPayload>): void {
-    const runId =
-      'runId' in job.data ? job.data.runId : 'n/a';
+  onActive(
+    job: Job<NewsTriggerGroupJobPayload | NewsTriggerManualJobPayload>,
+  ): void {
+    const runId = 'runId' in job.data ? job.data.runId : 'n/a';
     this.logger.log(
       `[NewsTrigger] worker active job=${job.name} id=${job.id} run=${runId}`,
     );
@@ -111,7 +112,9 @@ export class NewsTriggerProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(
-    job: Job<NewsTriggerGroupJobPayload | NewsTriggerManualJobPayload> | undefined,
+    job:
+      | Job<NewsTriggerGroupJobPayload | NewsTriggerManualJobPayload>
+      | undefined,
     error: Error,
   ): void {
     this.logger.error(
@@ -124,9 +127,7 @@ export class NewsTriggerProcessor extends WorkerHost {
     job: Job<NewsTriggerGroupJobPayload | NewsTriggerManualJobPayload>,
   ): Promise<void> {
     if (job.name === NEWS_TRIGGER_JOB_PROCESS_SINGLE) {
-      return this.processSingleRule(
-        job as Job<NewsTriggerManualJobPayload>,
-      );
+      return this.processSingleRule(job as Job<NewsTriggerManualJobPayload>);
     }
     return this.processNewsGroup(job as Job<NewsTriggerGroupJobPayload>);
   }
@@ -164,7 +165,9 @@ export class NewsTriggerProcessor extends WorkerHost {
         limit: 10,
       });
 
-      await this.logs.updateByRunId(runId, { articlesFetched: articles.length });
+      await this.logs.updateByRunId(runId, {
+        articlesFetched: articles.length,
+      });
 
       if (!articles.length) {
         this.logger.log(`[NewsTrigger] no articles for group=${groupKey}`);
@@ -372,11 +375,15 @@ export class NewsTriggerProcessor extends WorkerHost {
         limit: 10,
       });
 
-      await this.logs.updateByRunId(runId, { articlesFetched: articles.length });
+      await this.logs.updateByRunId(runId, {
+        articlesFetched: articles.length,
+      });
 
       if (!articles.length) {
         this.logger.log(`[NewsTrigger] manual: no articles for rule=${ruleId}`);
-        await this.finalizeManualRun(runId, ruleId, userId, { details: logDetails });
+        await this.finalizeManualRun(runId, ruleId, userId, {
+          details: logDetails,
+        });
         return;
       }
 
@@ -389,7 +396,9 @@ export class NewsTriggerProcessor extends WorkerHost {
       });
 
       if (!topArticles.length) {
-        await this.finalizeManualRun(runId, ruleId, userId, { details: logDetails });
+        await this.finalizeManualRun(runId, ruleId, userId, {
+          details: logDetails,
+        });
         return;
       }
 
@@ -440,7 +449,9 @@ export class NewsTriggerProcessor extends WorkerHost {
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await this.finalizeManualRun(runId, ruleId, userId, { errorMessage: msg });
+      await this.finalizeManualRun(runId, ruleId, userId, {
+        errorMessage: msg,
+      });
       this.logger.error(`[NewsTrigger] manual run=${runId} failed: ${msg}`);
       throw err;
     }
@@ -478,7 +489,10 @@ export class NewsTriggerProcessor extends WorkerHost {
       return;
     }
 
-    const summary = summarizeNewsTriggerLog(doc as unknown as NewsTriggerLogLike, ruleId);
+    const summary = summarizeNewsTriggerLog(
+      doc as unknown as NewsTriggerLogLike,
+      ruleId,
+    );
     if (summary.status === 'running') {
       this.logger.warn(
         `[NewsTrigger] finalizeManualRun still running run=${runId} — skip emit`,
@@ -508,8 +522,7 @@ export class NewsTriggerProcessor extends WorkerHost {
       return;
     }
 
-    const outcome =
-      summary.outcome === 'triggered' ? 'triggered' : 'skipped';
+    const outcome = summary.outcome === 'triggered' ? 'triggered' : 'skipped';
     const notif = newsRunCompletedNotification({
       runId: summary.runId,
       ruleRef: ruleId,
@@ -642,7 +655,7 @@ export class NewsTriggerProcessor extends WorkerHost {
       ...nt,
       lastTriggeredAt: new Date().toISOString(),
       totalTriggeredCount: Number(nt.totalTriggeredCount ?? 0) + 1,
-    } as Prisma.InputJsonValue);
+    });
   }
 
   private async releaseLockIfNeeded(

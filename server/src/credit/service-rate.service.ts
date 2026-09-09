@@ -40,7 +40,8 @@ export class ServiceRateService {
     }>,
   ) {
     const row = await this.serviceRates.updateById(serviceRateId, body);
-    if (!row) throw new NotFoundException(`Service rate ${serviceRateId} not found`);
+    if (!row)
+      throw new NotFoundException(`Service rate ${serviceRateId} not found`);
     return row;
   }
 

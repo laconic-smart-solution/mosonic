@@ -14,10 +14,7 @@ export async function publishRealtimeEventToRedis(
 ): Promise<void> {
   const client = new Redis(redisUrl, { maxRetriesPerRequest: null });
   try {
-    await client.publish(
-      REALTIME_EVENTS_CHANNEL,
-      JSON.stringify(envelope),
-    );
+    await client.publish(REALTIME_EVENTS_CHANNEL, JSON.stringify(envelope));
   } finally {
     await client.quit();
   }

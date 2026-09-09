@@ -67,7 +67,7 @@ export class RedNoteBrowserService {
       Object.defineProperty(navigator, 'languages', {
         get: () => ['zh-CN', 'zh', 'en'],
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       (window as any).chrome = { runtime: {} };
     });
   }
@@ -103,7 +103,10 @@ export class RedNoteBrowserService {
         '.side-bar .login-btn',
         '.login-btn',
       ].join(',');
-    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   loginTriggerSelector(): string {
@@ -133,7 +136,10 @@ export class RedNoteBrowserService {
     const raw =
       this.config.get<string>('REDNOTE_QR_CONTAINER_SELECTOR')?.trim() ||
       '.qrcode.force-light, .qrcode-container, .login-container .qrcode';
-    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   qrSelectors(): string[] {
@@ -147,7 +153,10 @@ export class RedNoteBrowserService {
     const raw =
       this.config.get<string>('REDNOTE_LOGGED_IN_SELECTOR')?.trim() ||
       '.creator-header, .user-info, [class*="avatar"]';
-    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
   /** Positive session signal on creator publish pages (only when authenticated). */
@@ -238,7 +247,10 @@ export class RedNoteBrowserService {
     return this.publishButtonHostSelector();
   }
 
-  async findFirst(page: Page, selectors: string[]): Promise<ElementHandle | null> {
+  async findFirst(
+    page: Page,
+    selectors: string[],
+  ): Promise<ElementHandle | null> {
     for (const sel of selectors) {
       try {
         const el = await page.$(sel);
@@ -504,7 +516,11 @@ export class RedNoteBrowserService {
             const rect = node.getBoundingClientRect();
             if (rect.width < 80 || rect.height < 80) return false;
             if (node instanceof HTMLImageElement) {
-              if (!node.src || node.naturalWidth < 80 || node.naturalHeight < 80) {
+              if (
+                !node.src ||
+                node.naturalWidth < 80 ||
+                node.naturalHeight < 80
+              ) {
                 return false;
               }
             }
@@ -596,7 +612,8 @@ export class RedNoteBrowserService {
           document.querySelector('.qrcode, .qrcode-container'),
         );
         const canvasCount = document.querySelectorAll('canvas').length;
-        const captcha = bodyText.includes('请通过验证') || bodyText.includes('验证');
+        const captcha =
+          bodyText.includes('请通过验证') || bodyText.includes('验证');
         return {
           title,
           bodyText,
@@ -777,8 +794,7 @@ export class RedNoteBrowserService {
   ): import('puppeteer').CookieParam[] {
     return cookies.map((c) => ({
       ...c,
-      domain:
-        c.domain && c.domain.length > 0 ? c.domain : '.xiaohongshu.com',
+      domain: c.domain && c.domain.length > 0 ? c.domain : '.xiaohongshu.com',
       path: c.path ?? '/',
     }));
   }
@@ -880,7 +896,9 @@ export class RedNoteBrowserService {
       document.documentElement.style.zoom = String(scale);
       document.body.style.zoom = String(scale);
     }, z);
-    this.logger.log(`RedNote: set page zoom=${z} so publish button fits in view`);
+    this.logger.log(
+      `RedNote: set page zoom=${z} so publish button fits in view`,
+    );
   }
 
   /**
@@ -908,9 +926,9 @@ export class RedNoteBrowserService {
           /processing video/i.test(text) ||
           /cover uploading/i.test(text);
 
-        const loadingEl = document.querySelector(
+        const loadingEl = document.querySelector<HTMLElement>(
           '.cover-plugin-preview .loading',
-        ) as HTMLElement | null;
+        );
         const coverBusy = Boolean(
           loadingEl && loadingEl.style?.display !== 'none',
         );
@@ -925,7 +943,7 @@ export class RedNoteBrowserService {
           hostDisabled,
           submitDisabledAttr: submitDisabledAttr ?? null,
           openShadow: Boolean(
-            (host as HTMLElement & { shadowRoot?: ShadowRoot | null } | null)
+            (host as (HTMLElement & { shadowRoot?: ShadowRoot | null }) | null)
               ?.shadowRoot,
           ),
         };
@@ -1360,8 +1378,8 @@ export class RedNoteBrowserService {
             });
             if (model?.content?.length >= 8) {
               const c = model.content;
-              const x = (c[0]! + c[2]! + c[4]! + c[6]!) / 4;
-              const y = (c[1]! + c[3]! + c[5]! + c[7]!) / 4;
+              const x = (c[0] + c[2] + c[4] + c[6]) / 4;
+              const y = (c[1] + c[3] + c[5] + c[7]) / 4;
               await page.mouse.click(x, y, { delay: 40 });
             }
           } catch {
@@ -1414,8 +1432,8 @@ export class RedNoteBrowserService {
         });
         if (model?.content?.length >= 8) {
           const c = model.content;
-          const x = (c[0]! + c[2]! + c[4]! + c[6]!) / 4;
-          const y = (c[1]! + c[3]! + c[5]! + c[7]!) / 4;
+          const x = (c[0] + c[2] + c[4] + c[6]) / 4;
+          const y = (c[1] + c[3] + c[5] + c[7]) / 4;
           await page.mouse.click(x, y, { delay: 40 });
         }
       } catch {
@@ -1466,7 +1484,9 @@ export class RedNoteBrowserService {
         return host?.getAttribute('submit-disabled') === 'true';
       });
       if (hostDisabled) {
-        this.logger.debug('RedNote: publish host still submit-disabled; retrying');
+        this.logger.debug(
+          'RedNote: publish host still submit-disabled; retrying',
+        );
         await new Promise((r) => setTimeout(r, 500));
         continue;
       }
@@ -1637,9 +1657,9 @@ export class RedNoteBrowserService {
         const root = (host as HTMLElement & { shadowRoot?: ShadowRoot | null })
           .shadowRoot;
         if (!root) return false;
-        const btn = root.querySelector(
+        const btn = root.querySelector<HTMLButtonElement>(
           'button, [role="button"]',
-        ) as HTMLButtonElement | null;
+        );
         if (!btn || btn.disabled) return false;
         btn.click();
         return true;
@@ -1704,7 +1724,10 @@ export class RedNoteBrowserService {
             const title = document.querySelector(sels.title);
             const body = document.querySelector(sels.body);
             if (!title || !body) return null;
-            if (!(title instanceof HTMLElement) || !(body instanceof HTMLElement)) {
+            if (
+              !(title instanceof HTMLElement) ||
+              !(body instanceof HTMLElement)
+            ) {
               return null;
             }
             const titleRect = title.getBoundingClientRect();
@@ -1713,7 +1736,7 @@ export class RedNoteBrowserService {
             // TipTap must be editable
             if (
               body.getAttribute('contenteditable') !== 'true' &&
-              !(body as HTMLElement).isContentEditable
+              !body.isContentEditable
             ) {
               return null;
             }
@@ -1784,7 +1807,7 @@ export class RedNoteBrowserService {
     // React controlled <input>: set via native value setter + input/change.
     await page.evaluate(
       (selector, next) => {
-        const input = document.querySelector(selector) as HTMLInputElement | null;
+        const input = document.querySelector<HTMLInputElement>(selector);
         if (!input) return;
         input.focus();
         const proto = Object.getOwnPropertyDescriptor(
@@ -1808,14 +1831,14 @@ export class RedNoteBrowserService {
 
     // Nudge React: blur → focus (same idea as a page re-render).
     await page.evaluate((selector) => {
-      const input = document.querySelector(selector) as HTMLInputElement | null;
+      const input = document.querySelector<HTMLInputElement>(selector);
       input?.blur();
     }, sel);
     await new Promise((r) => setTimeout(r, 200));
     await page.click(sel);
 
     const actual = await page.evaluate((selector) => {
-      const input = document.querySelector(selector) as HTMLInputElement | null;
+      const input = document.querySelector<HTMLInputElement>(selector);
       return (input?.value ?? '').trim();
     }, sel);
 
@@ -1870,7 +1893,7 @@ export class RedNoteBrowserService {
     if (afterCdp.length < Math.min(10, text.length)) {
       await page.evaluate(
         (selector, body) => {
-          const editor = document.querySelector(selector) as HTMLElement | null;
+          const editor = document.querySelector<HTMLElement>(selector);
           if (!editor) return;
           editor.focus();
           document.execCommand('selectAll', false);
@@ -1891,7 +1914,7 @@ export class RedNoteBrowserService {
 
     // Blur/focus nudge so creator SPA commits editor state (like a re-render).
     await page.evaluate((selector) => {
-      const editor = document.querySelector(selector) as HTMLElement | null;
+      const editor = document.querySelector<HTMLElement>(selector);
       editor?.blur();
     }, sel);
     await new Promise((r) => setTimeout(r, 250));
@@ -1902,7 +1925,7 @@ export class RedNoteBrowserService {
   async readBodyText(page: Page): Promise<string> {
     const sel = this.bodyEditorSelector();
     return page.evaluate((selector) => {
-      const el = document.querySelector(selector) as HTMLElement | null;
+      const el = document.querySelector<HTMLElement>(selector);
       return (el?.innerText ?? el?.textContent ?? '').trim();
     }, sel);
   }
@@ -1910,7 +1933,7 @@ export class RedNoteBrowserService {
   async readTitleText(page: Page): Promise<string> {
     const sel = this.titleInputSelector();
     return page.evaluate((selector) => {
-      const el = document.querySelector(selector) as HTMLInputElement | null;
+      const el = document.querySelector<HTMLInputElement>(selector);
       return (el?.value ?? '').trim();
     }, sel);
   }
@@ -2008,7 +2031,8 @@ export class RedNoteBrowserService {
           }
           const rect = img.getBoundingClientRect();
           if (rect.width < 100 || rect.height < 100) continue;
-          if (!img.src || img.naturalWidth < 80 || img.naturalHeight < 80) continue;
+          if (!img.src || img.naturalWidth < 80 || img.naturalHeight < 80)
+            continue;
 
           if (img.src.startsWith('data:image')) {
             const comma = img.src.indexOf(',');
@@ -2047,7 +2071,8 @@ export class RedNoteBrowserService {
           encoding: 'base64',
           type: 'png',
         });
-        if (typeof buf === 'string' && this.isScannableQrBase64(buf)) return buf;
+        if (typeof buf === 'string' && this.isScannableQrBase64(buf))
+          return buf;
       } catch (err) {
         this.logger.warn(
           `QR img screenshot failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -2067,7 +2092,8 @@ export class RedNoteBrowserService {
             encoding: 'base64',
             type: 'png',
           });
-          if (typeof buf === 'string' && this.isScannableQrBase64(buf)) return buf;
+          if (typeof buf === 'string' && this.isScannableQrBase64(buf))
+            return buf;
         } else {
           // Prefer an img inside the container
           const inner = await boxEl.$('img, canvas');
@@ -2077,7 +2103,8 @@ export class RedNoteBrowserService {
               type: 'png',
             });
             await inner.dispose().catch(() => undefined);
-            if (typeof buf === 'string' && this.isScannableQrBase64(buf)) return buf;
+            if (typeof buf === 'string' && this.isScannableQrBase64(buf))
+              return buf;
           }
         }
       } catch (err) {

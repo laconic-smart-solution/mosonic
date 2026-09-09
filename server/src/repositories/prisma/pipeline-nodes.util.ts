@@ -10,8 +10,9 @@ export function parsePipelineNodes(json: unknown): PipelineNodeExecution[] {
 }
 
 export function parsePipelineGraph(json: unknown): PipelineGraphSnapshot {
-  if (!json || typeof json !== 'object') return { edges: [], lanes: [], layout: {} };
-  return json as PipelineGraphSnapshot;
+  if (!json || typeof json !== 'object')
+    return { edges: [], lanes: [], layout: {} };
+  return json;
 }
 
 export type PipelineMetadata = {
@@ -25,7 +26,7 @@ export type PipelineMetadata = {
 
 export function parsePipelineMetadata(json: unknown): PipelineMetadata {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return {};
-  return json as PipelineMetadata;
+  return json;
 }
 
 export function serializePipelineNodes(
@@ -39,9 +40,7 @@ export function updatePipelineNode(
   nodeId: string,
   patch: Partial<PipelineNodeExecution>,
 ): PipelineNodeExecution[] {
-  return nodes.map((n) =>
-    n.nodeId === nodeId ? { ...n, ...patch } : n,
-  );
+  return nodes.map((n) => (n.nodeId === nodeId ? { ...n, ...patch } : n));
 }
 
 export function incrementNodeRetry(
@@ -73,9 +72,7 @@ export function applyNodeStatusUpdate(
   let next = updatePipelineNode(nodes, nodeId, {
     status,
     executedAt: new Date().toISOString(),
-    ...(output !== undefined
-      ? { output: JSON.stringify(output) }
-      : {}),
+    ...(output !== undefined ? { output: JSON.stringify(output) } : {}),
   });
   if (status === 'failed') {
     next = incrementNodeRetry(next, nodeId);

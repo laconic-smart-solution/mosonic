@@ -21,6 +21,7 @@ import {
 } from '../repositories/tokens';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { PlanChannelAccessService } from './plan-channel-access.service';
 import { DEFAULT_PLANS } from './plan-defaults';
 
 @Injectable()
@@ -35,6 +36,7 @@ export class PlanService implements OnModuleInit {
     @Inject(PLAN_PURCHASE_REPOSITORY)
     private readonly planPurchases: IPlanPurchaseRepository,
     private readonly calculation: CreditCalculationService,
+    private readonly channelAccess: PlanChannelAccessService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -181,15 +183,32 @@ export class PlanService implements OnModuleInit {
     const credits = await this.getCreditsForPlan(plan);
     const billingPeriod = currentBillingPeriod();
 
+    const previousUserPlan = await this.userPlans.findActiveByUserId(userId);
+    const isPlanChange = previousUserPlan?.planId !== planId;
+
     await this.userPlans.suspendOtherActivePlans(userId, planId);
 
-    return this.userPlans.upsertActivePlan({
+    const result = await this.userPlans.upsertActivePlan({
       userId,
       planId,
       creditsPerMonth: credits,
       billingPeriod,
       creditsRemaining: credits,
     });
+
+    // A real plan change (not a same-plan renewal) may drop channels the
+    // user's current connections rely on — disconnect them immediately.
+    if (isPlanChange) {
+      await this.channelAccess
+        .enforceChannelAccessForNewPlan(userId, planId)
+        .catch((err: unknown) => {
+          this.logger.warn(
+            `Channel access enforcement failed for user ${userId} on plan change to ${planId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
+
+    return result;
   }
 
   async assignDefaultPlan(userId: string): Promise<UserPlanRecord | null> {
@@ -235,8 +254,9 @@ export class PlanService implements OnModuleInit {
       if (!plan) continue;
 
       if (plan.priceThb > 0) {
-        const selfServe =
-          await this.planPurchases.hasPurchaseHistory(up.userId);
+        const selfServe = await this.planPurchases.hasPurchaseHistory(
+          up.userId,
+        );
         if (selfServe) {
           const paid = await this.planPurchases.findActiveForUserAndPeriod(
             up.userId,

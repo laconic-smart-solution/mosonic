@@ -35,7 +35,9 @@ export class CampaignAutonomyService {
     contentId: string;
     uploadId: string;
   }): Promise<void> {
-    if (this.config.get<string>('CAMPAIGN_AUTONOMY_ENABLED', 'false') !== 'true') {
+    if (
+      this.config.get<string>('CAMPAIGN_AUTONOMY_ENABLED', 'false') !== 'true'
+    ) {
       return;
     }
     if (args.pipeline.metadata?.source !== 'scheduler') {
@@ -53,12 +55,16 @@ export class CampaignAutonomyService {
       args.contentId,
     );
     if (blockReason) {
-      this.events.emitToRule(args.pipeline.ruleRef, 'campaign:autonomous_blocked', {
-        ruleRef: args.pipeline.ruleRef,
-        pipelineId: args.pipeline.pipelineId,
-        contentId: args.contentId,
-        reason: blockReason,
-      });
+      this.events.emitToRule(
+        args.pipeline.ruleRef,
+        'campaign:autonomous_blocked',
+        {
+          ruleRef: args.pipeline.ruleRef,
+          pipelineId: args.pipeline.pipelineId,
+          contentId: args.contentId,
+          reason: blockReason,
+        },
+      );
       return;
     }
 
@@ -71,7 +77,11 @@ export class CampaignAutonomyService {
         auth,
       );
       if (content.status !== ContentStatus.Approved) {
-        if (!allRequiredStepsApproved(content.approval as unknown as ContentApprovalState | undefined)) {
+        if (
+          !allRequiredStepsApproved(
+            content.approval as unknown as ContentApprovalState | undefined,
+          )
+        ) {
           this.emitBlocked(args, 'Approval steps incomplete');
           return;
         }
@@ -102,12 +112,16 @@ export class CampaignAutonomyService {
         auth,
       );
 
-      this.events.emitToRule(args.pipeline.ruleRef, 'campaign:autonomous_published', {
-        ruleRef: args.pipeline.ruleRef,
-        pipelineId: args.pipeline.pipelineId,
-        contentId: args.contentId,
-        uploadId: args.uploadId,
-      });
+      this.events.emitToRule(
+        args.pipeline.ruleRef,
+        'campaign:autonomous_published',
+        {
+          ruleRef: args.pipeline.ruleRef,
+          pipelineId: args.pipeline.pipelineId,
+          contentId: args.contentId,
+          uploadId: args.uploadId,
+        },
+      );
     } catch (err) {
       this.logger.warn(
         `Autonomy publish failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -176,11 +190,15 @@ export class CampaignAutonomyService {
     args: { pipeline: PipelineDocument; contentId: string },
     reason: string,
   ): void {
-    this.events.emitToRule(args.pipeline.ruleRef, 'campaign:autonomous_blocked', {
-      ruleRef: args.pipeline.ruleRef,
-      pipelineId: args.pipeline.pipelineId,
-      contentId: args.contentId,
-      reason,
-    });
+    this.events.emitToRule(
+      args.pipeline.ruleRef,
+      'campaign:autonomous_blocked',
+      {
+        ruleRef: args.pipeline.ruleRef,
+        pipelineId: args.pipeline.pipelineId,
+        contentId: args.contentId,
+        reason,
+      },
+    );
   }
 }

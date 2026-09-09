@@ -20,8 +20,7 @@ export class PaymentWebhookService {
       return;
     }
 
-    const handledByTopup =
-      await this.creditService.handlePaymentWebhook(dto);
+    const handledByTopup = await this.creditService.handlePaymentWebhook(dto);
     if (handledByTopup) {
       return;
     }

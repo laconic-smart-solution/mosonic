@@ -13,12 +13,18 @@ export interface WorkflowGraphEdge {
 export function parseWorkflowEdges(json: unknown): WorkflowGraphEdge[] {
   if (!Array.isArray(json)) return [];
   return json
-    .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+    .filter(
+      (e): e is Record<string, unknown> => typeof e === 'object' && e !== null,
+    )
     .map((e) => ({
       from: String(e.from ?? ''),
       to: String(e.to ?? ''),
-      ...(typeof e.sourceHandle === 'string' ? { sourceHandle: e.sourceHandle } : {}),
-      ...(typeof e.targetHandle === 'string' ? { targetHandle: e.targetHandle } : {}),
+      ...(typeof e.sourceHandle === 'string'
+        ? { sourceHandle: e.sourceHandle }
+        : {}),
+      ...(typeof e.targetHandle === 'string'
+        ? { targetHandle: e.targetHandle }
+        : {}),
     }))
     .filter((e) => e.from && e.to);
 }
@@ -95,9 +101,10 @@ export function getAncestors(
 }
 
 /** Drop nodes that do not participate in any edge when the graph is non-trivial. */
-export function stripDisconnectedNodes<
-  T extends { nodeId: string },
->(nodes: T[], edges: WorkflowGraphEdge[]): T[] {
+export function stripDisconnectedNodes<T extends { nodeId: string }>(
+  nodes: T[],
+  edges: WorkflowGraphEdge[],
+): T[] {
   if (edges.length === 0 || nodes.length <= 1) {
     return nodes;
   }
@@ -249,7 +256,7 @@ function assertWeaklyConnected(
     adj.get(edge.to)!.add(edge.from);
   }
   const visited = new Set<string>();
-  const stack = [nodeIds[0]!];
+  const stack = [nodeIds[0]];
   while (stack.length > 0) {
     const id = stack.pop()!;
     if (visited.has(id)) {
@@ -328,8 +335,8 @@ export function validateWorkflowGraph(
         'A branch workflow requires exactly one merge node',
       );
     }
-    const branchId = branchNodes[0]!.nodeId;
-    const mergeId = mergeNodes[0]!.nodeId;
+    const branchId = branchNodes[0].nodeId;
+    const mergeId = mergeNodes[0].nodeId;
     const reachableFromBranch = new Set<string>([branchId]);
     let frontier = [branchId];
     let foundMerge = false;
@@ -356,10 +363,7 @@ export function validateWorkflowGraph(
   }
 
   if (edges.length === 0 && nodes.length > 1) {
-    assertWeaklyConnected(
-      [...nodeIds],
-      effectiveEdges,
-    );
+    assertWeaklyConnected([...nodeIds], effectiveEdges);
   }
 
   assertIntelligenceBeforeText(nodes, effectiveEdges);

@@ -39,15 +39,60 @@ const DEFAULT_FIXED_COSTS = [
 ];
 
 const DEFAULT_SERVICE_RATES = [
-  { serviceType: 'text' as const, provider: 'openai', model: 'gpt-4o', avgPricePerCall: 0.01 },
-  { serviceType: 'text' as const, provider: 'openai', model: 'gpt-4o-mini', avgPricePerCall: 0.002 },
-  { serviceType: 'text' as const, provider: 'openai', model: 'gpt-4.1', avgPricePerCall: 0.012 },
-  { serviceType: 'image' as const, provider: 'openai', model: 'dall-e-3', pricePerImage: 0.04 },
-  { serviceType: 'image' as const, provider: 'ideogram', model: 'ideogram-3', pricePerImage: 0.06 },
-  { serviceType: 'video' as const, provider: 'openai', model: 'sora', pricePerSecond: 0.06 },
-  { serviceType: 'video' as const, provider: 'heygen', model: 'heygen-av3', pricePerSecond: 0.0167 },
-  { serviceType: 'video' as const, provider: 'heygen', model: 'heygen-av4', pricePerSecond: 0.02 },
-  { serviceType: 'video' as const, provider: 'runway', model: 'runway-gen4', pricePerSecond: 0.025 },
+  {
+    serviceType: 'text' as const,
+    provider: 'openai',
+    model: 'gpt-4o',
+    avgPricePerCall: 0.01,
+  },
+  {
+    serviceType: 'text' as const,
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+    avgPricePerCall: 0.002,
+  },
+  {
+    serviceType: 'text' as const,
+    provider: 'openai',
+    model: 'gpt-4.1',
+    avgPricePerCall: 0.012,
+  },
+  {
+    serviceType: 'image' as const,
+    provider: 'openai',
+    model: 'dall-e-3',
+    pricePerImage: 0.04,
+  },
+  {
+    serviceType: 'image' as const,
+    provider: 'ideogram',
+    model: 'ideogram-3',
+    pricePerImage: 0.06,
+  },
+  {
+    serviceType: 'video' as const,
+    provider: 'openai',
+    model: 'sora',
+    pricePerSecond: 0.06,
+  },
+  {
+    serviceType: 'video' as const,
+    provider: 'heygen',
+    model: 'heygen-av3',
+    pricePerSecond: 0.0167,
+  },
+  {
+    serviceType: 'video' as const,
+    provider: 'heygen',
+    model: 'heygen-av4',
+    pricePerSecond: 0.02,
+  },
+  {
+    serviceType: 'video' as const,
+    provider: 'runway',
+    model: 'runway-gen4',
+    pricePerSecond: 0.025,
+  },
 ];
 
 @Module({
@@ -125,7 +170,12 @@ export class CreditModule implements OnModuleInit {
           return {
             serviceType: 'video' as const,
             provider: op.provider,
-            model: op.provider === 'heygen' ? 'heygen-av3' : op.provider === 'runway' ? 'runway-gen4' : 'sora',
+            model:
+              op.provider === 'heygen'
+                ? 'heygen-av3'
+                : op.provider === 'runway'
+                  ? 'runway-gen4'
+                  : 'sora',
             pricePerSecond: op.costUsd / 30,
             isActive: true,
           };

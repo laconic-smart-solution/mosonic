@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Inject,
   Injectable,
@@ -7,12 +8,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { UserRole } from '../domain/users/user.types';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { buildSuggestionUpdateDto } from './rule-suggestion-field-patch.util';
 import { randomUUID } from 'node:crypto';
 import { EventsService } from '../events/events.service';
 import { mergeTenancyWhere } from '../repositories/prisma/prisma.util';
-import type { IRuleRepository, RuleRecord } from '../repositories/interfaces/rule.repository.interface';
+import type {
+  IRuleRepository,
+  RuleRecord,
+} from '../repositories/interfaces/rule.repository.interface';
 import { RULE_REPOSITORY } from '../repositories/tokens';
 import type { ExtractRuleResponseDto } from './dto/extract-rule.dto';
 import type { RuleExtractRequest } from './extract-request.types';
@@ -167,7 +172,7 @@ export class RuleService {
                 ? `structured://${ruleId}`
                 : `inline://${now.getTime()}`,
       },
-      intake: args.intake ? (args.intake as Prisma.InputJsonValue) : undefined,
+      intake: args.intake ? args.intake : undefined,
       status: RuleStatus.Processing,
       versions: [],
     });
@@ -225,6 +230,14 @@ export class RuleService {
     }
   }
 
+  async listSystemTemplates(category?: string): Promise<RuleRecord[]> {
+    return this.rules.findSystemTemplates(category);
+  }
+
+  async listTemplates(auth: TenancyAuth, category?: string): Promise<RuleRecord[]> {
+    return this.rules.listTemplates(auth, category);
+  }
+
   async getRuleById(ruleId: string, auth: TenancyAuth): Promise<RuleRecord> {
     const rule = await this.rules.findById(ruleId, auth);
     if (!rule) {
@@ -259,8 +272,14 @@ export class RuleService {
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
+    }
     const dto = buildSuggestionUpdateDto(
-      existing as unknown as Pick<RuleDocument, 'brand' | 'campaign' | 'channels'>,
+      existing as unknown as Pick<
+        RuleDocument,
+        'brand' | 'campaign' | 'channels'
+      >,
       fieldPath,
       suggestedValue,
     );
@@ -275,6 +294,9 @@ export class RuleService {
     const existing = await this.rules.findById(ruleId, auth);
     if (!existing) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
     }
 
     const data: Prisma.RuleUpdateInput = {};
@@ -292,7 +314,7 @@ export class RuleService {
 
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.brand !== undefined) {
-      data.brand = { ...brand, ...dto.brand } as Prisma.InputJsonValue;
+      data.brand = { ...brand, ...dto.brand };
     }
     if (dto.audience !== undefined) {
       data.audience = {
@@ -312,15 +334,14 @@ export class RuleService {
           dto.campaign.duration !== undefined
             ? {
                 startDate:
-                  dto.campaign.duration.startDate ?? campaign.duration?.startDate,
+                  dto.campaign.duration.startDate ??
+                  campaign.duration?.startDate,
                 endDate:
                   dto.campaign.duration.endDate ?? campaign.duration?.endDate,
               }
             : campaign.duration,
       };
-      data.campaign = this.campaignFromDto(
-        mergedCampaign as CampaignDto,
-      ) as Prisma.InputJsonValue;
+      data.campaign = this.campaignFromDto(mergedCampaign as CampaignDto);
     }
     if (dto.channels !== undefined) {
       data.channels = dto.channels as unknown as Prisma.InputJsonValue;
@@ -357,15 +378,24 @@ export class RuleService {
     dto: ReplaceRuleDto,
     auth: TenancyAuth,
   ): Promise<RuleRecord> {
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot modify a system rule template');
+    }
+
     const updated = await this.rules.updateById(
       ruleId,
       {
         name: dto.name,
         brand: dto.brand as unknown as Prisma.InputJsonValue,
         audience: dto.audience as unknown as Prisma.InputJsonValue,
-        campaign: this.campaignFromDto(dto.campaign) as unknown as Prisma.InputJsonValue,
+        campaign: this.campaignFromDto(dto.campaign),
         channels: dto.channels as unknown as Prisma.InputJsonValue,
-        contentGuidelines: dto.contentGuidelines as unknown as Prisma.InputJsonValue,
+        contentGuidelines:
+          dto.contentGuidelines as unknown as Prisma.InputJsonValue,
       },
       auth,
     );
@@ -373,6 +403,19 @@ export class RuleService {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
     return updated;
+  }
+
+  async deleteRule(ruleId: string, auth: TenancyAuth): Promise<void> {
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    if (existing.isSystem && auth.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Cannot delete a system rule template');
+    }
+    if (this.rules.deleteById) {
+      await this.rules.deleteById(ruleId, auth);
+    }
   }
 
   async findPage(
@@ -394,7 +437,7 @@ export class RuleService {
       filter.name = { contains: nameFilter, mode: 'insensitive' };
     }
     if (dto.filter?.status !== undefined) {
-      filter.status = dto.filter.status as Prisma.EnumRuleStatusFilter['equals'];
+      filter.status = dto.filter.status;
     } else {
       filter.status = { not: 'failed' };
     }
@@ -453,7 +496,9 @@ export class RuleService {
       const intakeContext = args.intake
         ? formatIntakeForContext(args.intake)
         : '';
-      const payloadInput = [intakeContext, userText].filter(Boolean).join('\n\n');
+      const payloadInput = [intakeContext, userText]
+        .filter(Boolean)
+        .join('\n\n');
 
       const payload = await this.preprocessing.resolvePayload({
         userText: payloadInput,
@@ -515,18 +560,18 @@ export class RuleService {
         ruleId,
         {
           name: extracted.name,
-          brand: extracted.brand as Prisma.InputJsonValue,
-          audience: extracted.audience as Prisma.InputJsonValue,
+          brand: extracted.brand,
+          audience: extracted.audience,
           campaign: {
             ...extracted.campaign,
             duration: {
               startDate: new Date(extracted.campaign.duration.startDate),
               endDate: new Date(extracted.campaign.duration.endDate),
             },
-          } as Prisma.InputJsonValue,
-          channels: extracted.channels as Prisma.InputJsonValue,
-          contentGuidelines: extracted.contentGuidelines as Prisma.InputJsonValue,
-          intake: args.intake ? (args.intake as Prisma.InputJsonValue) : undefined,
+          },
+          channels: extracted.channels,
+          contentGuidelines: extracted.contentGuidelines,
+          intake: args.intake ? args.intake : undefined,
           status: 'active',
         },
         {
@@ -542,11 +587,7 @@ export class RuleService {
       this.events.emitToRule(ruleId, 'rule:completed', { ruleId });
     } catch (error) {
       this.logger.error(`Rule extraction failed for ${ruleId}`, error as Error);
-      await this.rules.updateById(
-        ruleId,
-        { status: 'failed' },
-        auth,
-      );
+      await this.rules.updateById(ruleId, { status: 'failed' }, auth);
       const message =
         error instanceof BadRequestException
           ? (httpExceptionMessage(error) ?? 'Rule generation failed')
@@ -604,7 +645,7 @@ export class RuleService {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
     return this.toNewsTriggerResponse(
-      rule.newsTrigger as unknown as NewsTriggerConfig | undefined,
+      rule.newsTrigger as NewsTriggerConfig | undefined,
     );
   }
 

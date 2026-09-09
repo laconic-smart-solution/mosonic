@@ -8,6 +8,9 @@ export interface IPlanRepository {
   findAllSortedByPrice(): Promise<PlanRecord[]>;
   findManyByPlanIds(planIds: string[]): Promise<PlanRecord[]>;
   create(data: Prisma.PlanCreateInput): Promise<PlanRecord>;
-  update(planId: string, data: Prisma.PlanUpdateInput): Promise<PlanRecord | null>;
+  update(
+    planId: string,
+    data: Prisma.PlanUpdateInput,
+  ): Promise<PlanRecord | null>;
   countActiveUsersByPlan(): Promise<Map<string, number>>;
 }

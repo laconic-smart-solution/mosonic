@@ -26,15 +26,11 @@ describe('coerceOpenAiImageSize', () => {
   });
 
   it('maps legacy tall DALL·E 3 size to gpt-image-1 portrait', () => {
-    expect(coerceOpenAiImageSize('1024x1792', 'gpt-image-1')).toBe(
-      '1024x1536',
-    );
+    expect(coerceOpenAiImageSize('1024x1792', 'gpt-image-1')).toBe('1024x1536');
   });
 
   it('preserves valid gpt-style sizes', () => {
-    expect(coerceOpenAiImageSize('1024x1536', 'gpt-image-1')).toBe(
-      '1024x1536',
-    );
+    expect(coerceOpenAiImageSize('1024x1536', 'gpt-image-1')).toBe('1024x1536');
     expect(coerceOpenAiImageSize('auto', 'gpt-image-1')).toBe('auto');
   });
 });

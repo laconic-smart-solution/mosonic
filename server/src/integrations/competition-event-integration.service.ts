@@ -26,7 +26,10 @@ import type {
 } from './dto/competition-event-integration.dto';
 import { PIPELINE_REPOSITORY } from '../repositories/tokens';
 import type { IPipelineRepository } from '../repositories/interfaces/pipeline.repository.interface';
-import { CONTENT_REPOSITORY, WORKFLOW_REPOSITORY } from '../repositories/tokens';
+import {
+  CONTENT_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+} from '../repositories/tokens';
 import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
 import type { IWorkflowRepository } from '../repositories/interfaces/workflow.repository.interface';
 import { OrchestrationService } from '../orchestration/orchestration.service';
@@ -116,8 +119,7 @@ export class CompetitionEventIntegrationService {
 
     const pipeline = await this.pipelines.findById(doc.pipelineRef, auth);
     const externalRef =
-      this.readExternalRef(pipeline?.metadata) ??
-      `unknown/${normalizedId}`;
+      this.readExternalRef(pipeline?.metadata) ?? `unknown/${normalizedId}`;
 
     await this.pipelines.updateById(
       doc.pipelineRef,
@@ -223,7 +225,10 @@ export class CompetitionEventIntegrationService {
 
     const content = await this.contents.findLatestByPipeline(id, auth);
     const merged = content
-      ? { ...this.asRecord(content.outputs), ...this.asRecord(content.userEdits) }
+      ? {
+          ...this.asRecord(content.outputs),
+          ...this.asRecord(content.userEdits),
+        }
       : {};
     const text = readTrimmed(merged.text);
     const workflowImageUrl = readTrimmed(merged.image);
@@ -289,7 +294,10 @@ export class CompetitionEventIntegrationService {
       return null;
     }
 
-    const bundleJson = this.resolveBundleJson(content.outputs, content.userEdits);
+    const bundleJson = this.resolveBundleJson(
+      content.outputs,
+      content.userEdits,
+    );
     if (!bundleJson) {
       return null;
     }
@@ -319,7 +327,9 @@ export class CompetitionEventIntegrationService {
     try {
       JSON.parse(json);
     } catch {
-      throw new BadRequestException('LLM returned invalid JSON for event bundle');
+      throw new BadRequestException(
+        'LLM returned invalid JSON for event bundle',
+      );
     }
     return json;
   }
@@ -330,7 +340,12 @@ export class CompetitionEventIntegrationService {
     userPrompt: string;
     bundleJson: string;
     payload?: Record<string, unknown>;
-  }): Promise<Omit<GenerateCompetitionEventContentResponseDto, 'externalRef' | 'bundleJson' | 'reusedExisting'>> {
+  }): Promise<
+    Omit<
+      GenerateCompetitionEventContentResponseDto,
+      'externalRef' | 'bundleJson' | 'reusedExisting'
+    >
+  > {
     const ruleId = randomUUID();
     const workflowId = randomUUID();
     const pipelineId = randomUUID();
@@ -424,7 +439,7 @@ export class CompetitionEventIntegrationService {
             nodePromptOverrides: {},
             createdAt: new Date(),
           },
-        ] as unknown as Prisma.InputJsonValue,
+        ],
       },
     });
 
@@ -440,7 +455,10 @@ export class CompetitionEventIntegrationService {
     };
   }
 
-  private resolveBundleJson(outputs: unknown, userEdits: unknown): string | null {
+  private resolveBundleJson(
+    outputs: unknown,
+    userEdits: unknown,
+  ): string | null {
     const merged = { ...this.asRecord(outputs), ...this.asRecord(userEdits) };
     const text = merged.text;
     return typeof text === 'string' && text.trim() ? text.trim() : null;

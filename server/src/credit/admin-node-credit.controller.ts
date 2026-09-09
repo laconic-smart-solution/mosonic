@@ -25,7 +25,9 @@ const bodyPipe = new ValidationPipe({
 @ApiTags('Admin')
 @ApiBearerAuth('bearer')
 export class AdminNodeCreditController {
-  constructor(private readonly nodeCreditPriceService: NodeCreditPriceService) {}
+  constructor(
+    private readonly nodeCreditPriceService: NodeCreditPriceService,
+  ) {}
 
   @Get()
   list() {

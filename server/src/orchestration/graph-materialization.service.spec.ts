@@ -6,9 +6,9 @@ import {
 } from './graph-materialization.service';
 
 describe('GraphMaterializationService', () => {
-  const service = new GraphMaterializationService(
-    { get: (_key: string, def?: unknown) => def } as ConfigService,
-  );
+  const service = new GraphMaterializationService({
+    get: (_key: string, def?: unknown) => def,
+  } as ConfigService);
 
   const rule = {
     channels: [
@@ -42,7 +42,9 @@ describe('GraphMaterializationService', () => {
 
   it('materializes wizard_channels branch using explicit channel list', () => {
     const sparseRule = {
-      channels: [{ channel: 'linkedin', priority: 'low', contentStyle: 'short' }],
+      channels: [
+        { channel: 'linkedin', priority: 'low', contentStyle: 'short' },
+      ],
     } as never;
 
     const nodes = [
@@ -85,9 +87,9 @@ describe('GraphMaterializationService', () => {
     ];
     const out = service.materialize(nodes, edges, sparseRule, 1);
     expect(out.lanes.sort()).toEqual(['facebook', 'instagram']);
-    expect(out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
-      2,
-    );
+    expect(
+      out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt),
+    ).toHaveLength(2);
   });
 
   it('materializes branch into per-channel adapt lanes', () => {
@@ -139,9 +141,9 @@ describe('GraphMaterializationService', () => {
     expect(out.nodes.some((n) => n.type === WorkflowNodeType.Branch)).toBe(
       false,
     );
-    expect(out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
-      2,
-    );
+    expect(
+      out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt),
+    ).toHaveLength(2);
     expect(out.nodes.some((n) => n.type === WorkflowNodeType.Merge)).toBe(true);
     const instagramAdapt = out.nodes.find(
       (n) => n.lane === 'instagram' && n.type === WorkflowNodeType.Adapt,
@@ -201,6 +203,14 @@ describe('GraphMaterializationService', () => {
     expect(images.map((n) => n.lane).sort()).toEqual(['facebook', 'instagram']);
     expect(images.some((n) => n.nodeId === 'image__instagram')).toBe(true);
     expect(images.some((n) => n.nodeId === 'image__facebook')).toBe(true);
+    const instagramImage = images.find((n) => n.lane === 'instagram');
+    expect(String(instagramImage?.config.channel).toLowerCase()).toBe(
+      'instagram',
+    );
+    const facebookImage = images.find((n) => n.lane === 'facebook');
+    expect(String(facebookImage?.config.channel).toLowerCase()).toBe(
+      'facebook',
+    );
   });
 
   it('materializes per-lane adapt templates when each has laneId', () => {
@@ -410,9 +420,9 @@ describe('GraphMaterializationService', () => {
       'facebook',
       'instagram',
     ]);
-    expect(out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
-      0,
-    );
+    expect(
+      out.nodes.filter((n) => n.type === WorkflowNodeType.Adapt),
+    ).toHaveLength(0);
   });
 
   it('does not materialize summarization when multiple unassigned templates exist', () => {
@@ -530,7 +540,8 @@ describe('GraphMaterializationService', () => {
     ).toBe(true);
     expect(
       out.nodes.some(
-        (n) => n.type === WorkflowNodeType.Translation && n.lane === 'instagram',
+        (n) =>
+          n.type === WorkflowNodeType.Translation && n.lane === 'instagram',
       ),
     ).toBe(false);
   });
@@ -540,7 +551,11 @@ describe('GraphMaterializationService', () => {
       channels: [
         { channel: 'Instagram', priority: 'high', contentStyle: 'visual' },
         { channel: 'Facebook', priority: 'medium', contentStyle: 'story' },
-        { channel: 'LinkedIn', priority: 'medium', contentStyle: 'professional' },
+        {
+          channel: 'LinkedIn',
+          priority: 'medium',
+          contentStyle: 'professional',
+        },
         { channel: 'Twitter / X', priority: 'medium', contentStyle: 'short' },
       ],
     } as never;

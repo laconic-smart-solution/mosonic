@@ -5,7 +5,9 @@ export type ZernioPresignResult = {
   expires?: string;
 };
 
-export function normalizePresignResponse(data: unknown): ZernioPresignResult | null {
+export function normalizePresignResponse(
+  data: unknown,
+): ZernioPresignResult | null {
   if (!data || typeof data !== 'object') return null;
   const o = data as Record<string, unknown>;
   const uploadUrl = pickString(o.uploadUrl ?? o.upload_url);
@@ -61,7 +63,8 @@ export function resolvePresignMime(
   contentTypeHeader: string | null | undefined,
   fileName: string,
 ): string {
-  const raw = (contentTypeHeader ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  const raw =
+    (contentTypeHeader ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
   if (
     raw &&
     raw !== 'application/octet-stream' &&
@@ -128,7 +131,12 @@ export function sniffMimeFromBytes(
   }
 
   // JPEG: FF D8 FF
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) {
     return { mime: 'image/jpeg', ext: 'jpg' };
   }
 
@@ -161,7 +169,13 @@ export function sniffMimeFromBytes(
   }
 
   // WebM: 1A 45 DF A3
-  if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x1a &&
+    bytes[1] === 0x45 &&
+    bytes[2] === 0xdf &&
+    bytes[3] === 0xa3
+  ) {
     return { mime: 'video/webm', ext: 'webm' };
   }
 
@@ -174,7 +188,12 @@ export function sniffMimeFromBytes(
     bytes[7] === 0x70 // p
   ) {
     // brand is bytes[8..11]
-    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]).toLowerCase();
+    const brand = String.fromCharCode(
+      bytes[8],
+      bytes[9],
+      bytes[10],
+      bytes[11],
+    ).toLowerCase();
     if (brand.includes('qt')) return { mime: 'video/quicktime', ext: 'mov' };
     return { mime: 'video/mp4', ext: 'mp4' };
   }

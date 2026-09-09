@@ -1,4 +1,9 @@
-import type { Pipeline, PipelineLog, PipelineNodeExecutionStatus, PipelineStatus } from '@prisma/client';
+import type {
+  Pipeline,
+  PipelineLog,
+  PipelineNodeExecutionStatus,
+  PipelineStatus,
+} from '@prisma/client';
 
 export { PipelineNodeExecutionStatus, PipelineStatus };
 
@@ -25,7 +30,12 @@ export type PipelineNodeExecution = {
 };
 
 export type PipelineGraphSnapshot = {
-  edges?: Array<{ from: string; to: string; sourceHandle?: string; targetHandle?: string }>;
+  edges?: Array<{
+    from: string;
+    to: string;
+    sourceHandle?: string;
+    targetHandle?: string;
+  }>;
   materializedFromWorkflowVersion?: number;
   lanes?: string[];
   layout?: Record<string, { x: number; y: number }>;

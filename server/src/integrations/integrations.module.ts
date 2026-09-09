@@ -21,13 +21,16 @@ import { OutboundWebhookService } from './outbound-webhook.service';
     RepositoriesModule,
     forwardRef(() => OrchestrationModule),
   ],
-  controllers: [IntegrationsV1Controller, CompetitionEventIntegrationController],
+  controllers: [
+    IntegrationsV1Controller,
+    CompetitionEventIntegrationController,
+  ],
   providers: [
     IntegrationsService,
     ApiKeyOrJwtGuard,
     OutboundWebhookService,
     CompetitionEventIntegrationService,
   ],
-  exports: [OutboundWebhookService, IntegrationsService],
+  exports: [OutboundWebhookService, IntegrationsService, ApiKeyOrJwtGuard],
 })
 export class IntegrationsModule {}

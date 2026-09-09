@@ -193,7 +193,9 @@ export class PrismaContentRepository implements IContentRepository {
       select: PAGE_DOC_SELECT,
     });
 
-    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const docById = new Map(
+      docs.map((doc) => [doc.contentId, doc as PageDocLean]),
+    );
     const pageDocs = pageIds
       .map((id) => docById.get(id))
       .filter((doc): doc is PageDocLean => doc != null);
@@ -226,7 +228,9 @@ export class PrismaContentRepository implements IContentRepository {
       select: PAGE_DOC_SELECT,
     });
 
-    const docById = new Map(docs.map((doc) => [doc.contentId, doc as PageDocLean]));
+    const docById = new Map(
+      docs.map((doc) => [doc.contentId, doc as PageDocLean]),
+    );
     const pipelineRefs = [
       ...new Set(docs.map((d) => d.pipelineRef).filter(Boolean)),
     ];
@@ -314,9 +318,7 @@ export class PrismaContentRepository implements IContentRepository {
           Record<string, unknown>
         >,
       },
-      pipelineNodesOrdered.length > 0
-        ? { pipelineNodesOrdered }
-        : undefined,
+      pipelineNodesOrdered.length > 0 ? { pipelineNodesOrdered } : undefined,
     );
 
     let outputs = merged;
@@ -338,7 +340,7 @@ export class PrismaContentRepository implements IContentRepository {
       pipelineRef: doc.pipelineRef,
       workflowRef: doc.workflowRef,
       ruleRef: doc.ruleRef,
-      status: doc.status as SchemaContentStatus,
+      status: doc.status,
       variantId: doc.variantId ?? null,
       createdAt: doc.createdAt.toISOString(),
       updatedAt: doc.updatedAt.toISOString(),
@@ -414,7 +416,7 @@ export class PrismaContentRepository implements IContentRepository {
 
   countDrafts(auth: TenancyAuth): Promise<number> {
     return this.prisma.content.count({
-      where: mergeTenancyWhere({ status: 'draft' as ContentStatus }, auth),
+      where: mergeTenancyWhere({ status: SchemaContentStatus.Draft }, auth),
     });
   }
 

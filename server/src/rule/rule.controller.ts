@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UploadedFiles,
   UseFilters,
@@ -16,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import type { Express, Request } from 'express';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiKeyOrJwtGuard } from '../integrations/api-key-or-jwt.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
 import { ExtractRuleResponseDto } from './dto/extract-rule.dto';
@@ -32,10 +33,21 @@ import { UpdateNewsTriggerSettingsDto } from './dto/news-trigger-settings.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
 import { RuleService } from './rule.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(ApiKeyOrJwtGuard)
 @Controller('rules')
 export class RuleController {
   constructor(private readonly ruleService: RuleService) {}
+
+  @Get('system-templates')
+  getSystemTemplates(@Query('category') category?: string) {
+    return this.ruleService.listSystemTemplates(category);
+  }
+
+  @Get('templates')
+  getTemplates(@Req() req: Request, @Query('category') category?: string) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.ruleService.listTemplates(auth, category);
+  }
 
   /** Multipart: fields `input` (optional), `urls` (optional JSON string array), files field `files` (repeatable). */
   @Post('extract')
@@ -116,10 +128,7 @@ export class RuleController {
   }
 
   @Get(':ruleId/news-trigger')
-  getNewsTriggerSettings(
-    @Req() req: Request,
-    @Param('ruleId') ruleId: string,
-  ) {
+  getNewsTriggerSettings(@Req() req: Request, @Param('ruleId') ruleId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.ruleService.getNewsTriggerSettings(ruleId, auth);
   }

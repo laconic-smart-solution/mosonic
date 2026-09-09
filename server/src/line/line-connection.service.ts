@@ -23,7 +23,10 @@ export class LineConnectionService {
     });
   }
 
-  async upsert(userId: string, lineUserId: string): Promise<LineConnectionRecord> {
+  async upsert(
+    userId: string,
+    lineUserId: string,
+  ): Promise<LineConnectionRecord> {
     const uid = userId.trim();
     const lid = lineUserId.trim();
     const now = new Date();

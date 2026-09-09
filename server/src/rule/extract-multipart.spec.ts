@@ -1,4 +1,8 @@
-import { parseIntakeMultipart, parseRuleExtractMultipart, parseUrlsMultipart } from './extract-multipart';
+import {
+  parseIntakeMultipart,
+  parseRuleExtractMultipart,
+  parseUrlsMultipart,
+} from './extract-multipart';
 import type { RuleIntakeAnswers } from './rule-intake.types';
 
 describe('parseIntakeMultipart', () => {
@@ -34,7 +38,12 @@ describe('parseRuleExtractMultipart', () => {
       contentPurpose: 'internal_comms',
       channels: [{ channel: 'linkedin', priority: 'high' }],
     };
-    const req = parseRuleExtractMultipart([], '', undefined, JSON.stringify(intake));
+    const req = parseRuleExtractMultipart(
+      [],
+      '',
+      undefined,
+      JSON.stringify(intake),
+    );
     expect(req.intake?.mode).toBe('guided');
     expect(req.input).toBe('');
   });
@@ -47,9 +56,9 @@ describe('parseRuleExtractMultipart', () => {
 
 describe('parseUrlsMultipart', () => {
   it('parses url array', () => {
-    expect(parseUrlsMultipart(JSON.stringify(['https://example.com']))).toEqual([
-      'https://example.com/',
-    ]);
+    expect(parseUrlsMultipart(JSON.stringify(['https://example.com']))).toEqual(
+      ['https://example.com/'],
+    );
   });
 
   it('normalizes bare hosts', () => {

@@ -64,7 +64,9 @@ export class NodeCreditPriceService {
 
   /** Lower social unlock cost when the row still uses the legacy default. */
   private async migrateSocialUnlockCost(): Promise<void> {
-    const nextDefault = defaultCostUsdForNodeType(SOCIAL_ACCOUNT_CONNECT_NODE_TYPE);
+    const nextDefault = defaultCostUsdForNodeType(
+      SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
+    );
     if (nextDefault == null) return;
     await this.nodeCreditPrices.updateSocialUnlockLegacy(
       SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
@@ -169,6 +171,11 @@ export class NodeCreditPriceService {
       throw new BadRequestException(`Unsupported node type: ${nodeType}`);
     }
     const row = await this.nodeCreditPrices.upsertByNodeType(nodeType, costUsd);
-    return this.toAdminRow(row.nodeType, row.costUsd, row.isActive, row.updatedAt);
+    return this.toAdminRow(
+      row.nodeType,
+      row.costUsd,
+      row.isActive,
+      row.updatedAt,
+    );
   }
 }

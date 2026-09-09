@@ -1,7 +1,6 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 
-const DEFAULT_AI_PARSE_MESSAGE =
-  'Could not parse AI response. Please retry.';
+const DEFAULT_AI_PARSE_MESSAGE = 'Could not parse AI response. Please retry.';
 
 export function parseJsonOrThrow(
   text: string,

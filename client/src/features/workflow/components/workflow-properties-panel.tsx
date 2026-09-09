@@ -68,7 +68,7 @@ export function WorkflowPropertiesPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
-        className="flex max-h-[min(90vh,820px)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+        className="flex max-h-[min(90vh,820px)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
           <div className="flex items-center gap-3 pr-8">

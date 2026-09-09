@@ -107,12 +107,7 @@ function buildSystemPrompt(
 }
 
 function buildHumanPrompt(text: string, targetLanguage: string): string {
-  return [
-    `Translate the following content to ${targetLanguage}:`,
-    '',
-    text,
-    '',
-  ]
+  return [`Translate the following content to ${targetLanguage}:`, '', text, '']
     .filter(Boolean)
     .join('\n');
 }
@@ -157,9 +152,7 @@ function chunkToString(content: unknown): string {
 export class TranslationService {
   constructor(private readonly llm: LlmService) {}
 
-  async translate(
-    input: TranslationInput,
-  ): Promise<{
+  async translate(input: TranslationInput): Promise<{
     translatedText: string;
     usage?: { inputTokens: number; outputTokens: number };
   }> {
@@ -200,10 +193,7 @@ export class TranslationService {
 
     const normalized = normalizeTranslationConfig(input.config ?? {});
     const systemPrompt = buildSystemPrompt(input.rule, normalized);
-    const humanPrompt = buildHumanPrompt(
-      sourceText,
-      normalized.targetLanguage,
-    );
+    const humanPrompt = buildHumanPrompt(sourceText, normalized.targetLanguage);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
@@ -238,6 +228,8 @@ export class TranslationService {
       translatedText = translated.translatedText;
       usage = translated.usage;
     }
-    return usage ? { output: translatedText, usage } : { output: translatedText };
+    return usage
+      ? { output: translatedText, usage }
+      : { output: translatedText };
   }
 }

@@ -151,7 +151,9 @@ export class RuleExtractionService {
                   endDate: 'YYYY-MM-DD',
                 },
                 postingFrequency: 'daily | weekly | custom',
-                customSchedule: ['monday | tuesday | wednesday | thursday | friday | saturday | sunday'],
+                customSchedule: [
+                  'monday | tuesday | wednesday | thursday | friday | saturday | sunday',
+                ],
               },
               channels: [
                 {
@@ -201,7 +203,7 @@ export class RuleExtractionService {
         ...parsed,
         campaign,
         channels,
-        status: 'active' as RuleStatus,
+        status: 'active',
       },
       usage,
     };
@@ -248,8 +250,7 @@ function normalizeCampaignDuration(
   }
   const startDate = start ?? now;
   const endDate =
-    end ??
-    new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+    end ?? new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
   return {
     ...base,
     duration: {
@@ -263,7 +264,7 @@ function normalizeExtractedChannel(
   ch: ExtractedRuleDraft['channels'][0] & Record<string, unknown>,
 ): ExtractedRuleDraft['channels'][0] {
   const caption = CAPTIONS.has(String(ch.contentMapping?.caption))
-    ? (ch.contentMapping?.caption as 'text' | 'translatedText' | 'summary')
+    ? ch.contentMapping?.caption
     : 'text';
   const rawMedia = ch.contentMapping?.media;
   const media: 'image' | 'video' | null =

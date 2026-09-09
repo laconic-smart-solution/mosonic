@@ -34,7 +34,11 @@ export class ZernioBillingService {
   ) {}
 
   async getSummary(
-    range: SpendDateRange = parseSpendDateRange(undefined, undefined, DEFAULT_SPEND_DAYS),
+    range: SpendDateRange = parseSpendDateRange(
+      undefined,
+      undefined,
+      DEFAULT_SPEND_DAYS,
+    ),
   ): Promise<ApiProviderBillingSummaryDto> {
     const apiKey = this.config.get<string>('ZERNIO_API_KEY')?.trim() ?? '';
 
@@ -64,7 +68,9 @@ export class ZernioBillingService {
           profiles.map(async (profile) => {
             let accountCount: number | null = null;
             try {
-              const accounts = await this.zernioClient.listAccounts(profile._id);
+              const accounts = await this.zernioClient.listAccounts(
+                profile._id,
+              );
               accountCount = countAccountsPayload(accounts);
             } catch {
               accountCount = null;
@@ -88,7 +94,9 @@ export class ZernioBillingService {
             : null;
       } catch (err) {
         syncError =
-          err instanceof Error ? err.message : 'Failed to fetch Zernio profiles';
+          err instanceof Error
+            ? err.message
+            : 'Failed to fetch Zernio profiles';
       }
     }
 

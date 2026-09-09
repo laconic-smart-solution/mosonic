@@ -13,7 +13,12 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
   extractAuthCookieTokens,
@@ -53,9 +58,21 @@ export class AuthController {
     description:
       'Validates single-use exchange code from Event App, sends OTP email, and redirects user to Mosonic OTP page',
   })
-  @ApiQuery({ name: 'code', required: true, description: 'Single-use exchange code' })
-  @ApiQuery({ name: 'redirect_path', required: false, description: 'Destination redirect path' })
-  @ApiQuery({ name: 'source', required: false, description: 'Referral source tracking' })
+  @ApiQuery({
+    name: 'code',
+    required: true,
+    description: 'Single-use exchange code',
+  })
+  @ApiQuery({
+    name: 'redirect_path',
+    required: false,
+    description: 'Destination redirect path',
+  })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    description: 'Referral source tracking',
+  })
   async startExchange(
     @Query('code') code: string,
     @Query('redirect_path') redirectPath: string | undefined,
@@ -95,7 +112,9 @@ export class AuthController {
       }
       const refSource = source || 'crabonic';
       if (!targetRedirect.includes('source=')) {
-        targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + `source=${encodeURIComponent(refSource)}`;
+        targetRedirect +=
+          (targetRedirect.includes('?') ? '&' : '?') +
+          `source=${encodeURIComponent(refSource)}`;
       }
 
       const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
@@ -119,12 +138,11 @@ export class AuthController {
       'Confirms a single-use code from the Event App is valid and returns the associated identity. Does not establish a session — the /verify-origin page uses this only to confirm the referral, then checks the existing cookie session via GET /auth/me.',
   })
   async verifyOrigin(@Body() body: AuthVerifyOriginDto) {
-    const userInfo = await this.eventAppClient.validateExchangeCode(
-      body.code,
-    );
+    const userInfo = await this.eventAppClient.validateExchangeCode(body.code);
     let targetRedirect = userInfo.redirectPath || '/dashboard?source=crabonic';
     if (!targetRedirect.includes('source=')) {
-      targetRedirect += (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+      targetRedirect +=
+        (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
     }
     return {
       valid: true,

@@ -1,5 +1,11 @@
 import { BullModule } from '@nestjs/bullmq';
-import { forwardRef, Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
+import {
+  forwardRef,
+  Injectable,
+  Logger,
+  Module,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ContentModule } from '../content/content.module';
 import { PostModule } from '../post/post.module';
@@ -62,14 +68,18 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
 
   onModuleInit(): void {
     const databaseUrl = this.config.get<string>('DATABASE_URL') ?? '';
-    const redisHost = (this.config.get<string>('REDIS_HOST') ?? '127.0.0.1').trim();
+    const redisHost = (
+      this.config.get<string>('REDIS_HOST') ?? '127.0.0.1'
+    ).trim();
     const redisUrl = this.config.get<string>('REDIS_URL')?.trim();
     const queueMode =
-      this.config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
-      'true';
+      this.config
+        .get<string>('ORCHESTRATION_USE_QUEUE', 'false')
+        .toLowerCase() === 'true';
     const tenantIsolation =
-      this.config.get<string>('QUEUE_TENANT_ISOLATION', 'false').toLowerCase() ===
-      'true';
+      this.config
+        .get<string>('QUEUE_TENANT_ISOLATION', 'false')
+        .toLowerCase() === 'true';
 
     this.logger.log(
       `pipeline queue="${PIPELINE_NODES_QUEUE}" workersInApi=${runWorkersInApi} ` +

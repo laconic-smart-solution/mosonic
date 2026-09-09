@@ -635,7 +635,7 @@ export function UploadContentReviewPanel({
     setRunByNodeId((prev) => ({ ...prev, [nodeId]: emptyRunState() }))
   }
 
-  async function submitRerun(nodeId: string) {
+  async function submitRerun(nodeId: string, message?: string) {
     if (isGeneratingMore) {
       toast.error(i18n.t("upload:toast.waitGeneration"))
       return
@@ -651,6 +651,7 @@ export function UploadContentReviewPanel({
     try {
       await contentService.rerunNode(contentId, {
         nodeId,
+        message,
         previousOutputs: {
           keywords: editedOutputs.keywords,
           text: editedOutputs.text,
@@ -798,7 +799,7 @@ export function UploadContentReviewPanel({
         closeGenMore()
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
             {selectedGenType
@@ -1209,7 +1210,7 @@ export function UploadContentReviewPanel({
           onOpenChange={(open) => {
             if (!open) setRerunNodeId(null)
           }}
-          onSubmit={(nid) => void submitRerun(nid)}
+          onSubmit={(nid, message) => void submitRerun(nid, message)}
         />
 
         <ContentDetailImageLightbox

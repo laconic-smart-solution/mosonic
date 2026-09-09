@@ -38,6 +38,24 @@ export type UsageHistoryResponse = {
   totalPages: number
 }
 
+export type PurchaseHistoryEntry = {
+  id: string
+  type: "topup" | "plan"
+  label: string
+  credits: number | null
+  amount: number
+  currencyCode: string
+  status: string
+  purchaseDate: string
+}
+
+export type PurchaseHistoryResponse = {
+  entries: PurchaseHistoryEntry[]
+  total: number
+  page: number
+  totalPages: number
+}
+
 export type CurrentPlanResponse = {
   creditPriceUsd: number
   plan: {
@@ -46,6 +64,7 @@ export type CurrentPlanResponse = {
     creditsPerMonth: number
     priceThb: number
     priceUsd: number
+    allowedChannels: string[]
   } | null
   creditsUsed: number
   creditsRemaining: number

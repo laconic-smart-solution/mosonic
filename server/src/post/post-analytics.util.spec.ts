@@ -3,10 +3,7 @@ import {
   isPostMetricsEligible,
   supportsAnalyticsChannel,
 } from './post-analytics.util';
-import {
-  PlatformPostStatus,
-  PostStatus,
-} from './schemas/post.schema';
+import { PlatformPostStatus, PostStatus } from './schemas/post.schema';
 
 describe('post-analytics.util', () => {
   it('isPostMetricsEligible accepts published and partial', () => {

@@ -40,8 +40,18 @@ describe('expandGraphLaneTemplates', () => {
 
   it('expands shared adapt and image into per-channel nodes', () => {
     const nodes = assignNodeIds([
-      { type: WorkflowNodeType.KeywordPlanner, order: 1, isLocked: false, config: {} },
-      { type: WorkflowNodeType.TextGeneration, order: 2, isLocked: false, config: {} },
+      {
+        type: WorkflowNodeType.KeywordPlanner,
+        order: 1,
+        isLocked: false,
+        config: {},
+      },
+      {
+        type: WorkflowNodeType.TextGeneration,
+        order: 2,
+        isLocked: false,
+        config: {},
+      },
       {
         type: WorkflowNodeType.Branch,
         order: 3,
@@ -63,10 +73,12 @@ describe('expandGraphLaneTemplates', () => {
       },
     ]);
     const out = expandGraphLaneTemplates(nodes, ['instagram', 'linkedin']);
-    expect(out.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(2);
-    expect(out.filter((n) => n.type === WorkflowNodeType.ImageGeneration)).toHaveLength(
+    expect(out.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
       2,
     );
+    expect(
+      out.filter((n) => n.type === WorkflowNodeType.ImageGeneration),
+    ).toHaveLength(2);
     const igAdapt = out.find(
       (n) => n.type === WorkflowNodeType.Adapt && n.lane === 'instagram',
     );
@@ -76,12 +88,20 @@ describe('expandGraphLaneTemplates', () => {
 
   it('does not expand lane-specific image templates to other channels', () => {
     const nodes = assignNodeIds([
-      { type: WorkflowNodeType.TextGeneration, order: 1, isLocked: true, config: {} },
+      {
+        type: WorkflowNodeType.TextGeneration,
+        order: 1,
+        isLocked: true,
+        config: {},
+      },
       {
         type: WorkflowNodeType.Branch,
         order: 2,
         isLocked: false,
-        config: { mode: 'wizard_channels', channels: ['instagram', 'facebook', 'linkedin'] },
+        config: {
+          mode: 'wizard_channels',
+          channels: ['instagram', 'facebook', 'linkedin'],
+        },
       },
       { type: WorkflowNodeType.Adapt, order: 3, isLocked: false, config: {} },
       {
@@ -108,10 +128,12 @@ describe('expandGraphLaneTemplates', () => {
       'facebook',
       'linkedin',
     ]);
-    expect(out.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(3);
-    expect(out.filter((n) => n.type === WorkflowNodeType.ImageGeneration)).toHaveLength(
-      1,
+    expect(out.filter((n) => n.type === WorkflowNodeType.Adapt)).toHaveLength(
+      3,
     );
+    expect(
+      out.filter((n) => n.type === WorkflowNodeType.ImageGeneration),
+    ).toHaveLength(1);
     expect(
       out.find((n) => n.type === WorkflowNodeType.ImageGeneration)?.lane,
     ).toBe('instagram');

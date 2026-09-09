@@ -99,9 +99,7 @@ export function resolveRerunWorkflowNodeId(
 
   const laneNorm =
     lane ??
-    (pipelineNode?.lane?.trim()
-      ? normalizeLaneId(pipelineNode.lane)
-      : null);
+    (pipelineNode?.lane?.trim() ? normalizeLaneId(pipelineNode.lane) : null);
 
   if (laneNorm) {
     const adaptLaneNode = workflowNodes.find((n) => {
@@ -127,9 +125,7 @@ export function resolveRerunWorkflowNodeId(
   }
 
   if (pipelineNode) {
-    const sameType = workflowNodes.filter(
-      (n) => n.type === pipelineNode.type,
-    );
+    const sameType = workflowNodes.filter((n) => n.type === pipelineNode.type);
     if (laneNorm && sameType.length > 0) {
       const byLane = sameType.find((n) => {
         const cfg = n.config as { laneId?: string } | undefined;
@@ -142,7 +138,7 @@ export function resolveRerunWorkflowNodeId(
       }
     }
     if (sameType.length === 1) {
-      return { outputNodeId, workflowNodeId: sameType[0]!.nodeId };
+      return { outputNodeId, workflowNodeId: sameType[0].nodeId };
     }
   }
 

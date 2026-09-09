@@ -16,7 +16,9 @@
       "faq": "FAQ",
       "communication": "通讯",
       "line": "LINE",
-      "announcements": "公告"
+      "announcements": "公告",
+      "nodeSettings": "节点设置",
+      "nodeSettingsImage": "图片"
     }
   },
   "communication": {
@@ -479,6 +481,8 @@
     "fieldFeatures": "功能 (每行一项)",
     "featuresPlaceholder": "功能 1",
     "fieldActive": "启用",
+    "fieldAllowedChannels": "发布渠道",
+    "allowedChannelsHint": "此套餐的用户可以连接并发布的渠道。",
     "save": "保存套餐"
   },
   "usage": {
@@ -507,6 +511,58 @@
     "colCost": "成本 (USD)",
     "prev": "上一页",
     "next": "下一页"
+  },
+  "nodeSettingsImage": {
+    "title": "图片节点设置",
+    "subtitle": "管理 image_generation 节点使用的模板和设计风格。",
+    "tabs": {
+      "templates": "模板",
+      "styles": "设计风格"
+    },
+    "templates": {
+      "hint": "模板决定生成的图片类型。",
+      "create": "新建模板",
+      "createTitle": "创建模板",
+      "editTitle": "编辑模板",
+      "empty": "暂无模板。",
+      "loadError": "无法加载模板。",
+      "saveError": "无法保存模板。",
+      "deleteError": "无法删除模板。",
+      "deleteConfirm": "删除模板“{{name}}”？"
+    },
+    "styles": {
+      "hint": "设计风格决定图片的呈现方式——除非用户手动选择，否则由 AI 自动选择。",
+      "create": "新建风格",
+      "createTitle": "创建风格",
+      "editTitle": "编辑风格",
+      "empty": "暂无风格。",
+      "loadError": "无法加载风格。",
+      "saveError": "无法保存风格。",
+      "deleteError": "无法删除风格。",
+      "deleteConfirm": "删除风格“{{name}}”？"
+    },
+    "columns": {
+      "image": "图片",
+      "key": "键",
+      "name": "名称",
+      "description": "描述",
+      "status": "状态"
+    },
+    "fields": {
+      "key": "键",
+      "name": "名称",
+      "description": "描述",
+      "prompt": "提示词",
+      "image": "参考图片",
+      "active": "启用",
+      "uploadImage": "上传",
+      "replaceImage": "替换",
+      "noImage": "无图片",
+      "uploadFailed": "上传失败，请重试。"
+    },
+    "active": "启用",
+    "inactive": "停用",
+    "loading": "加载中…"
   },
   "faq": {
     "title": "FAQ 知识库",

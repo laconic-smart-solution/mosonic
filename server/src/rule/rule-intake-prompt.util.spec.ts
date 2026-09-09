@@ -1,4 +1,7 @@
-import { buildExtractionContext, formatIntakeForContext } from './rule-intake-prompt.util';
+import {
+  buildExtractionContext,
+  formatIntakeForContext,
+} from './rule-intake-prompt.util';
 import type { RuleIntakeAnswers } from './rule-intake.types';
 
 describe('rule-intake-prompt.util', () => {

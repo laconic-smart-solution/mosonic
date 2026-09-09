@@ -2,6 +2,11 @@ import { IntelligenceNodeService } from './intelligence-node.service';
 import type { NodeExecutionInput } from '../types/node-execution.types';
 import type { Rule } from '../../rule/schemas/rule.schema';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 describe('IntelligenceNodeService', () => {
   const rule = {
     brand: {
@@ -41,10 +46,7 @@ describe('IntelligenceNodeService', () => {
       }),
     };
     const events = { emitToPipeline: jest.fn() };
-    const service = new IntelligenceNodeService(
-      llm as never,
-      events as never,
-    );
+    const service = new IntelligenceNodeService(llm as never, events as never);
 
     const input: NodeExecutionInput = {
       pipelineRef: 'p1',

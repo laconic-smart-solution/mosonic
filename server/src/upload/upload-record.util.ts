@@ -13,7 +13,10 @@ export function withUploadChannels(
   upload: UploadRecord,
   channels: UploadChannelEntry[],
 ): UploadRecord {
-  return { ...upload, channels: channelsToJson(channels) as UploadRecord['channels'] };
+  return {
+    ...upload,
+    channels: channelsToJson(channels) as UploadRecord['channels'],
+  };
 }
 
 export function postPlatformResults(post: PostRecord): PlatformResult[] {
@@ -33,6 +36,7 @@ export function withPostPlatformResults(
 ): PostRecord {
   return {
     ...post,
-    platformResults: platformResults as unknown as PostRecord['platformResults'],
+    platformResults:
+      platformResults as unknown as PostRecord['platformResults'],
   };
 }

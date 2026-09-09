@@ -32,11 +32,7 @@ export class ViberController {
     @Query() query: ViberQrQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    const png = await this.viber.getQrPng(
-      query.uri,
-      query.size,
-      query.start,
-    );
+    const png = await this.viber.getQrPng(query.uri, query.size, query.start);
     res.set({
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=86400',

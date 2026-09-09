@@ -32,23 +32,6 @@ export class ZernioController {
     return await this.mcpService.ensureZernioProfile(user.userId);
   }
 
-  @Get('connection-credit')
-  @UseGuards(JwtAuthGuard)
-  async getConnectionCredit(@Req() req: Request) {
-    const user = req.auth!.localUser as User;
-    return await this.mcpService.getConnectionCreditQuote(user.userId);
-  }
-
-  @Post('unlock/:platform')
-  @UseGuards(JwtAuthGuard)
-  async unlockChannel(
-    @Req() req: Request,
-    @Param('platform') platform: string,
-  ) {
-    const user = req.auth!.localUser as User;
-    return await this.mcpService.unlockChannel(platform, user.userId);
-  }
-
   @Post('connect/:platform')
   @UseGuards(JwtAuthGuard)
   async connectChannel(
@@ -72,7 +55,10 @@ export class ZernioController {
     },
     @Res({ passthrough: false }) res: Response,
   ) {
-    const frontend = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    const frontend = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
     try {
       const { platform } = await this.mcpService.handleOAuthCallback(query);
       res.redirect(
@@ -81,7 +67,9 @@ export class ZernioController {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Zernio OAuth callback failed: ${message}`);
-      res.redirect(`${frontend}/settings/accounts?zernio_error=callback_failed`);
+      res.redirect(
+        `${frontend}/settings/accounts?zernio_error=callback_failed`,
+      );
     }
   }
 
@@ -111,4 +99,3 @@ export class ZernioController {
     return { success: true };
   }
 }
-

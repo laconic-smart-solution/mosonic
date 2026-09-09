@@ -9,7 +9,10 @@ export function tenantQueueBucket(userId: string): string {
   return `b${bucket}`;
 }
 
-export function tenantPipelineQueueName(baseQueue: string, userId: string): string {
+export function tenantPipelineQueueName(
+  baseQueue: string,
+  userId: string,
+): string {
   if (process.env.QUEUE_TENANT_ISOLATION !== 'true') {
     return baseQueue;
   }

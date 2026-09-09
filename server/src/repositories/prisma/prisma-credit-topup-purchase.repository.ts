@@ -5,9 +5,7 @@ import type { CreditTopupPurchaseRecord } from '../../domain/credit/credit.types
 import type { ICreditTopupPurchaseRepository } from '../interfaces/credit-topup-purchase.repository.interface';
 
 @Injectable()
-export class PrismaCreditTopupPurchaseRepository
-  implements ICreditTopupPurchaseRepository
-{
+export class PrismaCreditTopupPurchaseRepository implements ICreditTopupPurchaseRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(
@@ -21,6 +19,13 @@ export class PrismaCreditTopupPurchaseRepository
   ): Promise<CreditTopupPurchaseRecord | null> {
     return this.prisma.creditTopupPurchase.findUnique({
       where: { transactionId },
+    });
+  }
+
+  findByUserId(userId: string): Promise<CreditTopupPurchaseRecord[]> {
+    return this.prisma.creditTopupPurchase.findMany({
+      where: { userId },
+      orderBy: { purchaseDate: 'desc' },
     });
   }
 

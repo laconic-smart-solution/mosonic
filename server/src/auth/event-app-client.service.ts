@@ -78,11 +78,14 @@ export class EventAppClientService {
         throw new UnauthorizedException({
           statusCode: 401,
           error: 'InvalidCodePayload',
-          message: 'Invalid response received from Event App authentication backend',
+          message:
+            'Invalid response received from Event App authentication backend',
         });
       }
 
-      this.logger.log(`Successfully validated exchange code for user ${payload.email}`);
+      this.logger.log(
+        `Successfully validated exchange code for user ${payload.email}`,
+      );
       return payload;
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -91,7 +94,9 @@ export class EventAppClientService {
           err.response?.data?.message ||
           err.response?.data?.error ||
           'Failed to validate exchange code with Event App';
-        this.logger.warn(`Event App code validation failed [HTTP ${status}]: ${msg}`);
+        this.logger.warn(
+          `Event App code validation failed [HTTP ${status}]: ${msg}`,
+        );
         throw new UnauthorizedException({
           statusCode: 401,
           error: 'InvalidExchangeCode',

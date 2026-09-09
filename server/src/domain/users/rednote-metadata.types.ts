@@ -20,7 +20,9 @@ export function rednoteExternalAccountId(userId: string): string {
   return `rednote:${userId.trim()}`;
 }
 
-export function parseRedNoteMetadata(raw: unknown): RedNoteSessionMetadata | null {
+export function parseRedNoteMetadata(
+  raw: unknown,
+): RedNoteSessionMetadata | null {
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;
   const sessionCookiesRef =
@@ -45,9 +47,7 @@ export function parseRedNoteMetadata(raw: unknown): RedNoteSessionMetadata | nul
       typeof m.lastVerifiedAt === 'string' ? m.lastVerifiedAt : null,
     lastQrScanAt: typeof m.lastQrScanAt === 'string' ? m.lastQrScanAt : null,
     rednoteUserHandle:
-      typeof m.rednoteUserHandle === 'string'
-        ? m.rednoteUserHandle
-        : undefined,
+      typeof m.rednoteUserHandle === 'string' ? m.rednoteUserHandle : undefined,
   };
 }
 

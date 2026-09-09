@@ -10,7 +10,10 @@ export function resolveExecutionRule(
   rule: Rule | RuleRecord,
 ): Rule {
   const base = rule as unknown as Rule;
-  const overlay = pipeline.ruleOverlay as PipelineRuleOverlay | null | undefined;
+  const overlay = pipeline.ruleOverlay as
+    | PipelineRuleOverlay
+    | null
+    | undefined;
   if (!overlay?.patches?.length) {
     return base;
   }

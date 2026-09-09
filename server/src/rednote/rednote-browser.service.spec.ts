@@ -26,18 +26,16 @@ describe('RedNoteBrowserService login selectors', () => {
     const page = {
       $: jest.fn().mockResolvedValue(null),
     };
-    await expect(
-      browser.isQrLoginSucceeded(page as never),
-    ).resolves.toBe(true);
+    await expect(browser.isQrLoginSucceeded(page as never)).resolves.toBe(true);
   });
 
   it('isQrLoginSucceeded is false when modal is present', async () => {
     const page = {
       $: jest.fn().mockResolvedValue({}),
     };
-    await expect(
-      browser.isQrLoginSucceeded(page as never),
-    ).resolves.toBe(false);
+    await expect(browser.isQrLoginSucceeded(page as never)).resolves.toBe(
+      false,
+    );
   });
 
   it('defaults creator publish selectors', () => {

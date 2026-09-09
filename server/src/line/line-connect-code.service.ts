@@ -24,7 +24,9 @@ export class LineConnectCodeService implements OnModuleDestroy {
     await this.redis.quit().catch(() => undefined);
   }
 
-  async issue(userId: string): Promise<{ code: string; expiresInSeconds: number }> {
+  async issue(
+    userId: string,
+  ): Promise<{ code: string; expiresInSeconds: number }> {
     const uid = userId.trim();
     const previous = await this.redis.get(this.userKey(uid));
     if (previous) {
@@ -75,7 +77,7 @@ export class LineConnectCodeService implements OnModuleDestroy {
     const bytes = randomBytes(length);
     let out = '';
     for (let i = 0; i < length; i++) {
-      out += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
+      out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
     }
     return out;
   }

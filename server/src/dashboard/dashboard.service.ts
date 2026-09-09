@@ -7,10 +7,7 @@ import { PostAnalyticsService } from '../post/post-analytics.service';
 import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
 import type { IUploadRepository } from '../repositories/interfaces/upload.repository.interface';
 import type { UploadRecord } from '../repositories/interfaces/upload.repository.interface';
-import {
-  CONTENT_REPOSITORY,
-  UPLOAD_REPOSITORY,
-} from '../repositories/tokens';
+import { CONTENT_REPOSITORY, UPLOAD_REPOSITORY } from '../repositories/tokens';
 import { UploadChannelStatus } from '../upload/schemas/upload.schema';
 import { uploadChannels } from '../upload/upload-record.util';
 import type {
@@ -61,7 +58,7 @@ function flattenChannels(uploads: UploadRecord[]): FlatChannel[] {
         ruleRef: upload.ruleRef ?? '',
         channel: ch.channel,
         caption: (ch.caption ?? '').toString(),
-        status: ch.status as UploadChannelStatus,
+        status: ch.status,
         scheduledAt: toDate(ch.scheduledAt),
         publishedAt: toDate(ch.publishedAt),
         updatedAt: toDate(upload.updatedAt) ?? new Date(),
@@ -247,7 +244,7 @@ export class DashboardService {
     const contentEvents: DashboardRecentActivityDto[] = recentContents.map(
       (c) => {
         const at = safeIso(c.updatedAt) ?? now.toISOString();
-        const status = c.status as ContentStatus;
+        const status = c.status;
         if (status === ContentStatus.Approved) {
           return {
             kind: 'content_approved',
@@ -276,8 +273,8 @@ export class DashboardService {
       },
     );
 
-    const merged = [...contentEvents, ...recentUploadEvents].sort(
-      (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0),
+    const merged = [...contentEvents, ...recentUploadEvents].sort((a, b) =>
+      a.at < b.at ? 1 : a.at > b.at ? -1 : 0,
     );
     return merged.slice(0, limit);
   }
@@ -296,10 +293,7 @@ export class DashboardService {
       .filter((ch) => relevantStatuses.has(ch.status))
       .map((r) => ({
         ...r,
-        eventAt:
-          r.publishedAt ??
-          r.scheduledAt ??
-          r.updatedAt,
+        eventAt: r.publishedAt ?? r.scheduledAt ?? r.updatedAt,
       }))
       .sort((a, b) => b.eventAt.getTime() - a.eventAt.getTime())
       .slice(0, limit);
@@ -323,7 +317,9 @@ export class DashboardService {
         if (r.status === UploadChannelStatus.Failed) {
           return {
             kind: 'upload_failed',
-            label: channel ? `Failed to publish on ${channel}` : 'Publish failed',
+            label: channel
+              ? `Failed to publish on ${channel}`
+              : 'Publish failed',
             at,
             channel,
             uploadId,

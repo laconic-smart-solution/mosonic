@@ -65,7 +65,9 @@ export class PrismaPipelineRepository implements IPipelineRepository {
     sortBy: string,
     sortOrder: 'asc' | 'desc',
   ): Promise<{ rows: PipelineRecord[]; total: number }> {
-    const orderBy = { [sortBy]: sortOrder } as Prisma.PipelineOrderByWithRelationInput;
+    const orderBy = {
+      [sortBy]: sortOrder,
+    } as Prisma.PipelineOrderByWithRelationInput;
     const [rows, total] = await Promise.all([
       this.prisma.pipeline.findMany({
         where: filter,
@@ -143,12 +145,11 @@ export class PrismaPipelineRepository implements IPipelineRepository {
       { nodes: Array<{ nodeId: string; type: string; order: number }> }
     >
   > {
-    const where: Prisma.PipelineWhereInput = { pipelineId: { in: pipelineIds } };
+    const where: Prisma.PipelineWhereInput = {
+      pipelineId: { in: pipelineIds },
+    };
     if (auth && auth.role !== UserRole.ADMIN) {
-      where.OR = [
-        { userId: auth.userId },
-        { userId: null },
-      ];
+      where.OR = [{ userId: auth.userId }, { userId: null }];
     }
     const pipelines = await this.prisma.pipeline.findMany({
       where,
@@ -356,9 +357,7 @@ export class PrismaPipelineRepository implements IPipelineRepository {
 
   allNodesTerminal(pipeline: PipelineRecord): boolean {
     return parsePipelineNodes(pipeline.nodes).every(
-      (n) =>
-        n.status === 'completed' ||
-        n.status === 'skipped',
+      (n) => n.status === 'completed' || n.status === 'skipped',
     );
   }
 

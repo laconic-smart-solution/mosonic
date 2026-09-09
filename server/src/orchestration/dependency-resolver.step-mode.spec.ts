@@ -15,9 +15,18 @@ describe('dependency resolver step mode', () => {
       { from: 'adapt__facebook', to: 'merge' },
     ];
     const nodes = [
-      { nodeId: 'translation', status: PipelineNodeExecutionStatus.WaitingReview },
-      { nodeId: 'adapt__instagram', status: PipelineNodeExecutionStatus.Pending },
-      { nodeId: 'adapt__facebook', status: PipelineNodeExecutionStatus.Pending },
+      {
+        nodeId: 'translation',
+        status: PipelineNodeExecutionStatus.WaitingReview,
+      },
+      {
+        nodeId: 'adapt__instagram',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
+      {
+        nodeId: 'adapt__facebook',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
       { nodeId: 'merge', status: PipelineNodeExecutionStatus.Pending },
     ];
 
@@ -43,9 +52,18 @@ describe('dependency resolver step mode', () => {
         nodeId: 'adapt__instagram',
         status: PipelineNodeExecutionStatus.WaitingReview,
       },
-      { nodeId: 'adapt__facebook', status: PipelineNodeExecutionStatus.Completed },
-      { nodeId: 'image__instagram', status: PipelineNodeExecutionStatus.Pending },
-      { nodeId: 'image__facebook', status: PipelineNodeExecutionStatus.Pending },
+      {
+        nodeId: 'adapt__facebook',
+        status: PipelineNodeExecutionStatus.Completed,
+      },
+      {
+        nodeId: 'image__instagram',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
+      {
+        nodeId: 'image__facebook',
+        status: PipelineNodeExecutionStatus.Pending,
+      },
     ];
 
     expect(
@@ -57,8 +75,6 @@ describe('dependency resolver step mode', () => {
   });
 
   it('waiting_review is not a terminal status', () => {
-    expect(terminal.has(PipelineNodeExecutionStatus.WaitingReview)).toBe(
-      false,
-    );
+    expect(terminal.has(PipelineNodeExecutionStatus.WaitingReview)).toBe(false);
   });
 });

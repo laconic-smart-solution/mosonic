@@ -59,7 +59,9 @@ export class NewsPickerService {
       ]);
 
       const text =
-        typeof result.content === 'string' ? result.content : String(result.content);
+        typeof result.content === 'string'
+          ? result.content
+          : String(result.content);
       const parsed = this.safeParseArray(text);
 
       const picked = parsed
@@ -68,11 +70,17 @@ export class NewsPickerService {
             typeof p.index === 'number' && articles[p.index],
         )
         .slice(0, count)
-        .map((p: { index: number; importanceScore?: number; importanceReason?: string }) => ({
-          ...articles[p.index],
-          importanceScore: Number(p.importanceScore) || 70,
-          importanceReason: String(p.importanceReason ?? ''),
-        }));
+        .map(
+          (p: {
+            index: number;
+            importanceScore?: number;
+            importanceReason?: string;
+          }) => ({
+            ...articles[p.index],
+            importanceScore: Number(p.importanceScore) || 70,
+            importanceReason: String(p.importanceReason ?? ''),
+          }),
+        );
 
       if (picked.length) return picked;
     } catch (err) {

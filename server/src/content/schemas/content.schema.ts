@@ -8,8 +8,7 @@ export const ContentStatus = {
   Rejected: PrismaContentStatus.rejected,
 } as const;
 
-export type ContentStatus =
-  (typeof ContentStatus)[keyof typeof ContentStatus];
+export type ContentStatus = (typeof ContentStatus)[keyof typeof ContentStatus];
 
 export interface ApprovalStepDef {
   role: string;

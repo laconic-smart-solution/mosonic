@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { usageService } from "@/shared/services/usage.service"
 import { onCreditBalanceUpdated, onPlanUpdated } from "@/shared/socket/credit-events"
 import { useAuthStore } from "@/shared/stores/auth.store"
+import { rednoteQueryKeys } from "./rednote.query"
 import { zernioQueryKeys } from "./zernio.query"
 
 export const usageQueryKeys = {
@@ -11,6 +12,8 @@ export const usageQueryKeys = {
   history: (p: { from?: string; to?: string; page?: number }) =>
     ["usage", "history", p] as const,
   currentPlan: ["usage", "current-plan"] as const,
+  purchases: (p: { page?: number; limit?: number }) =>
+    ["usage", "purchases", p] as const,
 }
 
 export function useCreditBalanceSocketRefresh() {
@@ -20,9 +23,11 @@ export function useCreditBalanceSocketRefresh() {
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.summary })
       void queryClient.invalidateQueries({ queryKey: usageQueryKeys.currentPlan })
       void queryClient.invalidateQueries({ queryKey: ["usage", "history"] })
+      void queryClient.invalidateQueries({ queryKey: ["usage", "purchases"] })
       void queryClient.invalidateQueries({ queryKey: ["content"] })
       void queryClient.invalidateQueries({ queryKey: ["pipeline", "estimate"] })
-      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.connectionCredit })
+      void queryClient.invalidateQueries({ queryKey: zernioQueryKeys.accounts })
+      void queryClient.invalidateQueries({ queryKey: rednoteQueryKeys.account })
       void queryClient.invalidateQueries({ queryKey: ["plans", "public"] })
     }
     const offBalance = onCreditBalanceUpdated(invalidate)
@@ -65,6 +70,16 @@ export function useCurrentPlanQuery() {
   return useQuery({
     queryKey: usageQueryKeys.currentPlan,
     queryFn: () => usageService.getCurrentPlan(),
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+  })
+}
+
+export function usePurchaseHistoryQuery(params?: { page?: number; limit?: number }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  return useQuery({
+    queryKey: usageQueryKeys.purchases(params ?? {}),
+    queryFn: () => usageService.getPurchaseHistory(params),
     enabled: isAuthenticated,
     staleTime: 30_000,
   })

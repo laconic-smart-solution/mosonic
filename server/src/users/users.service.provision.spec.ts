@@ -1,11 +1,17 @@
 import { BadRequestException } from '@nestjs/common';
 import type { ModuleRef } from '@nestjs/core';
-import { UserRole, UserStatus, type UserRecord } from '../domain/users/user.types';
+import {
+  UserRole,
+  UserStatus,
+  type UserRecord,
+} from '../domain/users/user.types';
 import type { ISocialAccountRepository } from '../repositories/interfaces/social-account.repository.interface';
 import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
 import { UsersService } from './users.service';
 
-function user(overrides: Partial<UserRecord> & Pick<UserRecord, 'userId'>): UserRecord {
+function user(
+  overrides: Partial<UserRecord> & Pick<UserRecord, 'userId'>,
+): UserRecord {
   return {
     authServerUserId: 'sso-1',
     email: 'ada@example.com',
@@ -131,9 +137,9 @@ describe('UsersService.provisionForCompetitionEvent', () => {
     users.findByAuthServerUserId.mockResolvedValue(existing);
     users.findByEmailOrUsernameInsensitive.mockResolvedValue(clash);
 
-    await expect(service.provisionForCompetitionEvent(args)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.provisionForCompetitionEvent(args),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(users.update).not.toHaveBeenCalled();
   });
 

@@ -1,11 +1,13 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
+import { PUBLISHABLE_CHANNELS } from '../lib/publishable-channels';
 
 export class CreatePlanDto {
   @IsString()
@@ -36,4 +38,9 @@ export class CreatePlanDto {
   @IsArray()
   @IsString({ each: true })
   features?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(PUBLISHABLE_CHANNELS, { each: true })
+  allowedChannels?: string[];
 }

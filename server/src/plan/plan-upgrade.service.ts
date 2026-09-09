@@ -187,7 +187,10 @@ export class PlanUpgradeService {
     }
 
     if (rawStatus === 'CANCELLED' && purchase.status === 'pending') {
-      await this.planPurchases.updateStatus(purchase.planPurchaseId, 'cancelled');
+      await this.planPurchases.updateStatus(
+        purchase.planPurchaseId,
+        'cancelled',
+      );
       return true;
     }
 
@@ -227,7 +230,9 @@ export class PlanUpgradeService {
 
     if (!currentPlan) {
       if (target.priceThb <= 0) {
-        throw new BadRequestException('You are already eligible for the free plan');
+        throw new BadRequestException(
+          'You are already eligible for the free plan',
+        );
       }
       return;
     }

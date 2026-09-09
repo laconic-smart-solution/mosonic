@@ -31,7 +31,8 @@ export class UsersMaintenanceService implements OnModuleInit {
 
     const groups = new Map<string, string[]>();
     for (const u of users) {
-      const email = typeof u.email === 'string' ? u.email.trim().toLowerCase() : '';
+      const email =
+        typeof u.email === 'string' ? u.email.trim().toLowerCase() : '';
       if (!email) continue;
       const list = groups.get(email) ?? [];
       list.push(u.userId);

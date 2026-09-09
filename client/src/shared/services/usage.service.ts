@@ -1,6 +1,7 @@
 import apiClient from "@/shared/api/api-client"
 import type {
   CurrentPlanResponse,
+  PurchaseHistoryResponse,
   UsageHistoryResponse,
   UsageSummary,
 } from "@/shared/types/usage.type"
@@ -19,4 +20,9 @@ export const usageService = {
 
   getCurrentPlan: () =>
     apiClient.get<CurrentPlanResponse>("/usage/current-plan").then((r) => r.data),
+
+  getPurchaseHistory: (params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PurchaseHistoryResponse>("/usage/purchases", { params })
+      .then((r) => r.data),
 }

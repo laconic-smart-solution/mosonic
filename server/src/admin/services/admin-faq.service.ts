@@ -34,9 +34,7 @@ export class AdminFaqService {
   listDocuments(params: { page?: number; limit?: number }) {
     const page = params.page ?? 1;
     const limit = params.limit ?? 20;
-    return this.client.get(
-      `/documents?page=${page}&limit=${limit}`,
-    );
+    return this.client.get(`/documents?page=${page}&limit=${limit}`);
   }
 
   getDocument(documentId: string) {
@@ -111,7 +109,9 @@ export class AdminFaqService {
   async downloadDocument(documentId: string, res: Response) {
     const doc = await this.getDocument(documentId);
     if (!doc.storage_path?.trim()) {
-      throw new NotFoundException('Document file is not available for download');
+      throw new NotFoundException(
+        'Document file is not available for download',
+      );
     }
 
     const proxied = await this.fileProxy.fetchFile(doc.storage_path);

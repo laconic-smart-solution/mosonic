@@ -10,10 +10,7 @@ jest.mock('../orchestration/orchestration.service', () => ({
   OrchestrationService: class OrchestrationService {},
 }));
 
-import {
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import { UserRole, UserStatus } from '../domain/users/user.types';
@@ -35,7 +32,9 @@ function mockContext(headers: Record<string, string | undefined>) {
 }
 
 describe('ApiKeyOrJwtGuard', () => {
-  const jwt = { canActivate: jest.fn() } as unknown as jest.Mocked<JwtAuthGuard>;
+  const jwt = {
+    canActivate: jest.fn(),
+  } as unknown as jest.Mocked<JwtAuthGuard>;
   const integrations = {
     validateApiKey: jest.fn(),
   } as unknown as jest.Mocked<Pick<IntegrationsService, 'validateApiKey'>>;

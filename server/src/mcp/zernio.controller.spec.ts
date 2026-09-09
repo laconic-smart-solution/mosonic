@@ -8,7 +8,6 @@ jest.mock('jose', () => ({
 describe('ZernioController', () => {
   const mcpService = {
     ensureZernioProfile: jest.fn(),
-    unlockChannel: jest.fn(),
     connectChannel: jest.fn(),
     handleOAuthCallback: jest.fn(),
     syncAccounts: jest.fn(),
@@ -23,16 +22,6 @@ describe('ZernioController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('returns unlocked after slot charge', async () => {
-    mcpService.unlockChannel.mockResolvedValue({
-      unlocked: true,
-      alreadyUnlocked: false,
-    });
-    const req = { auth: { localUser: { userId: 'u1' } } };
-    const res = await controller.unlockChannel(req as never, 'instagram');
-    expect(res).toEqual({ unlocked: true, alreadyUnlocked: false });
   });
 
   it('returns connect url for unlocked channel', async () => {
@@ -70,4 +59,3 @@ describe('ZernioController', () => {
     );
   });
 });
-

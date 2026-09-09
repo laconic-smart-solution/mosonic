@@ -9,7 +9,7 @@ import {
 export function resolveVideoCreditNodeType(
   config: Record<string, unknown> | undefined,
 ): string {
-  return getVideoGenerationMode(config as WorkflowNodeConfig) === 'presenter'
+  return getVideoGenerationMode(config) === 'presenter'
     ? VIDEO_GENERATION_PRESENTER_CREDIT_TYPE
     : VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE;
 }

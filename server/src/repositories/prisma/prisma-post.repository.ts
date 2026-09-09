@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { PostStatus, Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { PrismaService } from '../../database/prisma.service';
-import type { IPostRepository, PostRecord } from '../interfaces/post.repository.interface';
+import type {
+  IPostRepository,
+  PostRecord,
+} from '../interfaces/post.repository.interface';
 import { mergeTenancyWhere } from './prisma.util';
 
 @Injectable()
@@ -13,10 +16,7 @@ export class PrismaPostRepository implements IPostRepository {
     return this.prisma.post.create({ data });
   }
 
-  findByPostId(
-    postId: string,
-    auth?: TenancyAuth,
-  ): Promise<PostRecord | null> {
+  findByPostId(postId: string, auth?: TenancyAuth): Promise<PostRecord | null> {
     const where = auth ? mergeTenancyWhere({ postId }, auth) : { postId };
     return this.prisma.post.findFirst({ where });
   }
@@ -48,7 +48,9 @@ export class PrismaPostRepository implements IPostRepository {
     sortBy: string,
     sortOrder: 'asc' | 'desc',
   ): Promise<{ rows: PostRecord[]; total: number }> {
-    const orderBy = { [sortBy]: sortOrder } as Prisma.PostOrderByWithRelationInput;
+    const orderBy = {
+      [sortBy]: sortOrder,
+    } as Prisma.PostOrderByWithRelationInput;
     const [rows, total] = await Promise.all([
       this.prisma.post.findMany({
         where: filter,

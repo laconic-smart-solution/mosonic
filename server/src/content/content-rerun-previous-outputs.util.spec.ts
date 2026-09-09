@@ -61,7 +61,7 @@ describe('buildContentRerunPreviousOutputs', () => {
       pipeline,
       'img__facebook',
       {
-        'adapt__facebook': { text: 'Edited FB caption' },
+        adapt__facebook: { text: 'Edited FB caption' },
       },
       {},
     );

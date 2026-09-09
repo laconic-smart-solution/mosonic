@@ -14,11 +14,15 @@ export type WorkflowQaChannelId = (typeof WORKFLOW_QA_CHANNEL_OPTIONS)[number];
 
 const QA_CHANNEL_SET = new Set<string>(WORKFLOW_QA_CHANNEL_OPTIONS);
 
-export function isWorkflowQaChannelId(value: string): value is WorkflowQaChannelId {
+export function isWorkflowQaChannelId(
+  value: string,
+): value is WorkflowQaChannelId {
   return QA_CHANNEL_SET.has(normalizeChannelId(value));
 }
 
-export function normalizeQaChannelIds(channels: string[]): WorkflowQaChannelId[] {
+export function normalizeQaChannelIds(
+  channels: string[],
+): WorkflowQaChannelId[] {
   const seen = new Set<string>();
   const out: WorkflowQaChannelId[] = [];
   for (const raw of channels) {

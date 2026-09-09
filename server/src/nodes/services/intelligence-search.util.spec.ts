@@ -4,6 +4,12 @@ import {
   buildIntelligenceSearchPrompt,
 } from './intelligence-search.util';
 
+// `@toon-format/toon` is ESM-only; Jest's default transform can't parse it.
+// These tests only assert on label substrings, not exact formatting.
+jest.mock('../../common/utils/toon.util', () => ({
+  toPromptToon: (data: unknown) => JSON.stringify(data),
+}));
+
 function minimalRule(overrides?: Partial<Rule>): Rule {
   return {
     ruleId: 'rule-1',
