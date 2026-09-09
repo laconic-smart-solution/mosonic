@@ -34,20 +34,6 @@ export class McpController {
     return await this.mcpService.ensureZernioProfile(user.userId);
   }
 
-  @Get('connect/:platform')
-  @UseGuards(JwtAuthGuard)
-  async connectAccount(
-    @Req() req: Request,
-    @Param('platform') platform: string,
-  ) {
-    const user = req.auth!.localUser as User;
-    const connectUrl = await this.mcpService.getConnectUrl(
-      platform,
-      user.userId,
-    );
-    return { connectUrl };
-  }
-
   @Get('callback')
   async handleCallback(
     @Query()

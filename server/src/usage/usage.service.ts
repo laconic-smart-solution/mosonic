@@ -1,18 +1,34 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CreditConfigService } from '../credit/credit-config.service';
 import { currentBillingPeriod } from '../credit/lib/billing-period.util';
 import { periodCreditBudget } from '../credit/lib/period-credit-budget.util';
 import type { ICreditLedgerRepository } from '../repositories/interfaces/credit-ledger.repository.interface';
+import type { ICreditTopupPurchaseRepository } from '../repositories/interfaces/credit-topup-purchase.repository.interface';
+import type { IPlanPurchaseRepository } from '../repositories/interfaces/plan-purchase.repository.interface';
 import type { IPlanRepository } from '../repositories/interfaces/plan.repository.interface';
 import type { IUserPlanRepository } from '../repositories/interfaces/user-plan.repository.interface';
 import type { IUserRepository } from '../repositories/interfaces/user.repository.interface';
 import {
   CREDIT_LEDGER_REPOSITORY,
+  CREDIT_TOPUP_PURCHASE_REPOSITORY,
+  PLAN_PURCHASE_REPOSITORY,
   PLAN_REPOSITORY,
   USER_PLAN_REPOSITORY,
   USER_REPOSITORY,
 } from '../repositories/tokens';
 import { PlanService } from '../plan/plan.service';
+import { PaymentService } from '../payment/payment.service';
+
+export type PurchaseHistoryEntry = {
+  id: string;
+  type: 'topup' | 'plan';
+  label: string;
+  credits: number | null;
+  amount: number;
+  currencyCode: string;
+  status: string;
+  purchaseDate: Date;
+};
 
 function parseDate(value?: string): Date | undefined {
   if (!value?.trim()) return undefined;
@@ -33,6 +49,8 @@ function displayName(u: {
 
 @Injectable()
 export class UsageService {
+  private readonly logger = new Logger(UsageService.name);
+
   constructor(
     @Inject(CREDIT_LEDGER_REPOSITORY)
     private readonly ledger: ICreditLedgerRepository,
@@ -40,8 +58,13 @@ export class UsageService {
     private readonly userPlans: IUserPlanRepository,
     @Inject(PLAN_REPOSITORY) private readonly plans: IPlanRepository,
     @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
+    @Inject(CREDIT_TOPUP_PURCHASE_REPOSITORY)
+    private readonly topupPurchases: ICreditTopupPurchaseRepository,
+    @Inject(PLAN_PURCHASE_REPOSITORY)
+    private readonly planPurchases: IPlanPurchaseRepository,
     private readonly creditConfig: CreditConfigService,
     private readonly planService: PlanService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   private buildDateFilter(from?: string, to?: string) {
@@ -78,6 +101,94 @@ export class UsageService {
       page,
       limit,
     );
+
+    return {
+      entries,
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  /**
+   * Combines credit top-up purchases and plan purchases into one list, newest
+   * first — this is money-in history, distinct from `getUserHistory` (credit
+   * spend). Merged and paginated in memory: per-user purchase volume is small
+   * (a handful of top-ups/renewals), so a DB-level UNION isn't worth the
+   * complexity across two separate tables.
+   */
+  async getPurchaseHistory(
+    userId: string,
+    query: { page?: number; limit?: number },
+  ): Promise<{
+    entries: PurchaseHistoryEntry[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const [topupPurchases, planPurchases] = await Promise.all([
+      this.topupPurchases.findByUserId(userId),
+      this.planPurchases.findByUserId(userId),
+    ]);
+
+    const packageLabelByCode = new Map<string, string>();
+    if (topupPurchases.length > 0) {
+      try {
+        const topupPlans = await this.paymentService.listTopupPlans({
+          activeOnly: false,
+        });
+        for (const plan of topupPlans) {
+          packageLabelByCode.set(plan.code, plan.label);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Could not resolve topup package labels: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    const planIds = [...new Set(planPurchases.map((p) => p.planId))];
+    const planNameById = new Map<string, string>();
+    if (planIds.length > 0) {
+      const plans = await this.plans.findManyByPlanIds(planIds);
+      for (const plan of plans) {
+        planNameById.set(plan.planId, plan.name);
+      }
+    }
+
+    const combined: PurchaseHistoryEntry[] = [
+      ...topupPurchases.map(
+        (p): PurchaseHistoryEntry => ({
+          id: p.topupPurchaseId,
+          type: 'topup',
+          label: packageLabelByCode.get(p.packageId) ?? p.packageId,
+          credits: p.credits,
+          amount: p.amount,
+          currencyCode: p.currencyCode,
+          status: p.status,
+          purchaseDate: p.purchaseDate,
+        }),
+      ),
+      ...planPurchases.map(
+        (p): PurchaseHistoryEntry => ({
+          id: p.planPurchaseId,
+          type: 'plan',
+          label: planNameById.get(p.planId) ?? p.planId,
+          credits: null,
+          amount: p.amount,
+          currencyCode: p.currencyCode,
+          status: p.status,
+          purchaseDate: p.purchaseDate,
+        }),
+      ),
+    ].sort((a, b) => b.purchaseDate.getTime() - a.purchaseDate.getTime());
+
+    const total = combined.length;
+    const start = (page - 1) * limit;
+    const entries = combined.slice(start, start + limit);
 
     return {
       entries,

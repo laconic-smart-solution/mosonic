@@ -1,24 +1,12 @@
 import apiClient from "../api/api-client"
 import type {
   ZernioConnectedAccountsResponse,
-  ZernioConnectionCreditResponse,
   ZernioConnectChannelResponse,
-  ZernioUnlockChannelResponse,
 } from "../types/zernio.type"
 
 export const zernioService = {
   createProfile: async (): Promise<{ zernioProfileId: string }> => {
     const response = await apiClient.post(`/zernio/profile/create`)
-    return response.data
-  },
-
-  getConnectionCredit: async (): Promise<ZernioConnectionCreditResponse> => {
-    const response = await apiClient.get(`/zernio/connection-credit`)
-    return response.data
-  },
-
-  unlockChannel: async (platform: string): Promise<ZernioUnlockChannelResponse> => {
-    const response = await apiClient.post(`/zernio/unlock/${platform}`)
     return response.data
   },
 

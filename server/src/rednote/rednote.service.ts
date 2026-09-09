@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -7,20 +6,18 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import { SocialAccountStatus } from '@prisma/client';
 import { Queue, QueueEvents } from 'bullmq';
 import {
   buildRedisConnectionOptions,
   redisEnvFromConfig,
 } from '../config/redis-connection.util';
-import { CreditCalculationService } from '../credit/credit-calculation.service';
-import { CreditService } from '../credit/credit.service';
-import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
-import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import {
   parseRedNoteMetadata,
   REDNOTE_CHANNEL,
 } from '../domain/users/rednote-metadata.types';
+import { PlanChannelAccessService } from '../plan/plan-channel-access.service';
 import type { PublishResult } from '../social/social-publish.types';
 import { UsersService } from '../users/users.service';
 import { RedNoteAdapter } from './adapters/rednote.adapter';
@@ -65,9 +62,7 @@ export class RedNoteService {
 
   constructor(
     private readonly users: UsersService,
-    private readonly creditService: CreditService,
-    private readonly nodeCreditPriceService: NodeCreditPriceService,
-    private readonly creditCalculation: CreditCalculationService,
+    private readonly moduleRef: ModuleRef,
     private readonly locks: RedNoteLockService,
     private readonly gateway: RedNoteGateway,
     private readonly adapter: RedNoteAdapter,
@@ -78,43 +73,18 @@ export class RedNoteService {
     private readonly publishQueue: Queue<RedNotePublishJobData>,
   ) {}
 
-  async unlock(userId: string): Promise<{
-    unlocked: true;
-    alreadyUnlocked: boolean;
-  }> {
-    const existing = await this.users.findRedNoteAccount(userId);
-    if (existing) {
-      throw new BadRequestException('RedNote is already connected');
-    }
-    const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      )) ?? 0;
-    const config = await this.creditCalculation.getConfig();
-    const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
-      userId,
-      channel: REDNOTE_CHANNEL,
-      credits: creditsEach,
-      creditPriceUsd: config.creditPriceUsd,
-    });
-    return { unlocked: true, alreadyUnlocked };
-  }
-
   async startConnect(userId: string): Promise<{ socketRoom: string }> {
-    const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      )) ?? 0;
-    if (creditsEach > 0) {
-      const unlocked = await this.creditService.hasSocialChannelUnlock(
-        userId,
-        REDNOTE_CHANNEL,
+    const planChannelAccess = this.moduleRef.get(PlanChannelAccessService, {
+      strict: false,
+    });
+    const allowed = await planChannelAccess.isChannelAllowed(
+      userId,
+      REDNOTE_CHANNEL,
+    );
+    if (!allowed) {
+      throw new ForbiddenException(
+        'Your current plan does not include "rednote". Upgrade your plan to connect this channel.',
       );
-      if (!unlocked) {
-        throw new ForbiddenException(
-          'Unlock "rednote" before connecting your account',
-        );
-      }
     }
 
     const socketRoom = rednoteLoginRoom(userId);

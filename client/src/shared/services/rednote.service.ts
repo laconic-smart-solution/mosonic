@@ -14,11 +14,6 @@ export type RedNoteConnectResponse = {
 }
 
 export const rednoteService = {
-  unlock: async (): Promise<{ unlocked: true; alreadyUnlocked: boolean }> => {
-    const response = await apiClient.post(`/rednote/unlock`)
-    return response.data
-  },
-
   connect: async (): Promise<RedNoteConnectResponse> => {
     const response = await apiClient.post(`/rednote/connect`)
     return response.data

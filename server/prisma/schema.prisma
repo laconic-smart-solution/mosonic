@@ -318,6 +318,8 @@ model Plan {
   isActive        Boolean  @default(true)
   description     String?
   features        String[] @default([])
+  /** Publishable channel keys this plan grants (facebook/instagram/youtube/linkedin/tiktok/rednote). */
+  allowedChannels String[] @default([])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

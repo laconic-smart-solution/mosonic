@@ -4,37 +4,31 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AccountChannelRow } from "@/features/settings/components/account-channel-row"
 import { ACCOUNT_CHANNELS } from "@/features/settings/constants/account-channels"
-import { buildAccountChannelMap, findConnectedForChannel, isChannelUnlocked } from "@/features/settings/lib/account-channel-lookup"
+import { buildAccountChannelMap, findConnectedForChannel, isChannelAllowedByPlan } from "@/features/settings/lib/account-channel-lookup"
 import type { ZernioConnectedAccount } from "@/shared/types/zernio.type"
 
 type AccountChannelsSectionProps = {
   accounts: ZernioConnectedAccount[] | undefined
-  unlockedChannels: string[] | undefined
+  allowedChannels: string[] | undefined
   loading: boolean
-  onUnlock: (apiKey: string) => void
   onConnect: (apiKey: string) => void
   onDisconnect: (channel: string) => void
-  unlockPending: boolean
   connectPending: boolean
   disconnectPending: boolean
   hideHeader?: boolean
-  creditsEach?: number
   /** Channel ids that need re-auth (e.g. RedNote session expired). */
   needsReauthChannels?: string[]
 }
 
 export function AccountChannelsSection({
   accounts,
-  unlockedChannels,
+  allowedChannels,
   loading,
-  onUnlock,
   onConnect,
   onDisconnect,
-  unlockPending,
   connectPending,
   disconnectPending,
   hideHeader = false,
-  creditsEach = 0,
   needsReauthChannels = [],
 }: AccountChannelsSectionProps) {
   const { t } = useTranslation("settings")
@@ -83,15 +77,12 @@ export function AccountChannelsSection({
             key={def.id}
             def={def}
             connected={findConnectedForChannel(def, byChannel)}
-            unlocked={isChannelUnlocked(def, unlockedChannels)}
+            allowed={isChannelAllowedByPlan(def, allowedChannels)}
             needsReauth={needsReauthSet.has(def.apiKey.toLowerCase())}
-            onUnlock={onUnlock}
             onConnect={onConnect}
             onDisconnect={onDisconnect}
-            unlockPending={unlockPending}
             connectPending={connectPending}
             disconnectPending={disconnectPending}
-            creditsEach={creditsEach}
           />
         ))}
       </CardContent>

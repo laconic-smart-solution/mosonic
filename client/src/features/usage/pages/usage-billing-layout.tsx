@@ -13,6 +13,7 @@ const TAB_ROUTES = [
   { id: "overview", path: "/usage" },
   { id: "topup", path: "/usage/topup" },
   { id: "plans", path: "/usage/plans" },
+  { id: "history", path: "/usage/history" },
 ] as const
 
 type TabId = (typeof TAB_ROUTES)[number]["id"]
@@ -20,6 +21,7 @@ type TabId = (typeof TAB_ROUTES)[number]["id"]
 function activeTabFromPath(pathname: string): TabId {
   if (pathname.startsWith("/usage/topup")) return "topup"
   if (pathname.startsWith("/usage/plans")) return "plans"
+  if (pathname.startsWith("/usage/history")) return "history"
   return "overview"
 }
 

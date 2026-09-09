@@ -6,10 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CreditCalculationService } from '../credit/credit-calculation.service';
-import { CreditService } from '../credit/credit.service';
-import { SOCIAL_ACCOUNT_CONNECT_NODE_TYPE } from '../credit/lib/billable-node-credit-types';
-import { NodeCreditPriceService } from '../credit/node-credit-price.service';
+import { ModuleRef } from '@nestjs/core';
+import { PlanChannelAccessService } from '../plan/plan-channel-access.service';
 import {
   type ConnectedAccountRecord,
   UsersService,
@@ -36,9 +34,7 @@ export class McpService {
     private readonly usersService: UsersService,
     private readonly oauthState: ZernioOauthStateService,
     private readonly config: ConfigService,
-    private readonly creditService: CreditService,
-    private readonly nodeCreditPriceService: NodeCreditPriceService,
-    private readonly creditCalculation: CreditCalculationService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /** Lazy-create Zernio REST profile and persist on the user. */
@@ -49,40 +45,7 @@ export class McpService {
     return { zernioProfileId: id };
   }
 
-  /** Charge unlock credits and persist the channel slot (no OAuth redirect). */
-  async unlockChannel(
-    platform: string,
-    userId: string,
-  ): Promise<{ unlocked: true; alreadyUnlocked: boolean }> {
-    const channel = platform.trim().toLowerCase();
-    if (isDeprecatedChannelId(channel)) {
-      throw new BadRequestException(
-        `Publishing channel "${platform}" is not supported`,
-      );
-    }
-    const accounts = await this.usersService.getZernioConnectedAccounts(userId);
-    if (this.isChannelConnected(accounts, platform)) {
-      throw new BadRequestException(
-        `Publishing channel "${platform}" is already connected`,
-      );
-    }
-
-    const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      )) ?? 0;
-    const config = await this.creditCalculation.getConfig();
-    const { alreadyUnlocked } = await this.creditService.unlockSocialChannel({
-      userId,
-      channel,
-      credits: creditsEach,
-      creditPriceUsd: config.creditPriceUsd,
-    });
-
-    return { unlocked: true, alreadyUnlocked };
-  }
-
-  /** OAuth redirect URL for an already-unlocked publishing channel. */
+  /** OAuth redirect URL for a publishing channel included in the user's current plan. */
   async connectChannel(
     platform: string,
     userId: string,
@@ -100,38 +63,18 @@ export class McpService {
       );
     }
 
-    const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      )) ?? 0;
-    if (creditsEach > 0) {
-      const unlocked = await this.creditService.hasSocialChannelUnlock(
-        userId,
-        platform,
+    const planChannelAccess = this.moduleRef.get(PlanChannelAccessService, {
+      strict: false,
+    });
+    const allowed = await planChannelAccess.isChannelAllowed(userId, channel);
+    if (!allowed) {
+      throw new ForbiddenException(
+        `Your current plan does not include "${platform}". Upgrade your plan to connect this channel.`,
       );
-      if (!unlocked) {
-        throw new ForbiddenException(
-          `Unlock "${platform}" before connecting your account`,
-        );
-      }
     }
 
     const connectUrl = await this.buildConnectUrl(platform, userId);
     return { connectUrl };
-  }
-
-  /** @deprecated Use `unlockChannel` then `connectChannel`. */
-  async unlockChannelForConnect(
-    platform: string,
-    userId: string,
-  ): Promise<{ connectUrl: string }> {
-    await this.unlockChannel(platform, userId);
-    return await this.connectChannel(platform, userId);
-  }
-
-  /** OAuth redirect URL only (no credit charge). Prefer `unlockChannelForConnect`. */
-  async getConnectUrl(platform: string, userId: string): Promise<string> {
-    return await this.buildConnectUrl(platform, userId);
   }
 
   private async buildConnectUrl(
@@ -219,7 +162,6 @@ export class McpService {
 
   async getConnectedAccounts(userId: string): Promise<{
     accounts: ConnectedAccountRecord[];
-    unlockedChannels: string[];
   }> {
     const accounts = (
       await this.usersService.getAllActiveConnectedAccounts(userId)
@@ -229,13 +171,10 @@ export class McpService {
         a.channel.trim().toLowerCase() !== 'line' &&
         a.provider !== SocialProvider.LINE,
     );
-    const unlockedChannels = (
-      await this.creditService.listUnlockedSocialChannels(userId)
-    ).filter((ch) => !isDeprecatedChannelId(ch));
     this.logger.log(
       `getConnectedAccounts accounts: jsons ${JSON.stringify(accounts)}`,
     );
-    return { accounts, unlockedChannels };
+    return { accounts };
   }
 
   /**
@@ -273,24 +212,6 @@ export class McpService {
       templateName: params.templateName,
       templateLanguage: params.templateLanguage,
     });
-  }
-
-  async getConnectionCreditQuote(userId: string): Promise<{
-    nodeType: typeof SOCIAL_ACCOUNT_CONNECT_NODE_TYPE;
-    creditsEach: number;
-    creditsRemaining: number;
-  }> {
-    const creditsEach =
-      (await this.nodeCreditPriceService.getActiveCostCredit(
-        SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      )) ?? 0;
-    const creditsRemaining =
-      await this.creditService.getCreditsRemaining(userId);
-    return {
-      nodeType: SOCIAL_ACCOUNT_CONNECT_NODE_TYPE,
-      creditsEach,
-      creditsRemaining,
-    };
   }
 
   async disconnectAccount(userId: string, channel: string): Promise<void> {

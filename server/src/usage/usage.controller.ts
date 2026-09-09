@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
+import { PurchaseHistoryQueryDto } from './dto/purchase-history-query.dto';
 import { UsageHistoryQueryDto } from './dto/usage-history-query.dto';
 import { UsageService } from './usage.service';
 
@@ -36,5 +37,17 @@ export class UsageController {
   getCurrentPlan(@Req() req: Request) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.usageService.getCurrentPlan(auth.userId);
+  }
+
+  @Get('purchases')
+  getPurchaseHistory(
+    @Req() req: Request,
+    @Query() query: PurchaseHistoryQueryDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.usageService.getPurchaseHistory(auth.userId, {
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+    });
   }
 }

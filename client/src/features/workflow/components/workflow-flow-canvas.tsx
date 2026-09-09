@@ -12,9 +12,10 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import type { MouseEvent, ReactNode } from "react"
+import type { MouseEvent, ReactNode, RefObject } from "react"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
-import { LayoutGrid } from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
+import { LayoutGrid, Trash2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Background,
@@ -29,6 +30,7 @@ import {
   type Connection,
   type Edge,
   type NodeChange,
+  type OnNodeDrag,
   type OnSelectionChangeParams,
   type OnMoveEnd,
   type ReactFlowInstance,
@@ -147,6 +149,28 @@ function flowPositionFromDragEvent(
   return screenToFlow({ x: clientX, y: clientY })
 }
 
+function clientPointFromNodeDragEvent(
+  event: globalThis.MouseEvent | globalThis.TouchEvent,
+): { x: number; y: number } | null {
+  if ("clientX" in event) {
+    return { x: event.clientX, y: event.clientY }
+  }
+  const touch = event.touches[0] ?? event.changedTouches[0]
+  return touch ? { x: touch.clientX, y: touch.clientY } : null
+}
+
+function pointInRect(
+  point: { x: number; y: number },
+  rect: DOMRect,
+): boolean {
+  return (
+    point.x >= rect.left &&
+    point.x <= rect.right &&
+    point.y >= rect.top &&
+    point.y <= rect.bottom
+  )
+}
+
 function WorkflowCanvasDropZone({
   children,
   disabled,
@@ -166,6 +190,56 @@ function WorkflowCanvasDropZone({
     >
       {children}
     </div>
+  )
+}
+
+function WorkflowNodeDeleteZone({
+  zoneRef,
+  deletable,
+  hover,
+}: {
+  zoneRef: RefObject<HTMLDivElement | null>
+  deletable: boolean
+  hover: boolean
+}) {
+  const { t } = useTranslation("workflow")
+  const active = deletable && hover
+  return (
+    <motion.div
+      className="fixed top-1/2 right-5 z-60 -translate-y-1/2"
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 16 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+    >
+      <div
+        ref={zoneRef}
+        className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-6 py-4 shadow-lg backdrop-blur transition-colors"
+        style={
+          active
+            ? {
+                borderColor: "var(--nt-red-border)",
+                backgroundColor: "var(--nt-red-bg)",
+                color: "var(--nt-red)",
+              }
+            : {
+                borderColor: "var(--nt-border)",
+                backgroundColor: "var(--card)",
+                color: "var(--muted-foreground)",
+                opacity: deletable ? 1 : 0.6,
+              }
+        }
+      >
+        <Trash2 className={active ? "size-6 animate-pulse" : "size-6"} />
+        <span className="max-w-26 text-center text-xs font-medium leading-snug">
+          {deletable
+            ? active
+              ? t("deleteZone.release")
+              : t("deleteZone.hint")
+            : t("deleteZone.notDeletable")}
+        </span>
+      </div>
+    </motion.div>
   )
 }
 
@@ -359,6 +433,12 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const suppressEditNotifyRef = useRef(false)
     nodesRef.current = nodes
     edgesRef.current = edges
+
+    const [draggingNode, setDraggingNode] = useState<
+      { id: string; deletable: boolean } | null
+    >(null)
+    const [overDeleteZone, setOverDeleteZone] = useState(false)
+    const deleteZoneRef = useRef<HTMLDivElement>(null)
     // Read via ref (not a dep) so the hydration effect below doesn't re-run
     // just because the parent passed a fresh (unmemoized) callback identity.
     const onChannelsReconciledRef = useRef(onChannelsReconciled)
@@ -1060,6 +1140,40 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       ],
     )
 
+    const onNodeDragStart = useCallback<OnNodeDrag<WfRfNode>>(
+      (_event, node) => {
+        if (readOnly || node.type === "plus_placeholder") return
+        setDraggingNode({ id: node.id, deletable: Boolean(node.data?.onDelete) })
+      },
+      [readOnly],
+    )
+
+    const onNodeDrag = useCallback<OnNodeDrag<WfRfNode>>((event) => {
+      const zone = deleteZoneRef.current
+      const point = clientPointFromNodeDragEvent(event)
+      if (!zone || !point) {
+        setOverDeleteZone(false)
+        return
+      }
+      setOverDeleteZone(pointInRect(point, zone.getBoundingClientRect()))
+    }, [])
+
+    const onNodeDragStop = useCallback<OnNodeDrag<WfRfNode>>(
+      (_event, node) => {
+        if (
+          draggingNode &&
+          draggingNode.id === node.id &&
+          draggingNode.deletable &&
+          overDeleteZone
+        ) {
+          deleteNode(node.id)
+        }
+        setDraggingNode(null)
+        setOverDeleteZone(false)
+      },
+      [draggingNode, overDeleteZone, deleteNode],
+    )
+
     useEffect(() => {
       if (!selectedId) return
       const handler = (event: KeyboardEvent) => {
@@ -1380,6 +1494,9 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             onConnect={readOnly ? undefined : onConnect}
             onSelectionChange={onSelectionChange}
             onNodeClick={onNodeClick}
+            onNodeDragStart={readOnly ? undefined : onNodeDragStart}
+            onNodeDrag={readOnly ? undefined : onNodeDrag}
+            onNodeDragStop={readOnly ? undefined : onNodeDragStop}
             onPaneClick={() => closePanel()}
             onInit={onInit}
             onMoveEnd={onMoveEnd}
@@ -1476,6 +1593,16 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             <WorkflowPaletteDragPreview wfType={paletteDragType} />
           </DragOverlay>
         ) : null}
+
+        <AnimatePresence>
+          {!readOnly && draggingNode ? (
+            <WorkflowNodeDeleteZone
+              zoneRef={deleteZoneRef}
+              deletable={draggingNode.deletable}
+              hover={overDeleteZone}
+            />
+          ) : null}
+        </AnimatePresence>
       </DndContext>
     )
   },

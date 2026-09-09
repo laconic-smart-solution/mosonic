@@ -32,23 +32,6 @@ export class ZernioController {
     return await this.mcpService.ensureZernioProfile(user.userId);
   }
 
-  @Get('connection-credit')
-  @UseGuards(JwtAuthGuard)
-  async getConnectionCredit(@Req() req: Request) {
-    const user = req.auth!.localUser as User;
-    return await this.mcpService.getConnectionCreditQuote(user.userId);
-  }
-
-  @Post('unlock/:platform')
-  @UseGuards(JwtAuthGuard)
-  async unlockChannel(
-    @Req() req: Request,
-    @Param('platform') platform: string,
-  ) {
-    const user = req.auth!.localUser as User;
-    return await this.mcpService.unlockChannel(platform, user.userId);
-  }
-
   @Post('connect/:platform')
   @UseGuards(JwtAuthGuard)
   async connectChannel(

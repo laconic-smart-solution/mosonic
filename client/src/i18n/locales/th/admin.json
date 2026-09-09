@@ -481,6 +481,8 @@
     "fieldFeatures": "คุณสมบัติ (หนึ่งบรรทัดต่อรายการ)",
     "featuresPlaceholder": "คุณสมบัติ 1",
     "fieldActive": "ใช้งาน",
+    "fieldAllowedChannels": "ช่องทางเผยแพร่",
+    "allowedChannelsHint": "ช่องทางที่ผู้ใช้แพ็กเกจนี้สามารถเชื่อมต่อและเผยแพร่ได้",
     "save": "บันทึกแพ็กเกจ"
   },
   "usage": {

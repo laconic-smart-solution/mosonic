@@ -5,7 +5,8 @@
     "label": "账单分区",
     "overview": "概览",
     "topup": "充值",
-    "plans": "套餐"
+    "plans": "套餐",
+    "history": "购买记录"
   },
   "planBanner": {
     "plan": "套餐",
@@ -70,5 +71,21 @@
     "7d": "近 7 天",
     "30d": "近 30 天",
     "all": "全部"
+  },
+  "purchaseHistory": {
+    "title": "购买记录",
+    "subtitle": "积分充值与套餐购买，按时间倒序排列。",
+    "date": "日期",
+    "type": "类型",
+    "typeTopup": "充值",
+    "typePlan": "套餐",
+    "item": "项目",
+    "credits": "积分",
+    "amount": "金额",
+    "status": "状态",
+    "statusActive": "已完成",
+    "statusPending": "处理中",
+    "statusCancelled": "已取消",
+    "empty": "暂无购买记录。"
   }
 }

@@ -183,23 +183,23 @@
     "profileReady": "Zernio 配置文件已就绪。",
     "profileFailed": "无法创建配置文件。",
     "connectUrlFailed": "无法获取连接 URL。",
-    "unlockFailed": "无法解锁此渠道，请重试。",
-    "insufficientCredits": "积分不足，无法解锁此渠道。",
+    "planRestricted": "您的套餐不包含此渠道。升级套餐以连接。",
     "disconnected": "渠道已断开。",
     "disconnectFailed": "无法断开账户。"
   },
   "channels": {
     "sectionTitle": "发布渠道",
-    "sectionDesc": "Facebook、Instagram、YouTube、LinkedIn 和 TikTok。仅解锁您使用的网络；与上传和定时发布共享。",
+    "sectionDesc": "Facebook、Instagram、YouTube、LinkedIn、TikTok 和小红书。可用渠道取决于您的套餐；与上传和定时发布共享。",
     "connected": "已连接",
     "notConnected": "未连接",
     "accountId": "账户 ID",
     "disconnect": "断开",
-    "unlock": "解锁",
-    "unlockWithCredits": "解锁 · {{count}}",
-    "unlockCost": "解锁需消耗 {{count}} 积分",
-    "unlockAria": "解锁 {{channel}}",
-    "unlockAriaWithCost": "解锁 {{channel}}，消耗 {{count}} 积分",
+    "connect": "连接",
+    "connectAria": "连接 {{channel}}",
+    "planLocked": "不在您的套餐内",
+    "planLockedDesc": "升级套餐以连接此渠道。",
+    "upgradePlan": "升级套餐",
+    "upgradePlanAria": "升级套餐以连接 {{channel}}",
     "facebook": {
       "label": "Facebook",
       "description": "用于 Meta 发布的页面和个人资料。"
@@ -237,26 +237,5 @@
     "healthCheck": "验证会话",
     "healthOk": "会话有效。",
     "healthFailed": "需要重新验证。"
-  },
-  "unlockConfirm": {
-    "title": "解锁 {{channel}}",
-    "description": "解锁后您可授权该网络用于发布。确认后将立即扣除积分，随后跳转到网络授权页面。",
-    "loading": "正在加载解锁费用…",
-    "estimatedCost": "解锁费用",
-    "currentBalance": "当前余额",
-    "credits": "积分",
-    "balanceAfter": "解锁后余额",
-    "balanceAfterAria": "解锁后余额：{{count}} 积分",
-    "costSummaryAria": "解锁费用与当前余额",
-    "noCharge": "解锁此渠道不消耗积分。",
-    "chargeNotice": "确认后将立即扣除积分，您可在网络页面完成授权。",
-    "insufficientTitle": "积分不足",
-    "insufficientDescription": "解锁需要 {{required}} 积分，但您仅剩 {{remaining}} 积分。",
-    "refill": "充值积分",
-    "cancel": "暂不",
-    "confirm": "是的，确认",
-    "confirmAria": "确认解锁 {{channel}}",
-    "confirmAriaWithCost": "确认解锁 {{channel}}，消耗 {{count}} 积分",
-    "unlocking": "正在解锁…"
   }
 }
