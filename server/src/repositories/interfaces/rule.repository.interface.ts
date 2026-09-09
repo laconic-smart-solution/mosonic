@@ -4,6 +4,9 @@ import type { TenancyAuth } from '../../auth/tenancy.types';
 export type RuleRecord = {
   ruleId: string;
   userId: string | null;
+  isSystem?: boolean;
+  isTemplate?: boolean;
+  templateCategory?: string | null;
   name: string;
   brand: unknown;
   audience: unknown;
@@ -24,6 +27,8 @@ export type RuleRecord = {
 export interface IRuleRepository {
   findById(ruleId: string, auth?: TenancyAuth): Promise<RuleRecord | null>;
   findByIds(ruleIds: string[]): Promise<RuleRecord[]>;
+  findSystemTemplates(category?: string): Promise<RuleRecord[]>;
+  listTemplates(auth?: TenancyAuth, category?: string): Promise<RuleRecord[]>;
   findPage(
     filter: Prisma.RuleWhereInput,
     page: number,
@@ -36,6 +41,10 @@ export interface IRuleRepository {
   updateById(
     ruleId: string,
     data: Prisma.RuleUpdateInput,
+    auth?: TenancyAuth,
+  ): Promise<RuleRecord | null>;
+  deleteById?(
+    ruleId: string,
     auth?: TenancyAuth,
   ): Promise<RuleRecord | null>;
   updateNewsTrigger(

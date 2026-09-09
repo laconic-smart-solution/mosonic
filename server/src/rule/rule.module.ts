@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { EventsModule } from '../events/events.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { LlmModule } from '../llm/llm.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { RuleExtractController } from './rule-extract.controller';
@@ -13,6 +14,7 @@ import { RuleService } from './rule.service';
   imports: [
     AuthModule,
     CreditModule,
+    IntegrationsModule,
     LlmModule,
     EventsModule,
     RepositoriesModule,

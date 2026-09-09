@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 jest.mock('../preprocessing/preprocessing.service', () => ({
   PreprocessingService: class PreprocessingService {},
@@ -16,16 +16,13 @@ import { UserRole } from '../users/schemas/user.schema';
 import { RuleService } from './rule.service';
 import { GenderOption, PostingFrequency } from './schemas/rule.schema';
 
-type MockChain<T> = {
-  exec: jest.Mock<Promise<T>, []>;
-};
-
 describe('RuleService updates', () => {
   const auth = { userId: 'user-1', role: UserRole.CUSTOMER };
 
   const existingRule = {
     ruleId: 'rule-1',
     userId: 'user-1',
+    isSystem: false,
     name: 'Old name',
     brand: { brandName: 'Brand' },
     audience: { ageRange: { min: 20, max: 50 } },
@@ -45,19 +42,22 @@ describe('RuleService updates', () => {
     contentGuidelines: { seoGuidelines: {} },
   };
 
-  const createService = () => {
-    const findOneExec = jest.fn().mockResolvedValue(existingRule);
-    const findOneAndUpdateExec = jest
-      .fn()
-      .mockResolvedValue({ ...existingRule });
-
-    const ruleModel = {
-      findOne: jest.fn(() => ({ exec: findOneExec })),
-      findOneAndUpdate: jest.fn(() => ({ exec: findOneAndUpdateExec })),
+  const createService = (overrideRule = existingRule) => {
+    const rulesRepo = {
+      findById: jest.fn().mockResolvedValue(overrideRule),
+      updateById: jest.fn().mockResolvedValue({ ...overrideRule }),
+      findSystemTemplates: jest.fn().mockResolvedValue([
+        {
+          ruleId: 'sys-rule-1',
+          name: 'E-Commerce Flash Sale',
+          isSystem: true,
+          isTemplate: true,
+        },
+      ]),
     };
 
     const service = new RuleService(
-      ruleModel as never,
+      rulesRepo as never,
       {} as never,
       {} as never,
       {} as never,
@@ -65,7 +65,7 @@ describe('RuleService updates', () => {
       {} as never,
     );
 
-    return { service, ruleModel };
+    return { service, rulesRepo };
   };
 
   it('rejects empty PATCH payloads', async () => {
@@ -75,8 +75,8 @@ describe('RuleService updates', () => {
     );
   });
 
-  it('uses runValidators for PUT replacement updates', async () => {
-    const { service, ruleModel } = createService();
+  it('updates rule when replacement is valid', async () => {
+    const { service, rulesRepo } = createService();
     await service.replaceRule(
       'rule-1',
       {
@@ -116,10 +116,42 @@ describe('RuleService updates', () => {
       auth,
     );
 
-    expect(ruleModel.findOneAndUpdate).toHaveBeenCalledWith(
-      { ruleId: 'rule-1', userId: 'user-1' },
-      { $set: expect.any(Object) },
-      { new: true, runValidators: true },
+    expect(rulesRepo.updateById).toHaveBeenCalledWith(
+      'rule-1',
+      expect.objectContaining({ name: 'New name' }),
+      auth,
     );
+  });
+
+  it('blocks customer from modifying a system rule template', async () => {
+    const systemRule = { ...existingRule, ruleId: 'sys-1', isSystem: true, userId: null };
+    const { service } = createService(systemRule);
+
+    await expect(
+      service.patchRule('sys-1', { name: 'Attempt edit' }, auth),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    await expect(
+      service.replaceRule(
+        'sys-1',
+        {
+          name: 'Attempt replace',
+          brand: existingRule.brand as never,
+          audience: {} as never,
+          campaign: { duration: { startDate: '2026-01-01', endDate: '2026-01-31' } } as never,
+          channels: [],
+          contentGuidelines: {} as never,
+        },
+        auth,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows fetching system rule templates', async () => {
+    const { service, rulesRepo } = createService();
+    const result = await service.listSystemTemplates('E-Commerce');
+    expect(rulesRepo.findSystemTemplates).toHaveBeenCalledWith('E-Commerce');
+    expect(result).toHaveLength(1);
+    expect(result[0].isSystem).toBe(true);
   });
 });

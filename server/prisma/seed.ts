@@ -4,6 +4,7 @@ import { DEFAULT_PLANS } from '../src/plan/plan-defaults';
 import type { PlanRecord } from '../src/domain/plans/plan.types';
 import { IMAGE_TEMPLATE_SEEDS } from './seed-data/image-templates.seed-data';
 import { IMAGE_DESIGN_STYLE_SEEDS } from './seed-data/image-design-styles.seed-data';
+import { SYSTEM_RULE_SEEDS } from './seed-data/system-rules.seed-data';
 
 const prisma = new PrismaClient();
 
@@ -85,11 +86,66 @@ async function seedImageDesignStyles(): Promise<void> {
   console.log(`Seeded ${IMAGE_DESIGN_STYLE_SEEDS.length} image design styles`);
 }
 
+async function seedSystemRules(): Promise<void> {
+  for (const seed of SYSTEM_RULE_SEEDS) {
+    const { ruleId, name, isSystem, isTemplate, templateCategory, brand, audience, campaign, channels, contentGuidelines } = seed;
+    const existing = await prisma.rule.findUnique({ where: { ruleId } });
+    if (existing) {
+      await prisma.rule.update({
+        where: { ruleId },
+        data: {
+          name,
+          isSystem,
+          isTemplate,
+          templateCategory,
+          brand,
+          audience,
+          campaign: {
+            ...campaign,
+            duration: {
+              startDate: new Date(campaign.duration.startDate),
+              endDate: new Date(campaign.duration.endDate),
+            },
+          },
+          channels,
+          contentGuidelines,
+        },
+      });
+    } else {
+      await prisma.rule.create({
+        data: {
+          ruleId,
+          userId: null,
+          name,
+          isSystem,
+          isTemplate,
+          templateCategory,
+          brand,
+          audience,
+          campaign: {
+            ...campaign,
+            duration: {
+              startDate: new Date(campaign.duration.startDate),
+              endDate: new Date(campaign.duration.endDate),
+            },
+          },
+          channels,
+          contentGuidelines,
+          originalInput: { type: 'seed' },
+          status: 'active',
+        },
+      });
+    }
+  }
+  console.log(`Seeded ${SYSTEM_RULE_SEEDS.length} system rule templates`);
+}
+
 async function main(): Promise<void> {
   await seedDefaultPlans();
   await assignFreePlans();
   await seedImageTemplates();
   await seedImageDesignStyles();
+  await seedSystemRules();
 }
 
 main()

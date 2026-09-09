@@ -564,6 +564,9 @@ model WorkflowNode {
 model Rule {
   ruleId           String     @id @default(uuid())
   userId           String?
+  isSystem         Boolean    @default(false)
+  isTemplate       Boolean    @default(false)
+  templateCategory String?
   name             String
   brand            Json       @default("{}")
   audience         Json       @default("{}")
@@ -583,6 +586,7 @@ model Rule {
   @@index([name])
   @@index([status, updatedAt(sort: Desc)])
   @@index([userId, updatedAt(sort: Desc)])
+  @@index([isSystem, isTemplate, status])
   @@map("rules")
 }
 
