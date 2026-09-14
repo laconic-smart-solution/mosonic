@@ -151,6 +151,10 @@ export class CompetitionEventIntegrationService {
     const externalRef = body.externalRef.trim();
     const prompt = body.prompt.trim();
     const imageUrl = body.imageUrl?.trim() || null;
+    this.logger.log(
+      `generateSocialContent starting for ruleId=${ruleId}, externalRef=${externalRef}, userId=${auth.userId}`,
+    );
+
     if (!ruleId) {
       throw new BadRequestException('ruleId must not be empty');
     }
@@ -161,47 +165,58 @@ export class CompetitionEventIntegrationService {
       throw new BadRequestException('prompt must not be empty');
     }
 
-    const workflow = await this.workflows.findLatestByRule(ruleId, auth);
-    if (!workflow) {
-      throw new NotFoundException(`No workflow found for rule ${ruleId}`);
-    }
+    try {
+      let workflow = await this.workflows.findLatestByRule(ruleId, auth);
+      if (!workflow) {
+        workflow = await this.workflows.findLatestReadyByRule(ruleId);
+      }
+      if (!workflow) {
+        throw new NotFoundException(`No workflow found for rule ${ruleId}`);
+      }
 
-    const { pipelineId } = await this.orchestration.startPipeline({
-      workflowId: workflow.workflowId,
-      ruleId,
-      contentPrompt: prompt,
-      metadata: { source: 'integration' },
-      auth,
-    });
+      const { pipelineId } = await this.orchestration.startPipeline({
+        workflowId: workflow.workflowId,
+        ruleId,
+        contentPrompt: prompt,
+        metadata: { source: 'integration' },
+        auth,
+      });
 
-    const pipeline = await this.pipelines.findById(pipelineId, auth);
-    await this.pipelines.updateById(
-      pipelineId,
-      {
-        metadata: {
-          ...(this.asRecord(pipeline?.metadata) ?? {}),
-          integrationSource: INTEGRATION_SOURCE,
-          externalRef,
-          ...(imageUrl ? { externalImageUrl: imageUrl } : {}),
+      const pipeline = await this.pipelines.findById(pipelineId, auth);
+      await this.pipelines.updateById(
+        pipelineId,
+        {
+          metadata: {
+            ...(this.asRecord(pipeline?.metadata) ?? {}),
+            integrationSource: INTEGRATION_SOURCE,
+            externalRef,
+            ...(imageUrl ? { externalImageUrl: imageUrl } : {}),
+          },
         },
-      },
-      auth,
-    );
+        auth,
+      );
 
-    this.logger.log(
-      `Started competition-event social pipeline ${pipelineId} on rule ${ruleId} for ${externalRef}`,
-    );
+      this.logger.log(
+        `Started competition-event social pipeline ${pipelineId} on rule ${ruleId} for ${externalRef}`,
+      );
 
-    return {
-      pipelineId,
-      workflowId: workflow.workflowId,
-      ruleId,
-      status: pipeline?.status ?? 'running',
-      contentId: null,
-      text: null,
-      imageUrl,
-      externalRef,
-    };
+      return {
+        pipelineId,
+        workflowId: workflow.workflowId,
+        ruleId,
+        status: pipeline?.status ?? 'running',
+        contentId: null,
+        text: null,
+        imageUrl,
+        externalRef,
+      };
+    } catch (err) {
+      this.logger.error(
+        `Error generating social content for rule ${ruleId}: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
+    }
   }
 
   /**
