@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Logger,
   Post,
   Query,
   Req,
@@ -45,6 +46,8 @@ const bodyPipe = new ValidationPipe({
 @Controller('auth')
 @ApiTags('Auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly sso: SsoClientService,
     private readonly eventAppClient: EventAppClientService,
@@ -87,24 +90,6 @@ export class AuthController {
     try {
       const userInfo = await this.eventAppClient.validateExchangeCode(code);
 
-      // The browser may still hold a session cookie from a previous Mosonic
-      // login for a DIFFERENT account. If we leave it in place, GuestOnlyRoute
-      // on the frontend sees an existing session and redirects straight to
-      // /dashboard as that OLD user, skipping the OTP page entirely — the new
-      // identity never gets a chance to authenticate. So only clear it when we
-      // can positively confirm it belongs to someone else. If the access token
-      // is simply missing/expired (its TTL is much shorter than the refresh
-      // token's), we can't tell either way — leave the cookies alone and let
-      // the frontend's normal refresh-on-401 flow handle it, rather than
-      // nuking a still-valid refresh token and forcing OTP on every access
-      // token expiry for the SAME user.
-      if (this.isConfirmedDifferentUser(req, userInfo)) {
-        this.cookies.clearTokens(res);
-      }
-
-      // Trigger OTP email dispatch through SSO service
-      await this.sso.resendOtpByEmail({ email: userInfo.email });
-
       let targetRedirect =
         redirectPath || userInfo.redirectPath || '/dashboard?source=crabonic';
       if (!targetRedirect.startsWith('/')) {
@@ -117,12 +102,32 @@ export class AuthController {
           `source=${encodeURIComponent(refSource)}`;
       }
 
+      // 1-Click Seamless SSO: If the exchange code provided the user's active SSO access token,
+      // establish the session cookie immediately and navigate straight to the destination.
+      if (userInfo.accessToken?.trim()) {
+        this.cookies.writeTokens(res, {
+          accessToken: userInfo.accessToken.trim(),
+        });
+        const destinationUrl = `${frontendUrl}${
+          targetRedirect.startsWith('/') ? targetRedirect : `/${targetRedirect}`
+        }`;
+        return res.redirect(302, destinationUrl);
+      }
+
+      if (this.isConfirmedDifferentUser(req, userInfo)) {
+        this.cookies.clearTokens(res);
+      }
+
+      // Fallback: Trigger OTP email dispatch through SSO service
+      await this.sso.resendOtpByEmail({ email: userInfo.email });
+
       const otpUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(
         userInfo.email,
       )}&redirectPath=${encodeURIComponent(targetRedirect)}`;
 
       return res.redirect(302, otpUrl);
-    } catch {
+    } catch (err) {
+      this.logger.error('startExchange failed', err);
       return res.redirect(
         302,
         `${frontendUrl}/login?error=invalid_or_expired_code`,
@@ -135,14 +140,22 @@ export class AuthController {
   @ApiOperation({
     summary: 'Validate a Competition Event exchange code',
     description:
-      'Confirms a single-use code from the Event App is valid and returns the associated identity. Does not establish a session — the /verify-origin page uses this only to confirm the referral, then checks the existing cookie session via GET /auth/me.',
+      'Confirms a single-use code from the Event App is valid and returns the associated identity.',
   })
-  async verifyOrigin(@Body() body: AuthVerifyOriginDto) {
+  async verifyOrigin(
+    @Body() body: AuthVerifyOriginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const userInfo = await this.eventAppClient.validateExchangeCode(body.code);
     let targetRedirect = userInfo.redirectPath || '/dashboard?source=crabonic';
     if (!targetRedirect.includes('source=')) {
       targetRedirect +=
         (targetRedirect.includes('?') ? '&' : '?') + 'source=crabonic';
+    }
+    if (userInfo.accessToken?.trim()) {
+      this.cookies.writeTokens(res, {
+        accessToken: userInfo.accessToken.trim(),
+      });
     }
     return {
       valid: true,

@@ -21,9 +21,22 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     const base = opts?.templateOnly
       ? { workflowRef, isGenerateMoreOnly: false }
       : { workflowRef };
-    const where = auth ? mergeTenancyWhere(base, auth) : base;
+    if (!auth || auth.role === 'ADMIN') {
+      return this.prisma.workflowNode.findMany({
+        where: base,
+        orderBy: { order: 'asc' },
+      });
+    }
     return this.prisma.workflowNode.findMany({
-      where,
+      where: {
+        ...base,
+        OR: [
+          { userId: auth.userId },
+          { userId: null },
+          { workflow: { isTemplate: true } },
+          { workflow: { userId: null } },
+        ],
+      },
       orderBy: { order: 'asc' },
     });
   }
@@ -36,8 +49,20 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     const base = opts?.templateOnly
       ? { workflowRef: { in: workflowRefs }, isGenerateMoreOnly: false }
       : { workflowRef: { in: workflowRefs } };
-    const where = auth ? mergeTenancyWhere(base, auth) : base;
-    return this.prisma.workflowNode.findMany({ where });
+    if (!auth || auth.role === 'ADMIN') {
+      return this.prisma.workflowNode.findMany({ where: base });
+    }
+    return this.prisma.workflowNode.findMany({
+      where: {
+        ...base,
+        OR: [
+          { userId: auth.userId },
+          { userId: null },
+          { workflow: { isTemplate: true } },
+          { workflow: { userId: null } },
+        ],
+      },
+    });
   }
 
   findByWorkflowAndNodeId(
@@ -45,10 +70,23 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     nodeId: string,
     auth?: TenancyAuth,
   ): Promise<WorkflowNodeRecord | null> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowRef, nodeId }, auth)
-      : { workflowRef, nodeId };
-    return this.prisma.workflowNode.findFirst({ where });
+    if (!auth || auth.role === 'ADMIN') {
+      return this.prisma.workflowNode.findFirst({
+        where: { workflowRef, nodeId },
+      });
+    }
+    return this.prisma.workflowNode.findFirst({
+      where: {
+        workflowRef,
+        nodeId,
+        OR: [
+          { userId: auth.userId },
+          { userId: null },
+          { workflow: { isTemplate: true } },
+          { workflow: { userId: null } },
+        ],
+      },
+    });
   }
 
   findVideoNode(
