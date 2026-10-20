@@ -16,6 +16,7 @@ import { CreditService } from '../credit/credit.service';
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { NodeExecutor } from '../orchestration/node-executor.service';
+import { SourcePackBuilderService } from '../orchestration/source-pack-builder.service';
 import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
   WorkflowNodeType,
@@ -37,9 +38,16 @@ import {
 import { mergeResolvedOutputs } from './content-output.utils';
 import { resolveRerunWorkflowNodeId } from './content-rerun-node-resolve.util';
 import { buildContentRerunPreviousOutputs } from './content-rerun-previous-outputs.util';
+import { mergeRerunSourcePack } from './content-rerun-source-pack.util';
+import { resolveImageRerunSourcePack } from './image-rerun-source-pack.util';
 import { buildNodeOutputMapFromPipeline } from '../pipeline/pipeline-output-parse';
 import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
-import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
+import {
+  emptySourcePack,
+  parsePipelineSourcePack,
+  type PipelineSourcePack,
+} from '../pipeline/source-pack.types';
+import type { UploadedFileLike } from '../preprocessing/preprocessed.types';import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
 import type {
   ContentPageItemDto,
   ContentPageQueryDto,
@@ -117,6 +125,7 @@ export class ContentService {
     private readonly uploadService: UploadService,
     private readonly workflowService: WorkflowService,
     private readonly nodeExecutor: NodeExecutor,
+    private readonly sourcePackBuilder: SourcePackBuilderService,
     private readonly creditService: CreditService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly creditCalculation: CreditCalculationService,
@@ -353,6 +362,10 @@ export class ContentService {
     contentId: string,
     dto: RerunNodeDto,
     auth: TenancyAuth,
+    attachments?: {
+      files?: UploadedFileLike[];
+      urls?: string[];
+    },
   ): Promise<void> {
     const content = await this.contentRepository.findById(contentId, auth);
     if (!content) {
@@ -523,6 +536,35 @@ export class ContentService {
       nodeConfig: this.asRecord(nodeForRun.config),
     });
 
+    const existingPack =
+      parsePipelineSourcePack(pipeline.sourcePack) ?? emptySourcePack();
+    const attachFiles = attachments?.files ?? [];
+    const attachUrls = (attachments?.urls ?? [])
+      .map((u) => u.trim())
+      .filter(Boolean);
+    let sourcePack: PipelineSourcePack = existingPack;
+    if (attachFiles.length > 0 || attachUrls.length > 0) {
+      const brand =
+        rule.brand &&
+        typeof rule.brand === 'object' &&
+        !Array.isArray(rule.brand) &&
+        typeof (rule.brand as { brandName?: unknown }).brandName === 'string'
+          ? (rule.brand as { brandName: string }).brandName
+          : undefined;
+      const fresh = await this.sourcePackBuilder.build({
+        contentPrompt:
+          dto.message?.trim() || pipeline.contentPrompt || '',
+        files: attachFiles,
+        urls: attachUrls,
+        brandName: brand,
+        storageKey: content.contentId,
+      });
+      sourcePack = mergeRerunSourcePack(existingPack, fresh);
+    }
+
+    const hadNewAttachments =
+      attachFiles.length > 0 || attachUrls.length > 0;
+
     void this.runRerunExecution({
       content,
       pipeline,
@@ -531,6 +573,8 @@ export class ContentService {
       rule,
       dto,
       previousOutputs,
+      sourcePack,
+      hadNewAttachments,
       auth,
       creditsCharged,
     }).catch((err: unknown) => {
@@ -564,6 +608,10 @@ export class ContentService {
     contentId: string,
     dto: GenerateNodeDto,
     auth: TenancyAuth,
+    attachments?: {
+      files?: UploadedFileLike[];
+      urls?: string[];
+    },
   ): Promise<{ success: true; nodeId: string }> {
     if (
       dto.type === WorkflowNodeType.TextGeneration ||
@@ -623,13 +671,16 @@ export class ContentService {
       throw new BadRequestException(`Invalid node config: ${msg}`);
     }
 
+    const direction =
+      dto.message?.trim() || dto.userPrompt?.trim() || undefined;
+
     const { order } = await this.workflowService.appendWorkflowNode(
       content.workflowRef,
       {
         nodeId,
         type: dto.type,
         config,
-        userPrompt: dto.userPrompt,
+        userPrompt: direction,
       },
       auth,
     );
@@ -643,6 +694,33 @@ export class ContentService {
       nodeConfig: config as Record<string, unknown>,
     });
 
+    const existingPack =
+      parsePipelineSourcePack(pipeline.sourcePack) ?? emptySourcePack();
+    const attachFiles = attachments?.files ?? [];
+    const attachUrls = (attachments?.urls ?? [])
+      .map((u) => u.trim())
+      .filter(Boolean);
+    let sourcePack: PipelineSourcePack = existingPack;
+    if (attachFiles.length > 0 || attachUrls.length > 0) {
+      const brand =
+        rule.brand &&
+        typeof rule.brand === 'object' &&
+        !Array.isArray(rule.brand) &&
+        typeof (rule.brand as { brandName?: unknown }).brandName === 'string'
+          ? (rule.brand as { brandName: string }).brandName
+          : undefined;
+      const fresh = await this.sourcePackBuilder.build({
+        contentPrompt: direction || pipeline.contentPrompt || '',
+        files: attachFiles,
+        urls: attachUrls,
+        brandName: brand,
+        storageKey: content.contentId,
+      });
+      // Prefer fresh attachments for this variant; keep original pack notes.
+      // Do NOT inject previous_output — Generate More is another shot, not a tweak.
+      sourcePack = mergeRerunSourcePack(existingPack, fresh);
+    }
+
     void this.runGenerateMoreExecution({
       content,
       pipeline,
@@ -652,6 +730,8 @@ export class ContentService {
       order,
       config,
       previousOutputs: previousOutputsFromDb,
+      sourcePack,
+      contentPrompt: direction || pipeline.contentPrompt,
       auth,
       creditsCharged,
     }).catch((err: unknown) => {
@@ -767,6 +847,8 @@ export class ContentService {
     order: number;
     config: WorkflowNodeConfig;
     previousOutputs: PreviousOutputs;
+    sourcePack: PipelineSourcePack;
+    contentPrompt: string;
     auth: TenancyAuth;
     creditsCharged: number;
   }): Promise<void> {
@@ -779,12 +861,13 @@ export class ContentService {
       order,
       config,
       previousOutputs,
+      sourcePack,
+      contentPrompt,
       auth,
       creditsCharged,
     } = args;
     const userId = auth.userId;
     try {
-      const contentPrompt = pipeline.contentPrompt;
       const totalNodes = await this.workflowNodes.countByWorkflow(
         content.workflowRef,
         auth,
@@ -796,6 +879,7 @@ export class ContentService {
           order,
           config,
           workflowRef: content.workflowRef,
+          userPrompt: dto.message?.trim() || dto.userPrompt?.trim() || undefined,
         },
         context: {
           rule: rule as unknown as Parameters<
@@ -803,6 +887,7 @@ export class ContentService {
           >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
+          sourcePack,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: Math.max(totalNodes, 1),
@@ -844,6 +929,8 @@ export class ContentService {
     rule: RuleRecord;
     dto: RerunNodeDto;
     previousOutputs: PreviousOutputs;
+    sourcePack: PipelineSourcePack;
+    hadNewAttachments: boolean;
     auth: TenancyAuth;
     creditsCharged: number;
   }): Promise<void> {
@@ -855,6 +942,8 @@ export class ContentService {
       rule,
       dto,
       previousOutputs,
+      sourcePack,
+      hadNewAttachments,
       auth,
       creditsCharged,
     } = args;
@@ -862,6 +951,17 @@ export class ContentService {
     // A follow-up message for this specific re-run overrides the pipeline's
     // original content prompt for this run only — the workflow/pipeline itself is untouched.
     const contentPrompt = dto.message?.trim() || pipeline.contentPrompt;
+    const isImageNode =
+      (wfNode.type as unknown as string) === WorkflowNodeType.ImageGeneration ||
+      (wfNode.type as unknown as string) === 'image_generation';
+    const packForRun = isImageNode
+      ? resolveImageRerunSourcePack({
+          sourcePack,
+          previousImageUrl: previousOutputs.image,
+          rerunMessage: dto.message?.trim() ?? '',
+          hadNewAttachments,
+        })
+      : sourcePack;
     try {
       const totalNodes = await this.workflowNodes.countByWorkflow(
         content.workflowRef,
@@ -881,6 +981,7 @@ export class ContentService {
           >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
+          sourcePack: packForRun,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: Math.max(totalNodes, 1),

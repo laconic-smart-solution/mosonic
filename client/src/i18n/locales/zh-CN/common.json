@@ -62,6 +62,8 @@
     "remove": "移除",
     "upload": "上传",
     "download": "下载",
+    "downloadAria": "下载 {{name}}",
+    "downloadFailed": "无法下载文件",
     "approve": "批准",
     "reject": "拒绝",
     "stop": "停止",
@@ -77,7 +79,7 @@
   "nav": {
     "home": "首页",
     "dashboard": "仪表板",
-    "rules": "规则",
+    "rules": "品牌档案",
     "workflows": "工作流",
     "pipelines": "流水线",
     "content": "内容",
@@ -96,7 +98,7 @@
   },
   "routes": {
     "dashboard": "仪表板",
-    "rules": "规则",
+    "rules": "品牌档案",
     "workflow": "工作流",
     "content": "内容",
     "upload": "上传",
@@ -115,9 +117,9 @@
       "keywords": "仪表板 首页 概览 dashboard home overview"
     },
     "rules": {
-      "title": "规则",
-      "subtitle": "活动规则",
-      "keywords": "规则 活动 设置 rules campaigns"
+      "title": "品牌档案",
+      "subtitle": "活动品牌档案",
+      "keywords": "品牌档案 规则 活动 设置 brand profile rules campaigns"
     },
     "content": {
       "title": "内容",

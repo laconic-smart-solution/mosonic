@@ -1,11 +1,16 @@
 import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost,
-} from '@nestjs/bullmq';
-import { Inject, Logger } from '@nestjs/common';
-import { Job, Queue } from 'bullmq';
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Job, Worker } from 'bullmq';
+import {
+  buildRedisConnectionOptions,
+  redisEnvFromConfig,
+} from '../../config/redis-connection.util';
 import {
   getVideoGenerationMode,
   VideoGenerationService,
@@ -14,6 +19,8 @@ import type { IPipelineRepository } from '../../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../../pipeline/pipeline.repository';
 import { PipelineNodeExecutionStatus } from '../../pipeline/schemas/pipeline.schema';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
+import { allQueueNamesForBase } from '../queue-tenant.util';
+import { TenantQueueService } from '../tenant-queue.service';
 import {
   computeVideoInitialDelayMs,
   QUEUES,
@@ -22,24 +29,50 @@ import {
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 import type { NodeJobPayload } from '../types/node-job.payload';
 
-@Processor(QUEUES.VIDEO_GENERATE, {
-  concurrency: Number(process.env.VIDEO_GENERATE_CONCURRENCY ?? 3),
-})
-export class VideoGenerateProcessor extends WorkerHost {
+/**
+ * Runs `video_generate` jobs — see PipelineNodeProcessor's doc comment for
+ * why this manages raw BullMQ Workers (one per tenant bucket) instead of
+ * using the `@Processor` decorator.
+ */
+@Injectable()
+export class VideoGenerateProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VideoGenerateProcessor.name);
+  private workers: Worker<NodeJobPayload>[] = [];
 
   constructor(
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly videoService: VideoGenerationService,
     private readonly completion: MediaNodeCompletionService,
-    @InjectQueue(QUEUES.VIDEO_CHECK)
-    private readonly videoCheckQueue: Queue<MediaCheckJobPayload>,
-  ) {
-    super();
+    private readonly tenantQueues: TenantQueueService,
+    private readonly config: ConfigService,
+  ) {}
+
+  onModuleInit(): void {
+    const connection = buildRedisConnectionOptions(
+      redisEnvFromConfig(this.config),
+    );
+    const concurrency = Number(process.env.VIDEO_GENERATE_CONCURRENCY ?? 3);
+    const names = allQueueNamesForBase(QUEUES.VIDEO_GENERATE);
+    for (const name of names) {
+      const worker = new Worker<NodeJobPayload>(
+        name,
+        (job) => this.process(job),
+        { connection, concurrency },
+      );
+      worker.on('failed', (job, error) => void this.onFailed(job, error));
+      this.workers.push(worker);
+    }
+    this.logger.log(
+      `${QUEUES.VIDEO_GENERATE} worker started on ${names.length} queue(s): ${names.join(', ')}`,
+    );
   }
 
-  async process(job: Job<NodeJobPayload>): Promise<void> {
+  async onModuleDestroy(): Promise<void> {
+    await Promise.all(this.workers.map((worker) => worker.close()));
+  }
+
+  private async process(job: Job<NodeJobPayload>): Promise<void> {
     const payload = job.data;
     const { pipelineId, nodeId } = payload;
 
@@ -100,7 +133,11 @@ export class VideoGenerateProcessor extends WorkerHost {
         normalized,
       };
 
-      await this.videoCheckQueue.add('video_check', checkPayload, {
+      const videoCheckQueue = this.tenantQueues.forUser<MediaCheckJobPayload>(
+        QUEUES.VIDEO_CHECK,
+        payload.userId,
+      );
+      await videoCheckQueue.add('video_check', checkPayload, {
         jobId: videoCheckJobId(pipelineId, nodeId, 0),
         delay: delayMs,
         attempts: 2,
@@ -138,8 +175,7 @@ export class VideoGenerateProcessor extends WorkerHost {
     }
   }
 
-  @OnWorkerEvent('failed')
-  async onFailed(
+  private async onFailed(
     job: Job<NodeJobPayload> | undefined,
     error: Error,
   ): Promise<void> {

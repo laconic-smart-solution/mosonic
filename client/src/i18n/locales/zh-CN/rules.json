@@ -1,30 +1,30 @@
 {
   "page": {
-    "title": "规则设置",
-    "loadError": "无法从服务器加载规则。",
-    "rulesList": "规则列表",
+    "title": "品牌档案设置",
+    "loadError": "无法从服务器加载品牌档案。",
+    "rulesList": "品牌档案列表",
     "createByPrompt": "通过提示创建",
     "newsAutoGenerate": "新闻自动生成",
     "continue": "继续",
-    "selectOrCreate": "选择或创建规则",
-    "loadRuleError": "无法加载此规则。",
+    "selectOrCreate": "选择或创建品牌档案",
+    "loadRuleError": "无法加载此品牌档案。",
     "viewTree": "树状图",
     "viewManage": "管理",
     "pendingChanges": "{{count}} 项待保存",
     "discardAll": "全部放弃",
     "saveChanges": "保存更改",
     "editedJustNow": "刚刚",
-    "processingRuleName": "正在处理规则",
+    "processingRuleName": "正在处理品牌档案",
     "attachmentsFallback": "附件"
   },
   "toast": {
-    "ruleSaved": "规则已保存",
-    "couldNotSaveRule": "无法保存规则",
+    "ruleSaved": "品牌档案已保存",
+    "couldNotSaveRule": "无法保存品牌档案",
     "treeChangesSaved": "树状更改已保存",
     "couldNotSaveTree": "无法保存树状更改",
-    "extractionStarted": "已开始提取规则",
-    "couldNotStartExtraction": "无法开始提取规则",
-    "generationFailed": "规则生成失败",
+    "extractionStarted": "已开始提取品牌档案",
+    "couldNotStartExtraction": "无法开始提取品牌档案",
+    "generationFailed": "品牌档案生成失败",
     "fileTooLarge": "文件“{{name}}”超过最大大小（{{maxMb}} MB）。",
     "autonomySaved": "自治策略已保存。",
     "couldNotSaveAutonomy": "无法保存自治策略。"
@@ -46,38 +46,38 @@
     "failed": "失败"
   },
   "extraction": {
-    "titleFailed": "规则生成失败",
-    "titleGenerating": "正在生成您的规则",
-    "subtitle": "规则提取",
+    "titleFailed": "品牌档案生成失败",
+    "titleGenerating": "正在生成您的品牌档案",
+    "subtitle": "品牌档案提取",
     "waitMessage": "请稍候，我们正在处理您的提示…",
-    "failedHint": "无法从您的输入中提取规则。请提供更多细节或尝试其他来源后重试。",
+    "failedHint": "无法从您的输入中提取品牌档案。请提供更多细节或尝试其他来源后重试。",
     "dismiss": "关闭",
     "tryAgain": "重试"
   },
   "createDialog": {
-    "title": "通过提示创建规则",
-    "description": "输入活动背景信息，我们将据此创建规则。",
+    "title": "通过提示创建品牌档案",
+    "description": "输入活动背景信息，我们将据此创建品牌档案。",
     "placeholder": "描述您的品牌、受众、渠道和活动目标…"
   },
   "drawer": {
-    "title": "规则列表",
-    "description": "选择规则以更新画布。",
+    "title": "品牌档案列表",
+    "description": "选择品牌档案以更新画布。",
     "channels": "渠道：{{list}}",
-    "loadingMore": "正在加载更多规则…",
+    "loadingMore": "正在加载更多品牌档案…",
     "scrollToLoadMore": "滚动以加载更多"
   },
   "bubbleNode": {
     "detailsTitle": "节点详情",
-    "viewOnlyDescription": "只读预览。切换到「管理」以编辑此规则。",
+    "viewOnlyDescription": "只读预览。切换到「管理」以编辑此品牌档案。",
     "structureDescription": "此节点为结构标签。"
   },
   "channelsDialog": {
     "atLeastOne": "请至少选择一个渠道。"
   },
   "detail": {
-    "campaignRule": "活动规则",
+    "campaignRule": "品牌档案",
     "status": "状态",
-    "navAria": "规则分区",
+    "navAria": "品牌档案分区",
     "nav": {
       "overview": "概览",
       "brand": "品牌",
@@ -138,7 +138,7 @@
     },
     "channels": {
       "title": "渠道",
-      "subtitle": "此规则适用的渠道，请选择一个或多个分发平台。",
+      "subtitle": "此品牌档案适用的渠道，请选择一个或多个分发平台。",
       "distribution": "分发",
       "distributionHint": "勾选此活动应发布的平台。"
     },
@@ -155,7 +155,7 @@
     "autonomy": {
       "title": "自动发布",
       "subtitle": "定时流水线运行后可选自动审批与发布（受全局开关约束）。",
-      "enable": "为此规则启用自治",
+      "enable": "为此品牌档案启用自治",
       "modeOff": "关闭",
       "modeReviewOptional": "可选审核",
       "modeFullAuto": "全自动"
@@ -186,8 +186,8 @@
     "itemCount": "{{count}} 项"
   },
   "newsTrigger": {
-    "missingRuleId": "缺少规则 ID。",
-    "backToRules": "返回规则",
+    "missingRuleId": "缺少品牌档案 ID。",
+    "backToRules": "返回品牌档案",
     "automation": "自动化",
     "title": "新闻自动生成",
     "description": "监测突发新闻并起草活动内容供您审核。",

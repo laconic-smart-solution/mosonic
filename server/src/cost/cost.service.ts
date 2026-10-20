@@ -112,7 +112,7 @@ export class CostService {
         const key = `${dto.providerModel}_${dto.imageSize}_${dto.imageQuality}`;
         let perImage = OPENAI_IMAGE_PRICING[key];
         if (perImage == null && dto.providerModel?.startsWith('gpt-image')) {
-          perImage = OPENAI_IMAGE_PRICING['gpt-image-1_default'];
+          perImage = OPENAI_IMAGE_PRICING['gpt-image-2_default'];
         }
         if (perImage == null) {
           this.logger.warn(

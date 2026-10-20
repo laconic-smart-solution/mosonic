@@ -18,7 +18,7 @@ export const IMAGE_TEMPLATE_SEEDS: ImageTemplateSeed[] = [
     description:
       'Promotional creative for a specific offer, campaign, or call-to-action.',
     prompt:
-      'The composition must have one dominant focal subject that reads instantly, even at small mobile sizes. Build a strong visual hierarchy: the subject occupies the primary visual weight, secondary elements stay clearly subordinate. Reserve roughly a third of the frame as clean, uncluttered negative space suitable for a headline overlay to be added afterward — do not place any text, logos, or captions inside the scene itself. Frame for high impact at a glance.',
+      'The composition must have one dominant focal subject that reads instantly, even at small mobile sizes. Build a strong visual hierarchy: the subject occupies the primary visual weight, secondary elements stay clearly subordinate. Fill the frame as a finished advertising creative — do not leave a blank overlay region. If a short headline or call to action is provided, render it once in the image with clean, high-contrast type. No extra slogans, watermarks, or unrelated logos. Frame for high impact at a glance.',
   },
   {
     key: 'product_mockup',

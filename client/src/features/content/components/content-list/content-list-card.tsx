@@ -31,6 +31,8 @@ import {
   FileServiceImage,
   FileServiceVideo,
 } from "@/features/upload/components/upload-display-media"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import { ContentListStatusBadge } from "./content-list-status-badge"
 import { formatRelativeTime, previewEmoji } from "./content-list-format"
 
@@ -192,6 +194,22 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         <div className="absolute top-2.5 right-2.5 z-20">
           <ContentListStatusBadge status={item.status} />
         </div>
+        {gridHero?.kind === "video" || gridHero?.kind === "image" ? (
+          <div
+            className="absolute bottom-2.5 right-2.5 z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DownloadMediaButton
+              src={gridHero.url}
+              filename={filenameFromMediaUrl(
+                gridHero.url,
+                gridHero.kind,
+                title || "content"
+              )}
+              label={title}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="px-3 pt-1 pb-3">

@@ -1,18 +1,30 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Post,
   Req,
+  UploadedFiles,
+  UseFilters,
   UseGuards,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import type { Express, Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
+import {
+  ruleExtractMaxFileBytes,
+  ruleExtractMaxFiles,
+} from '../rule/extract-limits';
+import { MulterExceptionFilter } from '../rule/multer-exception.filter';
 import {
   ContentPageQueryDto,
   ContentPageResponseDto,
@@ -20,6 +32,8 @@ import {
 import { GenerateNodeDto } from './dto/generate-node.dto';
 import { RerunNodeDto } from './dto/rerun-node.dto';
 import { SaveContentDto } from './dto/save-content.dto';
+import { parseContentRerunMultipart } from './parse-content-rerun-multipart';
+import { parseContentGenerateMultipart } from './parse-content-generate-multipart';
 import { ContentService } from './content.service';
 
 const bodyPipe = new ValidationPipe({
@@ -27,6 +41,11 @@ const bodyPipe = new ValidationPipe({
   whitelist: true,
   forbidNonWhitelisted: true,
 });
+
+function isMultipart(req: Request): boolean {
+  const ct = String(req.headers['content-type'] ?? '').toLowerCase();
+  return ct.includes('multipart/form-data');
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('contents')
@@ -65,14 +84,35 @@ export class ContentController {
   }
 
   @Post(':contentId/rerun-node')
-  @UsePipes(bodyPipe)
+  @UseFilters(MulterExceptionFilter)
+  @UseInterceptors(
+    FilesInterceptor('files', ruleExtractMaxFiles(), {
+      limits: { fileSize: ruleExtractMaxFileBytes() },
+    }),
+  )
   async rerunNode(
     @Req() req: Request,
     @Param('contentId') contentId: string,
-    @Body() body: RerunNodeDto,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Body() body: Record<string, unknown>,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
-    await this.contentService.scheduleRerun(contentId, body, auth);
+
+    if (isMultipart(req) || (files && files.length > 0)) {
+      const parsed = parseContentRerunMultipart(files, body);
+      await this.contentService.scheduleRerun(contentId, parsed.dto, auth, {
+        files: parsed.files,
+        urls: parsed.urls,
+      });
+      return { success: true };
+    }
+
+    const dto = plainToInstance(RerunNodeDto, body);
+    const errors = await validate(dto);
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
+    }
+    await this.contentService.scheduleRerun(contentId, dto, auth);
     return { success: true };
   }
 
@@ -90,18 +130,36 @@ export class ContentController {
   }
 
   @Post(':contentId/generate-node')
-  @UsePipes(bodyPipe)
+  @UseFilters(MulterExceptionFilter)
+  @UseInterceptors(
+    FilesInterceptor('files', ruleExtractMaxFiles(), {
+      limits: { fileSize: ruleExtractMaxFileBytes() },
+    }),
+  )
   async generateNode(
     @Req() req: Request,
     @Param('contentId') contentId: string,
-    @Body() body: GenerateNodeDto,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Body() body: Record<string, unknown>,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
-    return await this.contentService.scheduleGenerateNode(
-      contentId,
-      body,
-      auth,
-    );
+
+    if (isMultipart(req) || (files && files.length > 0)) {
+      const parsed = parseContentGenerateMultipart(files, body);
+      return await this.contentService.scheduleGenerateNode(
+        contentId,
+        parsed.dto,
+        auth,
+        { files: parsed.files, urls: parsed.urls },
+      );
+    }
+
+    const dto = plainToInstance(GenerateNodeDto, body);
+    const errors = await validate(dto);
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
+    }
+    return await this.contentService.scheduleGenerateNode(contentId, dto, auth);
   }
 
   @Post(':contentId/ensure-upload')

@@ -62,6 +62,8 @@
     "remove": "ลบออก",
     "upload": "อัปโหลด",
     "download": "ดาวน์โหลด",
+    "downloadAria": "ดาวน์โหลด {{name}}",
+    "downloadFailed": "ไม่สามารถดาวน์โหลดไฟล์ได้",
     "approve": "อนุมัติ",
     "reject": "ปฏิเสธ",
     "stop": "หยุด",
@@ -77,7 +79,7 @@
   "nav": {
     "home": "หน้าแรก",
     "dashboard": "แดชบอร์ด",
-    "rules": "กฎ",
+    "rules": "โปรไฟล์แบรนด์",
     "workflows": "เวิร์กโฟลว์",
     "pipelines": "ไปป์ไลน์",
     "content": "คอนเทนต์",
@@ -96,7 +98,7 @@
   },
   "routes": {
     "dashboard": "แดชบอร์ด",
-    "rules": "กฎ",
+    "rules": "โปรไฟล์แบรนด์",
     "workflow": "เวิร์กโฟลว์",
     "content": "คอนเทนต์",
     "upload": "อัปโหลด",
@@ -115,9 +117,9 @@
       "keywords": "แดชบอร์ด หน้าแรก ภาพรวม เริ่มต้น dashboard home overview"
     },
     "rules": {
-      "title": "กฎ",
-      "subtitle": "กฎแคมเปญ",
-      "keywords": "กฎ แคมเปญ ตั้งค่า rules campaigns"
+      "title": "โปรไฟล์แบรนด์",
+      "subtitle": "โปรไฟล์แบรนด์แคมเปญ",
+      "keywords": "โปรไฟล์แบรนด์ กฎ แคมเปญ ตั้งค่า brand profile rules campaigns"
     },
     "content": {
       "title": "คอนเทนต์",

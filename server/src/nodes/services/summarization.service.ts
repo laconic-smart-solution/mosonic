@@ -123,8 +123,19 @@ function buildSystemPrompt(
     .join('\n');
 }
 
-function buildHumanPrompt(sourceOutput: string): string {
-  return ['Summarize the following content:', '', sourceOutput, '']
+function buildHumanPrompt(
+  sourceOutput: string,
+  sourcePackNotes?: string,
+): string {
+  const notes = sourcePackNotes?.trim();
+  return [
+    'Summarize the following content:',
+    '',
+    sourceOutput,
+    notes
+      ? `\nSource attachments for this run (use as factual context):\n${notes}`
+      : '',
+  ]
     .filter(Boolean)
     .join('\n');
 }
@@ -186,7 +197,7 @@ export class SummarizationService {
     }
 
     const systemPrompt = buildSystemPrompt(rule, normalized);
-    const humanPrompt = buildHumanPrompt(sourceOutput);
+    const humanPrompt = buildHumanPrompt(sourceOutput, input.sourcePackNotes);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
@@ -219,7 +230,7 @@ export class SummarizationService {
       );
     }
     const systemPrompt = buildSystemPrompt(input.rule, normalized);
-    const humanPrompt = buildHumanPrompt(sourceOutput);
+    const humanPrompt = buildHumanPrompt(sourceOutput, input.sourcePack?.notes);
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,

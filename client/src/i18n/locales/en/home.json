@@ -2,7 +2,7 @@
   "prompt": {
     "focusedPlaceholder": "Describe what you want to create today…",
     "generatingWorkflow": "Generating workflow…",
-    "extractingSubtitle": "We'll open a few quick questions when your rule is ready."
+    "extractingSubtitle": "We'll open a few quick questions when your brand profile is ready."
   },
   "promptSuggestions": {
     "songkran": "Write a Songkran festival promotion for Facebook and Instagram",
@@ -12,7 +12,7 @@
   "templates": {
     "dashboard": { "label": "Dashboard", "sub": "Overview and KPIs" },
     "content": { "label": "Content", "sub": "Library and items" },
-    "rules": { "label": "Rules", "sub": "Campaign rules" },
+    "rules": { "label": "Brand Profiles", "sub": "Campaign brand profiles" },
     "railLabel": "Templates"
   },
   "recent": {
@@ -21,13 +21,13 @@
     "openLibrary": "Open content library"
   },
   "helper": {
-    "setupRule": "Set up rule",
-    "selectRule": "Select rule",
-    "selectedRule": "Selected rule: {{name}}",
-    "rulePrefix": "Rule: {{name}}",
-    "savedRules": "Saved rules",
-    "loadingRules": "Loading rules...",
-    "noRules": "No rules found.",
+    "setupRule": "Set up brand profile",
+    "selectRule": "Select brand profile",
+    "selectedRule": "Selected brand profile: {{name}}",
+    "rulePrefix": "Brand Profile: {{name}}",
+    "savedRules": "Saved brand profiles",
+    "loadingRules": "Loading brand profiles...",
+    "noRules": "No brand profiles found.",
     "tones": "Tones: {{value}}",
     "channels": "Channels: {{value}}",
     "updated": "Updated: {{date}}",
@@ -38,16 +38,16 @@
     "copyright": "© 2026 Mosonic Co., Ltd. — Bangkok, Thailand"
   },
   "toast": {
-    "extractionFailed": "Could not build a campaign rule from your prompt. Please try again.",
-    "noChannelsAfterExtract": "The extracted rule has no channels. Add channels in Rules, then try again.",
-    "generationFailed": "Rule generation failed",
-    "couldNotStartExtraction": "Unable to start rule extraction",
+    "extractionFailed": "Could not build a brand profile from your prompt. Please try again.",
+    "noChannelsAfterExtract": "The extracted brand profile has no channels. Add channels in Brand Profiles, then try again.",
+    "generationFailed": "Brand profile generation failed",
+    "couldNotStartExtraction": "Unable to start brand profile extraction",
     "fileTooLarge": "File \"{{name}}\" exceeds maximum size ({{maxMb}} MB)."
   },
   "extraction": {
-    "titleGenerating": "Building your campaign rule…",
-    "titleFailed": "Could not build rule",
-    "subtitle": "Analyzing your prompt and preparing your campaign rule.",
+    "titleGenerating": "Building your brand profile…",
+    "titleFailed": "Could not build brand profile",
+    "subtitle": "Analyzing your prompt and preparing your brand profile.",
     "waitMessage": "Analyzing your prompt…",
     "dismiss": "Dismiss",
     "tryAgain": "Try again"

@@ -151,6 +151,12 @@ export class PipelineService {
     useLearnings?: boolean;
     executionMode?: 'auto' | 'step';
     reviewNodeIds?: string[];
+    files?: Array<{
+      buffer: Buffer;
+      originalname: string;
+      mimetype?: string;
+    }>;
+    urls?: string[];
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     return this.orchestration.startPipeline(args);

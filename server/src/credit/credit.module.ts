@@ -60,7 +60,7 @@ const DEFAULT_SERVICE_RATES = [
   {
     serviceType: 'image' as const,
     provider: 'openai',
-    model: 'dall-e-3',
+    model: 'gpt-image-2',
     pricePerImage: 0.04,
   },
   {
@@ -184,7 +184,7 @@ export class CreditModule implements OnModuleInit {
           return {
             serviceType: 'image' as const,
             provider: op.provider,
-            model: op.provider === 'ideogram' ? 'ideogram-3' : 'dall-e-3',
+            model: op.provider === 'ideogram' ? 'ideogram-3' : 'gpt-image-2',
             pricePerImage: op.costUsd,
             isActive: true,
           };

@@ -198,11 +198,15 @@ export function buildVideoPrompt(
   rule: Rule,
   previousOutputs: { text?: string; image?: string },
   config: NormalizedVideoConfig,
+  sourcePackNotes?: string,
 ): string {
   return [
     'Create a short marketing video for the following content:',
     `"${previousOutputs.text ?? ''}"`,
     '',
+    sourcePackNotes?.trim()
+      ? `Source attachments for this run:\n${sourcePackNotes.trim()}`
+      : '',
     previousOutputs.image
       ? `Match the visual style of this reference image: ${previousOutputs.image}`
       : '',
@@ -680,6 +684,7 @@ export class VideoGenerationService {
       rule,
       { text: sourceText, image: previousOutputs.image },
       normalized,
+      input.sourcePack?.notes,
     );
 
     const client = this.getOpenAiClient(normalized.provider);
@@ -813,6 +818,7 @@ export class VideoGenerationService {
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
       config,
+      sourcePack: input.sourcePack,
       pipelineId: input.pipelineRef,
       nodeId: input.nodeId,
     };

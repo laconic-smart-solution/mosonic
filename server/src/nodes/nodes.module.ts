@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
-import { ImageNodeOptionsController } from './controllers/image-node-options.controller';
 import { ImageGenerationService } from './services/image-generation.service';
 import { ImageTemplateClassifierService } from './services/image-template-classifier.service';
 import { ImageTemplateResolverService } from './services/image-template-resolver.service';
@@ -44,7 +43,6 @@ const NODE_SERVICES = [
 
 @Module({
   imports: [LlmModule, EventsModule],
-  controllers: [ImageNodeOptionsController],
   providers: NODE_SERVICES,
   exports: [...NODE_SERVICES],
 })

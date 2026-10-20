@@ -77,7 +77,7 @@ describe('CostService', () => {
       const cost = service.calculateCost(
         dto({
           entryType: 'openai_image',
-          providerModel: 'gpt-image-1',
+          providerModel: 'gpt-image-2',
           imageCount: 1,
           imageSize: '1024x1024',
           imageQuality: 'standard',

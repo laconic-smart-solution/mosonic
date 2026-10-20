@@ -1,4 +1,4 @@
-import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
 
 export class GenerateNodeDto {
@@ -17,4 +17,10 @@ export class GenerateNodeDto {
   @IsOptional()
   @IsString()
   userPrompt?: string;
+
+  /** Optional direction for this extra output (e.g. image variant brief). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string;
 }

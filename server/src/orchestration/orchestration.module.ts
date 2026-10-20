@@ -19,7 +19,9 @@ import { TelegramModule } from '../telegram/telegram.module';
 import { ViberModule } from '../viber/viber.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { LoggingModule } from '../logging/logging.module';
+import { LlmModule } from '../llm/llm.module';
 import { NodesModule } from '../nodes/nodes.module';
+import { PreprocessingModule } from '../preprocessing/preprocessing.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UploadModule } from '../upload/upload.module';
 import { DependencyResolverService } from './dependency-resolver.service';
@@ -36,6 +38,10 @@ import { VideoGenerateProcessor } from './processors/video-generate.processor';
 import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { PipelineNodeReviewService } from './pipeline-node-review.service';
 import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
+import { TenantQueueService } from './tenant-queue.service';
+import { ImageAssetRoleClassifierService } from './image-asset-role-classifier.service';
+import { SourcePackBuilderService } from './source-pack-builder.service';
+import { allQueueNamesForBase } from './queue-tenant.util';
 import { QUEUES } from './types/queue.constants';
 import {
   PIPELINE_NODES_DLQ,
@@ -106,8 +112,10 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     }
 
     if (tenantIsolation) {
-      this.logger.warn(
-        'QUEUE_TENANT_ISOLATION=true is not wired to enqueue/workers yet; use false for local dev',
+      const buckets = Number(this.config.get('QUEUE_TENANT_BUCKETS', 32));
+      this.logger.log(
+        `QUEUE_TENANT_ISOLATION=true — pipeline_nodes/video_generate/video_check ` +
+          `sharded across ${buckets} bucket queues each`,
       );
     }
   }
@@ -126,25 +134,35 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     forwardRef(() => ViberModule),
     forwardRef(() => WhatsAppModule),
     NodesModule,
+    LlmModule,
+    PreprocessingModule,
     LoggingModule,
     EventsModule,
     forwardRef(() => UploadModule),
     forwardRef(() => ContentModule),
     RepositoriesModule,
-    BullModule.registerQueueAsync({
-      name: PIPELINE_NODES_QUEUE,
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        defaultJobOptions: {
-          attempts: Number(config.get('QUEUE_MAX_ATTEMPTS', 2)),
-          backoff: {
-            type: 'fixed',
-            delay: Number(config.get('QUEUE_RETRY_DELAY_MS', 3000)),
+    // Sharded when QUEUE_TENANT_ISOLATION=true: one BullMQ queue per tenant
+    // bucket instead of one global queue, so a noisy user's backlog only
+    // contends with the ~1/QUEUE_TENANT_BUCKETS of users hashed into the
+    // same bucket. Queues are bound at Nest bootstrap (not per-request), so
+    // every bucket is registered up front — see TenantQueueService for how a
+    // userId is resolved to the right one at runtime.
+    ...allQueueNamesForBase(PIPELINE_NODES_QUEUE).map((name) =>
+      BullModule.registerQueueAsync({
+        name,
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          defaultJobOptions: {
+            attempts: Number(config.get('QUEUE_MAX_ATTEMPTS', 2)),
+            backoff: {
+              type: 'fixed',
+              delay: Number(config.get('QUEUE_RETRY_DELAY_MS', 3000)),
+            },
           },
-        },
+        }),
+        inject: [ConfigService],
       }),
-      inject: [ConfigService],
-    }),
+    ),
     BullModule.registerQueueAsync({
       name: PIPELINE_NODES_DLQ,
       imports: [ConfigModule],
@@ -169,30 +187,34 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
       }),
       inject: [ConfigService],
     }),
-    BullModule.registerQueueAsync({
-      name: QUEUES.VIDEO_GENERATE,
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        defaultJobOptions: {
-          attempts: Number(config.get('QUEUE_MAX_ATTEMPTS', 2)),
-          backoff: {
-            type: 'fixed',
-            delay: Number(config.get('QUEUE_RETRY_DELAY_MS', 3000)),
+    ...allQueueNamesForBase(QUEUES.VIDEO_GENERATE).map((name) =>
+      BullModule.registerQueueAsync({
+        name,
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          defaultJobOptions: {
+            attempts: Number(config.get('QUEUE_MAX_ATTEMPTS', 2)),
+            backoff: {
+              type: 'fixed',
+              delay: Number(config.get('QUEUE_RETRY_DELAY_MS', 3000)),
+            },
           },
-        },
+        }),
+        inject: [ConfigService],
       }),
-      inject: [ConfigService],
-    }),
-    BullModule.registerQueueAsync({
-      name: QUEUES.VIDEO_CHECK,
-      imports: [ConfigModule],
-      useFactory: () => ({
-        defaultJobOptions: {
-          attempts: 2,
-          removeOnComplete: true,
-        },
+    ),
+    ...allQueueNamesForBase(QUEUES.VIDEO_CHECK).map((name) =>
+      BullModule.registerQueueAsync({
+        name,
+        imports: [ConfigModule],
+        useFactory: () => ({
+          defaultJobOptions: {
+            attempts: 2,
+            removeOnComplete: true,
+          },
+        }),
       }),
-    }),
+    ),
   ],
   providers: [
     OrchestrationModuleBootstrap,
@@ -206,7 +228,10 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     MediaNodeCompletionService,
     HeygenWebhookService,
     OrchestrationService,
+    TenantQueueService,
     DependencyResolverService,
+    ImageAssetRoleClassifierService,
+    SourcePackBuilderService,
     ...(process.env.RUN_WORKERS_IN_API !== 'false'
       ? [PipelineNodeProcessor, VideoGenerateProcessor, VideoCheckProcessor]
       : []),
@@ -216,6 +241,8 @@ class OrchestrationModuleBootstrap implements OnModuleInit {
     OrchestrationService,
     MediaNodeCompletionService,
     HeygenWebhookService,
+    TenantQueueService,
+    SourcePackBuilderService,
     BullModule,
   ],
 })

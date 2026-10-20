@@ -603,6 +603,8 @@ model Pipeline {
   executionMode         PipelineUserExecutionMode @default(auto)
   graph                 Json                  @default("{}")
   ruleOverlay           Json?
+  /** Run attachments: notes + classified assets for node context / image edit. */
+  sourcePack            Json?
   metadata              Json                  @default("{}")
   creditsCharged        Int?                  @default(0)
   creditChargeBreakdown Json?

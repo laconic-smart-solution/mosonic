@@ -1,13 +1,19 @@
 import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost,
-} from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job, Queue } from 'bullmq';
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Job, Worker } from 'bullmq';
+import {
+  buildRedisConnectionOptions,
+  redisEnvFromConfig,
+} from '../../config/redis-connection.util';
 import { VideoGenerationService } from '../../nodes/services/video-generation.service';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
+import { allQueueNamesForBase } from '../queue-tenant.util';
+import { TenantQueueService } from '../tenant-queue.service';
 import {
   POLL_CONFIG,
   QUEUES,
@@ -17,22 +23,48 @@ import {
 } from '../types/queue.constants';
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 
-@Processor(QUEUES.VIDEO_CHECK, {
-  concurrency: Number(process.env.VIDEO_CHECK_CONCURRENCY ?? 10),
-})
-export class VideoCheckProcessor extends WorkerHost {
+/**
+ * Runs `video_check` jobs — see PipelineNodeProcessor's doc comment for why
+ * this manages raw BullMQ Workers (one per tenant bucket) instead of using
+ * the `@Processor` decorator.
+ */
+@Injectable()
+export class VideoCheckProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VideoCheckProcessor.name);
+  private workers: Worker<MediaCheckJobPayload>[] = [];
 
   constructor(
     private readonly videoService: VideoGenerationService,
     private readonly completion: MediaNodeCompletionService,
-    @InjectQueue(QUEUES.VIDEO_CHECK)
-    private readonly videoCheckQueue: Queue<MediaCheckJobPayload>,
-  ) {
-    super();
+    private readonly tenantQueues: TenantQueueService,
+    private readonly config: ConfigService,
+  ) {}
+
+  onModuleInit(): void {
+    const connection = buildRedisConnectionOptions(
+      redisEnvFromConfig(this.config),
+    );
+    const concurrency = Number(process.env.VIDEO_CHECK_CONCURRENCY ?? 10);
+    const names = allQueueNamesForBase(QUEUES.VIDEO_CHECK);
+    for (const name of names) {
+      const worker = new Worker<MediaCheckJobPayload>(
+        name,
+        (job) => this.process(job),
+        { connection, concurrency },
+      );
+      worker.on('failed', (job, error) => void this.onFailed(job, error));
+      this.workers.push(worker);
+    }
+    this.logger.log(
+      `${QUEUES.VIDEO_CHECK} worker started on ${names.length} queue(s): ${names.join(', ')}`,
+    );
   }
 
-  async process(job: Job<MediaCheckJobPayload>): Promise<void> {
+  async onModuleDestroy(): Promise<void> {
+    await Promise.all(this.workers.map((worker) => worker.close()));
+  }
+
+  private async process(job: Job<MediaCheckJobPayload>): Promise<void> {
     const payload = job.data;
     const {
       pipelineId,
@@ -147,7 +179,11 @@ export class VideoCheckProcessor extends WorkerHost {
     const nextCount = payload.checkCount + 1;
     const intervalMs = videoPollIntervalMs(payload.videoProvider ?? 'sora');
     try {
-      await this.videoCheckQueue.add(
+      const videoCheckQueue = this.tenantQueues.forUser<MediaCheckJobPayload>(
+        QUEUES.VIDEO_CHECK,
+        payload.userId,
+      );
+      await videoCheckQueue.add(
         'video_check',
         { ...payload, checkCount: nextCount },
         {
@@ -165,8 +201,7 @@ export class VideoCheckProcessor extends WorkerHost {
     }
   }
 
-  @OnWorkerEvent('failed')
-  async onFailed(
+  private async onFailed(
     job: Job<MediaCheckJobPayload> | undefined,
     error: Error,
   ): Promise<void> {

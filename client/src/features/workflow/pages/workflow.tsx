@@ -177,6 +177,9 @@ export default function WorkflowPage() {
     undefined
   )
   const [workflowPrompt, setWorkflowPrompt] = useState(initialNavContentPrompt)
+  const [workflowAttachments, setWorkflowAttachments] = useState<Attachment[]>(
+    [],
+  )
   const [stopPipelineDialogOpen, setStopPipelineDialogOpen] = useState(false)
   const [apiNodes, setApiNodes] = useState<WorkflowNode[] | undefined>(
     undefined
@@ -234,6 +237,9 @@ export default function WorkflowPage() {
   const pendingPipelineAfterWorkflowRef = useRef<string | null>(null)
   const [runConfirmOpen, setRunConfirmOpen] = useState(false)
   const [pendingRunPrompt, setPendingRunPrompt] = useState<string | null>(null)
+  const [pendingRunAttachments, setPendingRunAttachments] = useState<
+    Attachment[]
+  >([])
   /** Id used to filter socket events; updated synchronously on adopt so rapid events are not dropped before React re-renders. */
   const workflowEventTargetRef = useRef<string | undefined>(undefined)
   const committedWfNameRef = useRef(i18n.t("workflow:toolbar.untitledWorkflow"))
@@ -1173,6 +1179,7 @@ export default function WorkflowPage() {
     contentPrompt: string,
     workflowIdOverride?: string,
     executionMode: PipelineUserExecutionMode = "auto",
+    attachments: Attachment[] = [],
   ) {
     const workflowId = workflowIdOverride ?? activeWorkflowId
     if (!workflowId || !ruleId) return
@@ -1185,6 +1192,7 @@ export default function WorkflowPage() {
         contentPrompt,
         useLearnings,
         executionMode,
+        attachments,
       },
       {
         onSuccess: ({ pipelineId: id }) => {
@@ -1226,10 +1234,13 @@ export default function WorkflowPage() {
     )
   }
 
-  function handleStartPipeline(contentPromptOverride?: string) {
+  function handleStartPipeline(
+    contentPromptOverride?: string,
+    attachments: Attachment[] = [],
+  ) {
     if (!activeWorkflowId || !ruleId) return
     const contentPrompt = (contentPromptOverride ?? workflowPrompt).trim()
-    if (!contentPrompt) {
+    if (!contentPrompt && attachments.length === 0) {
       toast.error(t("toasts.enterPostTopic"))
       return
     }
@@ -1251,6 +1262,7 @@ export default function WorkflowPage() {
 
     const startAfterSave = () => {
       setPendingRunPrompt(contentPrompt)
+      setPendingRunAttachments(attachments)
       setRunConfirmOpen(true)
     }
 
@@ -1326,9 +1338,9 @@ export default function WorkflowPage() {
     })
   }
 
-  function handlePrimaryAction(text: string, _attachments: Attachment[]) {
+  function handlePrimaryAction(text: string, attachments: Attachment[]) {
     if (generationUiLocked) return
-    handleStartPipeline(text.trim())
+    handleStartPipeline(text.trim(), attachments)
   }
 
   function resetPipelineProcessingState() {
@@ -1689,7 +1701,7 @@ export default function WorkflowPage() {
         onRuleClick={() =>
           navigate("/rules", { state: { selectedRuleId: ruleId } })
         }
-        onRun={() => handlePrimaryAction(workflowPrompt, [])}
+        onRun={() => handlePrimaryAction(workflowPrompt, workflowAttachments)}
         runLabel={t("toolbar.generateContent")}
         onSave={processingMode === "edit" ? handleSave : undefined}
         isSaving={saveNodesMutation.isPending || saveByRuleMutation.isPending}
@@ -1826,6 +1838,7 @@ export default function WorkflowPage() {
                       <PromptArea
                         value={workflowPrompt}
                         onChange={setWorkflowPrompt}
+                        onAttachmentsChange={setWorkflowAttachments}
                         onSubmit={handlePrimaryAction}
                         disabled={promptInputDisabled}
                         submitDisabled={generationUiLocked}
@@ -2005,15 +2018,23 @@ export default function WorkflowPage() {
         open={runConfirmOpen}
         onOpenChange={(open) => {
           setRunConfirmOpen(open)
-          if (!open) setPendingRunPrompt(null)
+          if (!open) {
+            setPendingRunPrompt(null)
+            setPendingRunAttachments([])
+          }
         }}
         workflowId={activeWorkflowId}
         ruleId={ruleId}
         isStarting={startPipelineMutation.isPending}
         showFreshnessWarning={!workflowHasIntelligenceNode(apiNodes ?? [])}
         onConfirm={(executionMode) => {
-          if (pendingRunPrompt != null) {
-            runStartPipelineMutation(pendingRunPrompt, undefined, executionMode)
+          if (pendingRunPrompt != null || pendingRunAttachments.length > 0) {
+            runStartPipelineMutation(
+              pendingRunPrompt ?? "",
+              undefined,
+              executionMode,
+              pendingRunAttachments,
+            )
           }
         }}
       />

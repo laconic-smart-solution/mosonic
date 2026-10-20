@@ -36,7 +36,7 @@
     "adapt": "适配",
     "intelligence": "情报",
     "social_account_connect": "社交账户解锁",
-    "rule_generation": "规则生成",
+    "rule_generation": "品牌档案生成",
     "workflow_generation": "工作流生成"
   },
   "laneNodeLabel": {
@@ -59,7 +59,7 @@
       "tips": "活动主题在启动流水线运行时输入，而非在此面板中。"
     },
     "image": {
-      "usage": "根据上游文本或关键词生成图像。配置宽高比和风格以匹配规则中的渠道。",
+      "usage": "根据上游文本或关键词生成图像。配置宽高比和风格以匹配品牌档案中的渠道。",
       "example": "文本 → 图像，1:1 宽高比、Natural 风格，基于帖子文案生成 Instagram 信息流主图。"
     },
     "video": {
@@ -79,13 +79,13 @@
       "example": "转录 → 摘要，中等长度、要点形式，用于轮播幻灯片文案。"
     },
     "branch": {
-      "usage": "将执行拆分为并行渠道分支（来自规则的渠道、手动选择或 A/B 变体）。运行时会在 Branch 与 Merge 之间为每个分支实例化一个子图。",
-      "example": "文本 → 分支（规则渠道）→ 适配 → 合并，向 Instagram、Facebook、LinkedIn 发布同一活动并生成各渠道文案。",
+      "usage": "将执行拆分为并行渠道分支（来自品牌档案的渠道、手动选择或 A/B 变体）。运行时会在 Branch 与 Merge 之间为每个分支实例化一个子图。",
+      "example": "文本 → 分支（品牌档案渠道）→ 适配 → 合并，向 Instagram、Facebook、LinkedIn 发布同一活动并生成各渠道文案。",
       "tips": "在下游将 Branch 连接到 Merge，以便所有分支在最终完成前结束。"
     },
     "adapt": {
-      "usage": "将共享文案调整为特定渠道的风格与映射（文案长度、语气、话题标签）。实例化后每个分支一个 adapt 节点；渠道由规则自动设置。",
-      "example": "Branch 后 Instagram 分支：adapt 将共享文本改写为符合规则中 Instagram 内容风格的文案。",
+      "usage": "将共享文案调整为特定渠道的风格与映射（文案长度、语气、话题标签）。实例化后每个分支一个 adapt 节点；渠道由品牌档案自动设置。",
+      "example": "Branch 后 Instagram 分支：adapt 将共享文本改写为符合品牌档案中 Instagram 内容风格的文案。",
       "tips": "无需在此配置渠道——它来自实例化时创建的分支。"
     },
     "merge": {
@@ -119,8 +119,6 @@
       "textLength": { "label": "长度" }
     },
     "image": {
-      "template": { "label": "模板" },
-      "designStyle": { "label": "设计风格" },
       "style": { "label": "风格" },
       "aspectRatio": { "label": "宽高比" },
       "quality": { "label": "质量" },
@@ -228,7 +226,7 @@
     "keywordPlanner": "关键词规划",
     "summary": "摘要",
     "transcription": "转录",
-    "fromCampaignRule": "来自活动规则",
+    "fromCampaignRule": "来自品牌档案",
     "channelAdapt": "渠道适配",
     "channel": "渠道：{{channel}}",
     "fanInBarrier": "汇聚屏障",
@@ -310,7 +308,7 @@
   "properties": {
     "title": "属性",
     "configuration": "配置",
-    "branchChannelsHint": "在活动规则中添加至少一个分发渠道以启用分支。",
+    "branchChannelsHint": "在品牌档案中添加至少一个分发渠道以启用分支。",
     "channelLanes": "渠道分支",
     "channelLanesHint": "取消勾选某个渠道即可停止在此工作流中运行它。至少需保留一个渠道处于启用状态。",
     "applyHint": "更改仅适用于本次运行。保存工作流以持久化。",
@@ -322,7 +320,7 @@
     "label": "分支",
     "channelLanes_one": "{{count}} 个渠道分支",
     "channelLanes_other": "{{count}} 个渠道分支",
-    "channelsFromRule": "渠道来自活动规则"
+    "channelsFromRule": "渠道来自品牌档案"
   },
   "mergeNode": {
     "label": "合并",
@@ -366,14 +364,6 @@
     "voiceSaveFailed": "无法保存语音。请保存工作流后重试。",
     "clickOrDrag": "点击或拖拽图像到此处",
     "uploading": "上传中…"
-  },
-  "imageTemplateStylePicker": {
-    "loadingTemplates": "正在加载模板…",
-    "loadTemplatesFailed": "无法加载模板。",
-    "noTemplates": "暂无可用模板。",
-    "loadingStyles": "正在加载风格…",
-    "loadStylesFailed": "无法加载风格。",
-    "noStyles": "暂无可用风格。"
   },
   "voicePicker": {
     "genderAll": "全部",
@@ -457,7 +447,7 @@
     "modeTabCurrent": "当前",
     "modeTabAuto": "自动",
     "generateWorkflowPlaceholder": "例如：Instagram + Facebook 文案、泰语翻译、主图…",
-    "autoWorkflowHint": "AI 将根据您的帖子和活动规则构建工作流，然后生成内容。",
+    "autoWorkflowHint": "AI 将根据您的帖子和品牌档案构建工作流，然后生成内容。",
     "hidePrompt": "隐藏提示词区域",
     "showPrompt": "显示提示词区域"
   },
@@ -465,15 +455,15 @@
   "nodesLabel_other": "节点",
   "dialogs": {
     "rebuildTitle": "重建工作流节点",
-    "rebuildDescription": "根据规则和您的备注替换当前节点布局。单帖主题在「生成内容」提示词中，而非此处。",
-    "rebuildPlaceholder": "可选：渠道、格式、翻译、媒体… 留空则从规则推断。",
+    "rebuildDescription": "根据品牌档案和您的备注替换当前节点布局。单帖主题在「生成内容」提示词中，而非此处。",
+    "rebuildPlaceholder": "可选：渠道、格式、翻译、媒体… 留空则从品牌档案推断。",
     "rebuilding": "重建中…",
     "rebuild": "重建"
   },
   "fab": {
     "workflowContents": "工作流内容",
     "goHome": "返回首页",
-    "goToRules": "前往规则",
+    "goToRules": "前往品牌档案",
     "takeTour": "开始导览"
   },
   "tour": {
@@ -519,7 +509,7 @@
   "errors": {
     "generateWorkflowFailed": "无法生成工作流。请重试。",
     "somethingWrong": "出错了。请重试。",
-    "invalidUrl": "工作流 URL 无效。请从规则打开工作流。",
+    "invalidUrl": "工作流 URL 无效。请从品牌档案打开工作流。",
     "loadWorkflowsFailed": "无法加载工作流。",
     "pipelineContentNotFound": "流水线已完成但未找到内容。"
   },
@@ -573,20 +563,20 @@
     "loadErrorTitle": "无法加载工作流",
     "emptyTitle": "未找到工作流",
     "emptyFiltered": "请尝试调整搜索或节点类型筛选。",
-    "emptyDefault": "从规则生成工作流后将显示在此处。",
+    "emptyDefault": "从品牌档案生成工作流后将显示在此处。",
     "noNodesYet": "尚无节点",
     "updated": "更新于 {{date}}",
     "showing": "本页显示 {{count}} 条 · 共 {{total}} 条",
     "pageOf": "第 {{page}} 页，共 {{totalPages}} 页"
   },
   "promptPage": {
-    "selectedRule": "所选规则",
+    "selectedRule": "所选品牌档案",
     "title": "您想创建什么？",
     "subtitle": "描述您要制作的内容，我们将构建合适的工作流。",
     "placeholder": "例如：面向年轻职场人士的新品发布帖…",
     "generating": "正在生成工作流…",
     "existingBanner": "从已保存的工作流继续，或留在此页生成新的。",
-    "backToRules": "返回规则设置",
+    "backToRules": "返回品牌档案设置",
     "openExisting": "打开已有工作流",
     "noExisting": "尚无已有工作流"
   },
@@ -615,16 +605,16 @@
     "presenter": "数字人",
     "cinematic": "电影感"
   },
-  "rebuildTooltip": "根据当前规则和渠道设置刷新工作流节点。",
+  "rebuildTooltip": "根据当前品牌档案和渠道设置刷新工作流节点。",
   "freshness": {
     "warningTitle": "无实时网络调研",
-    "warning": "此工作流没有 Intelligence 节点。内容将仅依据您的规则与简报生成，不会搜索网络上的最新趋势或新闻。仍会锚定当前日期，但时效性可能有限。"
+    "warning": "此工作流没有 Intelligence 节点。内容将仅依据您的品牌档案与简报生成，不会搜索网络上的最新趋势或新闻。仍会锚定当前日期，但时效性可能有限。"
   },
   "qaWizard": {
     "title": "生成工作流",
     "yes": "是",
     "no": "否",
-    "webSearchHint": "选择“否”将跳过 Intelligence 步骤，不进行实时网络调研。内容仅依赖活动规则、简报和模型。",
+    "webSearchHint": "选择“否”将跳过 Intelligence 步骤，不进行实时网络调研。内容仅依赖品牌档案、简报和模型。",
     "back": "上一步",
     "next": "下一步",
     "generate": "生成工作流",
@@ -660,39 +650,39 @@
       },
       "keywordPlanner": {
         "title": "是否规划目标关键词？",
-        "description": "根据活动规则，在文本生成前添加关键词规划步骤。"
+        "description": "根据品牌档案，在文本生成前添加关键词规划步骤。"
       },
       "summary": {
         "title": "是否生成摘要？",
-        "description": "下一步将选择活动规则中的哪些渠道需要摘要。"
+        "description": "下一步将选择品牌档案中的哪些渠道需要摘要。"
       },
       "summaryChannels": {
         "title": "哪些渠道需要摘要？",
-        "description": "仅显示活动规则中的渠道。"
+        "description": "仅显示品牌档案中的渠道。"
       },
       "image": {
         "title": "是否生成图片？",
-        "description": "下一步将选择活动规则中的哪些渠道需要图片。"
+        "description": "下一步将选择品牌档案中的哪些渠道需要图片。"
       },
       "imageChannels": {
         "title": "哪些渠道需要图片？",
-        "description": "仅显示活动规则中的渠道。"
+        "description": "仅显示品牌档案中的渠道。"
       },
       "video": {
         "title": "是否生成视频？",
-        "description": "下一步将选择活动规则中的哪些渠道需要视频。"
+        "description": "下一步将选择品牌档案中的哪些渠道需要视频。"
       },
       "videoChannels": {
         "title": "哪些渠道需要视频？",
-        "description": "仅显示活动规则中的渠道。"
+        "description": "仅显示品牌档案中的渠道。"
       },
       "translate": {
         "title": "是否翻译内容？",
-        "description": "下一步将选择活动规则中的哪些渠道需要翻译。"
+        "description": "下一步将选择品牌档案中的哪些渠道需要翻译。"
       },
       "translationChannels": {
         "title": "哪些渠道需要翻译？",
-        "description": "仅显示活动规则中的渠道。"
+        "description": "仅显示品牌档案中的渠道。"
       },
       "targetLanguages": {
         "title": "目标语言",

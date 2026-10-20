@@ -82,6 +82,10 @@ export class IntelligenceNodeService {
       customPrompt ?? null,
     );
     prompt = appendAnalyticsContextToPrompt(prompt, input.intelligenceContext);
+    const notes = input.sourcePack?.notes?.trim();
+    if (notes) {
+      prompt = `${prompt}\n\n=== SOURCE ATTACHMENTS (this run) ===\n${notes}`;
+    }
 
     const { text, usage } = await this.llm.runWebSearchBrief({
       prompt,

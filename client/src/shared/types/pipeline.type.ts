@@ -1,5 +1,7 @@
 import type { WorkflowNodeType } from "./workflow.type"
 
+import type { Attachment } from "@/components/core/prompt-area"
+
 export type StartPipelinePayload = {
   workflowId: string
   ruleId: string
@@ -7,6 +9,8 @@ export type StartPipelinePayload = {
   useLearnings?: boolean
   executionMode?: "auto" | "step"
   reviewNodeIds?: string[]
+  /** PromptArea attachments — sent as multipart when files/urls present. */
+  attachments?: Attachment[]
 }
 
 export type StartPipelineResponse = {

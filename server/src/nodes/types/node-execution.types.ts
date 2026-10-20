@@ -3,6 +3,7 @@ import type {
   WorkflowNodeConfig,
   WorkflowNodeType,
 } from '../schemas/workflow-node.schema';
+import type { PipelineSourcePack } from '../../pipeline/source-pack.types';
 
 export interface PreviousOutputs {
   /** Target keywords from keyword_planner (newline-separated or plain text). */
@@ -25,6 +26,8 @@ export interface PipelineContext {
   rule: Rule;
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
+  /** Run attachments: notes for all nodes; pixel assets for image edit. */
+  sourcePack?: PipelineSourcePack | null;
 }
 
 export interface NodeExecutorInput {
@@ -104,6 +107,8 @@ export interface NodeExecutionInput {
   contentPrompt?: string;
   /** Prior node outputs from completed nodes in the pipeline. */
   previousOutputs?: PreviousOutputs;
+  /** Run-level source pack (notes + classified attachments). */
+  sourcePack?: import('../../pipeline/source-pack.types').PipelineSourcePack | null;
   /** Optional chunk callback for streaming-capable text nodes. */
   onChunk?: (chunk: string) => void;
   /** Analytics-backed context for intelligence nodes. */
@@ -123,6 +128,7 @@ export interface TextGenerationInput {
   config: WorkflowNodeConfig;
   /** When set (e.g. after keyword_planner), folded into the human prompt. */
   previousOutputs?: Pick<PreviousOutputs, 'keywords'>;
+  sourcePackNotes?: string;
 }
 
 /** Strongly typed input for {@link ImageGenerationService.generateImage}. */
@@ -131,6 +137,7 @@ export interface ImageGenerationInput {
   contentPrompt: string;
   previousOutputs: { text: string };
   config: WorkflowNodeConfig;
+  sourcePack?: import('../../pipeline/source-pack.types').PipelineSourcePack | null;
 }
 
 /** Strongly typed input for {@link TranslationService.translate}. */
@@ -139,6 +146,7 @@ export interface TranslationInput {
   contentPrompt: string;
   previousOutputs: { text: string };
   config: WorkflowNodeConfig;
+  sourcePackNotes?: string;
 }
 
 /** Strongly typed input for {@link SummarizationService.summarize}. */
@@ -147,6 +155,7 @@ export interface SummarizationInput {
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
   config: WorkflowNodeConfig;
+  sourcePackNotes?: string;
 }
 
 /** Strongly typed input for {@link TranscriptionService.transcribe}. */
@@ -163,6 +172,7 @@ export interface VideoGenerationInput {
   contentPrompt: string;
   previousOutputs: PreviousOutputs;
   config: WorkflowNodeConfig;
+  sourcePack?: import('../../pipeline/source-pack.types').PipelineSourcePack | null;
 }
 
 export interface StoredImageOutput {

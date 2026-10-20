@@ -4,6 +4,7 @@ import {
   aspectRatioToOpenAiImageSize,
   coerceOpenAiImageSize,
   isValidOpenAiImageSizeForModel,
+  OPENAI_IMAGE_GENERATION_MODEL,
 } from './openai-image-size.util';
 import {
   LlmProvider,
@@ -25,6 +26,7 @@ export {
   aspectRatioToOpenAiImageSize,
   coerceOpenAiImageSize,
   isValidOpenAiImageSizeForModel,
+  OPENAI_IMAGE_GENERATION_MODEL,
 } from './openai-image-size.util';
 
 const llmProvider = z.enum([
@@ -99,10 +101,7 @@ const imageConfigSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    const model =
-      typeof data.model === 'string' && data.model.trim()
-        ? data.model.trim()
-        : 'gpt-image-1';
+    const model = OPENAI_IMAGE_GENERATION_MODEL;
     if (typeof data.size === 'string' && data.size.trim()) {
       const s = data.size.trim();
       if (!isValidOpenAiImageSizeForModel(s, model)) {
@@ -360,13 +359,13 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     textLength: NodeSummaryLength.Medium,
   },
   [WorkflowNodeType.ImageGeneration]: {
-    model: 'gpt-image-1',
+    model: OPENAI_IMAGE_GENERATION_MODEL,
     quality: NodeImageQuality.Standard,
     style: NodeImageStyle.Natural,
     template: NodeImageTemplate.Auto,
     designStyle: 'auto',
     aspectRatio: NodeAspectRatio.R1x1,
-    size: aspectRatioToOpenAiImageSize('1:1', 'gpt-image-1'),
+    size: aspectRatioToOpenAiImageSize('1:1', OPENAI_IMAGE_GENERATION_MODEL),
   },
   [WorkflowNodeType.VideoGeneration]: {
     mode: 'cinematic',
@@ -414,7 +413,8 @@ function mergeWithDefaults(
   const out: Record<string, unknown> = { ...base, ...parsed };
 
   if (type === WorkflowNodeType.ImageGeneration) {
-    const model = typeof out.model === 'string' ? out.model : 'gpt-image-1';
+    const model = OPENAI_IMAGE_GENERATION_MODEL;
+    out.model = model;
     const hadAspectInParsed =
       'aspectRatio' in parsed &&
       typeof parsed.aspectRatio === 'string' &&
@@ -505,10 +505,8 @@ export function parseWorkflowNodeConfig(
   }
 
   if (type === WorkflowNodeType.ImageGeneration) {
-    const model =
-      typeof picked.model === 'string' && picked.model.trim()
-        ? picked.model.trim()
-        : 'gpt-image-1';
+    const model = OPENAI_IMAGE_GENERATION_MODEL;
+    picked.model = model;
     if (typeof picked.size === 'string' && picked.size.trim()) {
       picked.size = coerceOpenAiImageSize(picked.size.trim(), model);
     }

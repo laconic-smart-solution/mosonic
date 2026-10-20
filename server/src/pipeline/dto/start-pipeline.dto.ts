@@ -16,9 +16,10 @@ export class StartPipelineDto {
   @IsNotEmpty()
   ruleId: string;
 
+  /** Optional when files/urls are provided via multipart. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  contentPrompt: string;
+  contentPrompt?: string;
 
   /** When true, merge applied analytics suggestions into an ephemeral rule overlay. */
   @IsOptional()

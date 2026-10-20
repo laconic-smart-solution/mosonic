@@ -29,6 +29,7 @@ import { isSharedTrunkFailure } from './lane-pause.util';
 import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
+import { parsePipelineSourcePack } from '../pipeline/source-pack.types';
 
 @Injectable()
 export class PipelineNodeRunnerService {
@@ -159,6 +160,7 @@ export class PipelineNodeRunnerService {
         rule: executionRule,
         contentPrompt: effectiveContentPrompt,
         previousOutputs,
+        sourcePack: parsePipelineSourcePack(pipeline.sourcePack),
       },
       pipelineId: payload.pipelineId,
       totalNodes: payload.totalNodes,

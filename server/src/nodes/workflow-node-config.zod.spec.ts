@@ -76,13 +76,14 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.quality).toBe(NodeImageQuality.Hd);
   });
 
-  it('coerces legacy DALL·E-3-only size when persisting gpt-image-1', () => {
+  it('coerces legacy DALL·E-3-only size when persisting gpt-image-2', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
-      model: 'gpt-image-1',
+      model: 'dall-e-3',
       size: '1792x1024',
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
+    expect(r.data.model).toBe('gpt-image-2');
     expect(r.data.size).toBe('1536x1024');
   });
 

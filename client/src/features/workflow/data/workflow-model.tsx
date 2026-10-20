@@ -14,6 +14,7 @@ import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
 import {
   effectiveVideoMode,
 } from "@/features/workflow/lib/video-generation-ui"
+import { OPENAI_IMAGE_GENERATION_MODEL } from "@/features/workflow/lib/openai-image-size"
 import type {
   WorkflowEdge,
   WorkflowNode,
@@ -308,7 +309,7 @@ export const PIPE_GAP = 80
 export const DEFAULT_MODEL_BY_CANVAS_TYPE: Record<string, string> = {
   keywords: "gpt-4o",
   text: "gpt-4o",
-  image: "dall-e-3",
+  image: OPENAI_IMAGE_GENERATION_MODEL,
   video: "sora-2",
   translation: "gpt-4o",
   transcription: "whisper-1",
@@ -619,7 +620,7 @@ export const INITIAL_NODES: WFNode[] = [
     status: "idle",
     locked: false,
     config: {
-      model: "dall-e-3",
+      model: OPENAI_IMAGE_GENERATION_MODEL,
       style: "natural",
       aspectRatio: "4:5",
     },

@@ -25,7 +25,7 @@ describe('defaultWorkflowNodeConfigForRule', () => {
       WorkflowNodeType.ImageGeneration,
       null,
     );
-    expect(config.model).toBe('gpt-image-1');
+    expect(config.model).toBe('gpt-image-2');
     expect(config.style).toBe('natural');
     expect(config.aspectRatio).toBe('1:1');
     expect(config.quality).toBe('standard');

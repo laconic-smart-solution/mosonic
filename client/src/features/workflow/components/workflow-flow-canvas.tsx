@@ -206,10 +206,10 @@ function WorkflowNodeDeleteZone({
   const active = deletable && hover
   return (
     <motion.div
-      className="fixed top-1/2 right-5 z-60 -translate-y-1/2"
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 16 }}
+      className="fixed bottom-32 left-1/2 z-60 -translate-x-1/2"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 16 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
     >
       <div

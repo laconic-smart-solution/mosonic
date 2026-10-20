@@ -124,6 +124,7 @@ export class NodeExecutor {
       rule: input.context.rule,
       contentPrompt: input.context.contentPrompt,
       previousOutputs: input.context.previousOutputs,
+      sourcePack: input.context.sourcePack,
       intelligenceContext: input.intelligenceContext,
       nodeUserPrompt: input.node.userPrompt?.trim() || undefined,
       onChunk: (chunk) => {

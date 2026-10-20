@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -7,14 +7,23 @@ import {
   Post,
   Query,
   Req,
+  UploadedFiles,
+  UseFilters,
   UseGuards,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Express, Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../auth/tenancy.util';
 import { User } from '../users/schemas/user.schema';
+import {
+  ruleExtractMaxFileBytes,
+  ruleExtractMaxFiles,
+} from '../rule/extract-limits';
+import { MulterExceptionFilter } from '../rule/multer-exception.filter';
 import {
   PipelinePageQueryDto,
   PipelinePageResponseDto,
@@ -30,8 +39,41 @@ import {
   UpdatePipelineDto,
   UpdatePipelineResponseDto,
 } from './dto/update-pipeline.dto';
+import { parsePipelineStartMultipart } from './parse-pipeline-start-multipart';
 import { PipelineService } from './pipeline.service';
 
+function isMultipart(req: Request): boolean {
+  const ct = String(req.headers['content-type'] ?? '').toLowerCase();
+  return ct.includes('multipart/form-data');
+}
+
+function parseOptionalBoolean(raw: unknown): boolean | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') {
+    const v = raw.trim().toLowerCase();
+    if (v === 'true' || v === '1') return true;
+    if (v === 'false' || v === '0') return false;
+  }
+  return undefined;
+}
+
+function parseOptionalStringArray(raw: unknown): string[] | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string');
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return undefined;
+      return parsed.filter((x): x is string => typeof x === 'string');
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
 @UseGuards(JwtAuthGuard)
 @Controller('pipeline')
 export class PipelineController {
@@ -92,12 +134,47 @@ export class PipelineController {
   }
 
   @Post('start')
-  startPipeline(@Req() req: Request, @Body() dto: StartPipelineDto) {
+  @UseFilters(MulterExceptionFilter)
+  @UseInterceptors(
+    FilesInterceptor('files', ruleExtractMaxFiles(), {
+      limits: { fileSize: ruleExtractMaxFileBytes() },
+    }),
+  )
+  startPipeline(
+    @Req() req: Request,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+
+    if (isMultipart(req) || (files && files.length > 0)) {
+      const attachments = parsePipelineStartMultipart(
+        files,
+        body.contentPrompt,
+        body.urls,
+      );
+      const executionMode =
+        body.executionMode === 'step' || body.executionMode === 'auto'
+          ? body.executionMode
+          : undefined;
+      return this.pipelineService.startPipeline({
+        workflowId: String(body.workflowId ?? ''),
+        ruleId: String(body.ruleId ?? ''),
+        contentPrompt: attachments.contentPrompt,
+        files: attachments.files,
+        urls: attachments.urls,
+        useLearnings: parseOptionalBoolean(body.useLearnings),
+        executionMode,
+        reviewNodeIds: parseOptionalStringArray(body.reviewNodeIds),
+        auth,
+      });
+    }
+
+    const dto = body as unknown as StartPipelineDto;
     return this.pipelineService.startPipeline({
       workflowId: dto.workflowId,
       ruleId: dto.ruleId,
-      contentPrompt: dto.contentPrompt,
+      contentPrompt: dto.contentPrompt ?? '',
       useLearnings: dto.useLearnings,
       executionMode: dto.executionMode,
       reviewNodeIds: dto.reviewNodeIds,

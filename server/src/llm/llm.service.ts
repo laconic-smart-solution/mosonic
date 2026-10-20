@@ -16,6 +16,7 @@ import {
   allowedOpenAiImageSizesForModel,
   coerceOpenAiImageSize,
   isValidOpenAiImageSizeForModel,
+  OPENAI_IMAGE_GENERATION_MODEL,
 } from '../nodes/openai-image-size.util';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 
@@ -158,10 +159,7 @@ export class LlmService {
     }
     if (type === WorkflowNodeType.ImageGeneration && config) {
       const rec = config as Record<string, unknown>;
-      const model =
-        typeof rec.model === 'string' && rec.model.trim()
-          ? rec.model.trim()
-          : 'gpt-image-1';
+      const model = OPENAI_IMAGE_GENERATION_MODEL;
       const sizeRaw =
         typeof rec.size === 'string' && rec.size.trim() ? rec.size.trim() : '';
       if (sizeRaw && !isValidOpenAiImageSizeForModel(sizeRaw, model)) {
@@ -367,8 +365,8 @@ export class LlmService {
   }
 
   /**
-   * DALL-E image generation (non-streaming). Returns base64 payload
-   * (`response_format: b64_json`) for downstream storage.
+   * OpenAI image generation (non-streaming). Always uses `gpt-image-2`.
+   * Returns base64 payload (`response_format: b64_json`) for downstream storage.
    */
   async generateImageBase64(params: {
     provider?: string;
@@ -383,9 +381,7 @@ export class LlmService {
       this.assertProviderCapability(provider, 'image_generation');
       const apiKey = this.requireApiKeyForProvider(provider);
       const client = new OpenAI({ apiKey });
-      const requestedModel = (params.model ?? '').trim();
-      const model = requestedModel || 'gpt-image-2';
-      const isDalle3 = model === 'dall-e-3';
+      const model = OPENAI_IMAGE_GENERATION_MODEL;
 
       const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
         model,
@@ -394,11 +390,6 @@ export class LlmService {
         n: 1,
         response_format: 'b64_json',
       };
-      // DALL·E 3 historically accepted `style`; current Images API rejects it
-      // ("Unknown parameter: 'style'"). Style is already reflected in the prompt text.
-      if (isDalle3) {
-        body.quality = params.quality;
-      }
 
       const callWithCompat = async (
         req: OpenAI.Images.ImageGenerateParamsNonStreaming,
@@ -417,30 +408,7 @@ export class LlmService {
         }
       };
 
-      let response: OpenAI.Images.ImagesResponse;
-      try {
-        response = await callWithCompat(body);
-      } catch (error: unknown) {
-        // Back-compat: some environments don't recognize `dall-e-3` even when configured.
-        const msg = this.formatError(error);
-        if (
-          model === 'dall-e-3' &&
-          (msg.includes("model 'dall-e-3' does not exist") ||
-            msg.includes('does not exist') ||
-            msg.includes('invalid_value'))
-        ) {
-          const fallbackBody: OpenAI.Images.ImageGenerateParamsNonStreaming = {
-            model: 'gpt-image-1',
-            prompt: params.prompt,
-            size: coerceOpenAiImageSize(params.size, 'gpt-image-1'),
-            n: 1,
-            response_format: 'b64_json',
-          };
-          response = await callWithCompat(fallbackBody);
-        } else {
-          throw error;
-        }
-      }
+      const response = await callWithCompat(body);
 
       const row = response.data?.[0];
       const base64 = row?.b64_json;
@@ -468,6 +436,90 @@ export class LlmService {
     } catch (error) {
       this.logger.error(
         `OpenAI image generation failed: ${this.formatError(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * gpt-image-2 edit (text + reference images → image). Returns base64 PNG.
+   */
+  async editImageBase64(params: {
+    provider?: string;
+    prompt: string;
+    /** Local file paths or Blob-like uploads; OpenAI SDK accepts File/Blob. */
+    images: Array<{ buffer: Buffer; fileName: string; mimeType: string }>;
+    size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+  }): Promise<{ base64: string; mimeType: string }> {
+    try {
+      const provider = this.resolveProvider(params.provider);
+      this.assertProviderCapability(provider, 'image_generation');
+      const apiKey = this.requireApiKeyForProvider(provider);
+      const client = new OpenAI({ apiKey });
+      const model = OPENAI_IMAGE_GENERATION_MODEL;
+
+      if (!params.images.length) {
+        throw new Error('editImageBase64 requires at least one reference image');
+      }
+
+      const files = params.images.map((img) => {
+        const bytes = Uint8Array.from(img.buffer);
+        return new File([bytes], img.fileName, { type: img.mimeType });
+      });
+
+      const body: OpenAI.Images.ImageEditParamsNonStreaming = {
+        model,
+        prompt: params.prompt,
+        image: files.length === 1 ? files[0] : files,
+        size: coerceOpenAiImageSize(String(params.size), model) as
+          | '1024x1024'
+          | '1024x1536'
+          | '1536x1024'
+          | 'auto',
+        n: 1,
+        response_format: 'b64_json',
+      };
+
+      let response: OpenAI.Images.ImagesResponse;
+      try {
+        response = await client.images.edit(body);
+      } catch (error: unknown) {
+        const msg = this.formatError(error);
+        if (msg.includes("Unknown parameter: 'response_format'")) {
+          const without = { ...body };
+          delete (without as { response_format?: unknown }).response_format;
+          response = await client.images.edit(without);
+        } else {
+          throw error;
+        }
+      }
+
+      const row = response.data?.[0];
+      const base64 = row?.b64_json;
+      if (base64) {
+        return { base64, mimeType: 'image/png' };
+      }
+
+      const url = row?.url;
+      if (typeof url === 'string' && url.trim()) {
+        const res = await fetch(url.trim(), {
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!res.ok) {
+          throw new Error(
+            `Image edit returned URL but download failed (${res.status})`,
+          );
+        }
+        const mimeType =
+          res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
+        const buf = Buffer.from(await res.arrayBuffer());
+        return { base64: buf.toString('base64'), mimeType };
+      }
+
+      throw new Error('Image edit returned no base64 payload');
+    } catch (error) {
+      this.logger.error(
+        `OpenAI image edit failed: ${this.formatError(error)}`,
       );
       throw error;
     }

@@ -18,7 +18,7 @@ export const OPENAI_LLM_PRICING: Record<
 
 /**
  * USD per image. Key: `${model}_${size}_${quality}` for DALL·E;
- * gpt-image-1 uses simplified keys (OpenAI pricing varies — conservative defaults).
+ * gpt-image-2 uses simplified keys (OpenAI pricing varies — conservative defaults).
  */
 export const OPENAI_IMAGE_PRICING: Record<string, number> = {
   'dall-e-3_1024x1024_standard': 0.04,
@@ -33,6 +33,7 @@ export const OPENAI_IMAGE_PRICING: Record<string, number> = {
   'dall-e-2_512x512': 0.018,
   /** Fallback per image when size/quality keys are unknown */
   'gpt-image-1_default': 0.04,
+  'gpt-image-2_default': 0.04,
 };
 
 /**

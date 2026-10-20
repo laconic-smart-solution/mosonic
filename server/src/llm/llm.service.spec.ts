@@ -30,10 +30,10 @@ describe('LlmService', () => {
     service = new LlmService(config);
   });
 
-  it('rejects invalid explicit image size for gpt-image-1 (schema)', () => {
+  it('rejects invalid explicit image size for gpt-image-2 (schema)', () => {
     expect(() =>
       service.validateWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         size: '1792x1024',
       }),
     ).toThrow('Invalid image size');

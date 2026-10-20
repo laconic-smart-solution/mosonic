@@ -62,6 +62,8 @@
     "remove": "Remove",
     "upload": "Upload",
     "download": "Download",
+    "downloadAria": "Download {{name}}",
+    "downloadFailed": "Could not download file",
     "approve": "Approve",
     "reject": "Reject",
     "stop": "Stop",
@@ -77,7 +79,7 @@
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
-    "rules": "Rules",
+    "rules": "Brand Profiles",
     "workflows": "Workflows",
     "pipelines": "Pipelines",
     "content": "Content",
@@ -96,7 +98,7 @@
   },
   "routes": {
     "dashboard": "Dashboard",
-    "rules": "Rules",
+    "rules": "Brand Profiles",
     "workflow": "Workflows",
     "content": "Content",
     "upload": "Upload",
@@ -115,9 +117,9 @@
       "keywords": "dashboard home overview start"
     },
     "rules": {
-      "title": "Rules",
-      "subtitle": "Campaign rules",
-      "keywords": "rules campaigns setup"
+      "title": "Brand Profiles",
+      "subtitle": "Campaign brand profiles",
+      "keywords": "brand profile profiles rules campaigns setup"
     },
     "content": {
       "title": "Content",

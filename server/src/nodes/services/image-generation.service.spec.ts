@@ -25,11 +25,17 @@ describe('ImageGenerationService', () => {
     return {
       generateImageBase64: jest.fn(({ prompt }: { prompt: string }) => {
         promptCapture.prompt = prompt;
-        return { base64: 'abc', mimeType: 'image/png' };
+        return Promise.resolve({ base64: 'abc', mimeType: 'image/png' });
       }),
-      uploadImageBase64: jest.fn(() => ({
-        fileUrl: 'https://files.example.com/image.png',
-      })),
+      editImageBase64: jest.fn(({ prompt }: { prompt: string }) => {
+        promptCapture.prompt = prompt;
+        return Promise.resolve({ base64: 'edit-abc', mimeType: 'image/png' });
+      }),
+      uploadImageBase64: jest.fn(() =>
+        Promise.resolve({
+          fileUrl: 'https://files.example.com/image.png',
+        }),
+      ),
     };
   }
 
@@ -63,12 +69,6 @@ describe('ImageGenerationService', () => {
     return { getByKey: jest.fn().mockResolvedValue(row) };
   }
 
-  function makeDesignDirection(
-    result: string = 'a merged composition and style direction',
-  ) {
-    return { compose: jest.fn().mockResolvedValue(result) };
-  }
-
   function makePromptComposer(
     result: string | null = 'A composed natural-language prompt.',
   ) {
@@ -81,7 +81,6 @@ describe('ImageGenerationService', () => {
     templateResolver?: ReturnType<typeof makeTemplateResolver>;
     styleSelector?: ReturnType<typeof makeStyleSelector>;
     styleRepository?: ReturnType<typeof makeStyleRepository>;
-    designDirection?: ReturnType<typeof makeDesignDirection>;
     promptComposer?: ReturnType<typeof makePromptComposer>;
   }) {
     const promptCapture: { prompt?: string } = {};
@@ -91,7 +90,6 @@ describe('ImageGenerationService', () => {
       overrides.templateResolver ?? makeTemplateResolver();
     const styleSelector = overrides.styleSelector ?? makeStyleSelector();
     const styleRepository = overrides.styleRepository ?? makeStyleRepository();
-    const designDirection = overrides.designDirection ?? makeDesignDirection();
     const promptComposer = overrides.promptComposer ?? makePromptComposer();
 
     const svc = new ImageGenerationService(
@@ -100,7 +98,6 @@ describe('ImageGenerationService', () => {
       templateResolver as never,
       styleSelector as never,
       styleRepository as never,
-      designDirection as never,
       promptComposer as never,
     );
 
@@ -111,7 +108,6 @@ describe('ImageGenerationService', () => {
       templateResolver,
       styleSelector,
       styleRepository,
-      designDirection,
       promptComposer,
     };
   }
@@ -179,7 +175,7 @@ describe('ImageGenerationService', () => {
     );
   });
 
-  it('merges template and style into a design direction before composing', async () => {
+  it('passes template and style to the composer without a merged design direction', async () => {
     const templateResolver = makeTemplateResolver({
       name: 'Product Advertisement',
       description: 'd',
@@ -191,11 +187,9 @@ describe('ImageGenerationService', () => {
       description: 'd',
       prompt: 'style prompt text',
     });
-    const designDirection = makeDesignDirection('merged direction text');
     const { svc, promptComposer } = makeService({
       templateResolver,
       styleRepository,
-      designDirection,
     });
 
     await svc.generateImage({
@@ -206,17 +200,14 @@ describe('ImageGenerationService', () => {
       config: { template: 'lifestyle', channel: 'instagram' },
     });
 
-    expect(designDirection.compose).toHaveBeenCalledWith(
-      expect.objectContaining({
-        templateName: 'Product Advertisement',
-        templatePrompt: 'template prompt text',
-        styleName: 'Minimalism',
-        stylePrompt: 'style prompt text',
-      }),
-    );
-    expect(promptComposer.compose).toHaveBeenCalledWith(
-      expect.objectContaining({ designDirection: 'merged direction text' }),
-    );
+    const composeArg = (
+      promptComposer.compose as jest.Mock
+    ).mock.calls[0][0] as Record<string, unknown>;
+    expect(composeArg.templateName).toBe('Product Advertisement');
+    expect(composeArg.templatePrompt).toBe('template prompt text');
+    expect(composeArg.styleName).toBe('Minimalism');
+    expect(composeArg.stylePrompt).toBe('style prompt text');
+    expect(composeArg).not.toHaveProperty('designDirection');
   });
 
   it('uses the composed prompt when the composer succeeds', async () => {
@@ -249,6 +240,8 @@ describe('ImageGenerationService', () => {
     });
 
     expect(promptCapture.prompt).toContain('SOURCE CONTENT');
+    expect(promptCapture.prompt).toContain('Mosonic');
+    expect(promptCapture.prompt).toContain('Thai SMEs');
     expect(promptCapture.prompt).not.toBe(null);
   });
 
@@ -314,10 +307,8 @@ describe('ImageGenerationService', () => {
       description: 'd',
       prompt: 'style prompt text',
     });
-    const designDirection = makeDesignDirection();
-    const { svc, styleSelector } = makeService({
+    const { svc, styleSelector, promptComposer } = makeService({
       styleRepository,
-      designDirection,
     });
 
     await svc.generateImage({
@@ -334,15 +325,14 @@ describe('ImageGenerationService', () => {
 
     expect(styleSelector.select).not.toHaveBeenCalled();
     expect(styleRepository.getByKey).toHaveBeenCalledWith('cyberpunk');
-    expect(designDirection.compose).toHaveBeenCalledWith(
+    expect(promptComposer.compose).toHaveBeenCalledWith(
       expect.objectContaining({ styleName: 'Cyberpunk' }),
     );
   });
 
   it('tolerates a missing style row (unknown key) without throwing', async () => {
     const styleRepository = makeStyleRepository(null);
-    const designDirection = makeDesignDirection();
-    const { svc } = makeService({ styleRepository, designDirection });
+    const { svc, promptComposer } = makeService({ styleRepository });
 
     await svc.generateImage({
       rule,
@@ -352,8 +342,106 @@ describe('ImageGenerationService', () => {
       config: { template: 'lifestyle', channel: 'instagram' },
     });
 
-    expect(designDirection.compose).toHaveBeenCalledWith(
+    expect(promptComposer.compose).toHaveBeenCalledWith(
       expect.objectContaining({ styleName: undefined, stylePrompt: undefined }),
     );
+  });
+
+  it('uses images.generate when sourcePack has no pixel roles', async () => {
+    const promptCapture: { prompt?: string } = {};
+    const llm = makeLlm(promptCapture);
+    const { svc, promptComposer } = makeService({ llm });
+
+    await svc.generateImage({
+      rule,
+      workflowRef: 'wf1',
+      contentPrompt: 'ad for coffee',
+      previousOutputs: { text: 'Try our roast' },
+      config: { template: 'lifestyle', channel: 'instagram' },
+      sourcePack: {
+        notes: 'Product: coffee beans',
+        assets: [
+          {
+            id: 'a1',
+            kind: 'image',
+            label: 'photo.jpg',
+            fileUrl: 'https://files.example.com/photo.jpg',
+            role: 'context_only',
+            confidence: 0.5,
+          },
+        ],
+      },
+    });
+
+    expect(llm.generateImageBase64).toHaveBeenCalled();
+    expect(llm.editImageBase64).not.toHaveBeenCalled();
+    expect(promptComposer.compose).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourcePackNotes: 'Product: coffee beans',
+        referenceImages: undefined,
+      }),
+    );
+  });
+
+  it('uses images.edit when sourcePack has pixel roles', async () => {
+    const promptCapture: { prompt?: string } = {};
+    const llm = makeLlm(promptCapture);
+    const { svc, promptComposer } = makeService({ llm });
+
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.from([1, 2, 3, 4]).buffer,
+      headers: { get: () => 'image/png' },
+    } as unknown as Response);
+
+    try {
+      await svc.generateImage({
+        rule,
+        workflowRef: 'wf1',
+        contentPrompt: 'use this logo on the ad',
+        previousOutputs: { text: 'Try our roast' },
+        config: { template: 'ad_creative', channel: 'instagram' },
+        sourcePack: {
+          notes: 'Logo attached',
+          assets: [
+            {
+              id: 'logo1',
+              kind: 'image',
+              label: 'logo.png',
+              fileUrl: 'https://files.example.com/logo.png',
+              mime: 'image/png',
+              role: 'brand_mark',
+              confidence: 0.9,
+            },
+          ],
+        },
+      });
+
+      expect(llm.editImageBase64).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.any(String),
+          images: expect.arrayContaining([
+            expect.objectContaining({
+              fileName: expect.stringContaining('logo1'),
+              mimeType: 'image/png',
+            }),
+          ]),
+        }),
+      );
+      expect(llm.generateImageBase64).not.toHaveBeenCalled();
+      expect(promptComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({
+          referenceImages: [
+            expect.objectContaining({
+              index: 1,
+              label: 'logo.png',
+              role: 'brand_mark',
+            }),
+          ],
+        }),
+      );
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 });

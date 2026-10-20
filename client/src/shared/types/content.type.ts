@@ -119,6 +119,10 @@ export type GenerateNodeBody = {
   config?: Record<string, unknown>
   /** @deprecated Use `config` instead. */
   userPrompt?: string
+  /** Optional direction for this extra output. */
+  message?: string
+  /** Reference images for image_generation (multipart). */
+  attachments?: Array<{ id: string; label: string; file: File }>
 }
 
 export type GenerateNodeResponse = {

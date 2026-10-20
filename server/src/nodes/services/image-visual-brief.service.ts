@@ -96,11 +96,11 @@ const IMAGE_TEMPLATE_VISUAL_STRATEGY: Partial<
   Record<NodeImageTemplate, string>
 > = {
   [NodeImageTemplate.AdCreative]: [
-    'Create a commercial advertising composition.',
+    'Create a finished commercial advertising composition.',
     'Use one dominant focal subject.',
     'Create a strong visual hierarchy that works at mobile size.',
-    'Reserve approximately 30% clean negative space for later text overlay.',
-    'Do not place headline copy or advertising text inside the scene.',
+    'Fill the frame — do not reserve blank overlay space.',
+    'If a short headline or call to action is provided, render it once in the image.',
   ].join('\n'),
 
   [NodeImageTemplate.ProductMockup]: [

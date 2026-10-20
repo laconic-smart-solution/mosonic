@@ -106,8 +106,20 @@ function buildSystemPrompt(
     .join('\n');
 }
 
-function buildHumanPrompt(text: string, targetLanguage: string): string {
-  return [`Translate the following content to ${targetLanguage}:`, '', text, '']
+function buildHumanPrompt(
+  text: string,
+  targetLanguage: string,
+  sourcePackNotes?: string,
+): string {
+  const notes = sourcePackNotes?.trim();
+  return [
+    `Translate the following content to ${targetLanguage}:`,
+    '',
+    text,
+    notes
+      ? `\nSource attachments for this run (preserve product names and facts; do not invent):\n${notes}`
+      : '',
+  ]
     .filter(Boolean)
     .join('\n');
 }
@@ -162,6 +174,7 @@ export class TranslationService {
     const humanPrompt = buildHumanPrompt(
       previousOutputs.text,
       normalized.targetLanguage,
+      input.sourcePackNotes,
     );
 
     const model = this.llm.getChatModelForPlainText({
@@ -193,7 +206,11 @@ export class TranslationService {
 
     const normalized = normalizeTranslationConfig(input.config ?? {});
     const systemPrompt = buildSystemPrompt(input.rule, normalized);
-    const humanPrompt = buildHumanPrompt(sourceText, normalized.targetLanguage);
+    const humanPrompt = buildHumanPrompt(
+      sourceText,
+      normalized.targetLanguage,
+      input.sourcePack?.notes,
+    );
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
