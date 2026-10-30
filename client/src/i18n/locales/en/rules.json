@@ -87,6 +87,7 @@
       "campaign": "Campaign",
       "channels": "Channels",
       "guidelines": "Guidelines",
+      "assets": "Assets",
       "autonomy": "Autonomy"
     },
     "saving": "Saving…",
@@ -161,6 +162,34 @@
       "modeOff": "off",
       "modeReviewOptional": "review optional",
       "modeFullAuto": "full auto"
+    },
+    "assets": {
+      "title": "Brand assets",
+      "subtitle": "Logos, reference images, and guideline documents the AI uses as brand context.",
+      "empty": "No assets uploaded yet."
+    }
+  },
+  "assets": {
+    "upload": {
+      "logo": "Upload logo",
+      "reference_image": "Upload reference image",
+      "guideline_document": "Upload guideline PDF"
+    },
+    "type": {
+      "logo": "Logo",
+      "reference_image": "Reference image",
+      "guideline_document": "Guideline document"
+    },
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "ready": "Ready",
+      "failed": "Failed"
+    },
+    "deleteAction": "Delete asset",
+    "toast": {
+      "uploadFailed": "Could not upload asset",
+      "deleteFailed": "Could not delete asset"
     }
   },
   "tree": {
@@ -169,7 +198,8 @@
       "audience": "Audience",
       "campaign": "Campaign",
       "channels": "Channels",
-      "guidelines": "Guidelines"
+      "guidelines": "Guidelines",
+      "assets": "Assets"
     },
     "fields": {
       "brandName": "Brand name",
@@ -183,7 +213,8 @@
       "formats": "Formats",
       "channelNames": "Channel names",
       "dos": "Dos",
-      "donts": "Donts"
+      "donts": "Donts",
+      "assetNames": "Asset names"
     },
     "itemCount": "{{count}} items"
   },

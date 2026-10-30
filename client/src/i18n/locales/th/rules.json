@@ -85,6 +85,7 @@
       "campaign": "แคมเปญ",
       "channels": "ช่องทาง",
       "guidelines": "แนวทาง",
+      "assets": "ไฟล์แบรนด์",
       "autonomy": "อัตโนมัติ"
     },
     "saving": "กำลังบันทึก…",
@@ -159,6 +160,34 @@
       "modeOff": "ปิด",
       "modeReviewOptional": "ตรวจสอบได้",
       "modeFullAuto": "อัตโนมัติเต็มรูปแบบ"
+    },
+    "assets": {
+      "title": "ไฟล์แบรนด์",
+      "subtitle": "โลโก้ ภาพอ้างอิง และเอกสารแนวทางที่ AI ใช้เป็นข้อมูลแบรนด์",
+      "empty": "ยังไม่มีไฟล์ที่อัปโหลด"
+    }
+  },
+  "assets": {
+    "upload": {
+      "logo": "อัปโหลดโลโก้",
+      "reference_image": "อัปโหลดภาพอ้างอิง",
+      "guideline_document": "อัปโหลด PDF แนวทาง"
+    },
+    "type": {
+      "logo": "โลโก้",
+      "reference_image": "ภาพอ้างอิง",
+      "guideline_document": "เอกสารแนวทาง"
+    },
+    "status": {
+      "pending": "รอดำเนินการ",
+      "processing": "กำลังประมวลผล",
+      "ready": "พร้อมใช้งาน",
+      "failed": "ล้มเหลว"
+    },
+    "deleteAction": "ลบไฟล์",
+    "toast": {
+      "uploadFailed": "ไม่สามารถอัปโหลดไฟล์ได้",
+      "deleteFailed": "ไม่สามารถลบไฟล์ได้"
     }
   },
   "tree": {
@@ -167,7 +196,8 @@
       "audience": "กลุ่มเป้าหมาย",
       "campaign": "แคมเปญ",
       "channels": "ช่องทาง",
-      "guidelines": "แนวทาง"
+      "guidelines": "แนวทาง",
+      "assets": "ไฟล์แบรนด์"
     },
     "fields": {
       "brandName": "ชื่อแบรนด์",
@@ -181,7 +211,8 @@
       "formats": "รูปแบบ",
       "channelNames": "ชื่อช่องทาง",
       "dos": "ควรทำ",
-      "donts": "ไม่ควรทำ"
+      "donts": "ไม่ควรทำ",
+      "assetNames": "ชื่อไฟล์"
     },
     "itemCount": "{{count}} รายการ"
   },

@@ -301,6 +301,7 @@ export function getRuleSummaries(rules: RuleEntity[]): RuleSummary[] {
 export function buildRuleFlow(
   rule: RuleEntity,
   t: TFunction<"rules">,
+  assets: { originalFileName: string }[] = [],
 ): { nodes: Node[]; edges: Edge[] } {
   const ring1 = 260
   const ring2 = 470
@@ -352,6 +353,17 @@ export function buildRuleFlow(
       fields: [
         { key: "dos", label: t("tree.fields.dos"), value: rule.contentGuidelines.dos },
         { key: "donts", label: t("tree.fields.donts"), value: rule.contentGuidelines.donts },
+      ],
+    },
+    {
+      key: "assets",
+      title: t("tree.sections.assets"),
+      fields: [
+        {
+          key: "names",
+          label: t("tree.fields.assetNames"),
+          value: assets.map((asset) => asset.originalFileName),
+        },
       ],
     },
   ] as const

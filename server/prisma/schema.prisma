@@ -107,6 +107,19 @@ enum RuleStatus {
   failed
 }
 
+enum RuleAssetType {
+  logo
+  reference_image
+  guideline_document
+}
+
+enum RuleAssetStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
 enum CreditTopupSource {
   self_serve
   admin
@@ -584,6 +597,45 @@ model Rule {
   @@index([status, updatedAt(sort: Desc)])
   @@index([userId, updatedAt(sort: Desc)])
   @@map("rules")
+}
+
+model RuleAsset {
+  ruleAssetId      String          @id @default(uuid())
+  ruleId           String
+  userId           String?
+  type             RuleAssetType
+  status           RuleAssetStatus @default(pending)
+  fileUrl          String
+  relativePath     String?
+  originalFileName String
+  mimeType         String
+  fileSize         Int
+  aiDescription    String?
+  extractedText    String?
+  ragEnabled       Boolean         @default(false)
+  errorMessage     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  chunks RuleAssetChunk[]
+
+  @@index([ruleId, createdAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("rule_assets")
+}
+
+model RuleAssetChunk {
+  ruleAssetChunkId String   @id @default(uuid())
+  ruleAssetId      String
+  chunkIndex       Int
+  text             String
+  embedding        Json
+  createdAt        DateTime @default(now())
+
+  ruleAsset RuleAsset @relation(fields: [ruleAssetId], references: [ruleAssetId], onDelete: Cascade)
+
+  @@index([ruleAssetId, chunkIndex])
+  @@map("rule_asset_chunks")
 }
 
 model Pipeline {

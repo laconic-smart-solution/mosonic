@@ -5,7 +5,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import OpenAI from 'openai';
 import {
   type WorkflowNodeLlmConfigSubset,
@@ -26,6 +26,7 @@ const DEFAULT_GOOGLE_MODEL = 'gemini-1.5-pro';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
 const DEFAULT_FILE_SERVICE_UPLOAD_PATH = '/upload';
+const DEFAULT_OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
 
 type LlmCapability =
   | 'chat'
@@ -362,6 +363,29 @@ export class LlmService {
               .join('\n')
           : String(res.content);
     return text.trim();
+  }
+
+  /**
+   * Embed a batch of texts for RAG storage/search (OpenAI only, matching the
+   * `faq/` service's embedding approach — JSONB float-array storage, no pgvector).
+   */
+  async embedTexts(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    const apiKey = this.requireApiKeyForProvider(LlmProvider.OpenAI);
+    const model =
+      this.config.get<string>('OPENAI_EMBEDDING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_EMBEDDING_MODEL;
+    const embeddings = new OpenAIEmbeddings({ apiKey, model });
+    return embeddings.embedDocuments(texts);
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const apiKey = this.requireApiKeyForProvider(LlmProvider.OpenAI);
+    const model =
+      this.config.get<string>('OPENAI_EMBEDDING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_EMBEDDING_MODEL;
+    const embeddings = new OpenAIEmbeddings({ apiKey, model });
+    return embeddings.embedQuery(text);
   }
 
   /**

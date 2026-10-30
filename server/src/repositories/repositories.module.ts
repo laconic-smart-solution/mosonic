@@ -23,6 +23,7 @@ import {
   POST_ANALYTICS_REPOSITORY,
   POST_REPOSITORY,
   RULE_REPOSITORY,
+  RULE_ASSET_REPOSITORY,
   SERVICE_RATE_REPOSITORY,
   SYNC_LOCK_REPOSITORY,
   UPLOAD_REPOSITORY,
@@ -57,6 +58,7 @@ import { PrismaPlanRepository } from './prisma/prisma-plan.repository';
 import { PrismaPostAnalyticsRepository } from './prisma/prisma-post-analytics.repository';
 import { PrismaPostRepository } from './prisma/prisma-post.repository';
 import { PrismaRuleRepository } from './prisma/prisma-rule.repository';
+import { PrismaRuleAssetRepository } from './prisma/prisma-rule-asset.repository';
 import { PrismaServiceRateRepository } from './prisma/prisma-service-rate.repository';
 import { PrismaSyncLockRepository } from './prisma/prisma-sync-lock.repository';
 import { PrismaUploadRepository } from './prisma/prisma-upload.repository';
@@ -97,6 +99,7 @@ const repositoryProviders = [
   { provide: WORKFLOW_REPOSITORY, useClass: PrismaWorkflowRepository },
   { provide: WORKFLOW_NODE_REPOSITORY, useClass: PrismaWorkflowNodeRepository },
   { provide: RULE_REPOSITORY, useClass: PrismaRuleRepository },
+  { provide: RULE_ASSET_REPOSITORY, useClass: PrismaRuleAssetRepository },
   { provide: PIPELINE_REPOSITORY, useClass: PrismaPipelineRepository },
   { provide: PIPELINE_LOG_REPOSITORY, useClass: PrismaPipelineLogRepository },
   { provide: CONTENT_REPOSITORY, useClass: PrismaContentRepository },

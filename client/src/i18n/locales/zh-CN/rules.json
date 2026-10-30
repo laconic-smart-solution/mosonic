@@ -85,6 +85,7 @@
       "campaign": "活动",
       "channels": "渠道",
       "guidelines": "指南",
+      "assets": "品牌素材",
       "autonomy": "自治"
     },
     "saving": "正在保存…",
@@ -159,6 +160,34 @@
       "modeOff": "关闭",
       "modeReviewOptional": "可选审核",
       "modeFullAuto": "全自动"
+    },
+    "assets": {
+      "title": "品牌素材",
+      "subtitle": "AI 用作品牌背景的徽标、参考图片和指南文档。",
+      "empty": "尚未上传任何素材。"
+    }
+  },
+  "assets": {
+    "upload": {
+      "logo": "上传徽标",
+      "reference_image": "上传参考图片",
+      "guideline_document": "上传指南 PDF"
+    },
+    "type": {
+      "logo": "徽标",
+      "reference_image": "参考图片",
+      "guideline_document": "指南文档"
+    },
+    "status": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "ready": "就绪",
+      "failed": "失败"
+    },
+    "deleteAction": "删除素材",
+    "toast": {
+      "uploadFailed": "上传素材失败",
+      "deleteFailed": "删除素材失败"
     }
   },
   "tree": {
@@ -167,7 +196,8 @@
       "audience": "受众",
       "campaign": "活动",
       "channels": "渠道",
-      "guidelines": "指南"
+      "guidelines": "指南",
+      "assets": "品牌素材"
     },
     "fields": {
       "brandName": "品牌名称",
@@ -181,7 +211,8 @@
       "formats": "格式",
       "channelNames": "渠道名称",
       "dos": "建议",
-      "donts": "禁止"
+      "donts": "禁止",
+      "assetNames": "素材名称"
     },
     "itemCount": "{{count}} 项"
   },
