@@ -4,6 +4,7 @@ import type {
   CreditTopup,
   CreditTopupPurchase,
   FixedCost,
+  LlmTokenRate,
   NodeCreditPrice,
   ServiceRate,
 } from '@prisma/client';
@@ -12,6 +13,7 @@ export type CreditConfigRecord = CreditConfig;
 export type FixedCostRecord = FixedCost;
 export type ServiceRateRecord = ServiceRate;
 export type NodeCreditPriceRecord = NodeCreditPrice;
+export type LlmTokenRateRecord = LlmTokenRate;
 export type CreditLedgerRecord = CreditLedger;
 export type CreditTopupRecord = CreditTopup;
 export type CreditTopupPurchaseRecord = CreditTopupPurchase;

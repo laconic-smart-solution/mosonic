@@ -124,11 +124,11 @@ export class CostService {
       }
 
       case 'openai_video': {
-        const modelKey = dto.providerModel ?? 'sora-2';
+        const modelKey = dto.providerModel ?? 'heygen_video_1';
         const p =
           OPENAI_VIDEO_PRICING[modelKey] ??
-          OPENAI_VIDEO_PRICING['sora-2'] ??
-          OPENAI_VIDEO_PRICING['sora'];
+          OPENAI_VIDEO_PRICING['heygen_video_1'] ??
+          OPENAI_VIDEO_PRICING['heygen-presenter'];
         if (!p) {
           return 0;
         }

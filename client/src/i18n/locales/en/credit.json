@@ -46,11 +46,14 @@
     "summarization": "Summarization",
     "image_generation": "Image generation",
     "video_generation": "Video generation",
+    "video_presenter": "Presenter video (HeyGen)",
+    "video_cinematic": "Cinematic video (Sora)",
     "video_generation_presenter": "Presenter video (HeyGen)",
     "video_generation_cinematic": "Cinematic video (Sora)",
     "social_account_connect": "Social account unlock",
     "rule_generation": "Brand Profile generation",
-    "workflow_generation": "Workflow generation"
+    "workflow_generation": "Workflow generation",
+    "subtitle": "Subtitles"
   },
   "generationCost": "{{count}} credits",
   "generationConfirm": {

@@ -149,22 +149,22 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.aspectRatio).toBe('4:5');
   });
 
-  it('snaps legacy video duration 15 to 16 seconds', () => {
+  it('snaps cinematic duration 12 to 10 seconds', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      duration: 12,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.duration).toBe(10);
+  });
+
+  it('accepts explicit cinematic duration 15', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
       duration: 15,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.data.duration).toBe(16);
-  });
-
-  it('accepts explicit Sora duration 20', () => {
-    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
-      duration: 20,
-    });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.data.duration).toBe(20);
+    expect(r.data.duration).toBe(15);
   });
 
   it('snaps presenter duration to allowed HeyGen values', () => {

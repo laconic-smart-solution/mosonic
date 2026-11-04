@@ -37,6 +37,7 @@ const NAV_ITEMS: {
     | "cost"
     | "credit"
     | "nodeCredits"
+    | "tokenRates"
     | "plans"
     | "topupPlans"
     | "usage"
@@ -50,6 +51,7 @@ const NAV_ITEMS: {
   { key: "users", href: "/admin/users", icon: Users },
   { key: "credit", href: "/admin/credit", icon: Gauge },
   { key: "nodeCredits", href: "/admin/node-credits", icon: Workflow },
+  { key: "tokenRates", href: "/admin/token-rates", icon: Sparkles },
   { key: "plans", href: "/admin/plans", icon: CreditCard },
   { key: "topupPlans", href: "/admin/topup-plans", icon: ShoppingBag },
   { key: "usage", href: "/admin/usage", icon: History },

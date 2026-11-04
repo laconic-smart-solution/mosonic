@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, forwardRef } from '@nestjs/common';
 import { EventsService } from '../events/events.service';
 import { pipelineNodeReviewNotification } from '../events/notification.util';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
@@ -31,6 +31,7 @@ export class PipelineNodeCompletionService {
   constructor(
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
+    @Inject(forwardRef(() => DependencyResolverService))
     private readonly resolver: DependencyResolverService,
     private readonly events: EventsService,
   ) {}

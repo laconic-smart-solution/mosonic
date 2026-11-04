@@ -6,6 +6,7 @@ import { ImageHandler } from './handlers/image.handler';
 import { PdfHandler } from './handlers/pdf.handler';
 import { TextHandler } from './handlers/text.handler';
 import { UrlHandler } from './handlers/url.handler';
+import { WebsiteAssetHandler } from './handlers/website-asset.handler';
 import { PreprocessingService } from './preprocessing.service';
 
 @Global()
@@ -17,9 +18,10 @@ import { PreprocessingService } from './preprocessing.service';
     PdfHandler,
     ImageHandler,
     UrlHandler,
+    WebsiteAssetHandler,
     PreprocessingService,
     ContentReaderService,
   ],
-  exports: [PreprocessingService, ContentReaderService],
+  exports: [PreprocessingService, ContentReaderService, WebsiteAssetHandler],
 })
 export class PreprocessingModule {}

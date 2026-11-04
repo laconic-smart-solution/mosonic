@@ -60,9 +60,10 @@ export class ZernioController {
       'http://localhost:5173',
     );
     try {
-      const { platform } = await this.mcpService.handleOAuthCallback(query);
+      const { platform, returnTo } =
+        await this.mcpService.handleOAuthCallback(query);
       res.redirect(
-        `${frontend}/settings/accounts?connected=${encodeURIComponent(platform)}`,
+        `${frontend}${returnTo}?connected=${encodeURIComponent(platform)}`,
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

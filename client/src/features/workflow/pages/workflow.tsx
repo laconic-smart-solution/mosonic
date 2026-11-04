@@ -2078,6 +2078,8 @@ function extractReviewText(
       return String(output.summary ?? "")
     case "transcription":
       return String(output.transcription ?? "")
+    case "subtitle":
+      return String(output.subtitle ?? "")
     case "keyword_planner":
       if (typeof output.keywords === "string") return output.keywords
       if (Array.isArray(output.keywords)) {
@@ -2110,6 +2112,8 @@ function outputToRuntime(
         ? output.translatedText
         : typeof output.transcription === "string"
           ? output.transcription
+          : typeof output.subtitle === "string"
+          ? output.subtitle
           : typeof output.summary === "string"
             ? output.summary
             : undefined
@@ -2122,6 +2126,7 @@ function outputToRuntime(
     case "text_generation":
     case "translation":
     case "transcription":
+    case "subtitle":
     case "summarization":
     case "adapt":
     case "intelligence":
@@ -2138,6 +2143,8 @@ function outputToRuntime(
               : undefined,
       }
     case "video_generation":
+    case "video_presenter":
+    case "video_cinematic":
       return {
         previewVideo:
           typeof output.video === "string"

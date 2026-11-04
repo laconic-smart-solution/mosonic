@@ -45,11 +45,14 @@
     "summarization": "การสรุป",
     "image_generation": "สร้างรูปภาพ",
     "video_generation": "สร้างวิดีโอ",
+    "video_presenter": "วิดีโอผู้นำเสนอ (HeyGen)",
+    "video_cinematic": "วิดีโอซีเนมาติก (Sora)",
     "video_generation_presenter": "วิดีโอพรีเซนเตอร์ (HeyGen)",
     "video_generation_cinematic": "วิดีโอภาพยนตร์ (Sora)",
     "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
     "rule_generation": "สร้างโปรไฟล์แบรนด์",
-    "workflow_generation": "สร้างเวิร์กโฟลว์"
+    "workflow_generation": "สร้างเวิร์กโฟลว์",
+    "subtitle": "คำบรรยาย"
   },
   "generationCost": "{{count}} เครดิต",
   "generationConfirm": {

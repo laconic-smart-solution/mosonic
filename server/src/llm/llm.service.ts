@@ -12,6 +12,7 @@ import {
   LlmProvider,
   WorkflowNodeType,
 } from '../nodes/workflow-node-llm.enums';
+import { coerceOpenAiImageMime } from '../nodes/openai-image-mime.util';
 import {
   allowedOpenAiImageSizesForModel,
   coerceOpenAiImageSize,
@@ -19,14 +20,32 @@ import {
   OPENAI_IMAGE_GENERATION_MODEL,
 } from '../nodes/openai-image-size.util';
 import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
+import { resolveAbsoluteMediaUrlFromConfig } from '../upload/resolve-absolute-media-url.util';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o';
+const DEFAULT_OPENAI_REASONING_MODEL = 'gpt-6-luna';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-3-5-sonnet-latest';
 const DEFAULT_GOOGLE_MODEL = 'gemini-1.5-pro';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
 const DEFAULT_FILE_SERVICE_UPLOAD_PATH = '/upload';
 const DEFAULT_OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+
+const DEFAULT_CONTEXT_LIMIT = 128_000;
+const MODEL_CONTEXT_LIMITS: Record<string, number> = {
+  'gpt-4o': 128_000,
+  'gpt-4o-mini': 128_000,
+  'gpt-4.1': 1_047_576,
+  'gpt-4.1-mini': 1_047_576,
+  'o4-mini': 200_000,
+  'gpt-5-mini': 200_000,
+  'gpt-5.4-mini': 200_000,
+  'gpt-6-luna': 1_050_000,
+  'gpt-6-sol': 1_050_000,
+  'gpt-6-astra': 1_050_000,
+  'claude-3-5-sonnet-latest': 200_000,
+  'gemini-1.5-pro': 2_000_000,
+};
 
 type LlmCapability =
   | 'chat'
@@ -149,8 +168,11 @@ export class LlmService {
       [WorkflowNodeType.Translation]: 'chat',
       [WorkflowNodeType.Summarization]: 'chat',
       [WorkflowNodeType.ImageGeneration]: 'image_generation',
+      [WorkflowNodeType.VideoPresenter]: 'video_generation',
+      [WorkflowNodeType.VideoCinematic]: 'video_generation',
       [WorkflowNodeType.VideoGeneration]: 'video_generation',
       [WorkflowNodeType.Transcription]: 'transcription',
+      // Subtitle is a local string transform: no provider capability required.
       [WorkflowNodeType.Adapt]: 'chat',
       [WorkflowNodeType.Intelligence]: 'chat',
     };
@@ -318,6 +340,40 @@ export class LlmService {
     });
   }
 
+  /** Default chat Completions model id (`OPENAI_MODEL`). */
+  getPlainTextModelId(): string {
+    return this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL;
+  }
+
+  /** The OpenAI reasoning model id currently configured (for context-limit lookups etc). */
+  getReasoningModelId(): string {
+    return (
+      this.config.get<string>('OPENAI_REASONING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_REASONING_MODEL
+    );
+  }
+
+  /**
+   * OpenAI reasoning model for the chat operator (default gpt-6-luna).
+   * Omit temperature (rejected on reasoning models). Use the Responses API so
+   * function tools work with reasoning.effort; Chat Completions rejects that
+   * combo on gpt-6-luna. Default effort is low (cheap thinking + tools).
+   */
+  getReasoningChatModel(options?: {
+    effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+    maxTokens?: number;
+  }): BaseChatModel {
+    const apiKey = this.requireApiKeyForProvider(LlmProvider.OpenAI);
+    const model = this.getReasoningModelId();
+    return new ChatOpenAI({
+      apiKey,
+      model,
+      useResponsesApi: true,
+      reasoning: { effort: options?.effort ?? 'low' },
+      ...(options?.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
+    });
+  }
+
   /**
    * Describe image content for rule extraction preprocessing (vision models).
    * Visual understanding is the primary task — what the image actually
@@ -377,6 +433,15 @@ export class LlmService {
       DEFAULT_OPENAI_EMBEDDING_MODEL;
     const embeddings = new OpenAIEmbeddings({ apiKey, model });
     return embeddings.embedDocuments(texts);
+  }
+
+  /** Max context window (tokens) for the resolved model — used for the chat context-usage UI. */
+  getContextLimit(model?: string): number {
+    const resolved =
+      model?.trim() ||
+      this.config.get<string>('OPENAI_MODEL')?.trim() ||
+      DEFAULT_OPENAI_MODEL;
+    return MODEL_CONTEXT_LIMITS[resolved] ?? DEFAULT_CONTEXT_LIMIT;
   }
 
   async embedQuery(text: string): Promise<number[]> {
@@ -487,8 +552,18 @@ export class LlmService {
       }
 
       const files = params.images.map((img) => {
-        const bytes = Uint8Array.from(img.buffer);
-        return new File([bytes], img.fileName, { type: img.mimeType });
+        const bytes = Buffer.isBuffer(img.buffer)
+          ? img.buffer
+          : Buffer.from(img.buffer);
+        const { mimeType, ext } = coerceOpenAiImageMime({
+          buffer: bytes,
+          declaredMime: img.mimeType,
+          fileName: img.fileName,
+        });
+        const baseName = img.fileName.replace(/\.[a-z0-9]+$/i, '') || 'image';
+        return new File([Uint8Array.from(bytes)], `${baseName}.${ext}`, {
+          type: mimeType,
+        });
       });
 
       const body: OpenAI.Images.ImageEditParamsNonStreaming = {
@@ -592,7 +667,11 @@ export class LlmService {
       }
 
       return {
-        fileUrl: data.fileUrl,
+        // The file service can answer with an origin-less `4001/api/file/v1/file?...`;
+        // store a fetchable absolute URL instead (I-10).
+        fileUrl:
+          resolveAbsoluteMediaUrlFromConfig(data.fileUrl, this.config) ||
+          data.fileUrl,
         relativePath: data.relativePath,
         storedFileName: data.storedFileName ?? params.fileName,
         originalFileName: data.originalFileName,

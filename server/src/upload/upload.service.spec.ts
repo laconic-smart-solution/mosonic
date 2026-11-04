@@ -1326,6 +1326,66 @@ describe('UploadService', () => {
       const out = service.mergeChannelsPreservingUserEdits(fresh, previous);
       expect(out[0].caption).toBe('same');
     });
+
+    it('keeps a generate-more channel that is not in the fresh pipeline snapshot', () => {
+      const previous = [
+        mockChannel({ channel: 'facebook', caption: 'FB' }),
+        mockChannel({ channel: 'instagram', caption: 'IG adapt' }),
+      ];
+      const fresh = [mockChannel({ channel: 'facebook', caption: 'FB' })];
+      const out = service.mergeChannelsPreservingUserEdits(fresh, previous);
+      expect(out.map((c) => c.channel)).toEqual(['facebook', 'instagram']);
+      expect(out.find((c) => c.channel === 'instagram')?.caption).toBe(
+        'IG adapt',
+      );
+    });
+  });
+
+  describe('ensureLaneChannelOnContent', () => {
+    it('adds an Instagram tab on the existing Facebook-only upload', async () => {
+      const doc = {
+        uploadId: 'u1',
+        contentRef: 'c1',
+        channels: [mockChannel({ channel: 'Facebook', caption: 'FB copy' })],
+        resolvedOutputs: { text: 'FB copy' },
+        status: UploadJobStatus.Pending,
+      };
+      uploadModel.findLatestByContentRef.mockResolvedValue(doc);
+
+      await service.ensureLaneChannelOnContent(
+        'c1',
+        'instagram',
+        { caption: 'IG caption' },
+        { userId: 'user-1' },
+      );
+
+      const saved = uploadModel.save.mock.calls[0]?.[0] as {
+        channels: Array<{ channel: string; caption: string }>;
+      };
+      expect(saved.channels.map((c) => c.channel)).toEqual([
+        'Facebook',
+        'Instagram',
+      ]);
+      expect(saved.channels.find((c) => c.channel === 'Instagram')?.caption).toBe(
+        'IG caption',
+      );
+      expect(events.emitToRoom).toHaveBeenCalledWith(
+        'upload_u1',
+        'upload:updated',
+        { uploadId: 'u1' },
+      );
+    });
+
+    it('is a no-op when this content has no upload yet', async () => {
+      uploadModel.findLatestByContentRef.mockResolvedValue(null);
+      await service.ensureLaneChannelOnContent(
+        'c1',
+        'instagram',
+        {},
+        { userId: 'user-1' },
+      );
+      expect(uploadModel.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('buildChannelEntriesFromPipeline', () => {
@@ -1383,6 +1443,47 @@ describe('UploadService', () => {
       );
       expect(entries.find((e) => e.channel === 'facebook')?.caption).toBe(
         'FB-specific caption',
+      );
+    });
+
+    it('includes a generate-more Adapt lane missing from graph.lanes when the rule has it', () => {
+      const pipeline = {
+        graph: { lanes: ['facebook'] },
+        nodes: [
+          {
+            nodeId: 'adapt_ig',
+            lane: 'instagram',
+            type: WorkflowNodeType.Adapt,
+            status: PipelineNodeExecutionStatus.Completed,
+            output: JSON.stringify({ text: 'IG extra' }),
+          },
+        ],
+      } as unknown as PipelineDocument;
+
+      const ruleChannels = [
+        {
+          channel: 'facebook',
+          priority: 'high',
+          contentStyle: '',
+          contentMapping: { caption: CaptionMappingSource.Text, media: null },
+        },
+        {
+          channel: 'instagram',
+          priority: 'medium',
+          contentStyle: '',
+          contentMapping: { caption: CaptionMappingSource.Text, media: null },
+        },
+      ];
+
+      const entries = service.buildChannelEntriesFromPipeline(
+        ruleChannels as never,
+        pipeline,
+        { text: 'FB trunk' },
+      );
+
+      expect(entries.map((e) => e.channel)).toEqual(['facebook', 'instagram']);
+      expect(entries.find((e) => e.channel === 'instagram')?.caption).toBe(
+        'IG extra',
       );
     });
 

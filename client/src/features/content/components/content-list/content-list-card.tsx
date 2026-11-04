@@ -40,6 +40,8 @@ type Props = {
   item: ContentPageItem
   index: number
   onOpen: (contentId: string, uploadId?: string) => void
+  /** Same card as the content page; compact fits the chat workspace rail. */
+  compact?: boolean
 }
 
 function hasOutput(value: string | undefined): boolean {
@@ -114,7 +116,7 @@ async function copyPageLink(
   }
 }
 
-export function ContentListCard({ item, index, onOpen }: Props) {
+export function ContentListCard({ item, index, onOpen, compact = false }: Props) {
   const { t } = useTranslation("content")
   const campaignLabel = displayLinkedRef(item.ruleRef, "campaign")
   const title = listCardPrimaryTitle(item.status)
@@ -131,7 +133,7 @@ export function ContentListCard({ item, index, onOpen }: Props) {
 
   return (
     <motion.article
-      layout
+      layout={!compact}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index, 11) * 0.04 }}
@@ -146,11 +148,16 @@ export function ContentListCard({ item, index, onOpen }: Props) {
         }
       }}
       className={cn(
-        "group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
+        "group min-w-0 w-full cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
         "hover:border-muted-foreground/30 hover:shadow-lg"
       )}
     >
-      <div className="relative flex h-40 items-center justify-center overflow-hidden bg-muted/30">
+      <div
+        className={cn(
+          "relative flex items-center justify-center overflow-hidden bg-muted/30",
+          compact ? "h-28" : "h-40",
+        )}
+      >
         {gridHero?.kind === "video" ? (
           <FileServiceVideo
             url={gridHero.url}
@@ -217,13 +224,15 @@ export function ContentListCard({ item, index, onOpen }: Props) {
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex gap-2">
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  {t("list.campaign")}
-                </p>
+                {compact ? null : (
+                  <p className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {t("list.campaign")}
+                  </p>
+                )}
                 <h2 className="line-clamp-2 font-heading text-[15px] leading-snug tracking-tight text-foreground">
                   {title}
                 </h2>
-                {campaignLabel.trim() ? (
+                {!compact && campaignLabel.trim() ? (
                   <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{campaignLabel}</p>
                 ) : null}
                 {laneCount > 1 ? (
@@ -239,18 +248,22 @@ export function ContentListCard({ item, index, onOpen }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span
-                className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
-                title={t("list.workflow")}
-              >
-                W
-              </span>
-              <span
-                className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
-                title={t("list.pipeline")}
-              >
-                P
-              </span>
+              {compact ? null : (
+                <>
+                  <span
+                    className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
+                    title={t("list.workflow")}
+                  >
+                    W
+                  </span>
+                  <span
+                    className="flex size-[22px] items-center justify-center rounded-md border border-border bg-muted text-[11px] text-muted-foreground"
+                    title={t("list.pipeline")}
+                  >
+                    P
+                  </span>
+                </>
+              )}
               {(item.creditsUsed ?? 0) > 0 ? (
                 <CreditUsageBadge credits={item.creditsUsed ?? 0} />
               ) : null}

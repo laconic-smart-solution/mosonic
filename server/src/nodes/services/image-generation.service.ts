@@ -21,6 +21,7 @@ import { ImageStyleSelectorService } from './image-style-selector.service';
 import { ImageDesignStyleRepositoryService } from './image-design-style-repository.service';
 import { ImagePromptComposerService } from './image-prompt-composer.service';
 
+import { coerceOpenAiImageMime } from '../openai-image-mime.util';
 import {
   aspectRatioToOpenAiImageSize,
   coerceOpenAiImageSize,
@@ -37,6 +38,8 @@ import {
   pixelAssetsFromPack,
   type SourcePackAsset,
 } from '../../pipeline/source-pack.types';
+import { selectKeepScenePixelAssets } from '../../orchestration/brand-image-assets.util';
+import { sourceImageFetchUrls } from '../../upload/resolve-absolute-media-url.util';
 
 /**
  * DALL·E 3 prompt max length.
@@ -58,7 +61,7 @@ type NormalizedImageConfig = {
   negativePrompt?: string;
 };
 
-function normalizeImageGenerationConfig(
+export function normalizeImageGenerationConfig(
   config: WorkflowNodeConfig | undefined,
 ): NormalizedImageConfig {
   const c = config ?? {};
@@ -193,7 +196,7 @@ function buildLegacyImagePrompt(
   const textInstruction =
     effectiveTemplate === NodeImageTemplate.Infographic
       ? 'Include only a few short, exact labels drawn directly from the source content below — never copy full sentences as captions, and never add unrelated decorative text.'
-      : 'Do not include any text, captions, logos, or watermarks.';
+      : 'Do not include any text, captions, invented logos, or watermarks. Composite a provided brand_mark reference when one is listed.';
 
   const sections = [
     `Create a ${getImageType(effectiveTemplate)}.`,
@@ -337,30 +340,11 @@ export class ImageGenerationService {
         styleRow?.prompt,
       );
 
-    const generated =
-      pixelAssets.length > 0
-        ? await this.editWithReferences({
-            provider: normalized.provider,
-            prompt: imagePrompt,
-            size: normalized.size,
-            assets: pixelAssets,
-          })
-        : await this.llm.generateImageBase64({
-            provider: normalized.provider,
-            model: normalized.model,
-            prompt: imagePrompt,
-            size: normalized.size,
-            quality: normalized.quality,
-            style: normalized.style,
-          });
-
-    const timePart = new Date().toISOString().replace(/[:.]/g, '-');
-
-    const image = await this.llm.uploadImageBase64({
-      base64: generated.base64,
-      mimeType: generated.mimeType,
-      fileName: `workflow-${workflowRef}-image-${timePart}.png`,
-      folderPath: buildFileStorageFolderPath('workflow-images', workflowRef),
+    const image = await this.renderPromptToImage({
+      workflowRef,
+      prompt: imagePrompt,
+      config,
+      assets: pixelAssets,
     });
 
     return {
@@ -368,11 +352,51 @@ export class ImageGenerationService {
     };
   }
 
+  /** Paint a finished prompt from the image composer. */
+  async renderPromptToImage(args: {
+    workflowRef: string;
+    prompt: string;
+    config?: WorkflowNodeConfig;
+    assets: SourcePackAsset[];
+    requireReferences?: boolean;
+  }): Promise<StoredImageOutput> {
+    const normalized = normalizeImageGenerationConfig(args.config);
+    const generated =
+      args.assets.length > 0
+        ? await this.editWithReferences({
+            provider: normalized.provider,
+            prompt: args.prompt,
+            size: normalized.size,
+            assets: args.assets,
+            requireAll: args.requireReferences === true,
+          })
+        : await this.llm.generateImageBase64({
+            provider: normalized.provider,
+            model: normalized.model,
+            prompt: args.prompt,
+            size: normalized.size,
+            quality: normalized.quality,
+            style: normalized.style,
+          });
+
+    const timePart = new Date().toISOString().replace(/[:.]/g, '-');
+    return this.llm.uploadImageBase64({
+      base64: generated.base64,
+      mimeType: generated.mimeType,
+      fileName: `workflow-${args.workflowRef}-image-${timePart}.png`,
+      folderPath: buildFileStorageFolderPath(
+        'workflow-images',
+        args.workflowRef,
+      ),
+    });
+  }
+
   private async editWithReferences(args: {
     provider?: LlmProvider;
     prompt: string;
     size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
     assets: SourcePackAsset[];
+    requireAll?: boolean;
   }): Promise<{ base64: string; mimeType: string }> {
     const images: Array<{
       buffer: Buffer;
@@ -381,32 +405,15 @@ export class ImageGenerationService {
     }> = [];
 
     for (const asset of args.assets) {
-      const url = asset.fileUrl?.trim();
-      if (!url) continue;
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-        if (!res.ok) {
-          this.logger.warn(
-            `Failed to download source image ${asset.label}: HTTP ${res.status}`,
-          );
-          continue;
-        }
-        const buf = Buffer.from(await res.arrayBuffer());
-        const mime =
-          asset.mime ||
-          res.headers.get('content-type')?.split(';')[0]?.trim() ||
-          'image/png';
-        const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
-        images.push({
-          buffer: buf,
-          fileName: `ref-${asset.id}.${ext}`,
-          mimeType: mime,
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Failed to download source image ${asset.label}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      const downloaded = await this.downloadSourceImage(asset);
+      if (!downloaded) continue;
+      images.push(downloaded);
+    }
+
+    if (args.requireAll && images.length < args.assets.length) {
+      throw new UnprocessableEntityException(
+        'Could not download the current image or brand logo for this edit.',
+      );
     }
 
     if (images.length === 0) {
@@ -438,6 +445,10 @@ export class ImageGenerationService {
       );
     }
 
+    if (input.imageEdit) {
+      return this.executeKeepSceneEdit(input);
+    }
+
     const text = input.previousOutputs?.text?.trim();
 
     if (!text) {
@@ -463,6 +474,97 @@ export class ImageGenerationService {
       output: image.fileUrl,
       image,
 
+      imageCost: {
+        model: normalized.model,
+        size: normalized.size,
+        quality: normalized.quality,
+        count: 1,
+      },
+    };
+  }
+
+  private async downloadSourceImage(asset: SourcePackAsset): Promise<{
+    buffer: Buffer;
+    fileName: string;
+    mimeType: string;
+  } | null> {
+    const urls = sourceImageFetchUrls(asset, {
+      fileServiceUrl: process.env.FILE_SERVICE_URL,
+      publicBaseUrl: process.env.APP_URL ?? process.env.PUBLIC_URL,
+    });
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+        if (!res.ok) {
+          this.logger.warn(
+            `Failed to download source image ${asset.label}: HTTP ${res.status}`,
+          );
+          continue;
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        const { mimeType, ext } = coerceOpenAiImageMime({
+          buffer: buf,
+          declaredMime: asset.mime || res.headers.get('content-type') || undefined,
+          fileName: `${asset.label ?? ''} ${asset.fileUrl ?? ''} ${asset.relativePath ?? ''} ${asset.id}`,
+        });
+        return {
+          buffer: buf,
+          fileName: `ref-${asset.id}.${ext}`,
+          mimeType,
+        };
+      } catch (err) {
+        this.logger.warn(
+          `Failed to download source image ${asset.label}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return null;
+  }
+
+  /** Paint a small change onto the current photo. Does not compose a new scene. */
+  private async executeKeepSceneEdit(
+    input: NodeExecutionInput,
+  ): Promise<NodeExecutionResult> {
+    const useBrandLogo = input.imageEdit?.useBrandLogo === true;
+    const assets = selectKeepScenePixelAssets(input.sourcePack, useBrandLogo);
+    if (assets.length === 0) {
+      throw new UnprocessableEntityException(
+        'Image edit requires the current image as a reference.',
+      );
+    }
+    if (useBrandLogo && !assets.some((asset) => asset.role === 'brand_mark')) {
+      throw new UnprocessableEntityException(
+        'This brand has no ready logo asset. Upload a logo on the Rule, then retry.',
+      );
+    }
+    const lines = assets.map(
+      (asset, index) =>
+        `Image ${index + 1} (${asset.role}): ${asset.label}`,
+    );
+    const logoIndex = assets.findIndex((asset) => asset.role === 'brand_mark');
+    const logoLine =
+      logoIndex >= 0
+        ? `Image ${logoIndex + 1} is the real brand logo file. Composite that exact logo onto Image 1. Do not redraw or invent a different mark.`
+        : 'Do not invent a logo.';
+    const prompt = [
+      'Edit Image 1. Keep its subject, layout, people, and setting.',
+      'Change only what the instruction says.',
+      `Instruction: ${input.imageEdit?.instruction?.trim() || 'Apply a small correction.'}`,
+      ...lines,
+      logoLine,
+    ].join('\n');
+
+    const image = await this.renderPromptToImage({
+      workflowRef: input.workflowRef,
+      prompt,
+      config: input.config,
+      assets,
+      requireReferences: true,
+    });
+    const normalized = normalizeImageGenerationConfig(input.config ?? {});
+    return {
+      output: image.fileUrl,
+      image,
       imageCost: {
         model: normalized.model,
         size: normalized.size,

@@ -8,6 +8,7 @@
       "users": "Users",
       "credit": "Credits",
       "nodeCredits": "Credit pricing",
+      "tokenRates": "Chat token rates",
       "plans": "Plans",
       "topupPlans": "Topup plans",
       "usage": "Usage",
@@ -460,6 +461,24 @@
     "loadFailed": "Could not load credit pricing. Ensure your account has admin access on the server.",
     "loading": "Loading…",
     "empty": "No pricing metrics configured."
+  },
+  "tokenRates": {
+    "title": "Chat token rates",
+    "subtitle": "USD per 1M tokens for the chat operator. Credits use the same formula as",
+    "creditSettingsLink": "Credit settings",
+    "creditHint": "raw USD = input/1M × input rate + output/1M × output rate. Credits = ceil((raw + overhead) × margin ÷ credit price). Sample column is 50k input + 2k output. Pipeline nodes stay on Credit pricing.",
+    "colModel": "Model",
+    "colInput": "Input $/1M",
+    "colOutput": "Output $/1M",
+    "colReasoning": "Reasoning $/1M",
+    "colSampleCredits": "Sample credits",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Could not save",
+    "invalidUsd": "Enter zero or a positive USD amount",
+    "loadFailed": "Could not load token rates. Ensure your account has admin access.",
+    "loading": "Loading…",
+    "empty": "No token rates configured."
   },
   "plans": {
     "title": "Plan management",

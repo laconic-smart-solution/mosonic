@@ -18,9 +18,16 @@ import { publishRealtimeEventToRedis } from './realtime-events-redis.util';
  * Server-side emit API for orchestration, logging streams, etc.
  * The gateway calls {@link EventsService.setServer} once Socket.IO is ready.
  */
+export type PipelineEventListener = (
+  pipelineId: string,
+  event: string,
+  payload: unknown,
+) => void;
+
 @Injectable()
 export class EventsService {
   private server: Server | null = null;
+  private readonly pipelineListeners = new Set<PipelineEventListener>();
 
   constructor(private readonly config: ConfigService) {}
 
@@ -61,8 +68,29 @@ export class EventsService {
       );
       return;
     }
+    this.dispatchPipelineEvent(pipelineId, event, payload);
+  }
+
+  /**
+   * Subscribe to pipeline events that reach this API process, whether emitted
+   * here or bridged from a worker over Redis. Returns an unsubscribe function.
+   */
+  onPipelineEvent(listener: PipelineEventListener): () => void {
+    this.pipelineListeners.add(listener);
+    return () => this.pipelineListeners.delete(listener);
+  }
+
+  /** Room emit + in-process listeners. Used by emitToPipeline and the Redis bridge. */
+  dispatchPipelineEvent(pipelineId: string, event: string, payload: unknown): void {
     if (this.server) {
       this.emitToRoom(`pipeline:${pipelineId}`, event, payload);
+    }
+    for (const listener of this.pipelineListeners) {
+      try {
+        listener(pipelineId, event, payload);
+      } catch {
+        // a listener must never break socket delivery
+      }
     }
   }
 
@@ -95,6 +123,11 @@ export class EventsService {
   /** Analytics dashboard / manual pull (client joins `analytics_${ruleId}`). */
   emitToAnalyticsRule(ruleId: string, event: string, payload: unknown): void {
     this.emitToRoom(`analytics_${ruleId}`, event, payload);
+  }
+
+  /** Chat step-trace live feed (client joins `chat_${sessionId}`). */
+  emitToChatSession(sessionId: string, event: string, payload: unknown): void {
+    this.emitToRoom(`chat_${sessionId}`, event, payload);
   }
 
   /** Broadcast to all connected clients (use sparingly). */

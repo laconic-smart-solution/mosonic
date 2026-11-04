@@ -64,13 +64,16 @@
     "text_generation": "文本",
     "image_generation": "图像",
     "video_generation": "视频",
+    "video_presenter": "主持人视频",
+    "video_cinematic": "电影感视频",
     "translation": "翻译",
     "transcription": "转录",
     "summarization": "摘要",
     "intelligence": "智能",
     "adapt": "适配",
     "branch": "分支",
-    "merge": "合并"
+    "merge": "合并",
+    "subtitle": "字幕"
   },
   "relativeTime": {
     "justNow": "刚刚",

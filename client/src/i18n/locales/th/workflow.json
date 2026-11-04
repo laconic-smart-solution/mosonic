@@ -4,32 +4,40 @@
     "text": "สร้างข้อความ",
     "image": "สร้างภาพ",
     "video": "สร้างวิดีโอ",
+    "video_presenter": "วิดีโอผู้นำเสนอ",
+    "video_cinematic": "วิดีโอซีเนมาติก",
     "translation": "แปลภาษา",
     "transcription": "ถอดเสียง",
     "summarization": "สรุปเนื้อหา",
     "branch": "แยกสาย",
     "adapt": "ปรับให้เหมาะช่องทาง",
     "merge": "รวมสาย",
-    "intelligence": "ข่าวกรอง"
+    "intelligence": "ข่าวกรอง",
+    "subtitle": "คำบรรยาย"
   },
   "nodeTypesShort": {
     "keywords": "คีย์เวิร์ด",
     "text": "สร้างข้อความ",
     "image": "ภาพ",
     "video": "วิดีโอ",
+    "video_presenter": "ผู้นำเสนอ",
+    "video_cinematic": "ซีเนมาติก",
     "translation": "แปลภาษา",
     "transcription": "ถอดเสียง",
     "summarization": "สรุป",
     "branch": "แยกสาย",
     "adapt": "ปรับช่องทาง",
     "merge": "รวมสาย",
-    "intelligence": "ข่าวกรอง"
+    "intelligence": "ข่าวกรอง",
+    "subtitle": "คำบรรยาย"
   },
   "nodeTypesBackend": {
     "keyword_planner": "วางแผนคีย์เวิร์ด",
     "text_generation": "ข้อความ / LLM",
     "image_generation": "ภาพ",
     "video_generation": "วิดีโอ",
+    "video_presenter": "วิดีโอผู้นำเสนอ",
+    "video_cinematic": "วิดีโอซีเนมาติก",
     "translation": "แปลภาษา",
     "transcription": "ถอดเสียง",
     "summarization": "สรุปเนื้อหา",
@@ -37,7 +45,8 @@
     "intelligence": "ข่าวกรอง",
     "social_account_connect": "ปลดล็อกบัญชีโซเชียล",
     "rule_generation": "สร้างโปรไฟล์แบรนด์",
-    "workflow_generation": "สร้างเวิร์กโฟลว์"
+    "workflow_generation": "สร้างเวิร์กโฟลว์",
+    "subtitle": "คำบรรยาย"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} สำหรับ {{channel}}"
@@ -65,6 +74,14 @@
     "video": {
       "usage": "สร้างคลิปวิดีโอสั้นจากพรอมpt และสินทรัพย์ก่อนหน้า (มักเป็นข้อความหรือภาพอ้างอิง) รันคิววิดีโอแยกและอาจใช้เวลานานกว่าโหนดอื่น",
       "example": "ภาพ → วิดีโอ 9:16 ความยาว 8 วินาที เปลี่ยนภาพนิ่งเป็นคลิปแนวตั้ง"
+    },
+    "video_presenter": {
+      "usage": "อวาตาร์จากรูปภาพของ HeyGen พูดแคปชันหรือข้อความของคุณ ต้องเลือกรูปอวาตาร์และเสียงในการตั้งค่าโหนด ค่าเริ่มต้นเป็นแนวตั้ง ทำงานบนคิววิดีโอและอาจใช้เวลาสองสามนาที",
+      "example": "Adapt (Instagram) → วิดีโอผู้นำเสนอ แนวตั้ง 20 วินาที ให้โฆษกอ่านโพสต์"
+    },
+    "video_cinematic": {
+      "usage": "Sora สร้างคลิปสั้นแบบภาพยนตร์จากพรอมต์และข้อความก่อนหน้า ไม่มีคนพูด ทำงานบนคิววิดีโอและอาจใช้เวลานานกว่าโหนดอื่น",
+      "example": "รูปภาพ → วิดีโอซีเนมาติก 9:16 ความยาว 8 วินาที เปลี่ยนรูปสินค้าเป็นรีลแนวตั้ง"
     },
     "translation": {
       "usage": "แปลข้อความจากโหนดก่อนหน้าเป็นภาษาเป้าหมาย ใช้เมื่อแคมเปญเดียวกันต้องการข้อความหลายภาษา",
@@ -96,6 +113,10 @@
       "usage": "ค้นหาเว็บ (เทรนด์ ตลาด คู่แข่ง หรือทั้งหมด) ผ่าน OpenAI แล้วส่งต่อให้สร้างข้อความ มี analytics overlay เมื่อเริ่มรันด้วยข้อมูลล่าสุด",
       "example": "ข่าวกรอง (ทั้งหมด) → ข้อความ: ค้นหาแฮชแท็ก ข่าวอุตสาหกรรม และช่องว่างคู่แข่งก่อนเขียนคัดลอก",
       "tips": "ใช้ \"ทั้งหมด\" แทนการซ้อนหลายโหนด Intelligence เลือก Custom เมื่อต้องการคำถามวิจัยเฉพาะ"
+    },
+    "subtitle": {
+      "usage": "แปลงข้อความจากการถอดเสียงเป็นคำบรรยาย SRT หรือ VTT พร้อมเวลา (ไม่ใช้ AI) วางต่อจากการถอดเสียง",
+      "example": "วิดีโอ -> ถอดเสียง -> คำบรรยาย (SRT)"
     }
   },
   "popoverDescriptions": {
@@ -107,57 +128,119 @@
     "adapt": "เขียนใหม่สำหรับช่องทางนี้",
     "image": "สร้างภาพด้วย AI",
     "video": "สร้างวิดีโอด้วย AI",
+    "video_presenter": "อวาตาร์ AI นำเสนอแคปชันของคุณ (HeyGen)",
+    "video_cinematic": "ฉากภาพยนตร์ด้วย AI (Sora)",
     "summarization": "สรุปเนื้อหาก่อนหน้า",
     "translation": "แปลเป็นภาษาเป้าหมาย",
-    "merge": "รวบรวมทุกสายก่อนสรุป"
+    "merge": "รวบรวมทุกสายก่อนสรุป",
+    "subtitle": "แปลงข้อความถอดเสียงเป็นคำบรรยาย SRT/VTT"
   },
   "fields": {
-    "shared": { "on": "เปิด", "off": "ปิด" },
+    "shared": {
+      "on": "เปิด",
+      "off": "ปิด"
+    },
     "text": {
-      "outputFormat": { "label": "รูปแบบผลลัพธ์" },
-      "tone": { "label": "โทนการเขียน" },
-      "textLength": { "label": "ความยาว" }
+      "outputFormat": {
+        "label": "รูปแบบผลลัพธ์"
+      },
+      "tone": {
+        "label": "โทนการเขียน"
+      },
+      "textLength": {
+        "label": "ความยาว"
+      }
     },
     "image": {
-      "style": { "label": "สไตล์" },
-      "aspectRatio": { "label": "อัตราส่วนภาพ" },
-      "quality": { "label": "คุณภาพ" },
+      "style": {
+        "label": "สไตล์"
+      },
+      "aspectRatio": {
+        "label": "อัตราส่วนภาพ"
+      },
+      "quality": {
+        "label": "คุณภาพ"
+      },
       "negativePrompt": {
         "label": "พรอมpt สิ่งที่ไม่ต้องการ",
         "placeholder": "ไม่บังคับ — สิ่งที่ไม่ต้องการในภาพ"
       }
     },
     "video": {
-      "mode": { "label": "โหมด" },
-      "aspectRatio": { "label": "อัตราส่วนภาพ" },
-      "duration": { "label": "ความยาว" },
-      "targetDuration": { "label": "ความยาวเป้าหมาย" },
-      "resolution": { "label": "ความละเอียด" },
+      "mode": {
+        "label": "โหมด"
+      },
+      "aspectRatio": {
+        "label": "อัตราส่วนภาพ"
+      },
+      "duration": {
+        "label": "ความยาว"
+      },
+      "targetDuration": {
+        "label": "ความยาวเป้าหมาย"
+      },
+      "resolution": {
+        "label": "ความละเอียด"
+      },
       "negativePrompt": {
         "label": "พรอมpt สิ่งที่ไม่ต้องการ",
         "placeholder": "ไม่บังคับ — สิ่งที่ไม่ต้องการในวิดีโอ"
       },
-      "heygenOrientation": { "label": "ทิศทาง" },
-      "heygenExpressiveness": { "label": "ความแสดงออก" },
-      "removeBackground": { "label": "ลบพื้นหลังรูปต้นฉบับ" },
+      "heygenOrientation": {
+        "label": "ทิศทาง"
+      },
+      "heygenExpressiveness": {
+        "label": "ความแสดงออก"
+      },
+      "removeBackground": {
+        "label": "ลบพื้นหลังรูปต้นฉบับ"
+      },
       "heygenMotionPrompt": {
         "label": "พรอมpt การเคลื่อนไหว (ไม่บังคับ)",
         "placeholder": "เช่น พยักหน้าเบา ๆ ขณะนำเสนอ"
+      },
+      "cinematicMode": {
+        "label": "Cinematic mode"
       }
     },
     "translation": {
-      "sourceLanguage": { "label": "ภาษาต้นทาง" },
-      "targetLanguage": { "label": "ภาษาเป้าหมาย" },
-      "formalityLevel": { "label": "ระดับความเป็นทางการ" },
-      "preserveFormatting": { "label": "รักษารูปแบบเดิม" }
+      "sourceLanguage": {
+        "label": "ภาษาต้นทาง"
+      },
+      "targetLanguage": {
+        "label": "ภาษาเป้าหมาย"
+      },
+      "formalityLevel": {
+        "label": "ระดับความเป็นทางการ"
+      },
+      "preserveFormatting": {
+        "label": "รักษารูปแบบเดิม"
+      }
     },
-    "transcription": { "language": { "label": "ภาษา" } },
+    "transcription": {
+      "language": {
+        "label": "ภาษา"
+      },
+      "sourceType": {
+        "label": "ประเภทแหล่งที่มา"
+      },
+      "sourceUrl": {
+        "label": "URL แหล่งที่มา",
+        "placeholder": "https://... ไฟล์เสียงหรือวิดีโอ"
+      }
+    },
     "summarization": {
-      "summaryLength": { "label": "ความยาวสรุป" },
-      "outputFormat": { "label": "รูปแบบผลลัพธ์" }
+      "summaryLength": {
+        "label": "ความยาวสรุป"
+      },
+      "outputFormat": {
+        "label": "รูปแบบผลลัพธ์"
+      }
     },
     "intelligence": {
-      "searchType": { "label": "ประเภทการค้นหา" },
+      "searchType": {
+        "label": "ประเภทการค้นหา"
+      },
       "customPrompt": {
         "label": "พรอมpt ค้นหาแบบกำหนดเอง",
         "placeholder": "อธิบายสิ่งที่ต้องการค้นหา…"
@@ -215,7 +298,23 @@
       "searchTrend": "เทรนด์ — แฮชแท็กและรูปแบบ",
       "searchMarket": "ตลาด — ข่าวและสัญญาณ",
       "searchCompetitor": "คู่แข่ง — ช่องว่างและมุม",
-      "searchCustom": "กำหนดเอง — พรอมpt ของคุณ"
+      "searchCustom": "กำหนดเอง — พรอมpt ของคุณ",
+      "duration5s": "5s",
+      "duration15s": "15s",
+      "cinematicAvatar": "Avatar scene",
+      "heygenVideo": "HeyGen video",
+      "cinematic_avatar": "Avatar scene",
+      "heygen_video": "HeyGen video",
+      "audio": "เสียง",
+      "video": "วิดีโอ"
+    },
+    "subtitle": {
+      "format": {
+        "label": "รูปแบบ"
+      },
+      "maxCharsPerLine": {
+        "label": "จำนวนตัวอักษรต่อบรรทัด"
+      }
     }
   },
   "configSummary": {
@@ -239,7 +338,8 @@
       "market": "ตลาด",
       "competitor": "คู่แข่ง",
       "custom": "กำหนดเอง"
-    }
+    },
+    "subtitle": "คำบรรยาย"
   },
   "nodeStatus": {
     "pending": "รอดำเนินการ",

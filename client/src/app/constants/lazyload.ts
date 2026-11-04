@@ -57,6 +57,9 @@ export const AdminCreditConfigPage = PageLoader(
 export const AdminNodeCreditsPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-node-credits")),
 )
+export const AdminTokenRatesPage = PageLoader(
+  lazy(() => import("@/features/admin/pages/admin-token-rates")),
+)
 export const AdminPlansPage = PageLoader(lazy(() => import("@/features/admin/pages/admin-plans")))
 export const AdminTopupPlansPage = PageLoader(
   lazy(() => import("@/features/admin/pages/admin-topup-plans")),

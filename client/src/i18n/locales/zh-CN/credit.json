@@ -45,11 +45,14 @@
     "summarization": "摘要",
     "image_generation": "图像生成",
     "video_generation": "视频生成",
+    "video_presenter": "主持人视频（HeyGen）",
+    "video_cinematic": "电影感视频（Sora）",
     "video_generation_presenter": "数字人视频 (HeyGen)",
     "video_generation_cinematic": "电影感视频 (Sora)",
     "social_account_connect": "社交账户解锁",
     "rule_generation": "品牌档案生成",
-    "workflow_generation": "工作流生成"
+    "workflow_generation": "工作流生成",
+    "subtitle": "字幕"
   },
   "generationCost": "{{count}} 积分",
   "generationConfirm": {

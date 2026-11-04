@@ -12,6 +12,7 @@ import { KeywordPlannerService } from './services/keyword-planner.service';
 import { SummarizationService } from './services/summarization.service';
 import { TextGenerationService } from './services/text-generation.service';
 import { TranscriptionService } from './services/transcription.service';
+import { SubtitleService } from './services/subtitle.service';
 import { TranslationService } from './services/translation.service';
 import { HeygenAssetsService } from './services/heygen-assets.service';
 import { ScriptDurationService } from './services/script-duration.service';
@@ -35,6 +36,7 @@ const NODE_SERVICES = [
   VideoGenerationService,
   TranslationService,
   TranscriptionService,
+  SubtitleService,
   SummarizationService,
   AdaptNodeService,
   IntelligenceNodeService,

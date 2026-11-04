@@ -51,6 +51,10 @@ export class SaveWorkflowNodeDto {
 
   @IsOptional()
   @IsString()
+  userPrompt?: string;
+
+  @IsOptional()
+  @IsString()
   lane?: string;
 
   @IsOptional()

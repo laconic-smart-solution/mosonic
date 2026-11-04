@@ -4,7 +4,13 @@ import i18n from "@/i18n"
 import type { WfNodeData, WfRfNode } from "@/features/workflow/data/workflow-model"
 import { normalizeLaneId } from "@/features/workflow/lib/branch-channels"
 import { laneKeyFromRfNode } from "@/features/workflow/lib/workflow-lane-layout"
-import { VIDEO_CINEMATIC_UI_ENABLED } from "@/features/workflow/lib/video-generation-ui"
+import {
+  VIDEO_CINEMATIC_UI_ENABLED,
+  VIDEO_CINEMATIC_CANVAS,
+  VIDEO_PRESENTER_CANVAS,
+  effectiveVideoMode,
+  isVideoCanvasType,
+} from "@/features/workflow/lib/video-generation-ui"
 
 import { canvasNextMatrix, type PlusPopoverKey } from "@workflow-next-matrix"
 
@@ -15,7 +21,8 @@ export const PLUS_POPOVER_TYPES = [
   "text",
   "branch",
   "image",
-  "video",
+  "video_presenter",
+  "video_cinematic",
   "summarization",
   "translation",
 ] as const
@@ -477,12 +484,21 @@ export function getBranchSubgraphLaneErrors(
   return errors
 }
 
-/** Merge HeyGen/video patch; fall back to cinematic only when avatar is cleared in presenter mode. */
+/**
+ * Merge HeyGen/video patch. Split node types pin `mode` (a presenter node never
+ * flips to cinematic). Legacy `video` nodes fall back to cinematic only when the
+ * avatar is cleared in presenter mode.
+ */
 export function mergeHeygenVideoConfig(
   current: Record<string, unknown>,
   patch: Record<string, unknown>,
+  wfType?: string,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...current, ...patch }
+  if (wfType === VIDEO_PRESENTER_CANVAS || wfType === VIDEO_CINEMATIC_CANVAS) {
+    next.mode = effectiveVideoMode(next, wfType)
+    return next
+  }
   const hasAvatar = Boolean(String(next.heygenAvatarId ?? "").trim())
   const clearingAvatar =
     "heygenAvatarId" in patch &&
@@ -502,13 +518,14 @@ export function mergeHeygenVideoConfig(
 /** Presenter video nodes need avatar + voice before pipeline run. */
 export function getVideoPresenterConfigErrors(
   config: Record<string, unknown> | undefined,
+  wfType?: string,
 ): string[] {
-  if (config?.mode !== "presenter") return []
+  if (effectiveVideoMode(config, wfType) !== "presenter") return []
   const errors: string[] = []
-  if (!String(config.heygenAvatarId ?? "").trim()) {
+  if (!String(config?.heygenAvatarId ?? "").trim()) {
     errors.push(i18n.t("workflow:validation.presenterAvatarRequired"))
   }
-  if (!String(config.heygenVoiceId ?? "").trim()) {
+  if (!String(config?.heygenVoiceId ?? "").trim()) {
     errors.push(i18n.t("workflow:validation.presenterVoiceRequired"))
   }
   return errors
@@ -520,8 +537,8 @@ export function getVideoPresenterErrorsFromRfNodes(rfNodes: WfRfNode[]): string[
   for (const n of rfNodes) {
     if (n.type === "plus_placeholder") continue
     const data = n.data as WfNodeData
-    if (data.wfType !== "video") continue
-    const nodeErrors = getVideoPresenterConfigErrors(data.config)
+    if (!isVideoCanvasType(data.wfType)) continue
+    const nodeErrors = getVideoPresenterConfigErrors(data.config, data.wfType)
     const label = data.label?.trim() || n.id
     for (const msg of nodeErrors) {
       errors.push(`${label}: ${msg}`)

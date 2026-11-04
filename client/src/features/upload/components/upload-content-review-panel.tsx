@@ -301,7 +301,8 @@ export function UploadContentReviewPanel({
 
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
-      "video_generation",
+      "video_presenter",
+      "video_cinematic",
       "summarization",
       "translation",
       "image_generation",
@@ -885,11 +886,11 @@ export function UploadContentReviewPanel({
               ← Change type
             </Button>
             <WorkflowNodeGuideSection
-              canvasType={backendTypeToCanvas(selectedGenType)}
+              canvasType={backendTypeToCanvas(selectedGenType, genMoreConfigDraft)}
             />
             <div className="max-h-[min(55vh,420px)] overflow-y-auto pr-1">
               <WorkflowNodeConfigFields
-                canvasType={backendTypeToCanvas(selectedGenType)}
+                canvasType={backendTypeToCanvas(selectedGenType, genMoreConfigDraft)}
                 config={genMoreConfigDraft}
                 onChange={setGenMoreConfigDraft}
                 workflowId={data?.workflowRef}

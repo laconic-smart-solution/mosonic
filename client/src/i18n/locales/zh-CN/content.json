@@ -78,7 +78,8 @@
     "image": "图片",
     "video": "视频",
     "transcription": "转录",
-    "summary": "摘要"
+    "summary": "摘要",
+    "subtitle": "字幕"
   },
   "nodeType": {
     "keyword_planner": "关键词",
@@ -86,8 +87,11 @@
     "image_generation": "图片生成",
     "translation": "翻译",
     "video_generation": "视频生成",
+    "video_presenter": "主持人视频",
+    "video_cinematic": "电影感视频",
     "transcription": "转录",
-    "summarization": "摘要"
+    "summarization": "摘要",
+    "subtitle": "字幕"
   },
   "relativeTime": {
     "justNow": "刚刚",

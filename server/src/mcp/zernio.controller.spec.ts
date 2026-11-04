@@ -33,8 +33,11 @@ describe('ZernioController', () => {
     expect(res).toEqual({ connectUrl: 'https://zernio/connect' });
   });
 
-  it('redirects callback success to settings/accounts', async () => {
-    mcpService.handleOAuthCallback.mockResolvedValue({ platform: 'instagram' });
+  it('redirects callback success to settings/accounts by default', async () => {
+    mcpService.handleOAuthCallback.mockResolvedValue({
+      platform: 'instagram',
+      returnTo: '/settings/accounts',
+    });
     const redirect = jest.fn();
     await controller.handleCallback(
       { connected: 'instagram', state: 'x', accountId: 'a1' },
@@ -47,6 +50,21 @@ describe('ZernioController', () => {
     });
     expect(redirect).toHaveBeenCalledWith(
       expect.stringContaining('/settings/accounts?connected=instagram'),
+    );
+  });
+
+  it('redirects callback success to /home when returnTo is chat', async () => {
+    mcpService.handleOAuthCallback.mockResolvedValue({
+      platform: 'tiktok',
+      returnTo: '/home',
+    });
+    const redirect = jest.fn();
+    await controller.handleCallback(
+      { connected: 'tiktok', state: 'x', accountId: 'a1' },
+      { redirect } as never,
+    );
+    expect(redirect).toHaveBeenCalledWith(
+      expect.stringContaining('/home?connected=tiktok'),
     );
   });
 

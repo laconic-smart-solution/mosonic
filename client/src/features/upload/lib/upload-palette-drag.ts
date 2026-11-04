@@ -45,7 +45,9 @@ export function palettePayloadForNode(
       const url = typeof layer.image === "string" ? layer.image.trim() : ""
       return url ? { kind: "image", url, nodeId } : null
     }
-    case "video_generation": {
+    case "video_generation":
+    case "video_presenter":
+    case "video_cinematic": {
       const url = typeof layer.video === "string" ? layer.video.trim() : ""
       return url ? { kind: "video", url, nodeId } : null
     }

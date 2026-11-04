@@ -5,6 +5,7 @@ import {
   FIXED_COST_REPOSITORY,
   SERVICE_RATE_REPOSITORY,
 } from '../repositories/tokens';
+import { AdminLlmTokenRateController } from './admin-llm-token-rate.controller';
 import { AdminNodeCreditController } from './admin-node-credit.controller';
 import { CreditBillingService } from './credit-billing.service';
 import { CreditCalculationService } from './credit-calculation.service';
@@ -16,6 +17,7 @@ import { PaymentWebhookService } from './payment-webhook.service';
 import { ContentCreditUsageService } from './content-credit-usage.service';
 import { CreditService } from './credit.service';
 import { FixedCostService } from './fixed-cost.service';
+import { LlmTokenRateService } from './llm-token-rate.service';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { OPERATION_REFERENCE_COSTS } from './lib/operation-reference-costs';
 import { ServiceRateService } from './service-rate.service';
@@ -113,6 +115,7 @@ const DEFAULT_SERVICE_RATES = [
   controllers: [
     CreditConfigController,
     AdminNodeCreditController,
+    AdminLlmTokenRateController,
     CreditTopupController,
     PaymentWebhookController,
   ],
@@ -126,6 +129,7 @@ const DEFAULT_SERVICE_RATES = [
     PaymentWebhookService,
     ServiceRateService,
     NodeCreditPriceService,
+    LlmTokenRateService,
   ],
   exports: [
     CreditConfigService,
@@ -136,6 +140,7 @@ const DEFAULT_SERVICE_RATES = [
     FixedCostService,
     ServiceRateService,
     NodeCreditPriceService,
+    LlmTokenRateService,
   ],
 })
 export class CreditModule implements OnModuleInit {
@@ -146,11 +151,13 @@ export class CreditModule implements OnModuleInit {
     private readonly serviceRates: IServiceRateRepository,
     private readonly calculation: CreditCalculationService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly llmTokenRates: LlmTokenRateService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.seedDefaults();
     await this.nodeCreditPriceService.seedDefaults();
+    await this.llmTokenRates.seedDefaults();
     await this.calculation.ensureLegacyConfigMigrated();
     await this.calculation.recalculateOverheadFactor();
   }
@@ -172,7 +179,9 @@ export class CreditModule implements OnModuleInit {
             provider: op.provider,
             model:
               op.provider === 'heygen'
-                ? 'heygen-av3'
+                ? op.nodeType.includes('presenter')
+                  ? 'heygen-av3'
+                  : 'heygen_video_1'
                 : op.provider === 'runway'
                   ? 'runway-gen4'
                   : 'sora',

@@ -101,6 +101,8 @@ export function PipelineTypeIcon({ type }: { type: WorkflowNodeType }) {
     case "translation":
       return <Languages className={ic} />
     case "video_generation":
+    case "video_presenter":
+    case "video_cinematic":
       return <Video className={ic} />
     case "transcription":
       return <Mic className={ic} />

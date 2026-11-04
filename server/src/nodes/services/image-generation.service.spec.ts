@@ -444,4 +444,153 @@ describe('ImageGenerationService', () => {
       fetchMock.mockRestore();
     }
   });
+
+  it('skips the scene composer for a keep-scene edit', async () => {
+    const promptComposer = makePromptComposer();
+    const classifier = { classify: jest.fn() };
+    const promptCapture: { prompt?: string } = {};
+    const llm = makeLlm(promptCapture);
+    const { svc } = makeService({ promptComposer, classifier, llm });
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.from([1, 2, 3, 4]).buffer,
+      headers: { get: () => 'image/png' },
+    } as unknown as Response);
+    await svc.execute({
+      pipelineRef: 'p1',
+      workflowRef: 'wf1',
+      nodeId: 'img',
+      order: 2,
+      rule,
+      contentPrompt: 'ignored',
+      previousOutputs: { text: 'caption', image: 'https://files.example.com/prev.png' },
+      imageEdit: { instruction: 'add the logo top-right', useBrandLogo: true },
+      sourcePack: {
+        notes: '',
+        assets: [
+          {
+            id: 'previous_output',
+            kind: 'image',
+            label: 'previous_output',
+            fileUrl: 'https://files.example.com/prev.png',
+            role: 'enhance',
+            confidence: 1,
+          },
+          {
+            id: 'logo-1',
+            kind: 'image',
+            label: 'wiser-logo.png',
+            fileUrl: 'https://files.example.com/logo.png',
+            role: 'brand_mark',
+            confidence: 1,
+          },
+        ],
+      },
+    });
+    expect(promptComposer.compose).not.toHaveBeenCalled();
+    expect(classifier.classify).not.toHaveBeenCalled();
+    expect(promptCapture.prompt).toContain('Edit Image 1');
+    expect(promptCapture.prompt).toContain('add the logo top-right');
+    expect(promptCapture.prompt).toContain('Image 2 is the real brand logo file');
+    expect(llm.editImageBase64).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: [
+          expect.objectContaining({ fileName: expect.stringContaining('previous_output') }),
+          expect.objectContaining({ fileName: expect.stringContaining('logo-1') }),
+        ],
+      }),
+    );
+    fetchMock.mockRestore();
+  });
+
+  it('downloads port-stripped 4001/api/file refs through FILE_SERVICE_URL', async () => {
+    const prev = process.env.FILE_SERVICE_URL;
+    process.env.FILE_SERVICE_URL = 'https://files.example.com/api/file/v1';
+    const promptCapture: { prompt?: string } = {};
+    const llm = makeLlm(promptCapture);
+    const { svc } = makeService({ llm });
+    const pngMagic = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
+    ]);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => pngMagic.buffer,
+      headers: { get: () => 'application/octet-stream' },
+    } as unknown as Response);
+    try {
+      await svc.execute({
+        pipelineRef: 'p1',
+        workflowRef: 'wf1',
+        nodeId: 'img',
+        order: 2,
+        rule,
+        previousOutputs: { text: 'caption' },
+        imageEdit: { instruction: 'use brand logo', useBrandLogo: true },
+        sourcePack: {
+          notes: '',
+          assets: [
+            {
+              id: 'previous_output',
+              kind: 'image',
+              label: 'previous_output',
+              fileUrl:
+                '4001/api/file/v1/file?relativePath=testing%2Fneural-tex%2Fprev.png',
+              role: 'enhance',
+              confidence: 1,
+            },
+            {
+              id: 'logo-1',
+              kind: 'image',
+              label: 'logo-icon.png',
+              fileUrl:
+                '4001/api/file/v1/file?relativePath=rule-assets%2Flogo.png',
+              role: 'brand_mark',
+              confidence: 1,
+            },
+          ],
+        },
+      });
+      const fetched = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(fetched.every((url) => url.startsWith('https://'))).toBe(true);
+      expect(llm.editImageBase64).toHaveBeenCalledWith(
+        expect.objectContaining({
+          images: expect.arrayContaining([
+            expect.objectContaining({ mimeType: 'image/png' }),
+          ]),
+        }),
+      );
+    } finally {
+      fetchMock.mockRestore();
+      process.env.FILE_SERVICE_URL = prev;
+    }
+  });
+
+  it('refuses a logo edit when the rule logo is not in the pack', async () => {
+    const { svc } = makeService({});
+    await expect(
+      svc.execute({
+        pipelineRef: 'p1',
+        workflowRef: 'wf1',
+        nodeId: 'img',
+        order: 2,
+        rule,
+        contentPrompt: 'ignored',
+        previousOutputs: { text: 'caption', image: 'https://files.example.com/prev.png' },
+        imageEdit: { instruction: 'use the brand logo', useBrandLogo: true },
+        sourcePack: {
+          notes: '',
+          assets: [
+            {
+              id: 'previous_output',
+              kind: 'image',
+              label: 'previous_output',
+              fileUrl: 'https://files.example.com/prev.png',
+              role: 'enhance',
+              confidence: 1,
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow(/no ready logo asset/i);
+  });
 });

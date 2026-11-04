@@ -29,6 +29,8 @@ import type { DeductCreditsDto } from './dto/deduct-credits.dto';
 import { currentBillingPeriod } from './lib/billing-period.util';
 import { periodCreditBudget } from './lib/period-credit-budget.util';
 import { PaymentService, type CreditPackage } from '../payment/payment.service';
+import { LlmTokenRateService } from './llm-token-rate.service';
+import { CHAT_CREDIT_NODE_TYPE } from './lib/llm-token-cost.util';
 import { NodeCreditPriceService } from './node-credit-price.service';
 import { InsufficientCreditsException } from './insufficient-credits.exception';
 import {
@@ -63,6 +65,7 @@ export class CreditService {
     private readonly userPlans: IUserPlanRepository,
     private readonly calculation: CreditCalculationService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
+    private readonly llmTokenRates: LlmTokenRateService,
     private readonly events: EventsService,
     private readonly payniService: PayniService,
     private readonly paymentService: PaymentService,
@@ -347,6 +350,63 @@ export class CreditService {
 
     await this.maybeEmitLowBalance(updated);
     this.emitBalanceUpdated(updated);
+  }
+
+  /** Charge the Home chat operator from measured tokens (not pipeline nodes). */
+  async chargeChatTurn(args: {
+    userId: string;
+    sessionId: string;
+    messageId: string;
+    model: string;
+    provider?: string;
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens?: number;
+  }): Promise<{ creditsCharged: number; rawCostUsd: number }> {
+    const quote = await this.llmTokenRates.quoteTokens({
+      provider: args.provider,
+      model: args.model,
+      inputTokens: args.inputTokens,
+      outputTokens: args.outputTokens,
+      reasoningTokens: args.reasoningTokens,
+    });
+    if (!quote || quote.marginAppliedUsd <= 0) {
+      return { creditsCharged: 0, rawCostUsd: 0 };
+    }
+
+    const accrued = await this.userPlans.accrueChatUnbilled(
+      args.userId,
+      quote.marginAppliedUsd,
+      quote.creditPriceUsdSnapshot,
+    );
+    if (!accrued.plan) {
+      throw new NotFoundException(`No active plan found for userId=${args.userId}`);
+    }
+    if (accrued.creditsCharged <= 0) {
+      return { creditsCharged: 0, rawCostUsd: quote.rawCostUsd };
+    }
+
+    await this.ledger.create({
+      userId: args.userId,
+      pipelineRef: `chat:${args.sessionId}`,
+      nodeId: args.messageId,
+      nodeType: CHAT_CREDIT_NODE_TYPE,
+      provider: quote.provider,
+      model: quote.model,
+      rawCostUsd: quote.rawCostUsd,
+      overheadUsd: quote.overheadUsd,
+      marginAppliedUsd: quote.marginAppliedUsd,
+      creditPriceUsdSnapshot: quote.creditPriceUsdSnapshot,
+      creditsCharged: accrued.creditsCharged,
+      billingPeriod: currentBillingPeriod(),
+    });
+
+    await this.maybeEmitLowBalance(accrued.plan);
+    this.emitBalanceUpdated(accrued.plan);
+    return {
+      creditsCharged: accrued.creditsCharged,
+      rawCostUsd: quote.rawCostUsd,
+    };
   }
 
   /** Charge credits for a single content node rerun or generate-more execution. */

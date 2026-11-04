@@ -18,6 +18,7 @@ export type ResolvedContentOutputs = {
   translatedText?: string;
   video?: string;
   transcription?: string;
+  subtitle?: string;
   summary?: string;
 };
 
@@ -71,6 +72,7 @@ export function mergeResolvedOutputs(
     translatedText: coalesce(u.translatedText, o.translatedText),
     video: coalesce(u.video, o.video),
     transcription: coalesce(u.transcription, o.transcription),
+    subtitle: coalesce(u.subtitle, o.subtitle),
     summary: coalesce(u.summary, o.summary),
   };
 }

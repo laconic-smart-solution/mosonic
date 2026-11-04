@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, UserPlanStatus } from '@prisma/client';
+import { applyChatCreditBucket } from '../../credit/lib/chat-credit-bucket.util';
 import { PrismaService } from '../../database/prisma.service';
 import type { UserPlanRecord } from '../../domain/plans/plan.types';
 import type { IUserPlanRepository } from '../interfaces/user-plan.repository.interface';
@@ -194,6 +195,72 @@ export class PrismaUserPlanRepository implements IUserPlanRepository {
 
     if (result.count === 0) return null;
     return this.findActiveByUserId(userId);
+  }
+
+  async accrueChatUnbilled(
+    userId: string,
+    addUsd: number,
+    creditPriceUsd: number,
+  ): Promise<{
+    creditsCharged: number;
+    chatUnbilledUsd: number;
+    plan: UserPlanRecord | null;
+  }> {
+    const add = Math.max(0, addUsd);
+    if (add <= 0) {
+      const plan = await this.findActiveByUserId(userId);
+      return {
+        creditsCharged: 0,
+        chatUnbilledUsd: plan?.chatUnbilledUsd ?? 0,
+        plan,
+      };
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT 1 FROM "user_plans"
+        WHERE "userId" = ${userId} AND "status" = 'active'
+        FOR UPDATE
+      `;
+      const plan = await tx.userPlan.findFirst({
+        where: { userId, status: 'active' },
+      });
+      if (!plan) {
+        return { creditsCharged: 0, chatUnbilledUsd: 0, plan: null };
+      }
+
+      const applied = applyChatCreditBucket({
+        unbilledUsd: plan.chatUnbilledUsd,
+        addUsd: add,
+        creditPriceUsd,
+      });
+      const price = creditPriceUsd;
+      const affordable =
+        price > 0
+          ? Math.min(applied.creditsCharged, Math.max(0, plan.creditsRemaining))
+          : 0;
+      const chatUnbilledUsd =
+        applied.unbilledUsd +
+        (applied.creditsCharged - affordable) * Math.max(0, price);
+
+      const updated = await tx.userPlan.update({
+        where: { id: plan.id },
+        data: {
+          chatUnbilledUsd,
+          ...(affordable > 0
+            ? {
+                creditsRemaining: { decrement: affordable },
+                creditsUsed: { increment: affordable },
+              }
+            : {}),
+        },
+      });
+      return {
+        creditsCharged: affordable,
+        chatUnbilledUsd,
+        plan: updated,
+      };
+    });
   }
 
   markLowBalanceNotified(userPlanId: string): Promise<void> {

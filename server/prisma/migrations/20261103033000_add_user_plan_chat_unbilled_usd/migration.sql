@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "user_plans" ADD COLUMN "chatUnbilledUsd" DOUBLE PRECISION NOT NULL DEFAULT 0;

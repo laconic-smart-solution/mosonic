@@ -1,4 +1,5 @@
 import {
+  forcePreviousImageFirst,
   isImageRerunStartFresh,
   resolveImageRerunSourcePack,
 } from './image-rerun-source-pack.util';
@@ -10,6 +11,20 @@ describe('image-rerun-source-pack.util', () => {
   it('detects start-fresh phrases', () => {
     expect(isImageRerunStartFresh('start over with something new')).toBe(true);
     expect(isImageRerunStartFresh('make the background darker')).toBe(false);
+  });
+
+  it('treats "recreate ... in editorial design" as a full redo, not a tweak', () => {
+    expect(
+      isImageRerunStartFresh(
+        'Recreate the image in a premium editorial design style. Use a magazine-like layout...',
+      ),
+    ).toBe(true);
+  });
+
+  it('treats redesign/reimagine/new layout as a full redo', () => {
+    expect(isImageRerunStartFresh('redesign this completely')).toBe(true);
+    expect(isImageRerunStartFresh('reimagine it as a poster')).toBe(true);
+    expect(isImageRerunStartFresh('give it a new layout')).toBe(true);
   });
 
   it('does not inject previous when message empty and no new attachments', () => {
@@ -69,5 +84,14 @@ describe('image-rerun-source-pack.util', () => {
       hadNewAttachments: true,
     });
     expect(pack.assets.map((a) => a.id)).toEqual(['logo1', 'previous_output']);
+  });
+
+  it('forces the previous image first even when the message says redesign', () => {
+    const pack = forcePreviousImageFirst(emptySourcePack(), prevUrl);
+    expect(pack.assets[0]).toMatchObject({
+      id: 'previous_output',
+      fileUrl: prevUrl,
+      role: 'enhance',
+    });
   });
 });

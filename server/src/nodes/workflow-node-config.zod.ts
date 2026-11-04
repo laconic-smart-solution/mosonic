@@ -20,6 +20,10 @@ import {
   WorkflowNodeType,
   type WorkflowNodeConfig,
 } from './schemas/workflow-node.schema';
+import {
+  isVideoNodeType,
+  videoModeForNode,
+} from './video-node-type.util';
 
 export {
   allowedOpenAiImageSizesForModel,
@@ -135,7 +139,8 @@ const videoAspect = z.enum([
   NodeAspectRatio.R4x5,
 ]);
 
-const SORA_DURATION_LITERALS = [4, 8, 12, 16, 20] as const;
+/** HeyGen cinematic_avatar / heygen_video common snaps (5-15s). */
+const CINEMATIC_DURATION_LITERALS = [5, 10, 15] as const;
 const PRESENTER_DURATION_LITERALS = [10, 20, 30, 40, 60] as const;
 
 function snapToNearestDuration(
@@ -162,14 +167,14 @@ function snapToNearestDuration(
   return best;
 }
 
-function snapToSoraDuration(
+function snapToCinematicDuration(
   raw: unknown,
-): (typeof SORA_DURATION_LITERALS)[number] {
+): (typeof CINEMATIC_DURATION_LITERALS)[number] {
   return snapToNearestDuration(
     raw,
-    SORA_DURATION_LITERALS,
-    8,
-  ) as (typeof SORA_DURATION_LITERALS)[number];
+    CINEMATIC_DURATION_LITERALS,
+    10,
+  ) as (typeof CINEMATIC_DURATION_LITERALS)[number];
 }
 
 function snapToPresenterDuration(
@@ -210,6 +215,26 @@ const videoConfigObjectSchema = z
     heygenExpressiveness: heygenExpressivenessSchema,
     heygenMotionPrompt: z.string().max(500).optional(),
     removeBackground: z.boolean().optional(),
+    /** cinematic_avatar (looks + prompt) | heygen_video (t2v/i2v/ref2v). */
+    cinematicMode: z.enum(['cinematic_avatar', 'heygen_video']).optional(),
+    /** Only when cinematicMode === heygen_video. */
+    heygenVideoMode: z
+      .enum(['text_to_video', 'image_to_video', 'reference_to_video'])
+      .optional(),
+    /** Up to 3 look ids for cinematic_avatar (falls back to heygenAvatarId). */
+    heygenAvatarIds: z.array(z.string().min(1)).max(3).optional(),
+    /** heygen_video_1 (default) | seedance_2 for cinematic_avatar. */
+    heygenCinematicModel: z.enum(['heygen_video_1', 'seedance_2']).optional(),
+    enhancePrompt: z.boolean().optional(),
+    promptEnhancement: z
+      .enum(['turbo', 'quality', 'ultraquality', 'disabled'])
+      .optional(),
+    seed: z.number().int().nonnegative().optional(),
+    /** Refs for heygen_video image_to_video | reference_to_video. */
+    heygenReferenceAssetIds: z.array(z.string().min(1)).max(12).optional(),
+    heygenReferenceImageUrl: z.string().max(2048).optional(),
+    /** Brand asset (rule_assets) the HeyGen look was created from. */
+    heygenLookSourceRuleAssetId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -218,18 +243,43 @@ const videoConfigSchema = videoConfigObjectSchema.transform((data) => {
   const duration =
     mode === 'presenter'
       ? snapToPresenterDuration(data.duration)
-      : snapToSoraDuration(data.duration);
-  return { ...data, duration };
+      : snapToCinematicDuration(data.duration);
+  const cinematicMode =
+    mode === 'cinematic'
+      ? (data.cinematicMode ?? 'cinematic_avatar')
+      : data.cinematicMode;
+  const heygenVideoMode =
+    cinematicMode === 'heygen_video'
+      ? (data.heygenVideoMode ?? 'text_to_video')
+      : data.heygenVideoMode;
+  return { ...data, duration, cinematicMode, heygenVideoMode };
 });
 
+/** Transcription (OpenAI Whisper). `sourceUrl` is required at run time unless an upstream video URL exists. */
 const transcriptionConfigSchema = z
   .object({
+    laneId: laneIdSchema,
     provider: llmProvider.optional(),
     model: z.string().min(1).optional(),
     sourceType: z
       .enum([NodeMediaSourceType.Audio, NodeMediaSourceType.Video])
       .optional(),
     language: z.string().min(1).max(16).optional(),
+    sourceUrl: z.string().trim().min(1).max(2048).optional(),
+  })
+  .strict();
+
+/** Subtitle: local SRT/VTT transform of upstream transcription (no AI). */
+const subtitleConfigSchema = z
+  .object({
+    laneId: laneIdSchema,
+    format: z.enum(['srt', 'vtt']).optional(),
+    maxCharsPerLine: z.number().int().min(10).max(120).optional(),
+    language: z.string().min(1).max(16).optional(),
+    /** Stub: burn-in is not implemented; stored only. */
+    burnIn: z.boolean().optional(),
+    sourceText: z.string().max(100_000).optional(),
+    audioDurationSeconds: z.number().positive().max(36_000).optional(),
   })
   .strict();
 
@@ -334,9 +384,12 @@ const SCHEMAS: Record<WorkflowNodeType, z.ZodTypeAny> = {
   [WorkflowNodeType.KeywordPlanner]: keywordPlannerConfigSchema,
   [WorkflowNodeType.TextGeneration]: textConfigSchema,
   [WorkflowNodeType.ImageGeneration]: imageConfigSchema,
+  [WorkflowNodeType.VideoPresenter]: videoConfigSchema,
+  [WorkflowNodeType.VideoCinematic]: videoConfigSchema,
   [WorkflowNodeType.VideoGeneration]: videoConfigSchema,
   [WorkflowNodeType.Translation]: translationConfigSchema,
   [WorkflowNodeType.Transcription]: transcriptionConfigSchema,
+  [WorkflowNodeType.Subtitle]: subtitleConfigSchema,
   [WorkflowNodeType.Summarization]: summarizationConfigSchema,
   [WorkflowNodeType.Branch]: branchConfigSchema,
   [WorkflowNodeType.Adapt]: adaptConfigSchema,
@@ -367,15 +420,37 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     aspectRatio: NodeAspectRatio.R1x1,
     size: aspectRatioToOpenAiImageSize('1:1', OPENAI_IMAGE_GENERATION_MODEL),
   },
+  [WorkflowNodeType.VideoPresenter]: {
+    mode: 'presenter',
+    duration: 20,
+    aspectRatio: NodeAspectRatio.R9x16,
+    heygenOrientation: 'portrait',
+    heygenExpressiveness: 'medium',
+    removeBackground: true,
+  },
+  [WorkflowNodeType.VideoCinematic]: {
+    mode: 'cinematic',
+    cinematicMode: 'cinematic_avatar',
+    heygenCinematicModel: 'heygen_video_1',
+    model: 'heygen_video_1',
+    duration: 10,
+    resolution: '720p',
+    aspectRatio: NodeAspectRatio.R16x9,
+    enhancePrompt: true,
+  },
+  /** Legacy combined node (kept for old snapshots). */
   [WorkflowNodeType.VideoGeneration]: {
     mode: 'cinematic',
-    model: 'sora-2',
-    duration: 8,
+    cinematicMode: 'cinematic_avatar',
+    heygenCinematicModel: 'heygen_video_1',
+    model: 'heygen_video_1',
+    duration: 10,
     resolution: '720p',
     aspectRatio: NodeAspectRatio.R16x9,
     heygenOrientation: 'landscape',
     heygenExpressiveness: 'medium',
     removeBackground: true,
+    enhancePrompt: true,
   },
   [WorkflowNodeType.Translation]: {
     model: 'gpt-4o',
@@ -388,6 +463,11 @@ const DEFAULTS: Record<WorkflowNodeType, WorkflowNodeConfig> = {
     model: 'whisper-1',
     sourceType: NodeMediaSourceType.Audio,
     language: 'auto',
+  },
+  [WorkflowNodeType.Subtitle]: {
+    format: 'srt',
+    maxCharsPerLine: 42,
+    burnIn: false,
   },
   [WorkflowNodeType.Summarization]: {
     model: 'gpt-4o',
@@ -456,8 +536,17 @@ export type ParseWorkflowNodeConfigResult =
  */
 export function coerceVideoConfigForPersist(
   raw: Record<string, unknown>,
+  nodeType?: WorkflowNodeType | string,
 ): Record<string, unknown> {
   const next = { ...raw };
+  // Split node types own their mode: a presenter node never flips to Sora.
+  if (
+    nodeType === WorkflowNodeType.VideoPresenter ||
+    nodeType === WorkflowNodeType.VideoCinematic
+  ) {
+    next.mode = videoModeForNode(nodeType);
+    return next;
+  }
   const hasAvatar = String(next.heygenAvatarId ?? '').trim().length > 0;
   const clearingAvatar =
     'heygenAvatarId' in raw && !String(raw.heygenAvatarId ?? '').trim();
@@ -469,7 +558,7 @@ export function coerceVideoConfigForPersist(
 }
 
 function configShapeKeys(type: WorkflowNodeType): string[] {
-  if (type === WorkflowNodeType.VideoGeneration) {
+  if (isVideoNodeType(type)) {
     return Object.keys(videoConfigObjectSchema.shape);
   }
   if (type === WorkflowNodeType.Intelligence) {
@@ -494,7 +583,7 @@ export function parseWorkflowNodeConfig(
 
   const picked: Record<string, unknown> = {};
   const allowed = new Set(
-    type === WorkflowNodeType.VideoGeneration
+    isVideoNodeType(type)
       ? Object.keys(videoConfigObjectSchema.shape)
       : configSchemaShapeKeys(schema),
   );
@@ -502,6 +591,11 @@ export function parseWorkflowNodeConfig(
     if (allowed.has(k)) {
       picked[k] = v;
     }
+  }
+
+  if (isVideoNodeType(type)) {
+    // Split types pin mode; legacy keeps config.mode.
+    picked.mode = videoModeForNode(type, picked);
   }
 
   if (type === WorkflowNodeType.ImageGeneration) {
@@ -559,7 +653,16 @@ export function defaultWorkflowNodeConfigForRule(
   const audienceLang = rule?.audience?.language?.trim();
 
   const overrides: Record<string, unknown> = {};
-  if (type === WorkflowNodeType.VideoGeneration && hasInstagram) {
+  // Instagram: cinematic renders 9:16; presenter stays portrait (its default).
+  if (
+    (type === WorkflowNodeType.VideoCinematic ||
+      type === WorkflowNodeType.VideoGeneration) &&
+    hasInstagram
+  ) {
+    overrides.aspectRatio = NodeAspectRatio.R9x16;
+  }
+  if (type === WorkflowNodeType.VideoPresenter && hasInstagram) {
+    overrides.heygenOrientation = 'portrait';
     overrides.aspectRatio = NodeAspectRatio.R9x16;
   }
   if (

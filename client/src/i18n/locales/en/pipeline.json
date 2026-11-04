@@ -64,13 +64,16 @@
     "text_generation": "Text",
     "image_generation": "Image",
     "video_generation": "Video",
+    "video_presenter": "Presenter video",
+    "video_cinematic": "Cinematic video",
     "translation": "Translate",
     "transcription": "Transcribe",
     "summarization": "Summary",
     "intelligence": "Intelligence",
     "adapt": "Adapt",
     "branch": "Branch",
-    "merge": "Merge"
+    "merge": "Merge",
+    "subtitle": "Subtitles"
   },
   "relativeTime": {
     "justNow": "just now",

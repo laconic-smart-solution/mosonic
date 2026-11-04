@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Inject } from '@nestjs/common';
 import { UnrecoverableError } from 'bullmq';
 import { buildIntelligenceContextFromPostMetrics } from '../analytics/intelligence-context.util';
 import { PostAnalyticsService } from '../post/post-analytics.service';
@@ -41,6 +40,7 @@ export class PipelineNodeRunnerService {
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly nodeExecutor: NodeExecutor,
+    @Inject(forwardRef(() => DependencyResolverService))
     private readonly resolver: DependencyResolverService,
     private readonly completion: PipelineNodeCompletionService,
     private readonly events: EventsService,

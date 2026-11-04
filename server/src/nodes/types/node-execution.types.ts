@@ -13,6 +13,8 @@ export interface PreviousOutputs {
   translatedText?: string;
   summary?: string;
   transcription?: string;
+  /** SRT/VTT text from subtitle node. */
+  subtitle?: string;
   video?: string;
   /** From intelligence node — folded into downstream prompts. */
   intelligenceHints?: string;
@@ -58,6 +60,8 @@ export interface NodeExecutorInput {
   suppressFailedFinalEmit?: boolean;
   /** When true, node:completed is emitted by the caller (pipeline completion service). */
   suppressCompletedEmit?: boolean;
+  /** Keep-scene image edit forwarded to ImageGenerationService. */
+  imageEdit?: { instruction: string; useBrandLogo: boolean };
 }
 
 export interface NodeExecutorOutput {
@@ -70,6 +74,7 @@ export interface NodeExecutorOutput {
     translatedText?: string;
     summary?: string;
     transcription?: string;
+    subtitle?: string;
     video?: string;
     intelligenceHints?: string;
     adaptedCaption?: string;
@@ -119,6 +124,8 @@ export interface NodeExecutionInput {
   };
   /** Optional per-node instruction from pipeline execution (user prompt + review regenerate). */
   nodeUserPrompt?: string;
+  /** Keep-scene image edit. Skips the scene composer and paints from the current photo. */
+  imageEdit?: { instruction: string; useBrandLogo: boolean };
 }
 
 /** Strongly typed input for {@link TextGenerationService.generateText}. */
@@ -187,6 +194,8 @@ export interface NodeExecutionResult {
   output: string | null;
   image?: StoredImageOutput;
   transcription?: string;
+  subtitle?: string;
+  subtitleFormat?: 'srt' | 'vtt';
   video?: {
     fileUrl: string;
     relativePath: string;

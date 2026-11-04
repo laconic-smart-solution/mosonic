@@ -4,7 +4,9 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { preflightVideoNode } from '../../nodes/video-node-preflight.util';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import {
@@ -78,9 +80,24 @@ export class VideoGenerateProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`[video:submit] pipeline=${pipelineId} node=${nodeId}`);
 
-    let videoProvider: 'sora' | 'heygen' = 'sora';
+    let videoProvider: 'sora' | 'heygen' = 'heygen';
     try {
       const input = await this.completion.buildVideoGenerationInput(payload);
+
+      // Defense-in-depth (primary preflight runs before enqueue in
+      // DependencyResolverService.enqueueNode). Fail once, no retries, no HeyGen call.
+      const preflight = preflightVideoNode(payload.nodeType, input.config);
+      if (!preflight.ok) {
+        this.logger.warn(
+          `[video:submit] preflight failed pipeline=${pipelineId} node=${nodeId} code=${preflight.code}`,
+        );
+        await this.completion.failVideoNode(
+          payload,
+          new UnprocessableEntityException(preflight.message),
+          { videoProvider: 'heygen', stage: 'preflight' },
+        );
+        return;
+      }
 
       await this.pipelineRepo.updateNodeStatus(
         pipelineId,
@@ -89,19 +106,20 @@ export class VideoGenerateProcessor implements OnModuleInit, OnModuleDestroy {
       );
 
       const isPresenter = getVideoGenerationMode(input.config) === 'presenter';
-      videoProvider = isPresenter ? 'heygen' : 'sora';
+      // Presenter + cinematic both use HeyGen now (Sora path retired).
+      videoProvider = 'heygen';
 
       await this.videoService.emitProcessing(
         pipelineId,
         nodeId,
         isPresenter
           ? 'Presenter video generation started...'
-          : 'Video generation started...',
+          : 'Cinematic video generation started...',
       );
 
       const submitResult = isPresenter
         ? await this.videoService.submitPresenterVideoJob(input)
-        : await this.videoService.submitVideoJob(input);
+        : await this.videoService.submitCinematicVideoJob(input);
 
       const { externalJobId, estimatedSeconds, normalized } = submitResult;
       videoProvider = submitResult.videoProvider ?? videoProvider;
@@ -129,7 +147,7 @@ export class VideoGenerateProcessor implements OnModuleInit, OnModuleDestroy {
         externalJobId,
         checkCount: 0,
         submittedAt: new Date().toISOString(),
-        videoProvider: videoProvider ?? (isPresenter ? 'heygen' : 'sora'),
+        videoProvider: videoProvider ?? 'heygen',
         normalized,
       };
 

@@ -97,6 +97,39 @@ export type HeygenSubmitPresenterParams = {
   callbackId: string;
 };
 
+
+export type HeygenCinematicMode = 'cinematic_avatar' | 'heygen_video';
+export type HeygenVideoGenMode =
+  | 'text_to_video'
+  | 'image_to_video'
+  | 'reference_to_video';
+
+export type HeygenSubmitCinematicAvatarParams = {
+  prompt: string;
+  avatarIds: string[];
+  model?: 'heygen_video_1' | 'seedance_2';
+  durationSeconds?: number;
+  aspectRatio?: string;
+  resolution?: string;
+  enhancePrompt?: boolean;
+  references?: Array<{ type: 'asset_id'; asset_id: string } | { type: 'url'; url: string }>;
+  title?: string;
+};
+
+export type HeygenSubmitHeygenVideoParams = {
+  prompt: string;
+  mode?: HeygenVideoGenMode;
+  durationSeconds?: number;
+  aspectRatio?: string;
+  resolution?: string;
+  promptEnhancement?: 'turbo' | 'quality' | 'ultraquality' | 'disabled';
+  seed?: number;
+  imageAssetId?: string;
+  imageUrl?: string;
+  referenceAssetIds?: string[];
+  callbackUrl?: string;
+  callbackId?: string;
+};
 export function heygenCallbackId(pipelineId: string, nodeId: string): string {
   return `${pipelineId}__${nodeId}`;
 }
@@ -437,6 +470,155 @@ export class HeygenAssetsService {
     return { videoId };
   }
 
+
+  /** Prompt-driven cinematic avatar (POST /v3/videos type cinematic_avatar). No callback_url. */
+  async submitCinematicAvatarVideo(
+    params: HeygenSubmitCinematicAvatarParams,
+  ): Promise<{ videoId: string }> {
+    const prompt = params.prompt.trim();
+    if (!prompt) {
+      throw new UnprocessableEntityException('Cinematic avatar requires a prompt');
+    }
+    const avatarIds = (params.avatarIds ?? [])
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (!avatarIds.length) {
+      throw new UnprocessableEntityException(
+        'Cinematic avatar requires at least one avatar look id',
+      );
+    }
+    const duration = Math.max(5, Math.min(15, Math.round(params.durationSeconds ?? 10)));
+    const body: Record<string, unknown> = {
+      type: 'cinematic_avatar',
+      model: params.model ?? 'heygen_video_1',
+      prompt,
+      avatar_id: avatarIds,
+      aspect_ratio: params.aspectRatio?.trim() || '16:9',
+      resolution: params.resolution?.trim() || '720p',
+      duration,
+    };
+    if (params.enhancePrompt != null) body.enhance_prompt = params.enhancePrompt;
+    if (params.title?.trim()) body.title = params.title.trim();
+    if (params.references?.length) body.references = params.references;
+
+    const resp = await fetch(`${HEYGEN_BASE}/v3/videos`, {
+      method: 'POST',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await this.parseHeygenJson<{ data?: { video_id?: string }; video_id?: string }>(
+      resp,
+      'HeyGen cinematic avatar submit',
+    );
+    const videoId = data.data?.video_id?.trim() ?? data.video_id?.trim() ?? '';
+    if (!videoId) {
+      throw new UnprocessableEntityException('HeyGen did not return video_id');
+    }
+    return { videoId };
+  }
+
+  /** Generative HeyGen Video model (POST /v3/models/videos). */
+  async submitHeygenVideoModel(
+    params: HeygenSubmitHeygenVideoParams,
+  ): Promise<{ videoId: string }> {
+    const prompt = params.prompt.trim();
+    if (!prompt) {
+      throw new UnprocessableEntityException('HeyGen Video requires a prompt');
+    }
+    const mode = params.mode ?? 'text_to_video';
+    const duration = Math.max(5, Math.min(30, Math.round(params.durationSeconds ?? 10)));
+    const body: Record<string, unknown> = {
+      model: 'heygen-video-1',
+      mode,
+      prompt,
+      duration,
+      resolution: params.resolution?.trim() || '768p',
+      aspect_ratio: params.aspectRatio?.trim() || '16:9',
+    };
+    if (params.promptEnhancement) body.prompt_enhancement = params.promptEnhancement;
+    if (params.seed != null) body.seed = params.seed;
+    if (params.callbackUrl?.trim()) body.callback_url = params.callbackUrl.trim();
+    if (params.callbackId?.trim()) body.callback_id = params.callbackId.trim();
+
+    if (mode === 'image_to_video') {
+      const assetId = params.imageAssetId?.trim();
+      const url = params.imageUrl?.trim();
+      if (assetId) body.image = { type: 'asset_id', asset_id: assetId };
+      else if (url) body.image = { type: 'url', url };
+      else {
+        throw new UnprocessableEntityException(
+          'image_to_video requires heygenReferenceImageUrl or an image asset id',
+        );
+      }
+    }
+    if (mode === 'reference_to_video') {
+      const refs = (params.referenceAssetIds ?? []).map((id) => id.trim()).filter(Boolean);
+      if (!refs.length && !params.imageAssetId?.trim() && !params.imageUrl?.trim()) {
+        throw new UnprocessableEntityException(
+          'reference_to_video requires at least one reference image or video',
+        );
+      }
+      const images: Array<Record<string, string>> = [];
+      for (const id of refs) images.push({ type: 'asset_id', asset_id: id });
+      if (params.imageAssetId?.trim()) {
+        images.push({ type: 'asset_id', asset_id: params.imageAssetId.trim() });
+      } else if (params.imageUrl?.trim()) {
+        images.push({ type: 'url', url: params.imageUrl.trim() });
+      }
+      body.reference_images = images;
+    }
+
+    const resp = await fetch(`${HEYGEN_BASE}/v3/models/videos`, {
+      method: 'POST',
+      headers: this.jsonHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await this.parseHeygenJson<{ data?: { video_id?: string }; video_id?: string }>(
+      resp,
+      'HeyGen Video model submit',
+    );
+    const videoId = data.data?.video_id?.trim() ?? data.video_id?.trim() ?? '';
+    if (!videoId) {
+      throw new UnprocessableEntityException('HeyGen did not return video_id');
+    }
+    return { videoId };
+  }
+
+  async getHeygenVideoModelStatus(videoId: string): Promise<{
+    status: HeygenVideoStatus;
+    videoUrl?: string;
+    duration?: number;
+    error?: string;
+  }> {
+    const resp = await fetch(`${HEYGEN_BASE}/v3/models/videos/${videoId}`, {
+      headers: { 'x-api-key': this.getApiKey() },
+    });
+    const data = await this.parseHeygenJson<{
+      data?: {
+        status?: string;
+        video_url?: string;
+        duration?: number;
+        failure_message?: string;
+        error?: string;
+      };
+      status?: string;
+    }>(resp, 'HeyGen Video model status');
+    const raw =
+      data.data?.status?.toLowerCase() ?? data.status?.toLowerCase() ?? '';
+    let status: HeygenVideoStatus = 'processing';
+    if (raw === 'completed' || raw === 'complete' || raw === 'success') {
+      status = 'completed';
+    } else if (raw === 'failed' || raw === 'error' || raw === 'cancelled') {
+      status = 'failed';
+    }
+    return {
+      status,
+      videoUrl: data.data?.video_url?.trim() || undefined,
+      duration: data.data?.duration,
+      error: data.data?.failure_message || data.data?.error,
+    };
+  }
   async getVideoStatus(videoId: string): Promise<{
     status: HeygenVideoStatus;
     videoUrl?: string;

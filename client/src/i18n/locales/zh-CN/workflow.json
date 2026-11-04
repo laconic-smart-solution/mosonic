@@ -4,32 +4,40 @@
     "text": "文本生成",
     "image": "图像生成",
     "video": "视频生成",
+    "video_presenter": "主持人视频",
+    "video_cinematic": "电影感视频",
     "translation": "翻译",
     "transcription": "转录",
     "summarization": "摘要",
     "branch": "分支",
     "adapt": "渠道适配",
     "merge": "合并",
-    "intelligence": "情报检索"
+    "intelligence": "情报检索",
+    "subtitle": "字幕"
   },
   "nodeTypesShort": {
     "keywords": "关键词",
     "text": "文本生成",
     "image": "图像",
     "video": "视频",
+    "video_presenter": "主持人",
+    "video_cinematic": "电影感",
     "translation": "翻译",
     "transcription": "转录",
     "summarization": "摘要",
     "branch": "分支",
     "adapt": "适配",
     "merge": "合并",
-    "intelligence": "情报"
+    "intelligence": "情报",
+    "subtitle": "字幕"
   },
   "nodeTypesBackend": {
     "keyword_planner": "关键词规划",
     "text_generation": "文本 / LLM",
     "image_generation": "图像",
     "video_generation": "视频",
+    "video_presenter": "主持人视频",
+    "video_cinematic": "电影感视频",
     "translation": "翻译",
     "transcription": "转录",
     "summarization": "摘要",
@@ -37,7 +45,8 @@
     "intelligence": "情报",
     "social_account_connect": "社交账户解锁",
     "rule_generation": "品牌档案生成",
-    "workflow_generation": "工作流生成"
+    "workflow_generation": "工作流生成",
+    "subtitle": "字幕"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} · {{channel}}"
@@ -65,6 +74,14 @@
     "video": {
       "usage": "根据运行提示词和上游素材（通常是文本或参考图）生成短视频。在专用视频队列中运行，可能比其他节点耗时更长。",
       "example": "图像 → 视频，9:16、8 秒，将静态产品图转为竖屏 Reels。"
+    },
+    "video_presenter": {
+      "usage": "HeyGen 照片数字人朗读你的改写文案或文本。需在节点设置中选择数字人照片和声音。默认竖屏；在视频队列中运行，可能需要几分钟。",
+      "example": "Adapt（Instagram）→ 主持人视频，竖屏，20 秒，让代言人朗读帖子。"
+    },
+    "video_cinematic": {
+      "usage": "Sora 根据运行提示和上游文本生成电影感短片，没有人物讲话。在视频队列中运行，耗时可能比其他节点长。",
+      "example": "图片 → 电影感视频，9:16、8 秒，把产品图变成竖屏短视频。"
     },
     "translation": {
       "usage": "将上游节点产生的文本翻译为目标语言。适用于同一活动需要本地化文案而无需重写的情况。",
@@ -96,6 +113,10 @@
       "usage": "通过 OpenAI 运行网络检索简报（趋势、市场、竞品或全部），并将结果注入下游文本生成。使用最新洞察启动运行时可选用分析叠加。",
       "example": "情报（全部）→ 文本：一次检索覆盖话题标签、行业新闻和竞品差距后再撰写文案。",
       "tips": "使用「全部」一次调用，而非堆叠多个 Intelligence 节点。需要特定研究问题时选择自定义。"
+    },
+    "subtitle": {
+      "usage": "在本地将上游转录文本转换为带时间轴的 SRT 或 VTT 字幕（不调用 AI）。放在转录之后。",
+      "example": "视频 -> 转录 -> 字幕 (SRT)"
     }
   },
   "popoverDescriptions": {
@@ -107,57 +128,119 @@
     "adapt": "为此渠道改写",
     "image": "使用 AI 创建图像",
     "video": "使用 AI 创建视频",
+    "video_presenter": "AI 数字人讲解你的文案（HeyGen）",
+    "video_cinematic": "AI 电影感场景（Sora）",
     "summarization": "摘要上游内容",
     "translation": "翻译为目标语言",
-    "merge": "在最终完成前收集所有分支"
+    "merge": "在最终完成前收集所有分支",
+    "subtitle": "将转录文本转换为 SRT/VTT 字幕"
   },
   "fields": {
-    "shared": { "on": "开", "off": "关" },
+    "shared": {
+      "on": "开",
+      "off": "关"
+    },
     "text": {
-      "outputFormat": { "label": "输出格式" },
-      "tone": { "label": "写作语气" },
-      "textLength": { "label": "长度" }
+      "outputFormat": {
+        "label": "输出格式"
+      },
+      "tone": {
+        "label": "写作语气"
+      },
+      "textLength": {
+        "label": "长度"
+      }
     },
     "image": {
-      "style": { "label": "风格" },
-      "aspectRatio": { "label": "宽高比" },
-      "quality": { "label": "质量" },
+      "style": {
+        "label": "风格"
+      },
+      "aspectRatio": {
+        "label": "宽高比"
+      },
+      "quality": {
+        "label": "质量"
+      },
       "negativePrompt": {
         "label": "负向提示词",
         "placeholder": "可选 — 图像中需避免的内容"
       }
     },
     "video": {
-      "mode": { "label": "模式" },
-      "aspectRatio": { "label": "宽高比" },
-      "duration": { "label": "时长" },
-      "targetDuration": { "label": "目标时长" },
-      "resolution": { "label": "分辨率" },
+      "mode": {
+        "label": "模式"
+      },
+      "aspectRatio": {
+        "label": "宽高比"
+      },
+      "duration": {
+        "label": "时长"
+      },
+      "targetDuration": {
+        "label": "目标时长"
+      },
+      "resolution": {
+        "label": "分辨率"
+      },
       "negativePrompt": {
         "label": "负向提示词",
         "placeholder": "可选 — 视频中需额外避免的内容"
       },
-      "heygenOrientation": { "label": "方向" },
-      "heygenExpressiveness": { "label": "表现力" },
-      "removeBackground": { "label": "移除原始照片背景" },
+      "heygenOrientation": {
+        "label": "方向"
+      },
+      "heygenExpressiveness": {
+        "label": "表现力"
+      },
+      "removeBackground": {
+        "label": "移除原始照片背景"
+      },
       "heygenMotionPrompt": {
         "label": "动作提示词（可选）",
         "placeholder": "例如：演示时轻轻点头"
+      },
+      "cinematicMode": {
+        "label": "Cinematic mode"
       }
     },
     "translation": {
-      "sourceLanguage": { "label": "源语言" },
-      "targetLanguage": { "label": "目标语言" },
-      "formalityLevel": { "label": "正式程度" },
-      "preserveFormatting": { "label": "保留格式" }
+      "sourceLanguage": {
+        "label": "源语言"
+      },
+      "targetLanguage": {
+        "label": "目标语言"
+      },
+      "formalityLevel": {
+        "label": "正式程度"
+      },
+      "preserveFormatting": {
+        "label": "保留格式"
+      }
     },
-    "transcription": { "language": { "label": "语言" } },
+    "transcription": {
+      "language": {
+        "label": "语言"
+      },
+      "sourceType": {
+        "label": "来源类型"
+      },
+      "sourceUrl": {
+        "label": "来源 URL",
+        "placeholder": "https://... 音频或视频文件"
+      }
+    },
     "summarization": {
-      "summaryLength": { "label": "摘要长度" },
-      "outputFormat": { "label": "输出形式" }
+      "summaryLength": {
+        "label": "摘要长度"
+      },
+      "outputFormat": {
+        "label": "输出形式"
+      }
     },
     "intelligence": {
-      "searchType": { "label": "检索类型" },
+      "searchType": {
+        "label": "检索类型"
+      },
       "customPrompt": {
         "label": "自定义检索提示词",
         "placeholder": "描述要检索的内容…"
@@ -215,7 +298,23 @@
       "searchTrend": "趋势 — 话题标签与格式",
       "searchMarket": "市场 — 新闻与信号",
       "searchCompetitor": "竞品 — 差距与角度",
-      "searchCustom": "自定义 — 您的提示词"
+      "searchCustom": "自定义 — 您的提示词",
+      "duration5s": "5s",
+      "duration15s": "15s",
+      "cinematicAvatar": "Avatar scene",
+      "heygenVideo": "HeyGen video",
+      "cinematic_avatar": "Avatar scene",
+      "heygen_video": "HeyGen video",
+      "audio": "音频",
+      "video": "视频"
+    },
+    "subtitle": {
+      "format": {
+        "label": "格式"
+      },
+      "maxCharsPerLine": {
+        "label": "每行最大字符数"
+      }
     }
   },
   "configSummary": {
@@ -239,7 +338,8 @@
       "market": "市场",
       "competitor": "竞品",
       "custom": "自定义"
-    }
+    },
+    "subtitle": "字幕"
   },
   "nodeStatus": {
     "pending": "待处理",

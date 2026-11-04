@@ -17,12 +17,19 @@ const TEXT_NODE_TYPES = new Set([
   "translation",
   "summarization",
   "transcription",
+  "subtitle",
   "adapt",
   "keyword_planner",
   "intelligence",
 ])
 
-const MEDIA_NODE_TYPES = new Set(["image_generation", "video_generation"])
+const MEDIA_NODE_TYPES = new Set([
+  "image_generation",
+  "video_generation",
+  "video_presenter",
+  "video_cinematic",
+])
+const VIDEO_NODE_TYPES = new Set(["video_generation", "video_presenter", "video_cinematic"])
 
 type Props = {
   nodeType: string
@@ -78,7 +85,7 @@ export function WorkflowNodeReviewCard({
   const imagePreviewRef =
     nodeType === "image_generation" ? mediaUrl ?? previewImage : undefined
   const videoPreviewRef =
-    nodeType === "video_generation" ? mediaUrl ?? previewVideo : undefined
+    VIDEO_NODE_TYPES.has(nodeType) ? mediaUrl ?? previewVideo : undefined
   const imageMedia = useFileObjectUrl(imagePreviewRef)
   const videoMedia = useFileObjectUrl(videoPreviewRef)
   const imageSrc =
@@ -210,7 +217,7 @@ export function WorkflowNodeReviewCard({
         </div>
       ) : null}
 
-      {isMedia && nodeType === "video_generation" ? (
+      {isMedia && VIDEO_NODE_TYPES.has(nodeType) ? (
         <div className="flex flex-col gap-2">
           {videoSrc ? (
             <div className="group/preview relative">

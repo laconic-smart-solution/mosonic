@@ -1,4 +1,12 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -50,6 +58,11 @@ import {
   pipelineNodeJobId,
   pipelineNodeReplayJobId,
 } from './types/node-job.payload';
+import {
+  isVideoNodeType,
+  withVideoModeForType,
+} from '../nodes/video-node-type.util';
+import { preflightVideoNode } from '../nodes/video-node-preflight.util';
 
 const TERMINAL_STATUSES = new Set<string>([
   PipelineNodeExecutionStatus.Completed,
@@ -74,6 +87,7 @@ export class DependencyResolverService {
     private readonly legacyPipelineVideoQueue: Queue<NodeJobPayload>,
     @Inject(forwardRef(() => OrchestrationService))
     private readonly orchestration: OrchestrationService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {
     this.useGraph =
       config.get<string>('ORCHESTRATION_USE_GRAPH', 'true').toLowerCase() !==
@@ -166,7 +180,7 @@ export class DependencyResolverService {
     let recovered = 0;
     for (const node of nodes) {
       if (
-        node.type !== WorkflowNodeType.VideoGeneration ||
+        !isVideoNodeType(node.type) ||
         node.status !== PipelineNodeExecutionStatus.Running ||
         !node.externalJobId?.trim()
       ) {
@@ -213,8 +227,10 @@ export class DependencyResolverService {
   ): Promise<void> {
     const allNodes = parsePipelineNodes(pipeline.nodes);
     const config = (node.config ?? {}) as WorkflowNodeConfig;
-    const isPresenter = getVideoGenerationMode(config) === 'presenter';
-    const videoProvider = isPresenter ? 'heygen' : 'sora';
+    const isPresenter =
+      getVideoGenerationMode(config, node.type) === 'presenter';
+    // Presenter + cinematic both use HeyGen (Sora only for legacy in-flight jobs).
+    const videoProvider = 'heygen';
     const startedAtMs = node.executedAt
       ? new Date(node.executedAt).getTime()
       : Date.now();
@@ -227,7 +243,7 @@ export class DependencyResolverService {
       ruleId: pipeline.ruleRef,
       userId: pipeline.userId ?? '',
       nodeId: node.nodeId,
-      nodeType: WorkflowNodeType.VideoGeneration,
+      nodeType: node.type as unknown as WorkflowNodeType,
       order: node.order,
       totalNodes: allNodes.length,
       contentPrompt: pipeline.contentPrompt,
@@ -658,11 +674,31 @@ export class DependencyResolverService {
       ...(options?.forceRegenerate ? { forceRegenerate: true } : {}),
     };
 
+    // Video preflight: fail before queue so workers never burn attempts on a
+    // node missing its HeyGen look / voice / refs.
+    if (isVideoNodeType(node.type)) {
+      const preflight = preflightVideoNode(
+        node.type,
+        withVideoModeForType(
+          node.type,
+          (node.config ?? {}) as Record<string, unknown>,
+        ),
+      );
+      if (!preflight.ok) {
+        this.logger.warn(
+          `[pipeline:${pipeline.pipelineId}] video preflight failed node=${nodeId} ` +
+            `code=${preflight.code} missing=${preflight.missing.join(',')} - not enqueued`,
+        );
+        await this.failVideoPreflight(payload, preflight.message);
+        return;
+      }
+    }
+
     const jobId = options?.useReplayJobId
       ? pipelineNodeReplayJobId(pipeline.pipelineId, node.nodeId)
       : pipelineNodeJobId(pipeline.pipelineId, node.nodeId);
     const queue = this.tenantQueues.forUser<NodeJobPayload>(
-      node.type === WorkflowNodeType.VideoGeneration
+      isVideoNodeType(node.type)
         ? QUEUES.VIDEO_GENERATE
         : PIPELINE_NODES_QUEUE,
       payload.userId,
@@ -686,5 +722,29 @@ export class DependencyResolverService {
       `[pipeline:${pipeline.pipelineId}] queued ${node.type} node=${nodeId} ` +
         `order=${node.order} jobId=${jobId} queue=${queue.name}`,
     );
+  }
+
+  private async failVideoPreflight(
+    payload: NodeJobPayload,
+    message: string,
+  ): Promise<void> {
+    // Lazy require: static import of MediaNodeCompletionService creates a CJS cycle
+    // (Resolver -> Media -> Runner/Completion -> Resolver) that leaves
+    // DependencyResolverService undefined in Nest design:paramtypes.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { MediaNodeCompletionService } = require('./media-node-completion.service') as typeof import('./media-node-completion.service');
+    const media = this.moduleRef?.get(MediaNodeCompletionService, {
+      strict: false,
+    });
+    if (!media) {
+      this.logger.error(
+        `[pipeline:${payload.pipelineId}] video preflight: MediaNodeCompletionService unavailable; node=${payload.nodeId} left pending`,
+      );
+      return;
+    }
+    await media.failVideoNode(payload, new UnprocessableEntityException(message), {
+      videoProvider: 'heygen',
+      stage: 'preflight',
+    });
   }
 }

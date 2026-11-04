@@ -93,6 +93,7 @@ import { buildApprovalStateFromPolicy } from '../content/content-approval.util';
 import type { UploadedFileLike } from '../preprocessing/preprocessed.types';
 import {
   emptySourcePack,
+  type SourcePackAsset,
   parsePipelineSourcePack,
 } from '../pipeline/source-pack.types';
 import {
@@ -163,6 +164,8 @@ export class OrchestrationService {
     reviewNodeIds?: string[];
     files?: UploadedFileLike[];
     urls?: string[];
+    /** Images picked in chat (e.g. attached screenshots), sent to image steps as references. */
+    referenceAssets?: SourcePackAsset[];
     metadata?: {
       source?: 'manual' | 'scheduler' | 'integration' | 'news';
       scheduleId?: string;
@@ -328,6 +331,9 @@ export class OrchestrationService {
             storageKey,
           })
         : emptySourcePack();
+    if (input.referenceAssets?.length) {
+      sourcePack.assets.push(...input.referenceAssets.slice(0, 3));
+    }
 
     const startedAt = new Date();
     const pipelineNamePrompt =

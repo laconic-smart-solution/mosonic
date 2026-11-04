@@ -71,8 +71,7 @@ export class VideoCheckProcessor implements OnModuleInit, OnModuleDestroy {
       nodeId,
       externalJobId,
       checkCount,
-      normalized,
-      videoProvider = 'sora',
+      videoProvider = 'heygen',
     } = payload;
 
     this.logger.log(
@@ -102,15 +101,20 @@ export class VideoCheckProcessor implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    if (videoProvider !== 'heygen') {
+      await this.completion.failVideoNode(
+        payload,
+        new Error(
+          'Sora video provider is retired; re-run this node with HeyGen (video_cinematic / video_presenter).',
+        ),
+        { videoProvider, stage: 'poll' },
+      );
+      return;
+    }
+
     let check;
     try {
-      check =
-        videoProvider === 'heygen'
-          ? await this.videoService.checkHeyGenVideoJob(externalJobId)
-          : await this.videoService.checkVideoJob(
-              externalJobId,
-              normalized?.provider,
-            );
+      check = await this.videoService.checkHeyGenVideoJob(externalJobId);
     } catch (err) {
       this.logger.warn(
         `[video:check] poll error pipeline=${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
@@ -145,13 +149,10 @@ export class VideoCheckProcessor implements OnModuleInit, OnModuleDestroy {
 
     const input = await this.completion.buildVideoGenerationInput(payload);
     try {
-      const completed =
-        videoProvider === 'heygen'
-          ? await this.videoService.completeHeyGenVideoJob(externalJobId, input)
-          : await this.videoService.completeVideoJob(externalJobId, {
-              ...input,
-              normalized: normalized!,
-            });
+      const completed = await this.videoService.completeHeyGenVideoJob(
+        externalJobId,
+        input,
+      );
 
       await this.completion.completeVideoNode(payload, completed);
       this.logger.log(
@@ -177,7 +178,7 @@ export class VideoCheckProcessor implements OnModuleInit, OnModuleDestroy {
     payload: MediaCheckJobPayload,
   ): Promise<void> {
     const nextCount = payload.checkCount + 1;
-    const intervalMs = videoPollIntervalMs(payload.videoProvider ?? 'sora');
+    const intervalMs = videoPollIntervalMs(payload.videoProvider ?? 'heygen');
     try {
       const videoCheckQueue = this.tenantQueues.forUser<MediaCheckJobPayload>(
         QUEUES.VIDEO_CHECK,

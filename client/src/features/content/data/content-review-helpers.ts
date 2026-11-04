@@ -21,6 +21,18 @@ export const NODE_TYPE_BY_KEY: Record<OutputKey, WorkflowNodeType> = {
   summary: "summarization",
 }
 
+const VIDEO_NODE_TYPES = new Set<WorkflowNodeType>([
+  "video_generation",
+  "video_presenter",
+  "video_cinematic",
+])
+
+/** True when a node of `type` fills the output `key` (any video node type fills `video`). */
+function nodeTypeMatchesKey(type: WorkflowNodeType, key: OutputKey): boolean {
+  if (key === "video") return VIDEO_NODE_TYPES.has(type)
+  return type === NODE_TYPE_BY_KEY[key]
+}
+
 /** Adapt nodes store caption text under `text` / `adaptedCaption` in nodeOutputs. */
 const ADAPT_OUTPUT_KEY: OutputKey = "text"
 
@@ -41,9 +53,8 @@ export function resolveNodeId(
   nodes: Array<{ nodeId: string; type: WorkflowNodeType; order: number }>,
   key: OutputKey
 ): string | undefined {
-  const want = NODE_TYPE_BY_KEY[key]
   const sorted = [...nodes].sort((a, b) => a.order - b.order)
-  return sorted.find((n) => n.type === want)?.nodeId
+  return sorted.find((n) => nodeTypeMatchesKey(n.type, key))?.nodeId
 }
 
 /** Last workflow node of the type that maps to `key` (matches publish “last wins”). */
@@ -51,10 +62,9 @@ export function lastNodeIdForOutputKey(
   nodes: Array<{ nodeId: string; type: WorkflowNodeType; order: number }>,
   key: OutputKey
 ): string | undefined {
-  const want = NODE_TYPE_BY_KEY[key]
   const sorted = [...nodes].sort((a, b) => a.order - b.order)
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].type === want) return sorted[i].nodeId
+    if (nodeTypeMatchesKey(sorted[i].type, key)) return sorted[i].nodeId
   }
   return undefined
 }
@@ -115,6 +125,8 @@ export function flattenWorkflowNodesToFlatOutputs(
           out.translatedText = layer.translatedText
         break
       case "video_generation":
+      case "video_presenter":
+      case "video_cinematic":
         if (typeof layer.video === "string") out.video = layer.video
         break
       case "transcription":
@@ -138,6 +150,7 @@ export function flattenWorkflowNodesToFlatOutputs(
 
 export function outputKeyForNodeType(type: WorkflowNodeType): OutputKey | undefined {
   if (type === "adapt") return ADAPT_OUTPUT_KEY
+  if (VIDEO_NODE_TYPES.has(type)) return "video"
   const pair = (Object.entries(NODE_TYPE_BY_KEY) as [OutputKey, WorkflowNodeType][]).find(
     ([, t]) => t === type,
   )
@@ -180,6 +193,8 @@ export function mergeExecutorOutput(
       if (typeof output.translatedText === "string") next.translatedText = output.translatedText
       break
     case "video_generation":
+    case "video_presenter":
+    case "video_cinematic":
       if (typeof output.video === "string") next.video = output.video
       break
     case "transcription":

@@ -167,6 +167,9 @@ export class ImagePromptComposerService {
     const isInfographic = effectiveTemplate === NodeImageTemplate.Infographic;
     const isAd = effectiveTemplate === NodeImageTemplate.AdCreative;
     const isEdit = (referenceImages?.length ?? 0) > 0;
+    const hasBrandMark = (referenceImages ?? []).some(
+      (image) => image.role === 'brand_mark',
+    );
 
     const textInstruction = isInfographic
       ? 'This is an infographic: put exact labels, numbers, and steps from the source content into `Text in image`, in quotes. Pick at most 3-4 of the most important points. Do not invent labels or change numbers. Fill the frame with a complete, readable layout — no empty unused panels.'
@@ -175,9 +178,13 @@ export class ImagePromptComposerService {
             'This is a finished advertising creative, not a background waiting for overlay.',
             'Fill the frame with a complete scene. Do not reserve a blank third of the image.',
             'If a call to action or short headline is present in the brand CTA or source content, render it once in the image: put the exact words in quotes on a `Text in image:` line, with placement and type style (bold sans-serif, high contrast, legible).',
-            'No extra slogans, no watermarks, no unrelated logos.',
+            hasBrandMark
+              ? 'Composite the brand_mark reference exactly. No extra slogans, no watermarks, no invented logos.'
+              : 'No extra slogans, no watermarks, no unrelated logos.',
           ].join(' ')
-        : 'Do not include captions, headlines, watermarks, or unrelated UI. Do not invent extra logos. The scene itself must still look finished and fully framed.';
+        : hasBrandMark
+          ? 'Do not include captions, headlines, watermarks, or unrelated UI. Composite the brand_mark reference exactly; do not invent a different mark.'
+          : 'Do not include captions, headlines, watermarks, or unrelated UI. Do not invent extra logos. The scene itself must still look finished and fully framed.';
 
     const referenceBlock = isEdit
       ? [

@@ -80,4 +80,21 @@ describe('source-pack.types', () => {
     const pixels = pixelAssetsFromPack(pack, 2);
     expect(pixels.map((a) => a.id)).toEqual(['1', '3']);
   });
+
+  it('pixelAssetsFromPack keeps images that only have a relativePath', () => {
+    const pack = parsePipelineSourcePack({
+      notes: '',
+      assets: [
+        {
+          id: 'logo',
+          kind: 'image',
+          label: 'logo.png',
+          relativePath: 'rule-assets/logo.png',
+          role: 'brand_mark',
+          confidence: 1,
+        },
+      ],
+    });
+    expect(pixelAssetsFromPack(pack).map((a) => a.id)).toEqual(['logo']);
+  });
 });

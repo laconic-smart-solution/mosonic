@@ -38,6 +38,7 @@ import {
   AdminCostPage,
   AdminCreditConfigPage,
   AdminNodeCreditsPage,
+  AdminTokenRatesPage,
   AdminPlansPage,
   AdminTopupPlansPage,
   AdminNodeSettingsImagePage,
@@ -59,7 +60,6 @@ export const router = createBrowserRouter([
     element: <MarketingLayout />,
     children: [
       { path: "/", element: <LandingPage /> },
-      { path: "/home", element: <HomePage /> },
       { path: "/pricing", element: <PricingPage /> },
       { path: "/faq", element: <MarketingFaqPage /> },
       { path: "/about", element: <Navigate to="/#about" replace /> },
@@ -130,6 +130,7 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
+          { path: "/home", element: <HomePage /> },
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/rules", element: <RulesPage /> },
           { path: "/rules/:ruleId/news-trigger", element: <NewsTriggerPage /> },
@@ -173,6 +174,7 @@ export const router = createBrowserRouter([
           { path: "users/:userId", element: <AdminUserDetailPage /> },
           { path: "credit", element: <AdminCreditConfigPage /> },
           { path: "node-credits", element: <AdminNodeCreditsPage /> },
+          { path: "token-rates", element: <AdminTokenRatesPage /> },
           { path: "plans", element: <AdminPlansPage /> },
           { path: "topup-plans", element: <AdminTopupPlansPage /> },
           { path: "usage", element: <AdminUsagePage /> },

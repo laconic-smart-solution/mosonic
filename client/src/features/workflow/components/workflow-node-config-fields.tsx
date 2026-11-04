@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { WorkflowVideoPresenterSettings } from "@/features/workflow/components/workflow-video-presenter-settings"
 import {
   effectiveVideoMode,
+  isVideoCanvasType,
   VIDEO_CINEMATIC_UI_ENABLED,
 } from "@/features/workflow/lib/video-generation-ui"
 import i18n from "@/i18n"
@@ -74,6 +75,18 @@ export type ConfigField =
   | ConfigFieldTextarea
 
 export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
+  const defs = buildWorkflowNodeFieldDefs()
+  // Split video nodes share the legacy field list; the mode field is dropped
+  // (the node type fixes the mode), and visibleWhen picks the matching fields.
+  const videoFields = (defs.video ?? []).filter((field) => field.key !== "mode")
+  return {
+    ...defs,
+    video_presenter: videoFields,
+    video_cinematic: videoFields,
+  }
+}
+
+function buildWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
   return {
   text: [
     {
@@ -171,18 +184,27 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
       visibleWhen: { key: "mode", value: "cinematic" },
     },
     {
+      key: "cinematicMode",
+      label: fl("video", "cinematicMode"),
+      control: "buttons",
+      options: [
+        { label: fo("cinematicAvatar"), value: "cinematic_avatar" },
+        { label: fo("heygenVideo"), value: "heygen_video" },
+      ],
+      defaultValue: "cinematic_avatar",
+      visibleWhen: { key: "mode", value: "cinematic" },
+    },
+    {
       key: "duration",
       label: fl("video", "duration"),
       control: "buttons",
       valueAsNumber: true,
       options: [
-        { label: fo("duration4s"), value: "4" },
-        { label: fo("duration8s"), value: "8" },
-        { label: fo("duration12s"), value: "12" },
-        { label: fo("duration16s"), value: "16" },
-        { label: fo("duration20s"), value: "20" },
+        { label: fo("duration5s"), value: "5" },
+        { label: fo("duration10s"), value: "10" },
+        { label: fo("duration15s"), value: "15" },
       ],
-      defaultValue: "8",
+      defaultValue: "10",
       visibleWhen: { key: "mode", value: "cinematic" },
     },
     {
@@ -311,6 +333,48 @@ export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
       ],
       defaultValue: "auto",
     },
+    {
+      key: "sourceType",
+      label: fl("transcription", "sourceType"),
+      control: "buttons",
+      options: [
+        { label: fo("audio"), value: "audio" },
+        { label: fo("video"), value: "video" },
+      ],
+      defaultValue: "audio",
+    },
+    {
+      key: "sourceUrl",
+      label: fl("transcription", "sourceUrl"),
+      control: "textarea",
+      defaultValue: "",
+      rows: 2,
+      placeholder: fp("transcription", "sourceUrl"),
+    },
+  ],
+  subtitle: [
+    {
+      key: "format",
+      label: fl("subtitle", "format"),
+      control: "buttons",
+      options: [
+        { label: "SRT", value: "srt" },
+        { label: "VTT", value: "vtt" },
+      ],
+      defaultValue: "srt",
+    },
+    {
+      key: "maxCharsPerLine",
+      label: fl("subtitle", "maxCharsPerLine"),
+      control: "buttons",
+      valueAsNumber: true,
+      options: [
+        { label: "32", value: "32" },
+        { label: "42", value: "42" },
+        { label: "56", value: "56" },
+      ],
+      defaultValue: "42",
+    },
   ],
   summarization: [
     {
@@ -426,7 +490,7 @@ function filterVisibleFields(
   return (fields ?? []).filter((field) => {
     if (!field.visibleWhen) return true
     const current =
-      field.visibleWhen.key === "mode" && canvasType === "video"
+      field.visibleWhen.key === "mode" && isVideoCanvasType(canvasType)
         ? mode
         : String(config[field.visibleWhen.key] ?? "")
     return current === field.visibleWhen.value
@@ -551,7 +615,7 @@ export function WorkflowNodeConfigFields({
   )
 
   const mode =
-    canvasType === "video" ? effectiveVideoMode(config) : ""
+    isVideoCanvasType(canvasType) ? effectiveVideoMode(config, canvasType) : ""
 
   const allFields = fieldDefs[canvasType] ?? []
   const visibleFields = filterVisibleFields(allFields, canvasType, config, mode)
@@ -590,10 +654,11 @@ export function WorkflowNodeConfigFields({
             updateConfig,
           )
         : null}
-      {canvasType === "video" && mode === "presenter" && nodeId ? (
+      {isVideoCanvasType(canvasType) && nodeId && (mode === "presenter" || (mode === "cinematic" && String(config.cinematicMode ?? "cinematic_avatar") !== "heygen_video")) ? (
         <WorkflowVideoPresenterSettings
           workflowId={workflowId}
           nodeId={nodeId}
+          canvasType={canvasType}
           config={config}
           onPatch={(patch) => patchConfig(patch)}
           compact={compact}

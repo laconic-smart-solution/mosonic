@@ -110,6 +110,7 @@ import {
 } from "./workflow-node-palette"
 import { WorkflowPaletteDropHints } from "./workflow-palette-drop-hints"
 import { WorkflowRfNode } from "./workflow-rf-node"
+import { isVideoCanvasType } from "@/features/workflow/lib/video-generation-ui"
 import {
   buildCreditEachByKey,
   creditCostForWfNode,
@@ -1018,10 +1019,10 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
       (config: Record<string, unknown>) => {
         if (readOnly || !settingsNodeId) return
         const selected = nodesRef.current.find((n) => n.id === settingsNodeId)
-        if (selected?.type !== "wfNode" || selected.data.wfType !== "video") {
+        if (selected?.type !== "wfNode" || !isVideoCanvasType(selected.data.wfType)) {
           return
         }
-        const configToApply = mergeHeygenVideoConfig({}, config)
+        const configToApply = mergeHeygenVideoConfig({}, config, selected.data.wfType)
         const nextNodes = nodesRef.current.map((n) => {
           if (n.id !== settingsNodeId || n.type === "plus_placeholder") return n
           return {
@@ -1061,7 +1062,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
     const handlePropConfigChange = useCallback(
       (next: Record<string, unknown>) => {
         setPropConfig(next)
-        if (selNode?.type === "video") {
+        if (isVideoCanvasType(selNode?.type)) {
           syncVideoConfigToCanvas(next)
         }
       },
@@ -1218,11 +1219,12 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
             wfType === "keywords" ||
             wfType === "intelligence" ||
             wfType === "transcription" ||
+            wfType === "subtitle" ||
             wfType === "summarization" ||
             wfType === "adapt" ||
             wfType === "text" ||
             wfType === "image" ||
-            wfType === "video" ||
+            isVideoCanvasType(wfType) ||
             wfType === "translation"
           ) {
             showAddButton = !hasBlockingOutgoingEdge(
@@ -1322,8 +1324,8 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
           toast.info(t("canvas.imageSizeAdjusted"))
         }
       }
-      if (selected?.type === "wfNode" && selected.data.wfType === "video") {
-        configToApply = mergeHeygenVideoConfig({}, propConfig)
+      if (selected?.type === "wfNode" && isVideoCanvasType(selected.data.wfType)) {
+        configToApply = mergeHeygenVideoConfig({}, propConfig, selected.data.wfType)
       }
       let nextNodes = currentNodes
       let nextEdges = edgesRef.current
@@ -1377,7 +1379,7 @@ export const WorkflowFlowCanvas = forwardRef<WorkflowFlowCanvasHandle, WorkflowF
         workflowId?.trim() &&
         persistedNodeIds.has(settingsNodeId) &&
         selected?.type === "wfNode" &&
-        selected.data.wfType === "video"
+        isVideoCanvasType(selected.data.wfType)
       ) {
         void heygenService
           .patchPresenterConfig(workflowId, settingsNodeId, configToApply)

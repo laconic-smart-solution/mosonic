@@ -43,6 +43,42 @@ describe('LlmService', () => {
     expect(() => service.getChatModelForPlainText()).not.toThrow();
   });
 
+  it('builds a reasoning model without throwing, and omits temperature', () => {
+    const chatModel = service.getReasoningChatModel();
+    expect(chatModel).toBeDefined();
+    // ChatOpenAI stores constructor options on the instance; temperature must
+    // never be set for reasoning models (the API rejects it).
+    expect((chatModel as unknown as { temperature?: number }).temperature).toBeUndefined();
+  });
+
+  it('defaults the reasoning model id to gpt-6-luna when unset', () => {
+    expect(service.getReasoningModelId()).toBe('gpt-6-luna');
+  });
+
+  it('uses OPENAI_REASONING_MODEL when configured', () => {
+    const customConfig = {
+      get: jest.fn((key: string) =>
+        key === 'OPENAI_REASONING_MODEL' ? 'o3' : config.get(key),
+      ),
+    } as unknown as ConfigService;
+    const customService = new LlmService(customConfig);
+    expect(customService.getReasoningModelId()).toBe('o3');
+  });
+
+  it('returns a context limit for the reasoning model id', () => {
+    expect(service.getContextLimit(service.getReasoningModelId())).toBe(1_050_000);
+  });
+
+  it('builds the reasoning model on the Responses API with low effort', () => {
+    const chatModel = service.getReasoningChatModel();
+    const fields = chatModel as unknown as {
+      reasoning?: { effort?: string };
+      useResponsesApi?: boolean;
+    };
+    expect(fields.reasoning?.effort).toBe('low');
+    expect(fields.useResponsesApi).toBe(true);
+  });
+
   it('rejects unsupported provider capability for image generation', () => {
     expect(() =>
       service.validateWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
@@ -66,4 +102,38 @@ describe('LlmService', () => {
       }),
     ).toThrow('does not support video generation');
   });
+
+  it('stores an absolute file URL when the file service returns "4001/api/..." (I-10)', async () => {
+    const fileConfig = {
+      get: jest.fn((key: string) =>
+        key === 'FILE_SERVICE_URL' ? 'https://files.test-host.io/api/file/v1' : undefined,
+      ),
+    } as unknown as ConfigService;
+    const fileService = new LlmService(fileConfig);
+    const relativePath = 'testing/neural-tex/workflow-images/wf/x.png';
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      status: 201,
+      json: async () => ({
+        success: true,
+        data: {
+          fileUrl: `4001/api/file/v1/file?relativePath=${encodeURIComponent(relativePath)}`,
+          relativePath,
+        },
+      }),
+    } as unknown as Response);
+    try {
+      const uploaded = await fileService.uploadImageBase64({
+        base64: Buffer.from('png').toString('base64'),
+        mimeType: 'image/png',
+        fileName: 'x.png',
+      });
+      expect(uploaded.fileUrl).toBe(
+        `https://files.test-host.io/api/file/v1/file?relativePath=${encodeURIComponent(relativePath)}`,
+      );
+      expect(uploaded.relativePath).toBe(relativePath);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
+

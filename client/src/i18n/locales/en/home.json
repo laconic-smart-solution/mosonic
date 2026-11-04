@@ -1,25 +1,4 @@
 {
-  "prompt": {
-    "focusedPlaceholder": "Describe what you want to create today…",
-    "generatingWorkflow": "Generating workflow…",
-    "extractingSubtitle": "We'll open a few quick questions when your brand profile is ready."
-  },
-  "promptSuggestions": {
-    "songkran": "Write a Songkran festival promotion for Facebook and Instagram",
-    "coffee": "Create a product launch campaign for Thai coffee brand",
-    "newsletter": "Generate a weekly newsletter for BKK lifestyle audience"
-  },
-  "templates": {
-    "dashboard": { "label": "Dashboard", "sub": "Overview and KPIs" },
-    "content": { "label": "Content", "sub": "Library and items" },
-    "rules": { "label": "Brand Profiles", "sub": "Campaign brand profiles" },
-    "railLabel": "Templates"
-  },
-  "recent": {
-    "label": "Recent",
-    "noItem": "No recent item",
-    "openLibrary": "Open content library"
-  },
   "helper": {
     "setupRule": "Set up brand profile",
     "selectRule": "Select brand profile",
@@ -33,24 +12,6 @@
     "updated": "Updated: {{date}}",
     "viewMore": "View more",
     "loadingMore": "Loading..."
-  },
-  "footer": {
-    "copyright": "© 2026 Mosonic Co., Ltd. — Bangkok, Thailand"
-  },
-  "toast": {
-    "extractionFailed": "Could not build a brand profile from your prompt. Please try again.",
-    "noChannelsAfterExtract": "The extracted brand profile has no channels. Add channels in Brand Profiles, then try again.",
-    "generationFailed": "Brand profile generation failed",
-    "couldNotStartExtraction": "Unable to start brand profile extraction",
-    "fileTooLarge": "File \"{{name}}\" exceeds maximum size ({{maxMb}} MB)."
-  },
-  "extraction": {
-    "titleGenerating": "Building your brand profile…",
-    "titleFailed": "Could not build brand profile",
-    "subtitle": "Analyzing your prompt and preparing your brand profile.",
-    "waitMessage": "Analyzing your prompt…",
-    "dismiss": "Dismiss",
-    "tryAgain": "Try again"
   },
   "userStrip": {
     "loading": "Loading…",

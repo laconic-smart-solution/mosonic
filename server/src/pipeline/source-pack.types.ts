@@ -31,6 +31,8 @@ export type SourcePackAsset = {
   label: string;
   /** Stored file URL for images (and optionally other uploads). */
   fileUrl?: string;
+  /** File-service relativePath — used when fileUrl is not fetchable. */
+  relativePath?: string;
   mime?: string;
   role: ImageAssetRole;
   confidence: number;
@@ -76,6 +78,10 @@ export function parsePipelineSourcePack(
       kind,
       label: label || id,
       fileUrl: typeof a.fileUrl === 'string' ? a.fileUrl : undefined,
+      relativePath:
+        typeof a.relativePath === 'string' && a.relativePath.trim()
+          ? a.relativePath.trim()
+          : undefined,
       mime: typeof a.mime === 'string' ? a.mime : undefined,
       role,
       confidence:
@@ -97,7 +103,7 @@ export function pixelAssetsFromPack(
       (a) =>
         a.kind === 'image' &&
         PIXEL_IMAGE_ROLES.has(a.role) &&
-        !!a.fileUrl?.trim(),
+        (!!a.fileUrl?.trim() || !!a.relativePath?.trim()),
     )
     .slice(0, max);
 }

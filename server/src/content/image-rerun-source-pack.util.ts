@@ -7,9 +7,13 @@ import {
 
 const PREVIOUS_OUTPUT_ID = 'previous_output';
 
-/** User explicitly wants a fresh image, not an edit of the last one. */
+/**
+ * User explicitly wants a fresh image, not an edit of the last one — an
+ * edit anchors to the old photo's layout/subject, so a real redesign
+ * ("editorial design", "magazine layout") needs a clean generate instead.
+ */
 export function isImageRerunStartFresh(message: string): boolean {
-  return /\b(start\s+over|completely\s+different|brand\s+new|from\s+scratch|new\s+concept|totally\s+different|try\s+again\s+from\s+scratch)\b/i.test(
+  return /\b(start\s+over|completely\s+different|brand\s+new|from\s+scratch|new\s+concept|totally\s+different|try\s+again\s+from\s+scratch|recreate|redesign|reimagine|re-?imagine|new\s+(layout|design|style|concept|direction)|different\s+(layout|design|style)|redo\s+(it\s+)?completely)\b/i.test(
     message.trim(),
   );
 }
@@ -70,5 +74,29 @@ export function resolveImageRerunSourcePack(
   return {
     notes: base.notes,
     assets: [prevAsset, ...base.assets],
+  };
+}
+
+/** Keep-scene edit: current photo is always Image 1, even if the message says redesign. */
+export function forcePreviousImageFirst(
+  sourcePack: PipelineSourcePack | null | undefined,
+  previousImageUrl: string,
+): PipelineSourcePack {
+  const base = sourcePack ?? emptySourcePack();
+  const prev = previousImageUrl.trim();
+  const withoutPrev = base.assets.filter(
+    (asset) => asset.id !== PREVIOUS_OUTPUT_ID && asset.fileUrl !== prev,
+  );
+  const prevAsset: SourcePackAsset = {
+    id: PREVIOUS_OUTPUT_ID,
+    kind: 'image',
+    label: 'previous_output',
+    fileUrl: prev,
+    role: 'enhance',
+    confidence: 1,
+  };
+  return {
+    notes: base.notes,
+    assets: [prevAsset, ...withoutPrev],
   };
 }

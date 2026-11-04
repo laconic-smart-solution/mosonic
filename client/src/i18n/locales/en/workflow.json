@@ -4,32 +4,40 @@
     "text": "Text Generation",
     "image": "Image Generation",
     "video": "Video Generation",
+    "video_presenter": "Presenter video",
+    "video_cinematic": "Cinematic video",
     "translation": "Translation",
     "transcription": "Transcription",
     "summarization": "Summarization",
     "branch": "Branch",
     "adapt": "Adapt",
     "merge": "Merge",
-    "intelligence": "Intelligence"
+    "intelligence": "Intelligence",
+    "subtitle": "Subtitles"
   },
   "nodeTypesShort": {
     "keywords": "Keywords",
     "text": "Text Generation",
     "image": "Image",
     "video": "Video",
+    "video_presenter": "Presenter",
+    "video_cinematic": "Cinematic",
     "translation": "Translation",
     "transcription": "Transcription",
     "summarization": "Summary",
     "branch": "Branch",
     "adapt": "Adapt",
     "merge": "Merge",
-    "intelligence": "Intelligence"
+    "intelligence": "Intelligence",
+    "subtitle": "Subtitles"
   },
   "nodeTypesBackend": {
     "keyword_planner": "Keyword planner",
     "text_generation": "Text / LLM",
     "image_generation": "Image",
     "video_generation": "Video",
+    "video_presenter": "Presenter video",
+    "video_cinematic": "Cinematic video",
     "translation": "Translation",
     "transcription": "Transcription",
     "summarization": "Summarization",
@@ -37,7 +45,8 @@
     "intelligence": "Intelligence",
     "social_account_connect": "Social account unlock",
     "rule_generation": "Brand Profile generation",
-    "workflow_generation": "Workflow generation"
+    "workflow_generation": "Workflow generation",
+    "subtitle": "Subtitles"
   },
   "laneNodeLabel": {
     "forChannel": "{{type}} For {{channel}}"
@@ -65,6 +74,14 @@
     "video": {
       "usage": "Produces a short video clip from the run prompt and upstream assets (often text or a reference image). Runs on a dedicated video queue and may take longer than other nodes.",
       "example": "Image → Video at 9:16 and 8s duration to turn a static product shot into a vertical reel."
+    },
+    "video_presenter": {
+      "usage": "A HeyGen photo avatar speaks your adapted caption or text. Needs an avatar photo and a voice in node settings. Portrait by default; runs on the video queue and may take a few minutes.",
+      "example": "Adapt (Instagram) → Presenter video, portrait, 20s, so your spokesperson reads the post."
+    },
+    "video_cinematic": {
+      "usage": "HeyGen renders a short cinematic clip. Default cinematic_avatar needs a look (avatar photo) plus a scene prompt; heygen_video is text/image/reference-to-video without a talking head. Runs on the video queue.",
+      "example": "Image → Cinematic video at 9:16 and 10s to turn a product shot into a vertical reel."
     },
     "translation": {
       "usage": "Translates text produced by an upstream node into a target language. Use when the same campaign needs localized copy without rewriting from scratch.",
@@ -96,6 +113,10 @@
       "usage": "Runs a web search brief (trend, market, competitor, or all) via OpenAI and injects the result into downstream text generation. Optional analytics overlay when you start a run with latest learnings.",
       "example": "Intelligence (All) → Text: one search covers hashtags, industry news, and competitor gaps before copy is written.",
       "tips": "Use \"All\" for one call instead of stacking multiple Intelligence nodes. Choose Custom when you need a specific research question."
+    },
+    "subtitle": {
+      "usage": "Turns the upstream transcription text into timed SRT or VTT captions locally (no AI call). Add it right after Transcription.",
+      "example": "Video -> Transcription -> Subtitles (SRT, 42 chars/line) for a captions file."
     }
   },
   "popoverDescriptions": {
@@ -107,9 +128,12 @@
     "adapt": "Rewrite for this channel",
     "image": "Create images with AI",
     "video": "Create video with AI",
+    "video_presenter": "AI avatar presents your caption (HeyGen)",
+    "video_cinematic": "Cinematic AI scene (HeyGen)",
     "summarization": "Summarize upstream content",
     "translation": "Translate to target language",
-    "merge": "Collect all lanes before finalize"
+    "merge": "Collect all lanes before finalize",
+    "subtitle": "Turn a transcription into SRT/VTT captions"
   },
   "fields": {
     "shared": {
@@ -117,52 +141,106 @@
       "off": "Off"
     },
     "text": {
-      "outputFormat": { "label": "Output Format" },
-      "tone": { "label": "Writing tone" },
-      "textLength": { "label": "Length" }
+      "outputFormat": {
+        "label": "Output Format"
+      },
+      "tone": {
+        "label": "Writing tone"
+      },
+      "textLength": {
+        "label": "Length"
+      }
     },
     "image": {
-      "style": { "label": "Style" },
-      "aspectRatio": { "label": "Aspect Ratio" },
-      "quality": { "label": "Quality" },
+      "style": {
+        "label": "Style"
+      },
+      "aspectRatio": {
+        "label": "Aspect Ratio"
+      },
+      "quality": {
+        "label": "Quality"
+      },
       "negativePrompt": {
         "label": "Negative prompt",
         "placeholder": "Optional — things to avoid in the image"
       }
     },
     "video": {
-      "mode": { "label": "Mode" },
-      "aspectRatio": { "label": "Aspect Ratio" },
-      "duration": { "label": "Duration" },
-      "targetDuration": { "label": "Target duration" },
-      "resolution": { "label": "Resolution" },
+      "mode": {
+        "label": "Mode"
+      },
+      "aspectRatio": {
+        "label": "Aspect Ratio"
+      },
+      "duration": {
+        "label": "Duration"
+      },
+      "targetDuration": {
+        "label": "Target duration"
+      },
+      "resolution": {
+        "label": "Resolution"
+      },
       "negativePrompt": {
         "label": "Negative prompt",
         "placeholder": "Optional — extra things to avoid in the video"
       },
-      "heygenOrientation": { "label": "Orientation" },
-      "heygenExpressiveness": { "label": "Expressiveness" },
-      "removeBackground": { "label": "Remove original photo background" },
+      "heygenOrientation": {
+        "label": "Orientation"
+      },
+      "heygenExpressiveness": {
+        "label": "Expressiveness"
+      },
+      "removeBackground": {
+        "label": "Remove original photo background"
+      },
       "heygenMotionPrompt": {
         "label": "Motion prompt (optional)",
         "placeholder": "e.g. nodding gently while presenting"
+      },
+      "cinematicMode": {
+        "label": "Cinematic mode"
       }
     },
     "translation": {
-      "sourceLanguage": { "label": "Source Language" },
-      "targetLanguage": { "label": "Target Language" },
-      "formalityLevel": { "label": "Formality" },
-      "preserveFormatting": { "label": "Preserve formatting" }
+      "sourceLanguage": {
+        "label": "Source Language"
+      },
+      "targetLanguage": {
+        "label": "Target Language"
+      },
+      "formalityLevel": {
+        "label": "Formality"
+      },
+      "preserveFormatting": {
+        "label": "Preserve formatting"
+      }
     },
     "transcription": {
-      "language": { "label": "Language" }
+      "language": {
+        "label": "Language"
+      },
+      "sourceType": {
+        "label": "Source type"
+      },
+      "sourceUrl": {
+        "label": "Source URL",
+        "placeholder": "https://... audio or video file (optional if a video step feeds this)"
+      }
     },
     "summarization": {
-      "summaryLength": { "label": "Summary Length" },
-      "outputFormat": { "label": "Output shape" }
+      "summaryLength": {
+        "label": "Summary Length"
+      },
+      "outputFormat": {
+        "label": "Output shape"
+      }
     },
     "intelligence": {
-      "searchType": { "label": "Search type" },
+      "searchType": {
+        "label": "Search type"
+      },
       "customPrompt": {
         "label": "Custom search prompt",
         "placeholder": "Describe what to search for…"
@@ -193,7 +271,7 @@
       "presenter": "Presenter",
       "landscape169": "Landscape 16:9",
       "portrait916": "Portrait 9:16",
-      "resolution720p": "720p (Sora 2)",
+      "resolution720p": "720p",
       "duration4s": "4s",
       "duration8s": "8s",
       "duration10s": "10s",
@@ -220,7 +298,23 @@
       "searchTrend": "Trend — hashtags & formats",
       "searchMarket": "Market — news & signals",
       "searchCompetitor": "Competitor — gaps & angles",
-      "searchCustom": "Custom — your own prompt"
+      "searchCustom": "Custom — your own prompt",
+      "duration5s": "5s",
+      "duration15s": "15s",
+      "cinematicAvatar": "Avatar scene",
+      "heygenVideo": "HeyGen video",
+      "cinematic_avatar": "Avatar scene",
+      "heygen_video": "HeyGen video",
+      "audio": "Audio",
+      "video": "Video"
+    },
+    "subtitle": {
+      "format": {
+        "label": "Format"
+      },
+      "maxCharsPerLine": {
+        "label": "Max characters per line"
+      }
     }
   },
   "configSummary": {
@@ -244,7 +338,8 @@
       "market": "Market",
       "competitor": "Competitor",
       "custom": "Custom"
-    }
+    },
+    "subtitle": "Subtitles"
   },
   "nodeStatus": {
     "pending": "Pending",

@@ -72,8 +72,8 @@ export class PipelineEventsBridgeService
       }
 
       if (this.isLegacyPipelineMessage(parsed)) {
-        this.events.emitToRoom(
-          `pipeline:${parsed.pipelineId}`,
+        this.events.dispatchPipelineEvent(
+          parsed.pipelineId,
           parsed.event,
           parsed.payload,
         );
@@ -106,8 +106,8 @@ export class PipelineEventsBridgeService
   private dispatchRealtimeEnvelope(envelope: RealtimeRedisEnvelope): void {
     switch (envelope.scope) {
       case 'pipeline':
-        this.events.emitToRoom(
-          `pipeline:${envelope.id}`,
+        this.events.dispatchPipelineEvent(
+          envelope.id,
           envelope.event,
           envelope.payload,
         );

@@ -1,4 +1,4 @@
-import { buildRuleBrainPrompt } from './rule-context-builder.util';
+import { buildOnboardingPrompt, buildRuleBrainPrompt } from './rule-context-builder.util';
 import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 import type { RuleAssetRecord } from '../repositories/interfaces/rule-asset.repository.interface';
 
@@ -98,5 +98,36 @@ describe('buildRuleBrainPrompt', () => {
     ]);
     expect(prompt).toContain('brand-guide.pdf');
     expect(prompt).toContain('Our brand voice is warm and direct.');
+  });
+
+  it('omits the memory section when there are no memories', () => {
+    const prompt = buildRuleBrainPrompt(makeRule());
+    expect(prompt).not.toContain('## Brand memory');
+  });
+
+  it('includes memories with their type and id', () => {
+    const prompt = buildRuleBrainPrompt(makeRule(), [], [
+      {
+        ruleMemoryId: 'mem-1',
+        ruleId: 'rule-1',
+        userId: 'user-1',
+        type: 'correction',
+        body: 'Never suggest infographics for LinkedIn.',
+        embedding: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    expect(prompt).toContain('## Brand memory');
+    expect(prompt).toContain('[correction, id=mem-1] Never suggest infographics for LinkedIn.');
+  });
+});
+
+describe('buildOnboardingPrompt', () => {
+  it('creates the brand on a defer instead of re-asking', () => {
+    const p = buildOnboardingPrompt();
+    expect(p).toMatch(/you decide/);
+    expect(p).toMatch(/never re-ask/);
+    expect(p).toMatch(/ask at most for channels/);
   });
 });

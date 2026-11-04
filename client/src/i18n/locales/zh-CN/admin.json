@@ -8,6 +8,7 @@
       "users": "用户",
       "credit": "积分",
       "nodeCredits": "积分定价",
+      "tokenRates": "对话 Token 单价",
       "plans": "套餐",
       "usage": "用量",
       "cost": "费用 (USD)",
@@ -445,6 +446,24 @@
     "loadFailed": "无法加载积分定价，请确认服务器端账户具有管理员权限。",
     "loading": "加载中…",
     "empty": "暂无定价指标"
+  },
+  "tokenRates": {
+    "title": "对话 Token 单价",
+    "subtitle": "聊天算子每百万 token 的 USD 价格。积分使用与",
+    "creditSettingsLink": "积分设置",
+    "creditHint": "成本 USD = input/1M × 输入单价 + output/1M × 输出单价。积分 = ceil((成本 + 间接费用) × 利润率 ÷ 积分单价)。示例列为 5 万输入 + 2 千输出。流水线节点仍在“积分定价”页。",
+    "colModel": "模型",
+    "colInput": "输入 $/1M",
+    "colOutput": "输出 $/1M",
+    "colReasoning": "推理 $/1M",
+    "colSampleCredits": "示例积分",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "invalidUsd": "请输入 0 或正数 USD",
+    "loadFailed": "无法加载 Token 单价，请确认账户具有管理员权限。",
+    "loading": "加载中…",
+    "empty": "暂无 Token 单价"
   },
   "plans": {
     "title": "套餐管理",

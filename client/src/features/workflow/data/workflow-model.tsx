@@ -13,6 +13,7 @@ import {
 import { laneEdgeId } from "@/features/workflow/lib/workflow-lane-layout"
 import {
   effectiveVideoMode,
+  videoCanvasTypeForMode,
 } from "@/features/workflow/lib/video-generation-ui"
 import { OPENAI_IMAGE_GENERATION_MODEL } from "@/features/workflow/lib/openai-image-size"
 import type {
@@ -70,7 +71,20 @@ const WF_NODE_TYPE_VISUALS: WfNodeTypeVisual[] = [
     ),
   },
   {
-    type: "video",
+    type: "video_presenter",
+    color: "#0891B2",
+    bg: "#ECFEFF",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <circle cx="6" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M1.5 14c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M12 5l3-1.5v5L12 7" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    type: "video_cinematic",
     color: "#06B6D4",
     bg: "#ECFEFF",
     locked: false,
@@ -104,6 +118,18 @@ const WF_NODE_TYPE_VISUALS: WfNodeTypeVisual[] = [
         <rect x="4" y="2" width="8" height="10" rx="2" stroke="currentColor" strokeWidth="1.4" />
         <path d="M2 8a6 6 0 0 0 12 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         <line x1="8" y1="14" x2="8" y2="16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    type: "subtitle",
+    color: "#4F46E5",
+    bg: "#EEF2FF",
+    locked: false,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <rect x="1.5" y="3" width="13" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M4 8.5h3M9 8.5h3M4 10.5h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -202,9 +228,12 @@ const BACKEND_TO_CANVAS: Record<WorkflowNodeType, string> = {
   keyword_planner: "keywords",
   text_generation: "text",
   image_generation: "image",
-  video_generation: "video",
+  video_generation: "video_cinematic",
+  video_presenter: "video_presenter",
+  video_cinematic: "video_cinematic",
   translation: "translation",
   transcription: "transcription",
+  subtitle: "subtitle",
   summarization: "summarization",
   branch: "branch",
   adapt: "adapt",
@@ -216,9 +245,12 @@ const CANVAS_TO_BACKEND: Record<string, WorkflowNodeType> = {
   keywords: "keyword_planner",
   text: "text_generation",
   image: "image_generation",
-  video: "video_generation",
+  video: "video_cinematic",
+  video_presenter: "video_presenter",
+  video_cinematic: "video_cinematic",
   translation: "translation",
   transcription: "transcription",
+  subtitle: "subtitle",
   summarization: "summarization",
   branch: "branch",
   adapt: "adapt",
@@ -226,7 +258,17 @@ const CANVAS_TO_BACKEND: Record<string, WorkflowNodeType> = {
   intelligence: "intelligence",
 }
 
-export function backendTypeToCanvas(t: WorkflowNodeType): string {
+/**
+ * Backend → canvas type. Legacy `video_generation` nodes become the split canvas
+ * type that matches `config.mode` (presenter or cinematic, default cinematic).
+ */
+export function backendTypeToCanvas(
+  t: WorkflowNodeType,
+  config?: Record<string, unknown> | null,
+): string {
+  if (t === "video_generation") {
+    return videoCanvasTypeForMode(effectiveVideoMode(config ?? undefined))
+  }
   return BACKEND_TO_CANVAS[t] ?? "keywords"
 }
 
@@ -310,7 +352,8 @@ export const DEFAULT_MODEL_BY_CANVAS_TYPE: Record<string, string> = {
   keywords: "gpt-4o",
   text: "gpt-4o",
   image: OPENAI_IMAGE_GENERATION_MODEL,
-  video: "sora-2",
+  video: "heygen_video_1",
+  video_cinematic: "heygen_video_1",
   translation: "gpt-4o",
   transcription: "whisper-1",
   summarization: "gpt-4o",
@@ -337,16 +380,25 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
         aspectRatio: "1:1",
         quality: "standard",
       }
-    case "video":
+    case "video_presenter":
+      // HeyGen presenter: portrait by default (no mode selector on this node).
       return {
-        mode: "cinematic",
-        model,
-        aspectRatio: "16:9",
-        resolution: "720p",
-        duration: 8,
-        heygenOrientation: "landscape",
+        mode: "presenter",
+        aspectRatio: "9:16",
+        duration: 20,
+        heygenOrientation: "portrait",
         heygenExpressiveness: "medium",
         removeBackground: true,
+      }
+    case "video":
+    case "video_cinematic":
+      return {
+        mode: "cinematic",
+        cinematicMode: "cinematic_avatar",
+        heygenCinematicModel: "heygen_video_1",
+        aspectRatio: "16:9",
+        resolution: "720p",
+        duration: 10,
       }
     case "translation":
       return {
@@ -357,7 +409,11 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
         preserveFormatting: true,
       }
     case "transcription":
+      // sourceUrl (audio/video URL) is required at run unless an upstream video feeds it.
       return { model, language: "auto", sourceType: "audio" }
+    case "subtitle":
+      // Local SRT/VTT transform of transcription text - no AI model.
+      return { format: "srt", maxCharsPerLine: 42, burnIn: false }
     case "summarization":
       return {
         model,
@@ -395,8 +451,15 @@ export function buildGenerateMoreDefaultConfig(
   )
   const audienceLang = rule?.audience?.language?.trim()
 
-  if (type === "video_generation" && hasInstagram) {
+  if (
+    (type === "video_cinematic" || type === "video_generation") &&
+    hasInstagram
+  ) {
     base.aspectRatio = "9:16"
+  }
+  if (type === "video_presenter" && hasInstagram) {
+    base.aspectRatio = "9:16"
+    base.heygenOrientation = "portrait"
   }
   if (
     type === "transcription" &&
@@ -511,8 +574,10 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
           formatOptionLabel(configString(config, "quality")),
         ]) || i18n.t("workflow:configSummary.imageSettings")
       )
-    case "video": {
-      const mode = effectiveVideoMode(config)
+    case "video":
+    case "video_presenter":
+    case "video_cinematic": {
+      const mode = effectiveVideoMode(config, wfType)
       if (mode === "presenter") {
         return (
           joinConfigParts([
@@ -529,6 +594,7 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
       return (
         joinConfigParts([
           formatOptionLabel("cinematic"),
+          formatOptionLabel(configString(config, "cinematicMode") ?? "cinematic_avatar"),
           formatDuration(config),
           configString(config, "aspectRatio"),
           formatOptionLabel(configString(config, "resolution")),
@@ -570,6 +636,12 @@ export function canvasConfigSummary(wfType: string, config: Record<string, unkno
           formatOptionLabel(configString(config, "language")),
           configString(config, "sourceType"),
         ]) || i18n.t("workflow:configSummary.transcription")
+      )
+    case "subtitle":
+      return (
+        joinConfigParts([
+          configString(config, "format")?.toUpperCase(),
+        ]) || i18n.t("workflow:configSummary.subtitle")
       )
     case "branch": {
       const mode = configString(config, "mode") ?? "rule_channels"
@@ -772,7 +844,7 @@ export function apiNodesToRf(
   const sorted = [...apiNodes].sort((a, b) => a.order - b.order)
   const channelHandles = options?.channelHandles ?? []
   const rfNodes: WfRfNode[] = sorted.map((n) => {
-    const canvasType = backendTypeToCanvas(n.type)
+    const canvasType = backendTypeToCanvas(n.type, n.config)
     const meta = WF_NODE_TYPES.find((t) => t.type === canvasType) ?? WF_NODE_TYPES[0]
     const rfType = rfNodeTypeForCanvas(canvasType)
     const branchMergeData =

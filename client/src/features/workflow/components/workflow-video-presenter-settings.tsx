@@ -53,6 +53,8 @@ function uploadResultToAvatarLook(
 type WorkflowVideoPresenterSettingsProps = {
   workflowId: string | undefined
   nodeId: string
+  /** Canvas type of the node (`video_presenter` pins mode; legacy `video` may flip). */
+  canvasType?: string
   config: Record<string, unknown>
   onPatch: (patch: Record<string, unknown>) => void
   compact?: boolean
@@ -68,6 +70,7 @@ function isAvatarSelectable(look: HeygenAvatarLook): boolean {
 export function WorkflowVideoPresenterSettings({
   workflowId,
   nodeId,
+  canvasType,
   config,
   onPatch,
   compact = false,
@@ -110,7 +113,7 @@ export function WorkflowVideoPresenterSettings({
 
   const persistPatch = useCallback(
     async (patch: Record<string, unknown>) => {
-      const merged = mergeHeygenVideoConfig(config, patch)
+      const merged = mergeHeygenVideoConfig(config, patch, canvasType)
       onPatch(merged)
       if (!canSyncToServer) return
       try {
@@ -119,7 +122,7 @@ export function WorkflowVideoPresenterSettings({
         setUploadError(t("presenter.saveFailed"))
       }
     },
-    [canSyncToServer, config, workflowId, nodeId, onPatch, t],
+    [canSyncToServer, config, workflowId, nodeId, onPatch, t, canvasType],
   )
 
   const handleSelectAvatar = useCallback(
@@ -145,9 +148,9 @@ export function WorkflowVideoPresenterSettings({
         heygenAvatarPhotoUrl: "",
         heygenAvatarAssetId: "",
         mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
-      }),
+      }, canvasType),
     )
-  }, [config, onPatch])
+  }, [config, onPatch, canvasType])
 
   const handleDeleteAvatar = useCallback(
     async (look: HeygenAvatarLook) => {
@@ -162,7 +165,7 @@ export function WorkflowVideoPresenterSettings({
               heygenAvatarPhotoUrl: "",
               heygenAvatarAssetId: "",
               mode: VIDEO_CINEMATIC_UI_ENABLED ? "cinematic" : "presenter",
-            }),
+            }, canvasType),
           )
         }
         setRemovedLookIds((prev) =>
@@ -184,7 +187,7 @@ export function WorkflowVideoPresenterSettings({
         setDeletingLookId(null)
       }
     },
-    [config, selectedAvatarId, onPatch, queryClient, t],
+    [config, selectedAvatarId, onPatch, queryClient, t, canvasType],
   )
 
   const handleFile = useCallback(
@@ -214,7 +217,7 @@ export function WorkflowVideoPresenterSettings({
               heygenAvatarId: result.heygenAvatarId,
               heygenAvatarAssetId: result.heygenAvatarAssetId,
               heygenAvatarPhotoUrl: result.previewUrl,
-            }),
+            }, canvasType),
           )
           await queryClient.refetchQueries({ queryKey: HEYGEN_AVATARS_QUERY_KEY })
           upsertAvatarInCache(queryClient, optimisticLook)
@@ -258,6 +261,7 @@ export function WorkflowVideoPresenterSettings({
       onPatch,
       queryClient,
       t,
+      canvasType,
     ],
   )
 
@@ -420,7 +424,7 @@ export function WorkflowVideoPresenterSettings({
             if (selectedAvatarId) {
               patch.mode = "presenter"
             }
-            const merged = mergeHeygenVideoConfig(config, patch)
+            const merged = mergeHeygenVideoConfig(config, patch, canvasType)
             onPatch(merged)
             if (canSyncToServer && nextVoice) {
               void heygenService
