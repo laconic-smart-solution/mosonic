@@ -1,3 +1,4 @@
+import { detectExplicitUserFormatting } from '../../nodes/services/text-generation.service';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { TenancyAuth } from '../../auth/tenancy.types';
@@ -61,7 +62,9 @@ export function isPipelineStartedObservation(result: string): boolean {
 const START_GENERATION_SCHEMA = z.object({
   contentPrompt: z
     .string()
-    .describe('What to generate this run, for example the post topic.'),
+    .describe(
+      'The prompt or user instruction for what to generate. Pass the COMPLETE, VERBATIM user prompt, including any requested layout, template, bullet points, emojis, examples, or section structures. Do NOT summarize or condense away user formatting.',
+    ),
   workflowId: z
     .string()
     .optional()
@@ -177,11 +180,15 @@ export function createStartGenerationTool(
           return fail('capability_gap', 'Nothing was started. Part of the request cannot run as asked.', { plan });
         }
         const style = styleArg === 'none' || parsed.noStyle ? null : (styleArg?.trim() || parsed.mentionsStyle || null);
+        const rawUserFormatted = options.requestText && detectExplicitUserFormatting(options.requestText);
+        const effectivePrompt = rawUserFormatted && !detectExplicitUserFormatting(prompt)
+          ? `${options.requestText}\n${prompt}`
+          : prompt;
         const runPrompt = style
-          ? `${prompt}\nImage style: ${style}.`
+          ? `${effectivePrompt}\nImage style: ${style}.`
           : options.styleNote
-            ? `${prompt}\nDo not use the saved image style this time; choose a style that fits the topic.`
-            : prompt;
+            ? `${effectivePrompt}\nDo not use the saved image style this time; choose a style that fits the topic.`
+            : effectivePrompt;
         const lanes = [...new Set(snapshot.nodes.map((n) => (n.lane ? normalizeLaneId(String(n.lane)) : '')).filter(Boolean))];
         const brief = {
           topic: prompt,
@@ -262,7 +269,7 @@ export function createStartGenerationTool(
     {
       name: START_GENERATION_TOOL_NAME,
       description:
-        'REQUIRED whenever the user wants generated content (a post, caption, image, video, campaign piece): starts the saved workflow pipeline. Never write the content yourself. Put their topic or bullet list in contentPrompt and call this in the same turn - do not ask_user again, unless their reply points at a choice you offered ("the second one") that does not clearly match one option; then ask_user which one. ' +
+        'REQUIRED whenever the user wants generated content (a post, caption, image, video, campaign piece): starts the saved workflow pipeline. Never write the content yourself. Put their full prompt, template, or bullet list in contentPrompt verbatim and call this in the same turn - do not summarize or strip user formatting - do not ask_user again, unless their reply points at a choice you offered ("the second one") that does not clearly match one option; then ask_user which one. ' +
           'Clear intent with no topic ("let\'s announce my brand", "make a post", or "do"/"yes" right after you offered ONE post): write a short topic from the brief (saved style, brand channels, season) yourself; ask_user with 3 short topic options only when nothing fits. Name only the brand\'s own channels; never add a channel or saved style the user did not ask for. ' +
           '"Use this photo for my post": say in contentPrompt to use the attached reference image; if reference images are needed and none are attached, say so first. "No image" / "text only" (any language) while the workflow has an Image step: do not call this; ask_user "Remove the image step, then make the post" / "Keep images". ' +
           'Other languages ("also in Thai"): pass languages; on no_translation_step follow its next hint. ' +

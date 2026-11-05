@@ -284,7 +284,10 @@ export class NodeExecutor {
       case WorkflowNodeType.KeywordPlanner:
         return { keywords: result.output ?? undefined };
       case WorkflowNodeType.TextGeneration:
-        return { text: result.output ?? undefined };
+        return {
+          text: result.output ?? undefined,
+          ...(result.sections ? { sections: result.sections } : {}),
+        };
       case WorkflowNodeType.ImageGeneration:
         return { image: result.output ?? undefined };
       case WorkflowNodeType.Translation:
@@ -339,6 +342,9 @@ export class NodeExecutor {
       }
       if (parsed.merged === true) {
         out.merged = true;
+      }
+      if (Array.isArray(parsed.sections)) {
+        out.sections = parsed.sections;
       }
       return out;
     } catch {

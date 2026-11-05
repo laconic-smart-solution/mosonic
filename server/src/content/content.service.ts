@@ -69,6 +69,12 @@ import type {
 import type { GenerateNodeDto } from './dto/generate-node.dto';
 import type { RerunNodeDto } from './dto/rerun-node.dto';
 import type { SaveContentDto } from './dto/save-content.dto';
+import { UpdateSectionDto } from './dto/update-section.dto';
+import { RegenerateSectionDto } from './dto/regenerate-section.dto';
+import { compileSectionsToMarkdown, parseMarkdownToSections } from './content-markdown-compiler.util';
+import type { ContentSectionItem } from './schemas/structured-content.schema';
+import { TextGenerationService } from '../nodes/services/text-generation.service';
+import { Optional } from '@nestjs/common';
 import {
   ContentStatus,
   type ContentApprovalState,
@@ -157,6 +163,8 @@ export class ContentService {
     private readonly rules: IRuleRepository,
     @Inject(USER_PLAN_REPOSITORY)
     private readonly userPlans: IUserPlanRepository,
+    @Optional()
+    private readonly textGeneration?: TextGenerationService,
   ) {}
 
   async describeDraftNodes(
@@ -1700,7 +1708,7 @@ export class ContentService {
     incoming?: PreviousOutputs,
   ): PreviousOutputs {
     const merged: PreviousOutputs = { ...fallback };
-    const keys: Array<keyof PreviousOutputs> = [
+    const keys: Array<keyof Omit<PreviousOutputs, 'sections'>> = [
       'keywords',
       'text',
       'image',
@@ -1714,6 +1722,9 @@ export class ContentService {
       if (normalized !== undefined) {
         merged[key] = normalized;
       }
+    }
+    if (Array.isArray(incoming?.sections)) {
+      merged.sections = incoming.sections;
     }
     return merged;
   }
@@ -1795,6 +1806,182 @@ export class ContentService {
       ) as Record<string, string>,
       nodeOutputs: {},
       nodeUserEdits: {},
+    };
+  }
+  async updateSection(
+    contentId: string,
+    sectionKey: string,
+    dto: UpdateSectionDto,
+    auth: TenancyAuth,
+  ): Promise<{ success: boolean; section: ContentSectionItem; compiledText: string }> {
+    const doc = await this.contentRepository.findById(contentId, auth);
+    if (!doc) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
+    const snapshot = this.resolveEditableState(doc);
+    let sections: ContentSectionItem[] = [
+      ...(((snapshot.outputs as any)?.sections ||
+        (snapshot.userEdits as any)?.sections ||
+        []) as ContentSectionItem[]),
+    ];
+
+    if (!sections.length && typeof snapshot.outputs?.text === 'string' && snapshot.outputs.text.trim()) {
+      sections = parseMarkdownToSections(snapshot.outputs.text);
+    }
+
+    const idx = sections.findIndex((s) => s.key === sectionKey);
+    if (idx === -1) {
+      throw new NotFoundException(`Section "${sectionKey}" not found in content ${contentId}`);
+    }
+
+    const updated: ContentSectionItem = {
+      ...sections[idx],
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.content !== undefined ? { content: dto.content } : {}),
+      ...(dto.items !== undefined ? { items: dto.items } : {}),
+    };
+    sections[idx] = updated;
+
+    const compiledText = compileSectionsToMarkdown(sections);
+    const nextOutputs: ContentOutputs = {
+      ...snapshot.outputs,
+      sections,
+      text: compiledText,
+    };
+    const nextUserEdits: ContentUserEdits = {
+      ...snapshot.userEdits,
+      sections,
+      text: compiledText,
+    };
+
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: nextOutputs,
+        userEdits: nextUserEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: snapshot.nodeOutputs,
+        nodeUserEdits: snapshot.nodeUserEdits,
+        laneOutputs: (doc as any).laneOutputs,
+      },
+      auth,
+    );
+
+    return {
+      success: true,
+      section: updated,
+      compiledText,
+    };
+  }
+
+  async regenerateSection(
+    contentId: string,
+    sectionKey: string,
+    dto: RegenerateSectionDto | undefined,
+    auth: TenancyAuth,
+  ): Promise<{ success: boolean; section: ContentSectionItem; compiledText: string }> {
+    const doc = await this.contentRepository.findById(contentId, auth);
+    if (!doc) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
+    const snapshot = this.resolveEditableState(doc);
+    let sections: ContentSectionItem[] = [
+      ...(((snapshot.outputs as any)?.sections ||
+        (snapshot.userEdits as any)?.sections ||
+        []) as ContentSectionItem[]),
+    ];
+
+    if (!sections.length && typeof snapshot.outputs?.text === 'string' && snapshot.outputs.text.trim()) {
+      sections = parseMarkdownToSections(snapshot.outputs.text);
+    }
+
+    const idx = sections.findIndex((s) => s.key === sectionKey);
+    if (idx === -1) {
+      throw new NotFoundException(`Section "${sectionKey}" not found in content ${contentId}`);
+    }
+
+    const targetSection = sections[idx];
+    const rule = await this.rules.findById(doc.ruleRef, auth);
+    if (!rule) {
+      throw new NotFoundException(`Rule ${doc.ruleRef} not found`);
+    }
+
+    let regeneratedContent = targetSection.content || '';
+    let regeneratedItems = targetSection.items ? [...targetSection.items] : undefined;
+
+    if (this.textGeneration) {
+      const sectionPrompt = [
+        `You are regenerating ONLY the single section "${targetSection.title || sectionKey}".`,
+        `Section type: ${targetSection.kind}.`,
+        dto?.userInstruction ? `User specific instructions for this section: ${dto.userInstruction}` : '',
+        `Current section content: ${targetSection.content || (targetSection.items?.join(', ') ?? '')}`,
+        targetSection.kind === 'bullet_list' || targetSection.kind === 'numbered_list'
+          ? 'Return only bullet points (one per line, starting with • or -).'
+          : targetSection.kind === 'hashtags'
+            ? 'Return only space-separated hashtags starting with #.'
+            : 'Return only the content for this section, without meta labels or quotes.',
+      ].filter(Boolean).join('\n\n');
+
+      const genResult = await this.textGeneration.generateText({
+        rule: rule as any,
+        contentPrompt: sectionPrompt,
+        config: {},
+      });
+
+      const raw = genResult.text.trim();
+      if (targetSection.kind === 'bullet_list' || targetSection.kind === 'numbered_list') {
+        const lines = raw.split('\n').map((l) => l.replace(/^[-*•✨👉🔥✅🛒📢🏎️\d\.\)]\s*/, '').trim()).filter(Boolean);
+        regeneratedItems = lines.length > 0 ? lines : [raw];
+        regeneratedContent = lines.map((l) => `• ${l}`).join('\n');
+      } else if (targetSection.kind === 'hashtags') {
+        const tags = raw.match(/#\w+/g) || raw.split(/\s+/).filter(Boolean).map(t => t.startsWith('#') ? t : `#${t}`);
+        regeneratedItems = tags;
+        regeneratedContent = tags.join(' ');
+      } else {
+        regeneratedContent = raw;
+      }
+    } else {
+      regeneratedContent = `[Regenerated] ${targetSection.content || targetSection.title}`;
+    }
+
+    const updated: ContentSectionItem = {
+      ...targetSection,
+      content: regeneratedContent,
+      ...(regeneratedItems ? { items: regeneratedItems } : {}),
+    };
+    sections[idx] = updated;
+
+    const compiledText = compileSectionsToMarkdown(sections);
+    const nextOutputs: ContentOutputs = {
+      ...snapshot.outputs,
+      sections,
+      text: compiledText,
+    };
+    const nextUserEdits: ContentUserEdits = {
+      ...snapshot.userEdits,
+      sections,
+      text: compiledText,
+    };
+
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: nextOutputs,
+        userEdits: nextUserEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: snapshot.nodeOutputs,
+        nodeUserEdits: snapshot.nodeUserEdits,
+        laneOutputs: (doc as any).laneOutputs,
+      },
+      auth,
+    );
+
+    return {
+      success: true,
+      section: updated,
+      compiledText,
     };
   }
 }
