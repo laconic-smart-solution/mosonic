@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { isVideoNodeType } from '../nodes/video-node-type.util';
 
 export type WorkflowOrderNode = {
   type: WorkflowNodeType;
@@ -74,7 +75,7 @@ export function assertValidWorkflowNodeOrder(nodes: WorkflowOrderNode[]): void {
     if (
       n.type === WorkflowNodeType.ImageGeneration ||
       n.type === WorkflowNodeType.Translation ||
-      n.type === WorkflowNodeType.VideoGeneration
+      isVideoNodeType(n.type)
     ) {
       if (n.order <= maxTextOrder) {
         throw new BadRequestException(

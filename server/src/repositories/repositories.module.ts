@@ -6,6 +6,8 @@ import {
   BUDGET_SETTINGS_REPOSITORY,
   CAMPAIGN_AUTONOMY_POLICY_REPOSITORY,
   CAMPAIGN_SCHEDULE_REPOSITORY,
+  CHAT_MESSAGE_REPOSITORY,
+  CHAT_SESSION_REPOSITORY,
   CONTENT_REPOSITORY,
   COST_ENTRY_REPOSITORY,
   CREDIT_CONFIG_REPOSITORY,
@@ -16,6 +18,7 @@ import {
   FIXED_COST_REPOSITORY,
   INTEGRATION_API_KEY_REPOSITORY,
   NEWS_TRIGGER_LOG_REPOSITORY,
+  LLM_TOKEN_RATE_REPOSITORY,
   NODE_CREDIT_PRICE_REPOSITORY,
   PIPELINE_LOG_REPOSITORY,
   PIPELINE_REPOSITORY,
@@ -23,6 +26,8 @@ import {
   POST_ANALYTICS_REPOSITORY,
   POST_REPOSITORY,
   RULE_REPOSITORY,
+  RULE_ASSET_REPOSITORY,
+  RULE_MEMORY_REPOSITORY,
   SERVICE_RATE_REPOSITORY,
   SYNC_LOCK_REPOSITORY,
   UPLOAD_REPOSITORY,
@@ -40,6 +45,8 @@ import { PrismaAnnouncementRepository } from './prisma/prisma-announcement.repos
 import { PrismaBudgetSettingsRepository } from './prisma/prisma-budget-settings.repository';
 import { PrismaCampaignAutonomyPolicyRepository } from './prisma/prisma-campaign-autonomy-policy.repository';
 import { PrismaCampaignScheduleRepository } from './prisma/prisma-campaign-schedule.repository';
+import { PrismaChatMessageRepository } from './prisma/prisma-chat-message.repository';
+import { PrismaChatSessionRepository } from './prisma/prisma-chat-session.repository';
 import { PrismaContentRepository } from './prisma/prisma-content.repository';
 import { PrismaCostEntryRepository } from './prisma/prisma-cost-entry.repository';
 import { PrismaCreditConfigRepository } from './prisma/prisma-credit-config.repository';
@@ -50,6 +57,7 @@ import { PrismaPlanPurchaseRepository } from './prisma/prisma-plan-purchase.repo
 import { PrismaFixedCostRepository } from './prisma/prisma-fixed-cost.repository';
 import { PrismaIntegrationApiKeyRepository } from './prisma/prisma-integration-api-key.repository';
 import { PrismaNewsTriggerLogRepository } from './prisma/prisma-news-trigger-log.repository';
+import { PrismaLlmTokenRateRepository } from './prisma/prisma-llm-token-rate.repository';
 import { PrismaNodeCreditPriceRepository } from './prisma/prisma-node-credit-price.repository';
 import { PrismaPipelineLogRepository } from './prisma/prisma-pipeline-log.repository';
 import { PrismaPipelineRepository } from './prisma/prisma-pipeline.repository';
@@ -57,6 +65,8 @@ import { PrismaPlanRepository } from './prisma/prisma-plan.repository';
 import { PrismaPostAnalyticsRepository } from './prisma/prisma-post-analytics.repository';
 import { PrismaPostRepository } from './prisma/prisma-post.repository';
 import { PrismaRuleRepository } from './prisma/prisma-rule.repository';
+import { PrismaRuleAssetRepository } from './prisma/prisma-rule-asset.repository';
+import { PrismaRuleMemoryRepository } from './prisma/prisma-rule-memory.repository';
 import { PrismaServiceRateRepository } from './prisma/prisma-service-rate.repository';
 import { PrismaSyncLockRepository } from './prisma/prisma-sync-lock.repository';
 import { PrismaUploadRepository } from './prisma/prisma-upload.repository';
@@ -84,6 +94,10 @@ const repositoryProviders = [
     provide: NODE_CREDIT_PRICE_REPOSITORY,
     useClass: PrismaNodeCreditPriceRepository,
   },
+  {
+    provide: LLM_TOKEN_RATE_REPOSITORY,
+    useClass: PrismaLlmTokenRateRepository,
+  },
   { provide: CREDIT_LEDGER_REPOSITORY, useClass: PrismaCreditLedgerRepository },
   { provide: CREDIT_TOPUP_REPOSITORY, useClass: PrismaCreditTopupRepository },
   {
@@ -97,6 +111,8 @@ const repositoryProviders = [
   { provide: WORKFLOW_REPOSITORY, useClass: PrismaWorkflowRepository },
   { provide: WORKFLOW_NODE_REPOSITORY, useClass: PrismaWorkflowNodeRepository },
   { provide: RULE_REPOSITORY, useClass: PrismaRuleRepository },
+  { provide: RULE_ASSET_REPOSITORY, useClass: PrismaRuleAssetRepository },
+  { provide: RULE_MEMORY_REPOSITORY, useClass: PrismaRuleMemoryRepository },
   { provide: PIPELINE_REPOSITORY, useClass: PrismaPipelineRepository },
   { provide: PIPELINE_LOG_REPOSITORY, useClass: PrismaPipelineLogRepository },
   { provide: CONTENT_REPOSITORY, useClass: PrismaContentRepository },
@@ -120,6 +136,8 @@ const repositoryProviders = [
     provide: CAMPAIGN_AUTONOMY_POLICY_REPOSITORY,
     useClass: PrismaCampaignAutonomyPolicyRepository,
   },
+  { provide: CHAT_SESSION_REPOSITORY, useClass: PrismaChatSessionRepository },
+  { provide: CHAT_MESSAGE_REPOSITORY, useClass: PrismaChatMessageRepository },
   {
     provide: NEWS_TRIGGER_LOG_REPOSITORY,
     useClass: PrismaNewsTriggerLogRepository,

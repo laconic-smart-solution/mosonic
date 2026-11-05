@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { LlmModule } from '../llm/llm.module';
-import { ImageNodeOptionsController } from './controllers/image-node-options.controller';
 import { ImageGenerationService } from './services/image-generation.service';
 import { ImageTemplateClassifierService } from './services/image-template-classifier.service';
 import { ImageTemplateResolverService } from './services/image-template-resolver.service';
@@ -13,6 +12,7 @@ import { KeywordPlannerService } from './services/keyword-planner.service';
 import { SummarizationService } from './services/summarization.service';
 import { TextGenerationService } from './services/text-generation.service';
 import { TranscriptionService } from './services/transcription.service';
+import { SubtitleService } from './services/subtitle.service';
 import { TranslationService } from './services/translation.service';
 import { HeygenAssetsService } from './services/heygen-assets.service';
 import { ScriptDurationService } from './services/script-duration.service';
@@ -36,6 +36,7 @@ const NODE_SERVICES = [
   VideoGenerationService,
   TranslationService,
   TranscriptionService,
+  SubtitleService,
   SummarizationService,
   AdaptNodeService,
   IntelligenceNodeService,
@@ -44,7 +45,6 @@ const NODE_SERVICES = [
 
 @Module({
   imports: [LlmModule, EventsModule],
-  controllers: [ImageNodeOptionsController],
   providers: NODE_SERVICES,
   exports: [...NODE_SERVICES],
 })

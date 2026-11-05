@@ -169,6 +169,26 @@ export const usePipelineStatsQuery = (
   })
 }
 
+/** Running or paused runs on one workflow (newest first), polled while the chat page is open. */
+export const useActivePipelinesQuery = (workflowRef: string | undefined) => {
+  return useQuery({
+    queryKey: ["pipeline", "active", workflowRef ?? ""],
+    queryFn: async () => {
+      const page = await pipelineService.pageable({
+        page: 1,
+        limit: 10,
+        filter: { workflowRef },
+        sortBy: "startedAt",
+        sortOrder: "desc",
+      })
+      return page.data.filter((row) => row.status === "running" || row.status === "paused")
+    },
+    enabled: !!workflowRef,
+    retry: false,
+    refetchInterval: 5000,
+  })
+}
+
 export const useCancelPipelineMutation = () => {
   return useMutation({
     mutationFn: (pipelineId: string) => pipelineService.cancel(pipelineId),

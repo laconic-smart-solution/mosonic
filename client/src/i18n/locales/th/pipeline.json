@@ -64,13 +64,16 @@
     "text_generation": "ข้อความ",
     "image_generation": "รูปภาพ",
     "video_generation": "วิดีโอ",
+    "video_presenter": "วิดีโอผู้นำเสนอ",
+    "video_cinematic": "วิดีโอซีเนมาติก",
     "translation": "แปล",
     "transcription": "ถอดเสียง",
     "summarization": "สรุป",
     "intelligence": "วิเคราะห์",
     "adapt": "ปรับ",
     "branch": "แยก",
-    "merge": "รวม"
+    "merge": "รวม",
+    "subtitle": "คำบรรยาย"
   },
   "relativeTime": {
     "justNow": "เมื่อสักครู่",

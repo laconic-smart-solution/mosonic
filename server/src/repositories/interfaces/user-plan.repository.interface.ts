@@ -47,5 +47,18 @@ export interface IUserPlanRepository {
     userId: string,
     amount: number,
   ): Promise<UserPlanRecord | null>;
+  /**
+   * Add billed chat USD to the leftover bucket and debit only whole credits.
+   * Takes as many whole credits as the active plan can afford; leftover stays in the bucket.
+   */
+  accrueChatUnbilled(
+    userId: string,
+    addUsd: number,
+    creditPriceUsd: number,
+  ): Promise<{
+    creditsCharged: number;
+    chatUnbilledUsd: number;
+    plan: UserPlanRecord | null;
+  }>;
   markLowBalanceNotified(userPlanId: string): Promise<void>;
 }

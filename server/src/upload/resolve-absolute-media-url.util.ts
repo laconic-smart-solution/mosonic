@@ -12,9 +12,18 @@ function normalizeHttpBase(raw: string): string {
   return s.startsWith('http') ? s : `http://${s}`;
 }
 
-function extractRelativePathFromFileProxy(value: string): string | null {
+export function extractRelativePathFromFileProxy(value: string): string | null {
   const raw = value.trim();
   if (!raw) return null;
+
+  const queryMatch = /(?:\?|&)relativePath=([^&]+)/i.exec(raw);
+  if (queryMatch?.[1] && /\/api\/file\/v1\/file/i.test(raw)) {
+    try {
+      return decodeURIComponent(queryMatch[1]).trim() || null;
+    } catch {
+      return queryMatch[1].trim() || null;
+    }
+  }
 
   const candidates = [raw];
   if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
@@ -33,6 +42,27 @@ function extractRelativePathFromFileProxy(value: string): string | null {
     }
   }
   return null;
+}
+
+/** Fetchable http(s) URLs for a stored image (repairs `4001/api/file/...`). */
+export function sourceImageFetchUrls(
+  asset: { fileUrl?: string; relativePath?: string },
+  ctx: ResolveAbsoluteMediaUrlContext,
+): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string) => {
+    const resolved = resolveAbsoluteMediaUrl(raw, ctx);
+    if (!/^https?:\/\//i.test(resolved) || seen.has(resolved)) return;
+    seen.add(resolved);
+    urls.push(resolved);
+  };
+  const relative =
+    asset.relativePath?.trim() ||
+    extractRelativePathFromFileProxy(asset.fileUrl ?? '');
+  if (relative) push(relative);
+  if (asset.fileUrl?.trim()) push(asset.fileUrl.trim());
+  return urls;
 }
 
 /**

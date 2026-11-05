@@ -243,7 +243,39 @@ export class RuleService {
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
-    return rule;
+    return { ...rule, campaign: this.sanitizeCampaignRecord(rule.campaign) };
+  }
+
+  /**
+   * Some older rows have a `campaign` JSON blob carrying extra keys (e.g. a
+   * stray `mode`) that were never part of the Campaign shape — likely from a
+   * past bug or manual edit. `campaign` is an unvalidated Json column, so
+   * nothing strips those on write. Project down to the known fields on read
+   * so the edit form never round-trips them back into a strict PUT/PATCH,
+   * which rejects unknown keys via `forbidNonWhitelisted`.
+   */
+  private sanitizeCampaignRecord(
+    campaign: unknown,
+  ): Record<string, unknown> {
+    const c = (campaign ?? {}) as Record<string, unknown>;
+    const {
+      goals,
+      keywords,
+      hashtagStrategy,
+      contentFormats,
+      duration,
+      postingFrequency,
+      customSchedule,
+    } = c;
+    return {
+      goals,
+      keywords,
+      hashtagStrategy,
+      contentFormats,
+      duration,
+      postingFrequency,
+      customSchedule,
+    };
   }
 
   private campaignFromDto(dto: CampaignDto) {

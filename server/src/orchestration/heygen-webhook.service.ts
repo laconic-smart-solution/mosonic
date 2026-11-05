@@ -9,6 +9,7 @@ import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import { MediaNodeCompletionService } from './media-node-completion.service';
 import { VideoGenerationService } from '../nodes/services/video-generation.service';
 import type { NodeJobPayload } from './types/node-job.payload';
+import { isVideoNodeType } from '../nodes/video-node-type.util';
 
 @Injectable()
 export class HeygenWebhookService {
@@ -67,7 +68,7 @@ export class HeygenWebhookService {
     }
 
     const node = this.pipelineRepo.getNode(pipeline, nodeId);
-    if (!node || node.type !== WorkflowNodeType.VideoGeneration) {
+    if (!node || !isVideoNodeType(node.type)) {
       this.logger.warn(
         `HeyGen webhook: node ${nodeId} missing or not video on ${pipelineId}`,
       );

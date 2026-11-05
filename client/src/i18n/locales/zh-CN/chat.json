@@ -1,0 +1,328 @@
+{
+  "session": {
+    "panelTitle": "聊天",
+    "newChat": "新建聊天",
+    "untitled": "未命名聊天",
+    "loading": "正在加载聊天…",
+    "empty": "暂无聊天记录。",
+    "deleteAction": "删除聊天"
+  },
+  "composer": {
+    "placeholder": "询问这个品牌，或告诉 AI 你想创建什么…",
+    "thinking": "思考中…",
+    "uploadNeedsRule": "请先设置品牌档案——先告诉 AI 一些关于你品牌的信息，然后就可以附加文件了。",
+    "uploadedFilesNote": "(已附加：{{files}})",
+    "attachedImage": "附件图片",
+    "attachedFile": "附件"
+  },
+  "empty": {
+    "noRuleTitle": "选择品牌档案以开始",
+    "noRuleSubtitle": "在上方选择品牌档案，或先创建一个。",
+    "noMessagesTitle": "开始对话",
+    "noMessagesSubtitle": "询问关于此品牌的问题，或告诉 AI 你想创建什么。"
+  },
+  "workspace": {
+    "activeWorkflow": "当前工作流",
+    "contents": "内容",
+    "noWorkflow": "尚无工作流 — 让 AI 为你创建一个。",
+    "noContent": "尚未生成任何内容。",
+    "viewAllContents": "查看全部内容",
+    "contentUntitled": "未命名内容",
+    "noRule": "选择品牌档案以查看其工作流和内容。",
+    "cancelRun": "取消运行"
+  },
+  "brandPanel": {
+    "panelTitle": "品牌档案",
+    "toggleAction": "显示品牌档案",
+    "closeAction": "关闭",
+    "editAction": "编辑",
+    "brandSection": "品牌",
+    "audienceSection": "受众",
+    "channelsSection": "渠道",
+    "assetsSection": "品牌素材",
+    "noAssets": "尚无品牌素材。"
+  },
+  "toolCall": {
+    "searchBrandAssets": "已搜索品牌文档",
+    "webSearch": "已搜索网络",
+    "getRule": "已查看品牌档案",
+    "listBrandAssets": "已查看品牌素材",
+    "requestAssetUpload": "已请求上传文件",
+    "createRuleFromIntake": "已开始创建品牌档案",
+    "updateRule": "已更新品牌档案",
+    "fetchWebsiteAssets": "已从网站获取图片",
+    "remember": "已记住一条品牌笔记",
+    "forget": "已忘记一条品牌笔记",
+    "searchBrandMemory": "已搜索品牌记忆",
+    "askUser": "请你选择",
+    "listWorkflows": "已查看工作流",
+    "generateWorkflow": "已生成工作流",
+    "applyDefaultWorkflow": "已应用默认工作流",
+    "getNodeConfig": "已查看工作流节点",
+    "updateNodeConfig": "已更新工作流节点",
+    "startGeneration": "已开始生成",
+    "listPipelines": "已查看该工作流的运行",
+    "getActivePipeline": "已查看进行中的运行",
+    "getPipelineStatus": "已查看生成状态",
+    "getPipelineLogs": "已查看生成日志",
+    "listContents": "已查看内容草稿",
+    "getContent": "已打开内容草稿",
+    "saveContent": "已保存内容修改",
+    "approveContent": "已批准内容",
+    "rejectContent": "已拒绝内容",
+    "rerunContentNode": "已重跑内容节点",
+    "rerunImageNode": "正在更新图片",
+    "rerunCaptionNode": "正在更新文案",
+    "rerunTranslationNode": "正在更新翻译",
+    "rerunSummaryNode": "正在更新摘要",
+    "generateMoreImage": "已开始生成另一张图",
+    "generatePresenterVideo": "已开始生成主持人视频",
+    "generateCinematicVideo": "已开始生成电影感视频",
+    "generateMoreTranslation": "已开始另一份翻译",
+    "generateMoreSummary": "已开始另一份摘要",
+    "generateMoreAdapt": "已开始另一条渠道文案",
+    "pipelineResult": "已检查完成的运行",
+    "forgetAll": "已清除所有记忆笔记",
+    "reorderWorkflowNodes": "已调整工作流顺序",
+    "removeWorkflowNode": "已删除工作流步骤",
+    "addWorkflowNode": "已添加工作流步骤",
+    "setWorkflowChannels": "已更新工作流渠道",
+    "listChannels": "已检查渠道",
+    "checkChannelAuth": "已检查账号连接",
+    "startChannelOauth": "已开始连接账号",
+    "getUpload": "已查看上传草稿",
+    "publishNow": "已发布帖子",
+    "schedulePublish": "已安排发布",
+    "retryUpload": "已重试失败的上传",
+    "listPosts": "已查看已发布帖子",
+    "getPost": "已打开已发布帖子",
+    "getPostAnalytics": "已查看帖子分析",
+    "retryPost": "已重试失败的帖子",
+    "suggestRuleImprovement": "已建议品牌改进",
+    "applyRuleSuggestion": "已应用品牌改进",
+    "addUploadMedia": "已添加媒体到发布草稿",
+    "removeUploadMedia": "已从发布草稿移除媒体",
+    "editUploadChannel": "已修改发布渠道",
+    "previewUpload": "已预览帖子",
+    "reschedulePublish": "已重新安排发布时间",
+    "cancelSchedule": "已取消定时发布",
+    "retryPublish": "已重试发布",
+    "editContent": "已编辑内容"
+  },
+  "workflowCard": {
+    "untitled": "工作流",
+    "openCanvas": "打开画布",
+    "waitingNodes": "正在整理节点列表…",
+    "stillGenerating": "仍在生成。打开画布继续查看。",
+    "observation": "工作流 · {{status}}",
+    "status": {
+      "generating": "生成中",
+      "ready": "已就绪",
+      "failed": "失败",
+      "archived": "已归档",
+      "unknown": "未知"
+    },
+    "types": {
+      "keyword_planner": "关键词规划",
+      "intelligence": "网页搜索",
+      "text_generation": "文本",
+      "image_generation": "图片",
+      "video_generation": "视频",
+      "video_presenter": "主持人视频",
+      "video_cinematic": "电影感视频",
+      "translation": "翻译",
+      "transcription": "转录",
+      "summarization": "摘要",
+      "branch": "分支",
+      "adapt": "渠道适配",
+      "merge": "合并",
+      "subtitle": "字幕"
+    },
+    "title": "工作流",
+    "openCanvasEdit": "打开工作流画布"
+  },
+  "pipelineCard": {
+    "title": "生成任务",
+    "openPipelines": "打开流水线",
+    "pausedHint": "这次生成已暂停。请到流水线页面继续。",
+    "stillRunning": "仍在运行。打开流水线页面继续查看。",
+    "observation": "流水线 · {{status}}",
+    "status": {
+      "running": "运行中",
+      "completed": "已完成",
+      "failed": "失败",
+      "paused": "已暂停",
+      "unknown": "未知"
+    }
+  },
+  "contentCard": {
+    "title": "内容草稿",
+    "titleUpdatingImage": "正在更新图片…",
+    "titleUpdatingCaption": "正在更新文案…",
+    "openContent": "打开内容",
+    "working": "正在生成额外结果…",
+    "workingImage": "正在更新图片…",
+    "workingCaption": "正在更新文案…",
+    "workingTranslation": "正在更新翻译…",
+    "workingSummary": "正在更新摘要…",
+    "stillWorking": "仍在处理。打开内容页继续查看。",
+    "observation": "内容 · {{status}}",
+    "hasImage": "图片",
+    "hasVideo": "视频",
+    "hasTranslation": "翻译",
+    "hasSummary": "摘要",
+    "channelPreview": "按渠道预览",
+    "allChannels": "全部",
+    "status": {
+      "draft": "草稿",
+      "in_review": "审核中",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "unknown": "未知"
+    },
+    "makeNewVersion": "生成新版本",
+    "rejectedReason": "原因：{{reason}}",
+    "newVersionMessage": "请为已拒绝的内容 {{contentId}} 生成一个新版本。",
+    "newVersionMessageWithReason": "请为已拒绝的内容 {{contentId}} 生成一个新版本。反馈：{{reason}}"
+  },
+  "askUser": {
+    "confirm": "确认",
+    "waiting": "等待你的选择",
+    "urlPlaceholder": "https://yourbrand.com",
+    "urlLabel": "你的网站网址",
+    "urlInvalid": "请输入网站地址，例如 yourbrand.com",
+    "continue": "继续",
+    "fetchAssets": {
+      "question": "用这个网站作为品牌素材吗？",
+      "questionWithSite": "用 {{site}} 作为品牌素材吗？",
+      "use": "使用",
+      "skip": "跳过"
+    },
+    "plan": {
+      "asked": "你的要求",
+      "willChange": "我会调整",
+      "notPossible": "无法实现"
+    }
+  },
+  "stepTrace": {
+    "summary": "思考 / 行动 / 观察（{{count}} 个工具）",
+    "summaryThoughtOnly": "思考",
+    "thought": "思考",
+    "action": "行动",
+    "observation": "观察",
+    "details": "查看输入和结果",
+    "args": "输入",
+    "result": "结果",
+    "uploadAction": "上传{{assetType}}",
+    "connectAction": "连接 {{platform}}",
+    "connectRednoteAction": "连接 RedNote（扫码）",
+    "assetType": {
+      "logo": "徽标",
+      "reference_image": "参考图片",
+      "guideline_document": "指南文档"
+    },
+    "failedSuffix_one": " · {{count}} 步未完成",
+    "failedSuffix_other": " · {{count}} 步未完成",
+    "savedNote": "已保存你的偏好",
+    "genericStep": "已处理"
+  },
+  "contextUsage": {
+    "label": "{{used}} / {{limit}} tokens"
+  },
+  "messageTokens": {
+    "label": "{{formatted}} tokens",
+    "breakdown": "输入 {{input}} · 输出 {{output}}"
+  },
+  "buildProgress": {
+    "started": "正在创建您的品牌档案…",
+    "readingInput": "正在阅读您提供的信息…",
+    "inputProcessed": "正在整理品牌简介…",
+    "streaming": "正在撰写品牌档案…",
+    "completedToast": "品牌档案已完成。",
+    "failedToast": "品牌档案创建失败。"
+  },
+  "toast": {
+    "createSessionFailed": "无法开始新聊天",
+    "deleteSessionFailed": "无法删除聊天",
+    "sendMessageFailed": "无法发送消息",
+    "cancelRunFailed": "无法停止运行",
+    "runActionFailed": "无法更新此次运行"
+  },
+  "dialogs": {
+    "cancelRun": {
+      "title": "要停止这次运行吗？",
+      "subtitle": "生成会立即停止。已完成的步骤会保留结果，未完成的步骤不会再消耗积分。",
+      "confirm": "停止运行"
+    },
+    "memory": {
+      "action": "品牌记忆",
+      "title": "“{{name}}” 的记忆",
+      "subtitle": "助手为该品牌保存的笔记——偏好、纠正与事实。",
+      "empty": "还没有记忆笔记。让助手记住一些内容后，会显示在这里。",
+      "loadFailed": "无法加载记忆笔记。",
+      "type": {
+        "preference": "偏好",
+        "correction": "纠正",
+        "fact": "事实"
+      }
+    },
+    "actions": {
+      "close": "关闭"
+    },
+    "toolError": {
+      "code": {
+        "generic": "已跳过此步骤。",
+        "one_mutation_per_turn": "已跳过：每条消息只能做一项更改。",
+        "confirmation_required": "等待你的确认。",
+        "followup_read_only": "已跳过：自动报告不会更改任何内容。",
+        "order_not_supported": "无法使用这个顺序，请在工作流画布中调整。",
+        "edit_not_supported": "此更改只能在工作流画布中完成。",
+        "unsupported_channel": "暂不支持该渠道。",
+        "no_change": "无需更改。",
+        "workflow_exists": "工作流已存在。",
+        "already_running": "已有运行正在进行。",
+        "no_workflow": "还没有工作流。",
+        "node_not_found": "工作流中没有这个步骤。",
+        "lane_required": "请为此步骤选择渠道。",
+        "lane_taken": "该渠道已有此步骤。",
+        "already_present": "此步骤已存在。",
+        "ambiguous_choice": "等待你选择一个选项。"
+      },
+      "retryMessage": "再试一次"
+    }
+  },
+  "runCard": {
+    "running": "运行中",
+    "paused": "已暂停",
+    "stopped": "已停止",
+    "stepsLabel": "工作流步骤",
+    "seconds_other": "{{count}} 秒",
+    "left": {
+      "seconds_other": "大约还剩 {{count}} 秒",
+      "minutes_other": "大约还剩 {{count}} 分钟",
+      "almost_other": "即将完成"
+    },
+    "cancel": "取消",
+    "finished": "已完成",
+    "finishedIn_other": "用时 {{count}} 秒完成",
+    "failedHere": "在此停止",
+    "genericError": "此步骤未完成。之前已完成的内容已保存。",
+    "tryAgain": "重试",
+    "skipStep": "跳过此步骤",
+    "retryMessage": "运行停在了“{{step}}”。请重新生成。",
+    "readyPill": "你的帖子已就绪"
+  },
+  "history": {
+    "loadingEarlier": "正在加载更早的消息",
+    "startOfChat": "这是 {{brand}} 聊天的开始。",
+    "startOfChatGeneric": "这是聊天的开始。",
+    "today": "今天",
+    "yesterday": "昨天",
+    "jumpToLatest": "跳到最新"
+  },
+  "runBrief": {
+    "textOnly": "仅文字",
+    "change": "修改",
+    "changeMessage": "我想修改这篇帖子的主题、风格或渠道"
+  }
+}

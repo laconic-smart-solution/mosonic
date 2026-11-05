@@ -36,6 +36,7 @@ import type {
   PublishUploadDto,
 } from './dto/publish-upload.dto';
 import {
+  DISTRIBUTION_CHANNELS,
   isDeprecatedChannelId,
   ruleChannelNamesToIds,
 } from '../workflow/distribution-channels.util';
@@ -153,14 +154,17 @@ export class UploadService {
     pipeline: PipelineDocument,
     resolvedOutputs: ResolvedContentOutputs,
   ): UploadChannelEntry[] {
-    const lanes = pipeline.graph?.lanes ?? [];
+    const graphLanes = pipeline.graph?.lanes ?? [];
+    const nodeLanes = (pipeline.nodes ?? [])
+      .map((n) => (typeof n.lane === 'string' ? n.lane : ''))
+      .filter(Boolean);
+    const lanes = [...graphLanes, ...nodeLanes];
     if (lanes.length === 0) {
       return this.buildChannelEntriesFromRule(ruleChannels, resolvedOutputs);
     }
 
-    // Only the channels this pipeline actually branched for — the rule may
-    // have channels added/changed after this pipeline ran, and those must
-    // not silently appear as upload channels the workflow never produced.
+    // Channels this pipeline branched for, plus extra lanes from generate-more
+    // Adapt nodes. Rule channels that never ran still stay off the upload.
     const laneSet = new Set(lanes.map((lane) => normalizeLaneId(lane)));
     const branchedChannels = ruleChannels.filter((ruleCh) =>
       laneSet.has(normalizeLaneId(ruleCh.channel)),
@@ -325,7 +329,7 @@ export class UploadService {
     const prevByKey = new Map(
       previous.map((ch) => [ch.channel.toLowerCase(), ch]),
     );
-    return fresh.map((row) => {
+    const merged = fresh.map((row) => {
       const prev = prevByKey.get(row.channel.toLowerCase());
       if (!prev) {
         return row;
@@ -352,6 +356,64 @@ export class UploadService {
         ...(keepCaption ? { caption: prev.caption } : {}),
         ...(prevYt.length > 0 ? { youtubeTitle: prev.youtubeTitle } : {}),
       };
+    });
+    const freshKeys = new Set(merged.map((ch) => ch.channel.toLowerCase()));
+    for (const prev of previous) {
+      if (!freshKeys.has(prev.channel.toLowerCase())) merged.push(prev);
+    }
+    return merged;
+  }
+
+  /**
+   * Adds (or updates) one publish tab on the linked upload so a generate-more
+   * Adapt/image lane shows up immediately — upload tabs are a snapshot and
+   * would otherwise stay on the original pipeline channels.
+   */
+  async ensureLaneChannelOnContent(
+    contentRef: string,
+    lane: string,
+    extras: { caption?: string | null; mediaUrl?: string | null },
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const laneKey = normalizeLaneId(lane);
+    if (!laneKey) return;
+    const doc = await this.uploads.findLatestByContentRef(contentRef, auth);
+    if (!doc) return;
+
+    const channels = uploadChannels(doc);
+    const idx = channels.findIndex(
+      (ch) => normalizeLaneId(ch.channel) === laneKey,
+    );
+    const caption = extras.caption?.trim() || undefined;
+    const mediaUrl = extras.mediaUrl?.trim() || undefined;
+    const label =
+      DISTRIBUTION_CHANNELS.find((c) => c.id === laneKey)?.label ??
+      `${laneKey.charAt(0).toUpperCase()}${laneKey.slice(1)}`;
+
+    let next: UploadChannelEntry[];
+    if (idx >= 0) {
+      const row = { ...channels[idx]! };
+      if (caption) row.caption = caption;
+      if (mediaUrl) row.mediaUrl = mediaUrl;
+      next = channels.map((ch, i) => (i === idx ? row : ch));
+    } else {
+      const row = this.createDefaultChannelRow(
+        label,
+        (doc.resolvedOutputs ?? {}) as ResolvedContentOutputs,
+      );
+      if (caption) row.caption = caption;
+      if (mediaUrl) row.mediaUrl = mediaUrl;
+      next = [...channels, row];
+    }
+
+    const saved = await this.uploads.save({
+      ...withUploadChannels(doc, next),
+      status: recomputeUploadJobStatus(next),
+    });
+    // Empty `channels` so the client invalidates and rebuilds tabs (a
+    // channels payload only patches live status on existing tabs).
+    this.emitUploadEvent(saved.uploadId, 'upload:updated', {
+      uploadId: saved.uploadId,
     });
   }
 

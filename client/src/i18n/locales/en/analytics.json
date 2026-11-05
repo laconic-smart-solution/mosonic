@@ -2,17 +2,17 @@
   "page": {
     "eyebrow": "Insights",
     "title": "Analytics",
-    "subtitle": "Performance by rule. Open a card for channel breakdown and AI suggestions.",
+    "subtitle": "Performance by brand profile. Open a card for channel breakdown and AI suggestions.",
     "loadErrorTitle": "Could not load analytics",
     "loadErrorDesc": "Try refreshing the page.",
-    "rulesCount": "{{count}} rule with analytics",
-    "rulesCount_plural": "{{count}} rules with analytics",
+    "rulesCount": "{{count}} brand profile with analytics",
+    "rulesCount_plural": "{{count}} brand profiles with analytics",
     "emptyTitle": "No analytics yet",
-    "emptyDesc": "Publish content with Zernio, then sync a rule to generate the first snapshot.",
+    "emptyDesc": "Publish content with Zernio, then sync a brand profile to generate the first snapshot.",
     "syncFailed": "Sync failed"
   },
   "summary": {
-    "rules": "Rules",
+    "rules": "Brand Profiles",
     "suggestions": "Suggestions",
     "lastPull": "Last pull"
   },
@@ -22,7 +22,7 @@
     "suggestionsReady_plural": "{{count}} suggestions ready",
     "noNewSuggestions": "No new suggestions from the current data",
     "generateFailed": "Could not generate suggestions",
-    "applied": "Suggestion applied to your rule",
+    "applied": "Suggestion applied to your brand profile",
     "applyFailed": "Could not apply suggestion",
     "rejected": "Suggestion rejected",
     "rejectFailed": "Could not reject suggestion",
@@ -47,8 +47,8 @@
     "daysAgo": "{{count}} days ago"
   },
   "detail": {
-    "missingRuleTitle": "Missing rule",
-    "missingRuleDesc": "Open Analytics from the list and select a rule.",
+    "missingRuleTitle": "Missing brand profile",
+    "missingRuleDesc": "Open Analytics from the list and select a brand profile.",
     "backToList": "All analytics",
     "noSnapshot": "No snapshot yet",
     "periodLastPulled": "{{range}} · Last pulled {{time}}",
@@ -60,7 +60,7 @@
     "suggestionsBanner": "{{count}} new suggestion available for this snapshot.",
     "suggestionsBanner_plural": "{{count}} new suggestions available for this snapshot.",
     "dismiss": "Dismiss",
-    "noSnapshotTitle": "No snapshot for this rule",
+    "noSnapshotTitle": "No snapshot for this brand profile",
     "noSnapshotDesc": "Publish or schedule posts with Zernio, then sync analytics to generate the first snapshot.",
     "views": "Views",
     "likes": "Likes",
@@ -89,11 +89,11 @@
     "noSuggestionsGenerate": "Generate suggestions to analyze this snapshot.",
     "current": "Current",
     "suggested": "Suggested",
-    "appliedToRule": "Applied to rule",
+    "appliedToRule": "Applied to brand profile",
     "rejectedLabel": "Rejected",
     "apply": "Apply",
     "reject": "Reject",
-    "defaultRuleName": "Rule"
+    "defaultRuleName": "Brand Profile"
   },
   "confidence": {
     "high": "high",

@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 
 import { FileServiceImage, FileServiceVideo } from "./upload-display-media"
 import type { MediaTabMode } from "../lib/upload-platform-media"
@@ -82,6 +84,13 @@ export function UploadPreviewMedia({
             controls={isDialog && !fillFrame}
             muted={!isDialog || fillFrame}
           />
+          {isDialog ? (
+            <DownloadMediaButton
+              src={videoUrl}
+              filename={filenameFromMediaUrl(videoUrl, "video", "upload")}
+              className="absolute top-2 right-2 z-10"
+            />
+          ) : null}
         </div>
       )
     }
@@ -152,6 +161,11 @@ export function UploadPreviewMedia({
             className="absolute inset-0 size-full object-contain"
             loadingClassName={loadingClass}
           />
+          <DownloadMediaButton
+            src={images[0]!}
+            filename={filenameFromMediaUrl(images[0]!, "image", "upload")}
+            className="absolute top-2 right-2 z-10"
+          />
         </div>
       )
     }
@@ -204,6 +218,11 @@ export function UploadPreviewMedia({
             >
               <ChevronRight className="size-4" aria-hidden />
             </Button>
+            <DownloadMediaButton
+              src={currentUrl}
+              filename={filenameFromMediaUrl(currentUrl, "image", "upload")}
+              className="absolute top-2 right-2 z-10"
+            />
             <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
               {t("preview.mediaCounter", {
                 current: safeIndex + 1,
@@ -273,6 +292,11 @@ export function UploadPreviewMedia({
             >
               <ChevronRight className="size-4" aria-hidden />
             </Button>
+            <DownloadMediaButton
+              src={currentUrl}
+              filename={filenameFromMediaUrl(currentUrl, "image", "upload")}
+              className="absolute top-2 right-2 z-10"
+            />
             <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
               {t("preview.mediaCounter", {
                 current: safeIndex + 1,

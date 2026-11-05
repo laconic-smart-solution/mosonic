@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Inject } from '@nestjs/common';
 import { UnrecoverableError } from 'bullmq';
 import { buildIntelligenceContextFromPostMetrics } from '../analytics/intelligence-context.util';
 import { PostAnalyticsService } from '../post/post-analytics.service';
@@ -29,6 +28,7 @@ import { isSharedTrunkFailure } from './lane-pause.util';
 import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
+import { parsePipelineSourcePack } from '../pipeline/source-pack.types';
 
 @Injectable()
 export class PipelineNodeRunnerService {
@@ -40,6 +40,7 @@ export class PipelineNodeRunnerService {
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly nodeExecutor: NodeExecutor,
+    @Inject(forwardRef(() => DependencyResolverService))
     private readonly resolver: DependencyResolverService,
     private readonly completion: PipelineNodeCompletionService,
     private readonly events: EventsService,
@@ -159,6 +160,7 @@ export class PipelineNodeRunnerService {
         rule: executionRule,
         contentPrompt: effectiveContentPrompt,
         previousOutputs,
+        sourcePack: parsePipelineSourcePack(pipeline.sourcePack),
       },
       pipelineId: payload.pipelineId,
       totalNodes: payload.totalNodes,

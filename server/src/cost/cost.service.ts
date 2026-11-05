@@ -112,7 +112,7 @@ export class CostService {
         const key = `${dto.providerModel}_${dto.imageSize}_${dto.imageQuality}`;
         let perImage = OPENAI_IMAGE_PRICING[key];
         if (perImage == null && dto.providerModel?.startsWith('gpt-image')) {
-          perImage = OPENAI_IMAGE_PRICING['gpt-image-1_default'];
+          perImage = OPENAI_IMAGE_PRICING['gpt-image-2_default'];
         }
         if (perImage == null) {
           this.logger.warn(
@@ -124,11 +124,11 @@ export class CostService {
       }
 
       case 'openai_video': {
-        const modelKey = dto.providerModel ?? 'sora-2';
+        const modelKey = dto.providerModel ?? 'heygen_video_1';
         const p =
           OPENAI_VIDEO_PRICING[modelKey] ??
-          OPENAI_VIDEO_PRICING['sora-2'] ??
-          OPENAI_VIDEO_PRICING['sora'];
+          OPENAI_VIDEO_PRICING['heygen_video_1'] ??
+          OPENAI_VIDEO_PRICING['heygen-presenter'];
         if (!p) {
           return 0;
         }

@@ -30,7 +30,7 @@ const FALLBACK_TEMPLATES: Record<
     description:
       'Promotional creative for a specific offer, campaign, or call-to-action.',
     prompt:
-      'The composition must have one dominant focal subject that reads instantly, even at small mobile sizes. Reserve roughly a third of the frame as clean negative space for a headline overlay to be added later — do not place text inside the scene itself.',
+      'The composition must have one dominant focal subject that reads instantly, even at small mobile sizes. Fill the frame as a finished advertising creative — do not leave a blank overlay region. If a short headline or call to action is provided, render it once in the image with clean, high-contrast type.',
   },
   [NodeImageTemplate.ProductMockup]: {
     name: 'Product Mockup',

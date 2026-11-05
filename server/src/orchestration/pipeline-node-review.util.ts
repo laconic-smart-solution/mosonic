@@ -1,11 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
+import { isVideoNodeType } from '../nodes/video-node-type.util';
 
 const TEXT_NODE_TYPES = new Set<string>([
   WorkflowNodeType.TextGeneration,
   WorkflowNodeType.Translation,
   WorkflowNodeType.Summarization,
   WorkflowNodeType.Transcription,
+  WorkflowNodeType.Subtitle,
   WorkflowNodeType.Adapt,
   WorkflowNodeType.KeywordPlanner,
   WorkflowNodeType.Intelligence,
@@ -13,6 +15,8 @@ const TEXT_NODE_TYPES = new Set<string>([
 
 const MEDIA_NODE_TYPES = new Set<string>([
   WorkflowNodeType.ImageGeneration,
+  WorkflowNodeType.VideoPresenter,
+  WorkflowNodeType.VideoCinematic,
   WorkflowNodeType.VideoGeneration,
 ]);
 
@@ -56,6 +60,8 @@ export function buildEditedOutput(
       return { summary: text };
     case WorkflowNodeType.Transcription:
       return { transcription: text };
+    case WorkflowNodeType.Subtitle:
+      return { subtitle: text };
     case WorkflowNodeType.Adapt:
     case WorkflowNodeType.Intelligence:
     case WorkflowNodeType.KeywordPlanner:
@@ -90,6 +96,8 @@ export function extractReviewText(
       return String(output.summary ?? '');
     case WorkflowNodeType.Transcription:
       return String(output.transcription ?? '');
+    case WorkflowNodeType.Subtitle:
+      return String(output.subtitle ?? '');
     case WorkflowNodeType.Adapt:
     case WorkflowNodeType.Intelligence:
     case WorkflowNodeType.KeywordPlanner:
@@ -109,7 +117,7 @@ export function extractReviewMediaUrl(
     const v = output.image;
     return typeof v === 'string' ? v : undefined;
   }
-  if (nodeType === WorkflowNodeType.VideoGeneration) {
+  if (isVideoNodeType(nodeType)) {
     const v = output.video;
     return typeof v === 'string' ? v : undefined;
   }

@@ -46,7 +46,7 @@
     "draftsApproval": "{{count}} 份草稿待批准",
     "draftsHint": "发布前请审核",
     "review": "审核",
-    "ruleSuggestions": "{{count}} 条规则建议",
+    "ruleSuggestions": "{{count}} 条品牌档案建议",
     "ruleSuggestionsHint": "根据分析优化活动",
     "open": "打开",
     "failedPublishes": "{{count}} 次发布失败",
@@ -74,10 +74,10 @@
   "quickStart": {
     "title": "欢迎使用 Mosonic",
     "desc": "三步完成首次发布",
-    "step1": "创建规则",
+    "step1": "创建您的品牌档案",
     "step2": "生成首条内容",
     "step3": "发布到社交媒体",
-    "cta": "创建您的第一条规则"
+    "cta": "创建您的第一个品牌档案"
   },
   "error": {
     "title": "无法加载仪表盘",

@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;margin:0}body{font-family:Inter;background:#F7F4EF;width:1200px;padding:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;font-size:13.5px;color:#090C11}
+.cap{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4A5568;font-weight:600;margin-bottom:10px}
+.card{background:#fff;border:1px solid #EDE9E1;border-radius:14px;overflow:hidden}
+.h{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #EDE9E1;background:#FBF9F6}.h b{flex:1}
+.sp{width:16px;height:16px;border-radius:50%;border:2px solid #FDECC8;border-top-color:#F5A623}
+.s{display:flex;align-items:center;gap:10px;padding:8px 14px;color:#4A5568}.s.on{color:#090C11;font-weight:500}
+.d{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;flex:none;border:1.5px solid #D9D3C7}
+.d.ok{background:#00C9A7;border-color:#00C9A7;color:#fff;font-size:11px}.d.run{border-color:#F5A623;box-shadow:0 0 0 4px #FEF6E4}.d.run:after{content:"";width:7px;height:7px;border-radius:50%;background:#F5A623}.d.err{background:#D64545;border-color:#D64545;color:#fff;font-size:11px}
+.r{margin-left:auto;font-size:12px;color:#718096}
+.f{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid #EDE9E1}
+.bar{flex:1;height:5px;background:#EDE9E1;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:#F5A623;width:55%}
+.l{font-size:12.5px;font-weight:600;color:#4A5568}.pill{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px}
+.b{padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;border:1px solid #D9D3C7;background:#fff}.b.p{background:#0F1F3D;color:#fff;border-color:#0F1F3D}
+.toast{margin-top:14px;display:inline-flex;gap:8px;align-items:center;background:#0F1F3D;color:#fff;padding:8px 14px;border-radius:99px;font-size:12.5px;font-weight:600;box-shadow:0 8px 20px rgba(15,31,61,.25)}
+</style></head><body>
+<div><div class="cap">Running</div><div class="card"><div class="h"><div class="sp"></div><b>Social launch pack</b><span class="pill" style="background:#FEF6E4;color:#A86C09">Running</span></div>
+<div class="s"><i class="d ok">✓</i>Brief &amp; strategy<span class="r">8s</span></div><div class="s"><i class="d ok">✓</i>Caption draft<span class="r">14s</span></div>
+<div class="s on"><i class="d run"></i>Generating images<span class="r">2 of 4</span></div><div class="s"><i class="d"></i>Translate TH / ZH</div><div class="s"><i class="d"></i>Ready for review</div>
+<div class="f"><div class="bar"><i></i></div><span class="r" style="margin:0">about 30s left</span><span class="l" style="color:#D64545">Cancel</span></div></div></div>
+<div><div class="cap">Finished</div><div class="card"><div class="h"><i class="d ok">✓</i><b>Social launch pack</b><span class="r" style="margin:0">Finished in 64s</span><span style="color:#718096">⌄</span></div></div>
+<div style="margin-top:14px;display:flex;gap:10px"><div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#00C9A7,#254C94);flex:none"></div><div style="line-height:1.55">Your post is ready. I checked all 4 images and the Thai and Chinese captions. Take a look:</div></div>
+<div class="card" style="margin:10px 0 0 40px;padding:12px;display:flex;gap:12px"><div style="width:64px;height:64px;border-radius:9px;background:linear-gradient(135deg,#F2EAE0,#C4A98A);flex:none"></div><div><b>Beautiful You. Beautiful Days.</b><div style="display:flex;gap:6px;margin-top:8px"><span class="b" style="background:#00C9A7;border-color:#00C9A7">Approve</span><span class="b">Edit</span></div></div></div>
+<div style="text-align:center"><span class="toast">Your post is ready ↓</span></div></div>
+<div><div class="cap">Failed</div><div class="card"><div class="h" style="background:#FDECEC"><i class="d err">!</i><b>Social launch pack</b><span class="pill" style="background:#fff;color:#D64545">Stopped</span></div>
+<div class="s"><i class="d ok">✓</i>Brief &amp; strategy</div><div class="s"><i class="d ok">✓</i>Caption draft</div><div class="s on" style="color:#D64545"><i class="d err">!</i>Generating images<span class="r">timed out</span></div>
+<div style="padding:4px 14px 12px;color:#4A5568;line-height:1.5">The image service didn't respond. Your captions are saved.</div>
+<div class="f" style="justify-content:flex-end"><span class="b">Skip images</span><span class="b p">Try again</span></div></div></div>
+</body></html>

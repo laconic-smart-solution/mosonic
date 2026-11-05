@@ -14,6 +14,8 @@ import {
 } from "@/features/upload/components/upload-display-media"
 import { UploadMediaDetailDialog } from "@/features/upload/components/upload-media-detail-dialog"
 import { cn } from "@/lib/utils"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import type { PostMediaItem } from "@/shared/types/post.type"
 
 type Props = {
@@ -97,6 +99,13 @@ export function PostDetailMediaGallery({ items, className }: Props) {
                 />
               </button>
             ) : null}
+            {isVideo && videoItem ? (
+              <DownloadMediaButton
+                src={videoItem.url}
+                filename={filenameFromMediaUrl(videoItem.url, "video", "post")}
+                className="absolute top-2 right-2 z-10"
+              />
+            ) : null}
 
             {!isVideo && collageCount > 0 ? (
               <div
@@ -147,6 +156,14 @@ export function PostDetailMediaGallery({ items, className }: Props) {
                           </span>
                         ) : null}
                       </button>
+                      {!showOverflow ? (
+                        <DownloadMediaButton
+                          src={url}
+                          filename={filenameFromMediaUrl(url, "image", "post")}
+                          size="xs"
+                          className="absolute top-1.5 right-1.5 z-10"
+                        />
+                      ) : null}
                     </div>
                   )
                 })}

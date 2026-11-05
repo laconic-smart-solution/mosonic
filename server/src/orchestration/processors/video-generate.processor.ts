@@ -1,11 +1,18 @@
 import {
-  InjectQueue,
-  OnWorkerEvent,
-  Processor,
-  WorkerHost,
-} from '@nestjs/bullmq';
-import { Inject, Logger } from '@nestjs/common';
-import { Job, Queue } from 'bullmq';
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { preflightVideoNode } from '../../nodes/video-node-preflight.util';
+import { ConfigService } from '@nestjs/config';
+import { Job, Worker } from 'bullmq';
+import {
+  buildRedisConnectionOptions,
+  redisEnvFromConfig,
+} from '../../config/redis-connection.util';
 import {
   getVideoGenerationMode,
   VideoGenerationService,
@@ -14,6 +21,8 @@ import type { IPipelineRepository } from '../../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../../pipeline/pipeline.repository';
 import { PipelineNodeExecutionStatus } from '../../pipeline/schemas/pipeline.schema';
 import { MediaNodeCompletionService } from '../media-node-completion.service';
+import { allQueueNamesForBase } from '../queue-tenant.util';
+import { TenantQueueService } from '../tenant-queue.service';
 import {
   computeVideoInitialDelayMs,
   QUEUES,
@@ -22,32 +31,73 @@ import {
 import type { MediaCheckJobPayload } from '../types/media-check-job.payload';
 import type { NodeJobPayload } from '../types/node-job.payload';
 
-@Processor(QUEUES.VIDEO_GENERATE, {
-  concurrency: Number(process.env.VIDEO_GENERATE_CONCURRENCY ?? 3),
-})
-export class VideoGenerateProcessor extends WorkerHost {
+/**
+ * Runs `video_generate` jobs — see PipelineNodeProcessor's doc comment for
+ * why this manages raw BullMQ Workers (one per tenant bucket) instead of
+ * using the `@Processor` decorator.
+ */
+@Injectable()
+export class VideoGenerateProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VideoGenerateProcessor.name);
+  private workers: Worker<NodeJobPayload>[] = [];
 
   constructor(
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
     private readonly videoService: VideoGenerationService,
     private readonly completion: MediaNodeCompletionService,
-    @InjectQueue(QUEUES.VIDEO_CHECK)
-    private readonly videoCheckQueue: Queue<MediaCheckJobPayload>,
-  ) {
-    super();
+    private readonly tenantQueues: TenantQueueService,
+    private readonly config: ConfigService,
+  ) {}
+
+  onModuleInit(): void {
+    const connection = buildRedisConnectionOptions(
+      redisEnvFromConfig(this.config),
+    );
+    const concurrency = Number(process.env.VIDEO_GENERATE_CONCURRENCY ?? 3);
+    const names = allQueueNamesForBase(QUEUES.VIDEO_GENERATE);
+    for (const name of names) {
+      const worker = new Worker<NodeJobPayload>(
+        name,
+        (job) => this.process(job),
+        { connection, concurrency },
+      );
+      worker.on('failed', (job, error) => void this.onFailed(job, error));
+      this.workers.push(worker);
+    }
+    this.logger.log(
+      `${QUEUES.VIDEO_GENERATE} worker started on ${names.length} queue(s): ${names.join(', ')}`,
+    );
   }
 
-  async process(job: Job<NodeJobPayload>): Promise<void> {
+  async onModuleDestroy(): Promise<void> {
+    await Promise.all(this.workers.map((worker) => worker.close()));
+  }
+
+  private async process(job: Job<NodeJobPayload>): Promise<void> {
     const payload = job.data;
     const { pipelineId, nodeId } = payload;
 
     this.logger.log(`[video:submit] pipeline=${pipelineId} node=${nodeId}`);
 
-    let videoProvider: 'sora' | 'heygen' = 'sora';
+    let videoProvider: 'sora' | 'heygen' = 'heygen';
     try {
       const input = await this.completion.buildVideoGenerationInput(payload);
+
+      // Defense-in-depth (primary preflight runs before enqueue in
+      // DependencyResolverService.enqueueNode). Fail once, no retries, no HeyGen call.
+      const preflight = preflightVideoNode(payload.nodeType, input.config);
+      if (!preflight.ok) {
+        this.logger.warn(
+          `[video:submit] preflight failed pipeline=${pipelineId} node=${nodeId} code=${preflight.code}`,
+        );
+        await this.completion.failVideoNode(
+          payload,
+          new UnprocessableEntityException(preflight.message),
+          { videoProvider: 'heygen', stage: 'preflight' },
+        );
+        return;
+      }
 
       await this.pipelineRepo.updateNodeStatus(
         pipelineId,
@@ -56,19 +106,20 @@ export class VideoGenerateProcessor extends WorkerHost {
       );
 
       const isPresenter = getVideoGenerationMode(input.config) === 'presenter';
-      videoProvider = isPresenter ? 'heygen' : 'sora';
+      // Presenter + cinematic both use HeyGen now (Sora path retired).
+      videoProvider = 'heygen';
 
       await this.videoService.emitProcessing(
         pipelineId,
         nodeId,
         isPresenter
           ? 'Presenter video generation started...'
-          : 'Video generation started...',
+          : 'Cinematic video generation started...',
       );
 
       const submitResult = isPresenter
         ? await this.videoService.submitPresenterVideoJob(input)
-        : await this.videoService.submitVideoJob(input);
+        : await this.videoService.submitCinematicVideoJob(input);
 
       const { externalJobId, estimatedSeconds, normalized } = submitResult;
       videoProvider = submitResult.videoProvider ?? videoProvider;
@@ -96,11 +147,15 @@ export class VideoGenerateProcessor extends WorkerHost {
         externalJobId,
         checkCount: 0,
         submittedAt: new Date().toISOString(),
-        videoProvider: videoProvider ?? (isPresenter ? 'heygen' : 'sora'),
+        videoProvider: videoProvider ?? 'heygen',
         normalized,
       };
 
-      await this.videoCheckQueue.add('video_check', checkPayload, {
+      const videoCheckQueue = this.tenantQueues.forUser<MediaCheckJobPayload>(
+        QUEUES.VIDEO_CHECK,
+        payload.userId,
+      );
+      await videoCheckQueue.add('video_check', checkPayload, {
         jobId: videoCheckJobId(pipelineId, nodeId, 0),
         delay: delayMs,
         attempts: 2,
@@ -138,8 +193,7 @@ export class VideoGenerateProcessor extends WorkerHost {
     }
   }
 
-  @OnWorkerEvent('failed')
-  async onFailed(
+  private async onFailed(
     job: Job<NodeJobPayload> | undefined,
     error: Error,
   ): Promise<void> {

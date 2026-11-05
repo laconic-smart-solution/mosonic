@@ -112,6 +112,8 @@ export class RuleExtractionService {
           '  youtube   → caption: summary                                           | media: video',
           '',
           'Rule: default to the table above. Only deviate if the user input explicitly states otherwise.',
+          'channels: include ONLY the platforms the input names or links to (e.g. a Facebook page URL = facebook). The table says how to map a channel, not which channels to add; never list every platform by default. If the input names none, return [].',
+          'audience.location: only places the input explicitly names as where the business or its customers are. Never infer a location from the brand name (e.g. a brand called "Mali" is not in Mali). If none is stated, return [].',
           '',
           // ── customSchedule ─────────────────────────────────────────────────
           'customSchedule must be an array of day name strings, e.g. ["monday", "wednesday", "friday"].',

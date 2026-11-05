@@ -2,6 +2,7 @@ import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import { PipelineNodeExecutionStatus } from '../pipeline/schemas/pipeline.schema';
 import { parsePipelineNodeOutputString } from '../pipeline/pipeline-output-parse';
 import { normalizeLaneId } from '../workflow/workflow-graph.util';
+import { isVideoNodeType } from '../nodes/video-node-type.util';
 
 type PipelineNodeLike = {
   lane?: string | null;
@@ -29,7 +30,7 @@ function extractMediaFromNode(node: PipelineNodeLike): {
     const url = typeof parsed.image === 'string' ? parsed.image.trim() : '';
     if (url) image = url;
   }
-  if (node.type === WorkflowNodeType.VideoGeneration) {
+  if (isVideoNodeType(node.type)) {
     const url = typeof parsed.video === 'string' ? parsed.video.trim() : '';
     if (url) video = url;
   }

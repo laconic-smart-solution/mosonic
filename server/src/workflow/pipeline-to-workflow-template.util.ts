@@ -42,6 +42,8 @@ export type CollapsedWorkflowTemplate = {
 const SHARED_LANE_TEMPLATE_TYPES = new Set<WorkflowNodeType>([
   WorkflowNodeType.Adapt,
   WorkflowNodeType.ImageGeneration,
+  WorkflowNodeType.VideoPresenter,
+  WorkflowNodeType.VideoCinematic,
   WorkflowNodeType.VideoGeneration,
   WorkflowNodeType.Summarization,
   WorkflowNodeType.Translation,

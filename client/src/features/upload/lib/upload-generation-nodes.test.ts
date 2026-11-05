@@ -106,7 +106,7 @@ describe("buildGenerationNodesForContent", () => {
         type: "image_generation",
         order: 10,
         isLocked: false,
-        config: { model: "gpt-image-1", aspectRatio: "1:1" },
+        config: { model: "gpt-image-2", aspectRatio: "1:1" },
       },
     ]
     const cards = buildGenerationNodesForContent(

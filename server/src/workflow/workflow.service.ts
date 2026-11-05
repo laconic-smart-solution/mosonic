@@ -13,6 +13,7 @@ import {
   type WorkflowNodeConfig,
 } from '../nodes/schemas/workflow-node.schema';
 import { parseWorkflowNodeConfig } from '../nodes/workflow-node-config.zod';
+import { normalizeVideoNodeType } from '../nodes/video-node-type.util';
 import { EventsService } from '../events/events.service';
 import { workflowCompletedNotification } from '../events/notification.util';
 import { CreditService } from '../credit/credit.service';
@@ -145,7 +146,11 @@ export class WorkflowService {
       normalizedRuleId,
       auth,
     );
-    const workflowName = this.workflowNameFromAnswers('', normalizedRuleId);
+    const workflowName = this.workflowNameFromAnswers(
+      '',
+      normalizedRuleId,
+      rule.name,
+    );
     const workflow =
       existing ??
       (await this.createWorkflow(normalizedRuleId, workflowName, auth.userId));
@@ -248,6 +253,7 @@ export class WorkflowService {
     const workflowName = this.workflowNameFromAnswers(
       normalizedAnswers.additionalMessage,
       normalizedRuleId,
+      rule.name,
     );
     const workflow =
       existing ??
@@ -286,6 +292,7 @@ export class WorkflowService {
       type: WorkflowNodeType;
       order: number;
       isLocked: boolean;
+      userPrompt: string;
       config: Record<string, unknown>;
       x?: number;
       y?: number;
@@ -318,6 +325,7 @@ export class WorkflowService {
       type: WorkflowNodeType;
       order: number;
       isLocked: boolean;
+      userPrompt: string;
       config: Record<string, unknown>;
       x?: number;
       y?: number;
@@ -344,6 +352,7 @@ export class WorkflowService {
       type: n.type as unknown as WorkflowNodeType,
       order: n.order,
       isLocked: n.isLocked,
+      userPrompt: typeof n.userPrompt === 'string' ? n.userPrompt : '',
       config: (n.config ?? {}) as Record<string, unknown>,
       ...(typeof n.x === 'number' && Number.isFinite(n.x) ? { x: n.x } : {}),
       ...(typeof n.y === 'number' && Number.isFinite(n.y) ? { y: n.y } : {}),
@@ -567,6 +576,21 @@ export class WorkflowService {
     const nodeIds = nodeSpecs.map((n) => n.nodeId);
     await this.workflowNodes.deleteExcept(workflowId, nodeIds, auth);
 
+    const promptOverrides = new Map<string, string>();
+    for (const node of body.nodes) {
+      if (typeof node.userPrompt === 'string' && node.nodeId?.trim()) {
+        promptOverrides.set(node.nodeId.trim(), node.userPrompt.slice(0, 2000));
+      }
+    }
+    const existingNodes = await this.workflowNodes.findByWorkflow(
+      workflowId,
+      auth,
+      { templateOnly: true },
+    );
+    const existingPrompts = new Map(
+      existingNodes.map((node) => [node.nodeId, node.userPrompt ?? '']),
+    );
+
     for (const spec of nodeSpecs) {
       await this.workflowNodes.upsertNode(
         workflowId,
@@ -578,7 +602,9 @@ export class WorkflowService {
           type: spec.type,
           order: spec.order,
           isLocked: spec.isLocked,
-          userPrompt: '',
+          userPrompt: promptOverrides.has(spec.nodeId)
+            ? (promptOverrides.get(spec.nodeId) ?? '')
+            : (existingPrompts.get(spec.nodeId) ?? ''),
           config: spec.config as never,
           ...('x' in spec && spec.x !== undefined ? { x: spec.x } : {}),
           ...('y' in spec && spec.y !== undefined ? { y: spec.y } : {}),
@@ -890,16 +916,20 @@ export class WorkflowService {
       throw new BadRequestException('nodes must not be empty');
     }
     const sorted = [...nodes].sort((a, b) => a.order - b.order);
+    // Legacy `video_generation` is upgraded to presenter/cinematic by mode on save.
     const normalized = sorted.map((n) => ({
       nodeId: n.nodeId,
-      type: n.type,
+      type: normalizeVideoNodeType(n.type, n.config),
       order: n.order,
-      isLocked: false,
+      isLocked: n.isLocked === true,
       ...(typeof n.x === 'number' && Number.isFinite(n.x) ? { x: n.x } : {}),
       ...(typeof n.y === 'number' && Number.isFinite(n.y) ? { y: n.y } : {}),
       lane: typeof n.lane === 'string' && n.lane.trim() ? n.lane.trim() : null,
       config: (() => {
-        const parsed = parseWorkflowNodeConfig(n.type, n.config ?? {});
+        const parsed = parseWorkflowNodeConfig(
+          normalizeVideoNodeType(n.type, n.config),
+          n.config ?? {},
+        );
         if (!parsed.ok) {
           throw new BadRequestException(
             `Invalid config for node "${n.type}": ${parsed.errors.join('; ')}`,
@@ -1096,12 +1126,15 @@ export class WorkflowService {
   private workflowNameFromAnswers(
     additionalMessage: string,
     ruleId: string,
+    brandName?: string,
   ): string {
     const trimmed = additionalMessage.trim();
     if (trimmed) {
       return `Workflow: ${trimmed.slice(0, 64)}`;
     }
-    return `Workflow for rule ${ruleId.slice(0, 8)}`;
+    return brandName?.trim()
+      ? `${brandName.trim()} · Workflow`
+      : `Workflow for rule ${ruleId.slice(0, 8)}`;
   }
 
   private async persistGeneratedNodes(
@@ -1113,7 +1146,8 @@ export class WorkflowService {
   ): Promise<{ nodeIds: string[]; edges: WorkflowGraphEdge[] }> {
     const normalized = [...nodes]
       .sort((a, b) => a.order - b.order)
-      .map((n, idx) => {
+      .map((raw, idx) => {
+        const n = { ...raw, type: normalizeVideoNodeType(raw.type, raw.config) };
         const parsed = parseWorkflowNodeConfig(n.type, n.config);
         if (!parsed.ok) {
           throw new BadRequestException(
@@ -1142,6 +1176,9 @@ export class WorkflowService {
     graphNodes = expandGraphLaneTemplates(graphNodes, channelIds);
 
     const edges = buildWorkflowEdges(graphNodes);
+    // Store the execution order the edges describe (same as saveNodes does),
+    // so a later save - e.g. a lane change - doesn't visibly "reorder" nodes.
+    graphNodes = assignOrderFromGraph(graphNodes, edges);
     const forValidation = graphNodes.map((n) => ({
       nodeId: n.nodeId,
       type: n.type,

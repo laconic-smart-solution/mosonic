@@ -46,7 +46,7 @@
     "draftsApproval": "{{count}} drafts need approval",
     "draftsHint": "Review before publishing",
     "review": "Review",
-    "ruleSuggestions": "{{count}} rule suggestions",
+    "ruleSuggestions": "{{count}} brand profile suggestions",
     "ruleSuggestionsHint": "Tune campaigns from analytics",
     "open": "Open",
     "failedPublishes": "{{count}} failed publishes",
@@ -74,10 +74,10 @@
   "quickStart": {
     "title": "Welcome to Mosonic",
     "desc": "Three quick steps to your first publish",
-    "step1": "Create your Rule",
+    "step1": "Create your Brand Profile",
     "step2": "Generate your first content",
     "step3": "Publish to social media",
-    "cta": "Create your first rule"
+    "cta": "Create your first brand profile"
   },
   "error": {
     "title": "Couldn't load dashboard",

@@ -53,7 +53,8 @@ const NODE_TYPE_FILTER_VALUES: WorkflowNodeType[] = [
   "keyword_planner",
   "text_generation",
   "image_generation",
-  "video_generation",
+  "video_presenter",
+  "video_cinematic",
   "translation",
   "summarization",
 ]

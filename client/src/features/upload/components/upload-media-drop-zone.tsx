@@ -8,6 +8,8 @@ import { toastApiError } from "@/shared/lib/toast-error"
 import { buttonVariants } from "@/lib/button-variants"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
 
 import { FileServiceImage, FileServiceVideo } from "./upload-display-media"
@@ -297,6 +299,13 @@ export function UploadMediaDropZone({
             />
           </button>
         ) : null}
+        {mode === "video" && videoUrl ? (
+          <DownloadMediaButton
+            src={videoUrl}
+            filename={filenameFromMediaUrl(videoUrl, "video", "upload")}
+            className="absolute top-1 right-1 z-10 rounded-full"
+          />
+        ) : null}
 
         {isImages && collageCount > 0 ? (
           <div
@@ -347,6 +356,21 @@ export function UploadMediaDropZone({
                       </span>
                     ) : null}
                   </button>
+                  {!showOverflow ? (
+                    <DownloadMediaButton
+                      src={url}
+                      filename={filenameFromMediaUrl(
+                        url,
+                        "image",
+                        "upload"
+                      )}
+                      size="xs"
+                      className={cn(
+                        "absolute top-1 z-10 rounded-full opacity-0 transition-opacity group-hover/slot:opacity-100",
+                        disabled ? "right-1" : "right-8"
+                      )}
+                    />
+                  ) : null}
                   {!disabled && !showOverflow ? (
                     <Button
                       type="button"

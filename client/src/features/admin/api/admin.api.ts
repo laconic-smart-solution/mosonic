@@ -104,6 +104,22 @@ export const adminApi = {
   updateNodeCredit: (nodeType: string, body: { costUsd: number }) =>
     apiClient.put(`/admin/node-credits/${encodeURIComponent(nodeType)}`, body).then((r) => r.data),
 
+  listTokenRates: () =>
+    apiClient.get("/admin/token-rates").then((r) => r.data),
+
+  updateTokenRate: (
+    model: string,
+    body: {
+      provider: string
+      inputPerMToken: number
+      outputPerMToken: number
+      reasoningPerMToken?: number | null
+    },
+  ) =>
+    apiClient
+      .put(`/admin/token-rates/${encodeURIComponent(model)}`, body)
+      .then((r) => r.data),
+
   listPlans: () => apiClient.get("/admin/plans").then((r) => r.data),
 
   createPlan: (body: Record<string, unknown>) =>

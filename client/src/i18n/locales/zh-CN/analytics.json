@@ -2,17 +2,17 @@
   "page": {
     "eyebrow": "洞察",
     "title": "分析",
-    "subtitle": "按规则查看表现。打开卡片可查看渠道明细和 AI 建议。",
+    "subtitle": "按品牌档案查看表现。打开卡片可查看渠道明细和 AI 建议。",
     "loadErrorTitle": "无法加载分析数据",
     "loadErrorDesc": "请尝试刷新页面。",
-    "rulesCount": "{{count}} 条规则有分析数据",
-    "rulesCount_plural": "{{count}} 条规则有分析数据",
+    "rulesCount": "{{count}} 个品牌档案有分析数据",
+    "rulesCount_plural": "{{count}} 个品牌档案有分析数据",
     "emptyTitle": "暂无分析数据",
-    "emptyDesc": "使用 Zernio 发布内容后，同步规则以生成首个快照。",
+    "emptyDesc": "使用 Zernio 发布内容后，同步品牌档案以生成首个快照。",
     "syncFailed": "同步失败"
   },
   "summary": {
-    "rules": "规则",
+    "rules": "品牌档案",
     "suggestions": "建议",
     "lastPull": "上次拉取"
   },
@@ -22,7 +22,7 @@
     "suggestionsReady_plural": "{{count}} 条建议已就绪",
     "noNewSuggestions": "当前数据未产生新建议",
     "generateFailed": "无法生成建议",
-    "applied": "建议已应用到您的规则",
+    "applied": "建议已应用到您的品牌档案",
     "applyFailed": "无法应用建议",
     "rejected": "建议已拒绝",
     "rejectFailed": "无法拒绝建议",
@@ -47,8 +47,8 @@
     "daysAgo": "{{count}} 天前"
   },
   "detail": {
-    "missingRuleTitle": "缺少规则",
-    "missingRuleDesc": "从列表打开分析并选择一条规则。",
+    "missingRuleTitle": "缺少品牌档案",
+    "missingRuleDesc": "从列表打开分析并选择一个品牌档案。",
     "backToList": "全部分析",
     "noSnapshot": "暂无快照",
     "periodLastPulled": "{{range}} · 上次拉取 {{time}}",
@@ -60,7 +60,7 @@
     "suggestionsBanner": "此快照有 {{count}} 条新建议。",
     "suggestionsBanner_plural": "此快照有 {{count}} 条新建议。",
     "dismiss": "关闭",
-    "noSnapshotTitle": "此规则暂无快照",
+    "noSnapshotTitle": "此品牌档案暂无快照",
     "noSnapshotDesc": "使用 Zernio 发布或定时发帖，然后同步分析以生成首个快照。",
     "views": "浏览量",
     "likes": "点赞",
@@ -89,11 +89,11 @@
     "noSuggestionsGenerate": "生成建议以分析此快照。",
     "current": "当前",
     "suggested": "建议",
-    "appliedToRule": "已应用到规则",
+    "appliedToRule": "已应用到品牌档案",
     "rejectedLabel": "已拒绝",
     "apply": "应用",
     "reject": "拒绝",
-    "defaultRuleName": "规则"
+    "defaultRuleName": "品牌档案"
   },
   "confidence": {
     "high": "高",

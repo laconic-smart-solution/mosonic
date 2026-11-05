@@ -12,7 +12,7 @@ import { toast } from "sonner"
 import i18n from "@/i18n"
 import { toastApiError } from "@/shared/lib/toast-error"
 import { motion } from "framer-motion"
-import { Sparkles } from "lucide-react"
+import { ImagePlus, Sparkles, X } from "lucide-react"
 
 import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
 import { useSetBreadcrumbLabel } from "@/components/app/breadcrumb-override.context"
@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -199,6 +201,11 @@ export function UploadContentReviewPanel({
   const [genMoreDraftNodeId, setGenMoreDraftNodeId] = useState<string | null>(
     null,
   )
+  const [genMoreMessage, setGenMoreMessage] = useState("")
+  const [genMoreAttachments, setGenMoreAttachments] = useState<
+    Array<{ id: string; label: string; file: File }>
+  >([])
+  const genMoreFileInputRef = useRef<HTMLInputElement>(null)
   const [isGeneratingMore, setIsGeneratingMore] = useState(false)
   const [generateMorePending, setGenerateMorePending] = useState<{
     nodeId: string
@@ -294,7 +301,8 @@ export function UploadContentReviewPanel({
 
   const generateMoreTypes = useMemo<WorkflowNodeType[]>(
     () => [
-      "video_generation",
+      "video_presenter",
+      "video_cinematic",
       "summarization",
       "translation",
       "image_generation",
@@ -492,6 +500,8 @@ export function UploadContentReviewPanel({
     setSelectedGenType(null)
     setGenMoreConfigDraft({})
     setGenMoreDraftNodeId(null)
+    setGenMoreMessage("")
+    setGenMoreAttachments([])
     let cancelled = false
     setAvailableTypesLoading(true)
     void contentService
@@ -526,15 +536,24 @@ export function UploadContentReviewPanel({
         toast.error(i18n.t("upload:toast.unknownNodeType"))
         return
       }
+      const message = genMoreMessage.trim() || undefined
+      const attachments =
+        type === "image_generation" && genMoreAttachments.length > 0
+          ? genMoreAttachments
+          : undefined
       setIsGeneratingMore(true)
       setApproveEnabled(false)
       setGenMoreOpen(false)
       setSelectedGenType(null)
       setGenMoreConfigDraft({})
+      setGenMoreMessage("")
+      setGenMoreAttachments([])
       try {
         const { nodeId } = await contentService.generateNode(contentId, {
           type,
           config,
+          message,
+          attachments,
           ...(genMoreDraftNodeId ? { nodeId: genMoreDraftNodeId } : {}),
         })
         setGenMoreDraftNodeId(null)
@@ -552,7 +571,15 @@ export function UploadContentReviewPanel({
         setIsGeneratingMore(false)
       }
     },
-    [contentId, data?.workflowRef, genMoreDraftNodeId, queryClient, setRunState]
+    [
+      contentId,
+      data?.workflowRef,
+      genMoreAttachments,
+      genMoreDraftNodeId,
+      genMoreMessage,
+      queryClient,
+      setRunState,
+    ],
   )
 
   const approveMutation = useMutation({
@@ -635,7 +662,11 @@ export function UploadContentReviewPanel({
     setRunByNodeId((prev) => ({ ...prev, [nodeId]: emptyRunState() }))
   }
 
-  async function submitRerun(nodeId: string, message?: string) {
+  async function submitRerun(
+    nodeId: string,
+    message?: string,
+    attachments?: { id: string; label: string; file: File }[],
+  ) {
     if (isGeneratingMore) {
       toast.error(i18n.t("upload:toast.waitGeneration"))
       return
@@ -652,6 +683,7 @@ export function UploadContentReviewPanel({
       await contentService.rerunNode(contentId, {
         nodeId,
         message,
+        attachments,
         previousOutputs: {
           keywords: editedOutputs.keywords,
           text: editedOutputs.text,
@@ -737,6 +769,8 @@ export function UploadContentReviewPanel({
     setSelectedGenType(null)
     setGenMoreConfigDraft({})
     setGenMoreDraftNodeId(null)
+    setGenMoreMessage("")
+    setGenMoreAttachments([])
   }, [])
 
   if (!contentId) {
@@ -852,11 +886,11 @@ export function UploadContentReviewPanel({
               ← Change type
             </Button>
             <WorkflowNodeGuideSection
-              canvasType={backendTypeToCanvas(selectedGenType)}
+              canvasType={backendTypeToCanvas(selectedGenType, genMoreConfigDraft)}
             />
             <div className="max-h-[min(55vh,420px)] overflow-y-auto pr-1">
               <WorkflowNodeConfigFields
-                canvasType={backendTypeToCanvas(selectedGenType)}
+                canvasType={backendTypeToCanvas(selectedGenType, genMoreConfigDraft)}
                 config={genMoreConfigDraft}
                 onChange={setGenMoreConfigDraft}
                 workflowId={data?.workflowRef}
@@ -865,6 +899,88 @@ export function UploadContentReviewPanel({
                 compact
               />
             </div>
+            {selectedGenType === "image_generation" ? (
+              <div className="space-y-3 rounded-lg border border-border/80 bg-muted/20 p-3">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="gen-more-message"
+                    className="text-xs font-medium"
+                  >
+                    Direction for this variant (optional)
+                  </Label>
+                  <Textarea
+                    id="gen-more-message"
+                    value={genMoreMessage}
+                    onChange={(e) => setGenMoreMessage(e.target.value)}
+                    placeholder="e.g. warmer lighting, vertical for Stories…"
+                    rows={2}
+                    className="resize-y bg-background text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    Reference images (optional)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Uses this run&apos;s source pack (logo/product) when
+                    present. Attach extra refs for a new variant — this does
+                    not edit the last image.
+                  </p>
+                  <input
+                    ref={genMoreFileInputRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? [])
+                      if (files.length === 0) return
+                      setGenMoreAttachments((prev) => [
+                        ...prev,
+                        ...files.map((file) => ({
+                          id: randomUuid(),
+                          label: file.name,
+                          file,
+                        })),
+                      ])
+                      e.target.value = ""
+                    }}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={genMoreAttachments.length >= 4}
+                      onClick={() => genMoreFileInputRef.current?.click()}
+                    >
+                      <ImagePlus className="size-3.5" />
+                      Add images
+                    </Button>
+                    {genMoreAttachments.map((att) => (
+                      <span
+                        key={att.id}
+                        className="inline-flex max-w-[180px] items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs"
+                      >
+                        <span className="truncate">{att.label}</span>
+                        <button
+                          type="button"
+                          className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                          aria-label={`Remove ${att.label}`}
+                          onClick={() =>
+                            setGenMoreAttachments((prev) =>
+                              prev.filter((a) => a.id !== att.id),
+                            )
+                          }
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -1210,7 +1326,9 @@ export function UploadContentReviewPanel({
           onOpenChange={(open) => {
             if (!open) setRerunNodeId(null)
           }}
-          onSubmit={(nid, message) => void submitRerun(nid, message)}
+          onSubmit={(nid, message, attachments) =>
+            void submitRerun(nid, message, attachments)
+          }
         />
 
         <ContentDetailImageLightbox

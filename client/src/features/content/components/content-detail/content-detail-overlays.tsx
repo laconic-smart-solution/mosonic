@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { ImagePlus, X } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   Modal,
@@ -23,6 +25,7 @@ import {
   outputKeyForNodeType,
 } from "@/features/content/data/content-review-helpers"
 import { cn } from "@/lib/utils"
+import { randomUuid } from "@/lib/random-uuid"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
 import {
   LightboxInner,
@@ -32,12 +35,22 @@ import {
 
 type WorkflowNodesLite = WorkflowNode[]
 
+export type RerunAttachment = {
+  id: string
+  label: string
+  file: File
+}
+
 type RerunConfirmDialogProps = {
   openNodeId: string | null
   workflowNodes: WorkflowNodesLite
   globalRerunning: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (nodeId: string, message?: string) => void
+  onSubmit: (
+    nodeId: string,
+    message?: string,
+    attachments?: RerunAttachment[],
+  ) => void
 }
 
 export function ContentDetailRerunConfirmDialog({
@@ -53,12 +66,16 @@ export function ContentDetailRerunConfirmDialog({
   const openKey: OutputKey | undefined = openNode
     ? outputKeyForNodeType(openNode.type)
     : undefined
+  const isImageNode = openNode?.type === "image_generation"
 
   const [message, setMessage] = useState("")
+  const [attachments, setAttachments] = useState<RerunAttachment[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset the message whenever a different node's dialog opens (or it closes).
   useEffect(() => {
     setMessage("")
+    setAttachments([])
   }, [openNodeId])
 
   return (
@@ -90,19 +107,94 @@ export function ContentDetailRerunConfirmDialog({
             untouched.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-1.5 py-1">
-          <Label htmlFor="rerun-message" className="text-xs font-medium text-foreground">
-            What should change? (optional)
-          </Label>
-          <Textarea
-            id="rerun-message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="e.g. make the background darker, shorten the caption…"
-            rows={3}
-            disabled={globalRerunning}
-            className="resize-y bg-background text-sm leading-relaxed"
-          />
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="rerun-message"
+              className="text-xs font-medium text-foreground"
+            >
+              What should change? (optional)
+            </Label>
+            <Textarea
+              id="rerun-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={
+                isImageNode
+                  ? "Describe a change to adjust the current image, or leave empty to try a fresh one…"
+                  : "e.g. make the background darker, shorten the caption…"
+              }
+              rows={3}
+              disabled={globalRerunning}
+              className="resize-y bg-background text-sm leading-relaxed"
+            />
+          </div>
+          {isImageNode ? (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-foreground">
+                Reference images (optional)
+              </Label>
+              <p className="text-[11px] text-muted-foreground">
+                Leave the note empty to generate a fresh image. Describe a tweak
+                to adjust the current one. Attach a logo/product to composite —
+                say “start over” for a completely new concept.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+                multiple
+                className="hidden"
+                disabled={globalRerunning}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? [])
+                  if (files.length === 0) return
+                  setAttachments((prev) => [
+                    ...prev,
+                    ...files.map((file) => ({
+                      id: randomUuid(),
+                      label: file.name,
+                      file,
+                    })),
+                  ])
+                  e.target.value = ""
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={globalRerunning || attachments.length >= 4}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImagePlus className="size-3.5" />
+                  Add images
+                </Button>
+                {attachments.map((att) => (
+                  <span
+                    key={att.id}
+                    className="inline-flex max-w-[180px] items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                  >
+                    <span className="truncate">{att.label}</span>
+                    <button
+                      type="button"
+                      disabled={globalRerunning}
+                      className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${att.label}`}
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((a) => a.id !== att.id),
+                        )
+                      }
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={globalRerunning}>Cancel</AlertDialogCancel>
@@ -110,7 +202,12 @@ export function ContentDetailRerunConfirmDialog({
             disabled={!openNodeId || globalRerunning}
             onClick={(event) => {
               event.preventDefault()
-              if (openNodeId) onSubmit(openNodeId, message.trim() || undefined)
+              if (openNodeId)
+                onSubmit(
+                  openNodeId,
+                  message.trim() || undefined,
+                  attachments.length > 0 ? attachments : undefined,
+                )
             }}
           >
             Re-run node

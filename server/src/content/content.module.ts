@@ -23,7 +23,7 @@ import { ContentService } from './content.service';
     RepositoriesModule,
     forwardRef(() => OrchestrationModule),
     forwardRef(() => UploadModule),
-    WorkflowModule,
+    forwardRef(() => WorkflowModule),
   ],
   controllers: [ContentController, FileProxyController, ImageFileController],
   providers: [ContentService, FileProxyService, ImageFileService],

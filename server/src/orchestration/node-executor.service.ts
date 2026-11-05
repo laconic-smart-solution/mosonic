@@ -1,8 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
 import { EventsService } from '../events/events.service';
+import { RULE_ASSET_REPOSITORY } from '../repositories/tokens';
+import type { IRuleAssetRepository } from '../repositories/interfaces/rule-asset.repository.interface';
+import { pixelAssetsFromPack, type PipelineSourcePack } from '../pipeline/source-pack.types';
+import {
+  brandImageAssetsFromRuleAssets,
+  ensureBrandMarkInSourcePack,
+} from './brand-image-assets.util';
 import {
   LlmProvider,
   WorkflowNodeType,
@@ -16,6 +23,7 @@ import { MergeBarrierService } from '../nodes/services/merge-barrier.service';
 import { SummarizationService } from '../nodes/services/summarization.service';
 import { TextGenerationService } from '../nodes/services/text-generation.service';
 import { TranscriptionService } from '../nodes/services/transcription.service';
+import { SubtitleService } from '../nodes/services/subtitle.service';
 import { TranslationService } from '../nodes/services/translation.service';
 import { VideoGenerationService } from '../nodes/services/video-generation.service';
 import type {
@@ -46,6 +54,9 @@ export class NodeExecutor {
     private readonly intelligenceNode: IntelligenceNodeService,
     private readonly mergeBarrier: MergeBarrierService,
     private readonly costService: CostService,
+    @Inject(RULE_ASSET_REPOSITORY)
+    private readonly ruleAssets: IRuleAssetRepository,
+    private readonly subtitle: SubtitleService,
   ) {}
 
   getFriendlyError(error: unknown): string {
@@ -115,6 +126,15 @@ export class NodeExecutor {
       totalNodes: input.totalNodes,
     });
 
+    const sourcePack =
+      input.node.type === WorkflowNodeType.ImageGeneration
+        ? await this.withBrandImageAssets(
+            input.context.sourcePack,
+            input.context.rule?.ruleId,
+            input.imageEdit?.useBrandLogo === true,
+          )
+        : input.context.sourcePack;
+
     const nodeInput: NodeExecutionInput = {
       pipelineRef: input.pipelineId,
       workflowRef: input.node.workflowRef ?? input.pipelineId,
@@ -124,8 +144,10 @@ export class NodeExecutor {
       rule: input.context.rule,
       contentPrompt: input.context.contentPrompt,
       previousOutputs: input.context.previousOutputs,
+      sourcePack,
       intelligenceContext: input.intelligenceContext,
       nodeUserPrompt: input.node.userPrompt?.trim() || undefined,
+      imageEdit: input.imageEdit,
       onChunk: (chunk) => {
         this.emitDual(input, 'node:streaming', {
           pipelineId: input.pipelineId,
@@ -161,6 +183,41 @@ export class NodeExecutor {
     return { nodeId: input.node.nodeId, type: input.node.type, output };
   }
 
+  /**
+   * image_generation only: inject the Rule's ready logo as brand_mark.
+   * Keep-scene edits pin it as Image 2 even when the pack is already full.
+   */
+  private async withBrandImageAssets(
+    sourcePack: PipelineSourcePack | null | undefined,
+    ruleId: string | undefined,
+    logoOnly: boolean,
+  ): Promise<PipelineSourcePack | null | undefined> {
+    if (!ruleId) return sourcePack;
+
+    const existing = pixelAssetsFromPack(sourcePack);
+    if (existing.some((a) => a.role === 'brand_mark')) {
+      return sourcePack;
+    }
+
+    let ruleAssets: Awaited<ReturnType<IRuleAssetRepository['findByRuleId']>>;
+    try {
+      ruleAssets = await this.ruleAssets.findByRuleId(ruleId);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to load brand assets for image generation (rule ${ruleId}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return sourcePack;
+    }
+
+    const brandAssets = brandImageAssetsFromRuleAssets(ruleAssets);
+    const toMerge = logoOnly
+      ? brandAssets.filter((asset) => asset.role === 'brand_mark')
+      : brandAssets;
+    return ensureBrandMarkInSourcePack(sourcePack, toMerge);
+  }
+
   private emitDual(
     input: NodeExecutorInput,
     event: string,
@@ -193,12 +250,18 @@ export class NodeExecutor {
         return this.textGeneration.execute(input);
       case WorkflowNodeType.ImageGeneration:
         return this.imageGeneration.execute(input);
+      case WorkflowNodeType.VideoPresenter:
+        return this.videoGeneration.executePresenter(input);
+      case WorkflowNodeType.VideoCinematic:
+        return this.videoGeneration.executeCinematic(input);
       case WorkflowNodeType.VideoGeneration:
         return this.videoGeneration.execute(input);
       case WorkflowNodeType.Translation:
         return this.translation.execute(input);
       case WorkflowNodeType.Transcription:
         return this.transcription.execute(input);
+      case WorkflowNodeType.Subtitle:
+        return this.subtitle.execute(input);
       case WorkflowNodeType.Summarization:
         return this.summarization.execute(input);
       case WorkflowNodeType.Adapt:
@@ -230,6 +293,10 @@ export class NodeExecutor {
         return { summary: result.output ?? undefined };
       case WorkflowNodeType.Transcription:
         return { transcription: result.output ?? undefined };
+      case WorkflowNodeType.Subtitle:
+        return { subtitle: result.output ?? undefined };
+      case WorkflowNodeType.VideoPresenter:
+      case WorkflowNodeType.VideoCinematic:
       case WorkflowNodeType.VideoGeneration:
         return { video: result.output ?? undefined };
       case WorkflowNodeType.Adapt:
@@ -257,6 +324,7 @@ export class NodeExecutor {
         'translatedText',
         'summary',
         'transcription',
+        'subtitle',
         'video',
         'intelligenceHints',
         'intelligenceBrief',
@@ -360,6 +428,8 @@ export class NodeExecutor {
           imageQuality: ic.quality,
         };
       }
+      case WorkflowNodeType.VideoPresenter:
+      case WorkflowNodeType.VideoCinematic:
       case WorkflowNodeType.VideoGeneration: {
         const vc = result.videoCost;
         if (!vc) {

@@ -50,6 +50,7 @@ import {
   useRuleByIdQuery,
   useRulesPageQuery,
 } from "@/shared/queries/rule.query"
+import { useRuleAssetsQuery } from "@/shared/queries/rule-asset.query"
 import type { RuleReplacePayload } from "@/shared/services/rule.service"
 import type { RuleListItem } from "@/shared/services/rule.service"
 
@@ -280,6 +281,7 @@ export default function RulesPage() {
     Boolean(selectedRuleId)
   )
   const selectedRule = ruleDetailQuery.data
+  const selectedRuleAssetsQuery = useRuleAssetsQuery(selectedRuleId)
 
   useSetBreadcrumbLabel(selectedRule?.name)
 
@@ -290,8 +292,8 @@ export default function RulesPage() {
 
   const flow = useMemo(() => {
     if (!selectedRule) return { nodes: [] as Node[], edges: [] as Edge[] }
-    return buildRuleFlow(selectedRule, t)
-  }, [selectedRule, t])
+    return buildRuleFlow(selectedRule, t, selectedRuleAssetsQuery.data ?? [])
+  }, [selectedRule, t, selectedRuleAssetsQuery.data])
 
   const [flowNodes, setFlowNodes] = useState<Node[]>([])
 

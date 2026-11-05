@@ -79,6 +79,25 @@ function fileNameFromUrl(
     : 'transcription-source.mp4';
 }
 
+/**
+ * Resolve the media URL to transcribe: `config.sourceUrl` wins; otherwise fall
+ * back to an upstream video URL (e.g. video_presenter -> transcription), in
+ * which case sourceType becomes video. Pure helper (no network / AI).
+ */
+export function resolveTranscriptionSource(
+  config: WorkflowNodeConfig | undefined,
+  previousOutputs: TranscriptionInput['previousOutputs'] | undefined,
+): WorkflowNodeConfig {
+  const c = config ?? {};
+  const explicit = typeof c.sourceUrl === 'string' ? c.sourceUrl.trim() : '';
+  if (explicit) return { ...c, sourceUrl: explicit };
+  const video = previousOutputs?.video?.trim();
+  if (video && /^https?:\/\//i.test(video)) {
+    return { ...c, sourceUrl: video, sourceType: NodeMediaSourceType.Video };
+  }
+  return c;
+}
+
 @Injectable()
 export class TranscriptionService {
   constructor(private readonly llm: LlmService) {}
@@ -144,7 +163,7 @@ export class TranscriptionService {
     const normalized = normalizeTranscriptionConfig(config);
     if (!normalized.sourceUrl) {
       throw new UnprocessableEntityException(
-        'Transcription requires `config.sourceUrl`',
+        'Transcription requires `config.sourceUrl` (audio/video https URL) or an upstream video step',
       );
     }
 
@@ -185,7 +204,7 @@ export class TranscriptionService {
       rule: input.rule,
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
-      config: input.config ?? {},
+      config: resolveTranscriptionSource(input.config, input.previousOutputs),
     });
 
     return {

@@ -11,7 +11,7 @@ export const VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE =
 
 /** HeyGen presenter reference USD (fresh installs without legacy row). */
 export const VIDEO_GENERATION_PRESENTER_DEFAULT_COST_USD = 0.501;
-/** OpenAI Sora reference USD. */
+/** HeyGen cinematic reference USD (fresh installs without legacy row). */
 export const VIDEO_GENERATION_CINEMATIC_DEFAULT_COST_USD = 0.48;
 
 /** Flat-fee generation ops — not tied to pipeline node completion / refund logic. */

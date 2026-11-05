@@ -2,9 +2,9 @@
 
 ## Queue sharding
 
-Set `QUEUE_TENANT_ISOLATION=true` and `QUEUE_TENANT_BUCKETS=64`. Job routing uses `tenantQueueBucket(userId)` from `queue-tenant.util.ts`.
+Set `QUEUE_TENANT_ISOLATION=true` and `QUEUE_TENANT_BUCKETS=64`. `pipeline_nodes`, `video_generate` and `video_check` are then each sharded into 64 bucket queues (`pipeline_nodes__b0` … `pipeline_nodes__b63`, etc — `__` not `:`, since BullMQ queue names can't contain `:`), hashed per userId via `tenantQueueBucket()`/`tenantPipelineQueueName()` in `queue-tenant.util.ts`. This isolates a noisy user's backlog to the ~1/64th of users sharing their bucket, without the cost of a literal queue per user.
 
-Workers must register all bucket queues (`pipeline_nodes:b0` … `pipeline_nodes:b63`) or run with shared queues in development.
+Every bucket queue and its worker is registered automatically at boot from `allQueueNamesForBase()` (`orchestration.module.ts` for queue registration, the three processor classes' `onModuleInit` for workers) — no manual per-bucket wiring needed, in either the API process or the standalone `worker/main.ts` process. Leave `QUEUE_TENANT_ISOLATION=false` (default) for local dev to keep a single shared queue.
 
 ## Kubernetes layout
 

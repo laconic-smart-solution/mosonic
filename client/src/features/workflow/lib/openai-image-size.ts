@@ -3,6 +3,8 @@
  * Keep in sync with `server/src/nodes/openai-image-size.util.ts`.
  */
 
+export const OPENAI_IMAGE_GENERATION_MODEL = "gpt-image-2"
+
 export const GPT_STYLE_IMAGE_API_SIZES = [
   "1024x1024",
   "1024x1536",
@@ -70,7 +72,9 @@ export function coerceOpenAiImageSize(
   size: string | undefined,
   model: string,
 ): string {
-  const m = (model ?? "gpt-image-1").trim() || "gpt-image-1"
+  const m =
+    (model ?? OPENAI_IMAGE_GENERATION_MODEL).trim() ||
+    OPENAI_IMAGE_GENERATION_MODEL
   const s = (size ?? "").trim()
   if (s && isValidOpenAiImageSizeForModel(s, m)) {
     return s
@@ -92,10 +96,7 @@ export type NormalizeImageCanvasConfigResult = {
 export function normalizeImageCanvasConfig(
   config: Record<string, unknown>,
 ): NormalizeImageCanvasConfigResult {
-  const model =
-    typeof config.model === "string" && config.model.trim()
-      ? config.model.trim()
-      : "gpt-image-1"
+  const model = OPENAI_IMAGE_GENERATION_MODEL
   const ar =
     typeof config.aspectRatio === "string" && config.aspectRatio.trim()
       ? config.aspectRatio.trim()

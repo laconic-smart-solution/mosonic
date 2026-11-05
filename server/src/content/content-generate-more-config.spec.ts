@@ -15,8 +15,9 @@ describe('defaultWorkflowNodeConfigForRule', () => {
     );
     expect(config.aspectRatio).toBe(NodeAspectRatio.R9x16);
     expect(config.mode).toBe('cinematic');
-    expect(config.model).toBe('sora-2');
-    expect(config.duration).toBe(8);
+    expect(config.model).toBe('heygen_video_1');
+    expect(config.cinematicMode).toBe('cinematic_avatar');
+    expect(config.duration).toBe(10);
     expect(config.resolution).toBe('720p');
   });
 
@@ -25,7 +26,7 @@ describe('defaultWorkflowNodeConfigForRule', () => {
       WorkflowNodeType.ImageGeneration,
       null,
     );
-    expect(config.model).toBe('gpt-image-1');
+    expect(config.model).toBe('gpt-image-2');
     expect(config.style).toBe('natural');
     expect(config.aspectRatio).toBe('1:1');
     expect(config.quality).toBe('standard');

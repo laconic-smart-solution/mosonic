@@ -74,6 +74,22 @@ describe('resolveRerunWorkflowNodeId', () => {
     });
   });
 
+  it('persists onto the sole materialized pipeline child of a template id', () => {
+    const uuid = '8a8681d8-7b26-45fa-9e01-dffa7efa8abe';
+    const materializedId = `${uuid}__tiktok`;
+    expect(
+      resolveRerunWorkflowNodeId(
+        uuid,
+        workflowNodes,
+        [{ nodeId: materializedId, type: 'adapt', lane: 'tiktok' }],
+        ['tiktok'],
+      ),
+    ).toEqual({
+      outputNodeId: materializedId,
+      workflowNodeId: uuid,
+    });
+  });
+
   it('resolves uuid__facebook without graph lanes', () => {
     const uuid = '45078cfe-20e0-41c8-b368-6d6eae22f469';
     const materializedId = `${uuid}__facebook`;

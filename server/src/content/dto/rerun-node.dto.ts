@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -57,6 +59,16 @@ export class RerunNodeDto {
   @IsString()
   @MaxLength(2000)
   message?: string;
+
+  /** `edit` keeps the current image and applies only the follow-up. Omit for a full regenerate. */
+  @IsOptional()
+  @IsIn(['edit', 'regenerate'])
+  mode?: 'edit' | 'regenerate';
+
+  /** When true, the ready brand logo must be composited onto the current image. */
+  @IsOptional()
+  @IsBoolean()
+  useBrandLogo?: boolean;
 
   @IsOptional()
   @ValidateNested()

@@ -49,6 +49,7 @@ export class McpService {
   async connectChannel(
     platform: string,
     userId: string,
+    options?: { returnTo?: string },
   ): Promise<{ connectUrl: string }> {
     const channel = platform.trim().toLowerCase();
     if (isDeprecatedChannelId(channel)) {
@@ -73,16 +74,19 @@ export class McpService {
       );
     }
 
-    const connectUrl = await this.buildConnectUrl(platform, userId);
+    const connectUrl = await this.buildConnectUrl(platform, userId, options);
     return { connectUrl };
   }
 
   private async buildConnectUrl(
     platform: string,
     userId: string,
+    options?: { returnTo?: string },
   ): Promise<string> {
     const profileId = await this.ensureZernioProfileId(userId);
-    const state = await this.oauthState.signState(userId);
+    const state = await this.oauthState.signState(userId, {
+      returnTo: options?.returnTo,
+    });
     const base = this.config.get<string>('ZERNIO_CALLBACK_URL')?.trim();
     if (!base) {
       throw new Error('ZERNIO_CALLBACK_URL is not set');
@@ -99,12 +103,12 @@ export class McpService {
     accountId?: string;
     account_id?: string;
     username?: string;
-  }): Promise<{ platform: string }> {
+  }): Promise<{ platform: string; returnTo: string }> {
     const state = query.state;
     if (!state?.trim()) {
       throw new BadRequestException('Missing OAuth state');
     }
-    const { userId } = await this.oauthState.verifyState(state);
+    const { userId, returnTo } = await this.oauthState.verifyState(state);
 
     // Zernio docs: standard redirect appends connected, profileId, accountId, username.
     const platform = (
@@ -147,7 +151,7 @@ export class McpService {
     this.logger.log(
       `Zernio OAuth saved ${resolvedPlatform} for user ${userId} (${username ?? ''})`,
     );
-    return { platform: resolvedPlatform };
+    return { platform: resolvedPlatform, returnTo };
   }
 
   async syncAccounts(userId: string): Promise<{

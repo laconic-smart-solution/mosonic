@@ -80,12 +80,24 @@ export type ContentOutputs = {
   video?: string
 }
 
+export type ContentDraftNodeView = {
+  nodeId: string
+  type: string
+  lane: string | null
+  field: string
+  preview: string
+  pending: boolean
+}
+
 export type ContentDetail = {
   contentId: string
   /** Merged userEdits over outputs. */
   outputs?: ContentOutputs
   nodeOutputs?: Record<string, Record<string, unknown>>
   nodeUserEdits?: Record<string, Record<string, unknown>>
+  /** Channel lanes for per-channel preview (chat card / review). */
+  lanes?: string[]
+  nodes?: ContentDraftNodeView[]
   pipelineRef: string
   workflowRef: string
   ruleRef: string
@@ -119,6 +131,10 @@ export type GenerateNodeBody = {
   config?: Record<string, unknown>
   /** @deprecated Use `config` instead. */
   userPrompt?: string
+  /** Optional direction for this extra output. */
+  message?: string
+  /** Reference images for image_generation (multipart). */
+  attachments?: Array<{ id: string; label: string; file: File }>
 }
 
 export type GenerateNodeResponse = {
