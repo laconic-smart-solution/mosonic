@@ -23,6 +23,10 @@ import { useRuleBuildProgress } from "@/features/chat/hooks/use-rule-build-progr
 import { useQueryClient } from "@tanstack/react-query"
 import { flattenChatMessagePages } from "@/features/chat/lib/chat-message-pages"
 import {
+  createPendingUserMessage,
+  withPendingUserMessage,
+} from "@/features/chat/lib/optimistic-chat-message"
+import {
   readHomeOauthReturn,
   stripHomeOauthParams,
 } from "@/features/home/lib/home-oauth-return"
@@ -90,11 +94,25 @@ export default function HomePage() {
   }, [searchParams, setSearchParams, syncMutation, tSettings])
 
   const messagesQuery = useChatMessagesQuery(activeSessionId ?? undefined)
-  const { messages: threadMessages, historicalIds } = useMemo(
-    () => flattenChatMessagePages(messagesQuery.data?.pages),
-    [messagesQuery.data],
-  )
   const sendMessageMutation = useSendChatMessageMutation()
+  const { messages: threadMessages, historicalIds } = useMemo(() => {
+    const flat = flattenChatMessagePages(messagesQuery.data?.pages)
+    const pending =
+      sendMessageMutation.isPending && sendMessageMutation.variables
+        ? createPendingUserMessage(
+            sendMessageMutation.variables.sessionId,
+            sendMessageMutation.variables.content,
+          )
+        : null
+    return {
+      messages: withPendingUserMessage(flat.messages, pending),
+      historicalIds: flat.historicalIds,
+    }
+  }, [
+    messagesQuery.data,
+    sendMessageMutation.isPending,
+    sendMessageMutation.variables,
+  ])
   const queryClient = useQueryClient()
   // Run follow-up replies arrive over the socket, not from our own send - refetch the thread.
   const { liveSteps, isFollowUp, prepareSession } = useChatSteps(activeSessionId, (sessionId) => {

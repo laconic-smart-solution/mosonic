@@ -1,12 +1,19 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query"
 
 import { toast } from "sonner"
 
 import { invalidateForToolSteps } from "@/features/chat/lib/chat-tool-invalidation"
+import { commitChatTurnMessages } from "@/features/chat/lib/optimistic-chat-message"
 import i18n from "@/i18n"
 import { parseApiError } from "@/shared/lib/api-error"
 import { toastApiError } from "@/shared/lib/toast-error"
-import { chatService } from "../services/chat.service"
+import { chatService, type ChatMessagePage } from "../services/chat.service"
 
 export function useChatSessionsQuery(ruleId: string | undefined) {
   return useQuery({
@@ -50,6 +57,10 @@ export function useSendChatMessageMutation() {
     mutationFn: ({ sessionId, content }: { sessionId: string; content: string }) =>
       chatService.sendMessage(sessionId, content),
     onSuccess: (data, { sessionId }) => {
+      queryClient.setQueryData<InfiniteData<ChatMessagePage>>(
+        ["chat-messages", sessionId],
+        (old) => commitChatTurnMessages(old, data),
+      )
       void queryClient.invalidateQueries({ queryKey: ["chat-messages", sessionId] })
       // Tools the agent ran this turn may have changed workflow/content/rule/etc.
       invalidateForToolSteps(queryClient, data.assistantMessage?.steps)
