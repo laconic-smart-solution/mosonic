@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { ImageFileService } from '../content/image-file.service';
 import { EventsModule } from '../events/events.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { LlmModule } from '../llm/llm.module';
 import { McpModule } from '../mcp/mcp.module';
 import { PlanModule } from '../plan/plan.module';
@@ -34,6 +35,7 @@ import { ChatPipelineFollowupService } from './chat/chat-pipeline-followup.servi
   imports: [
     AuthModule,
     CreditModule,
+    IntegrationsModule,
     LlmModule,
     EventsModule,
     RepositoriesModule,

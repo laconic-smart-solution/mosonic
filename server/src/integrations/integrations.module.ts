@@ -31,6 +31,6 @@ import { OutboundWebhookService } from './outbound-webhook.service';
     OutboundWebhookService,
     CompetitionEventIntegrationService,
   ],
-  exports: [OutboundWebhookService, IntegrationsService],
+  exports: [OutboundWebhookService, IntegrationsService, ApiKeyOrJwtGuard],
 })
 export class IntegrationsModule {}

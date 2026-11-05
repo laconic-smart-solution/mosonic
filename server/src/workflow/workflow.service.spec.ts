@@ -23,56 +23,58 @@ describe('WorkflowService.findPage', () => {
     distinctRefs?: string[];
     nodeRows?: Array<{ workflowRef: string; type: string }>;
   }) {
-    const workflowModel = {
-      find: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            skip: jest.fn().mockReturnValue({
-              limit: jest.fn().mockReturnValue({
-                lean: jest.fn().mockReturnValue({
-                  exec: jest.fn().mockResolvedValue(deps.findRows),
-                }),
-              }),
-            }),
-          }),
-        }),
+    const workflowsRepo = {
+      findPage: jest.fn().mockResolvedValue({
+        rows: deps.findRows,
+        total: deps.total,
       }),
-      countDocuments: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue(deps.total),
-      }),
-    };
-    const workflowNodeModel = {
-      distinct: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue(deps.distinctRefs ?? []),
-      }),
-      find: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          lean: jest.fn().mockReturnValue({
-            exec: jest.fn().mockResolvedValue(deps.nodeRows ?? []),
-          }),
-        }),
-      }),
-      deleteMany: jest.fn(),
+      findById: jest.fn(),
+      findLatestByRule: jest.fn(),
       create: jest.fn(),
+      updateById: jest.fn(),
     };
+    const workflowNodesRepo = {
+      distinctWorkflowRefsByType: jest
+        .fn()
+        .mockResolvedValue(deps.distinctRefs ?? []),
+      findNodeTypesByWorkflowRefs: jest.fn().mockResolvedValue(
+        (deps.nodeRows ?? []).map((r) => ({
+          workflowRef: r.workflowRef,
+          type: r.type,
+        })),
+      ),
+      findByWorkflowRefs: jest.fn().mockResolvedValue(
+        (deps.nodeRows ?? []).map((r) => ({
+          workflowRef: r.workflowRef,
+          type: r.type,
+        })),
+      ),
+      findByWorkflow: jest.fn().mockResolvedValue([]),
+      deleteManyByWorkflow: jest.fn(),
+      createMany: jest.fn(),
+    };
+    const pipelinesRepo = {} as never;
     const workflowGeneration = {} as never;
     const llm = {} as never;
     const ruleService = {} as never;
     const events = {} as never;
+    const credit = {} as never;
 
     const service = new WorkflowService(
-      workflowModel as never,
-      workflowNodeModel as never,
+      workflowsRepo as never,
+      workflowNodesRepo as never,
+      pipelinesRepo,
       workflowGeneration,
       llm,
       ruleService,
       events,
+      credit,
     );
-    return { service, workflowModel, workflowNodeModel };
+    return { service, workflowsRepo, workflowNodesRepo };
   }
 
   it('returns empty data and zero total when nodeType filter matches no nodes', async () => {
-    const { service, workflowModel } = makeService({
+    const { service, workflowsRepo } = makeService({
       findRows: [],
       total: 0,
       distinctRefs: [],
@@ -88,7 +90,7 @@ describe('WorkflowService.findPage', () => {
     );
 
     expect(out).toEqual({ data: [], total: 0 });
-    expect(workflowModel.find).not.toHaveBeenCalled();
+    expect(workflowsRepo.findPage).not.toHaveBeenCalled();
   });
 
   it('applies name search and returns nodeTypes for workflows on the page', async () => {
@@ -99,7 +101,7 @@ describe('WorkflowService.findPage', () => {
       status: WorkflowStatus.Ready,
       updatedAt: new Date('2026-01-02T00:00:00.000Z'),
     };
-    const { service, workflowModel, workflowNodeModel } = makeService({
+    const { service, workflowsRepo, workflowNodesRepo } = makeService({
       findRows: [wf1],
       total: 1,
       distinctRefs: ['wf-1'],
@@ -118,8 +120,8 @@ describe('WorkflowService.findPage', () => {
       auth,
     );
 
-    expect(workflowModel.find).toHaveBeenCalled();
-    expect(workflowNodeModel.distinct).toHaveBeenCalled();
+    expect(workflowsRepo.findPage).toHaveBeenCalled();
+    expect(workflowNodesRepo.distinctWorkflowRefsByType).toHaveBeenCalled();
     expect(out.total).toBe(1);
     expect(out.data).toHaveLength(1);
     expect(out.data[0]).toMatchObject({
@@ -138,7 +140,7 @@ describe('WorkflowService.findPage', () => {
   });
 
   it('loads workflows without node filter when only search q is set', async () => {
-    const { service, workflowNodeModel } = makeService({
+    const { service, workflowNodesRepo } = makeService({
       findRows: [
         {
           workflowId: 'wf-2',
@@ -157,7 +159,7 @@ describe('WorkflowService.findPage', () => {
       auth,
     );
 
-    expect(workflowNodeModel.distinct).not.toHaveBeenCalled();
+    expect(workflowNodesRepo.distinctWorkflowRefsByType).not.toHaveBeenCalled();
     expect(out.total).toBe(3);
     expect(out.data[0].workflowId).toBe('wf-2');
   });
@@ -179,49 +181,40 @@ describe('WorkflowService.saveNodesForRule', () => {
   function makeSaveByRuleService(
     existingWorkflow: { workflowId: string } | null,
   ) {
-    const findOneExec = jest.fn().mockResolvedValue(existingWorkflow);
-    const workflowModel = {
-      findOne: jest.fn().mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          exec: findOneExec,
-        }),
-      }),
+    const workflowsRepo = {
+      findLatestByRule: jest.fn().mockResolvedValue(existingWorkflow),
       create: jest.fn().mockResolvedValue({
         workflowId: 'wf-new',
         ruleRef: ruleId,
         status: WorkflowStatus.Ready,
       }),
-      updateOne: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue({}),
-      }),
+      updateById: jest.fn().mockResolvedValue({}),
     };
-    const workflowNodeModel = {
-      deleteMany: jest
-        .fn()
-        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
-      findOneAndUpdate: jest
-        .fn()
-        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+    const workflowNodesRepo = {
+      deleteManyByWorkflow: jest.fn(),
+      createMany: jest.fn(),
     };
     const ruleService = {
       getRuleById: jest.fn().mockResolvedValue({ ruleId }),
     };
     const service = new WorkflowService(
-      workflowModel as never,
-      workflowNodeModel as never,
+      workflowsRepo as never,
+      workflowNodesRepo as never,
+      {} as never,
       {} as never,
       {} as never,
       ruleService as never,
+      {} as never,
       {} as never,
     );
     const saveNodesSpy = jest
       .spyOn(service, 'saveNodes')
       .mockResolvedValue({ success: true });
-    return { service, workflowModel, ruleService, saveNodesSpy };
+    return { service, workflowsRepo, ruleService, saveNodesSpy };
   }
 
   it('creates a ready workflow when none exists, then saves nodes', async () => {
-    const { service, workflowModel, ruleService, saveNodesSpy } =
+    const { service, workflowsRepo, ruleService, saveNodesSpy } =
       makeSaveByRuleService(null);
 
     const out = await service.saveNodesForRule(
@@ -231,7 +224,7 @@ describe('WorkflowService.saveNodesForRule', () => {
     );
 
     expect(ruleService.getRuleById).toHaveBeenCalledWith(ruleId, auth);
-    expect(workflowModel.create).toHaveBeenCalledWith(
+    expect(workflowsRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'My workflow',
         ruleRef: ruleId,
@@ -244,13 +237,13 @@ describe('WorkflowService.saveNodesForRule', () => {
   });
 
   it('reuses existing workflow for the rule', async () => {
-    const { service, workflowModel, saveNodesSpy } = makeSaveByRuleService({
+    const { service, workflowsRepo, saveNodesSpy } = makeSaveByRuleService({
       workflowId: 'wf-existing',
     });
 
     const out = await service.saveNodesForRule(ruleId, saveBody, auth);
 
-    expect(workflowModel.create).not.toHaveBeenCalled();
+    expect(workflowsRepo.create).not.toHaveBeenCalled();
     expect(saveNodesSpy).toHaveBeenCalledWith('wf-existing', saveBody, auth);
     expect(out).toEqual({ workflowId: 'wf-existing', success: true });
   });
@@ -260,26 +253,25 @@ describe('WorkflowService.updateWorkflow', () => {
   const auth: TenancyAuth = { userId: 'u1', role: UserRole.CUSTOMER };
 
   function makeUpdateService(existing: { workflowId: string } | null) {
-    const updateOneExec = jest.fn().mockResolvedValue({});
-    const workflowModel = {
-      findOne: jest.fn().mockReturnValue({
-        exec: jest.fn().mockResolvedValue(existing),
-      }),
-      updateOne: jest.fn().mockReturnValue({ exec: updateOneExec }),
+    const workflowsRepo = {
+      findById: jest.fn().mockResolvedValue(existing),
+      updateById: jest.fn().mockResolvedValue({}),
     };
     const service = new WorkflowService(
-      workflowModel as never,
+      workflowsRepo as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
       {} as never,
       {} as never,
     );
-    return { service, workflowModel, updateOneExec };
+    return { service, workflowsRepo };
   }
 
   it('updates workflow name', async () => {
-    const { service, workflowModel } = makeUpdateService({
+    const { service, workflowsRepo } = makeUpdateService({
       workflowId: 'wf-1',
     });
 
@@ -289,23 +281,26 @@ describe('WorkflowService.updateWorkflow', () => {
       auth,
     );
 
-    expect(workflowModel.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ workflowId: 'wf-1' }),
-      { $set: { name: 'Renamed' } },
+    expect(workflowsRepo.updateById).toHaveBeenCalledWith(
+      'wf-1',
+      { name: 'Renamed' },
+      auth,
     );
     expect(out).toEqual({ workflowId: 'wf-1', name: 'Renamed' });
   });
 
   it('uses Untitled Workflow when name is empty after trim', async () => {
-    const { service, workflowModel } = makeUpdateService({
+    const { service, workflowsRepo } = makeUpdateService({
       workflowId: 'wf-1',
     });
 
     const out = await service.updateWorkflow('wf-1', { name: '   ' }, auth);
 
-    expect(workflowModel.updateOne).toHaveBeenCalledWith(expect.anything(), {
-      $set: { name: 'Untitled Workflow' },
-    });
+    expect(workflowsRepo.updateById).toHaveBeenCalledWith(
+      'wf-1',
+      { name: 'Untitled Workflow' },
+      auth,
+    );
     expect(out.name).toBe('Untitled Workflow');
   });
 

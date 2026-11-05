@@ -15,6 +15,16 @@ async function bootstrap() {
     rawBody: true,
   });
   app.use(cookieParser());
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      if (!req.url.includes('/docs') && !req.url.includes('/health')) {
+        console.log(`[HTTP] ${req.method} ${req.url} -> ${res.statusCode} (${duration}ms)`);
+      }
+    });
+    next();
+  });
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({

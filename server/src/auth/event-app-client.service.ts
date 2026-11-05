@@ -18,6 +18,7 @@ export interface EventAppUserInfo {
   organizationName?: string;
   role?: string;
   redirectPath?: string;
+  accessToken?: string;
 }
 
 @Injectable()

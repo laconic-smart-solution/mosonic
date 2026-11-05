@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, WorkflowStatus } from '@prisma/client';
+import { UserRole } from '../../domain/users/user.types';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { PrismaService } from '../../database/prisma.service';
 import type { WorkflowRecord } from '../../domain/workflow/workflow.types';
@@ -14,26 +15,50 @@ export class PrismaWorkflowRepository implements IWorkflowRepository {
     workflowId: string,
     auth?: TenancyAuth,
   ): Promise<WorkflowRecord | null> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowId }, auth)
-      : { workflowId };
-    return this.prisma.workflow.findFirst({ where });
+    if (!auth || auth.role === UserRole.ADMIN) {
+      return this.prisma.workflow.findFirst({ where: { workflowId } });
+    }
+    return this.prisma.workflow.findFirst({
+      where: {
+        workflowId,
+        OR: [{ userId: auth.userId }, { userId: null }, { isTemplate: true }],
+      },
+    });
   }
 
-  findLatestByRule(
+  async findLatestByRule(
     ruleRef: string,
     auth?: TenancyAuth,
   ): Promise<WorkflowRecord | null> {
-    const where = auth ? mergeTenancyWhere({ ruleRef }, auth) : { ruleRef };
+    if (!auth || auth.role === UserRole.ADMIN) {
+      return this.prisma.workflow.findFirst({
+        where: { ruleRef },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    // 1. Try finding user's own workflow for this rule
+    const userWorkflow = await this.prisma.workflow.findFirst({
+      where: { ruleRef, userId: auth.userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (userWorkflow) {
+      return userWorkflow;
+    }
+
+    // 2. Fall back to any system/template or unowned ready workflow on this rule
     return this.prisma.workflow.findFirst({
-      where,
+      where: {
+        ruleRef,
+        OR: [{ userId: null }, { isTemplate: true }, { status: 'ready' }],
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   findLatestReadyByRule(ruleRef: string): Promise<WorkflowRecord | null> {
     return this.prisma.workflow.findFirst({
-      where: { ruleRef, status: 'ready', isTemplate: false },
+      where: { ruleRef, status: 'ready' },
       orderBy: { createdAt: 'desc' },
     });
   }

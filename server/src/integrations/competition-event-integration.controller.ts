@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Req,
@@ -31,6 +32,8 @@ const bodyPipe = new ValidationPipe({
 @UseGuards(ApiKeyOrJwtGuard)
 @Controller('integrations/v1/competition-event')
 export class CompetitionEventIntegrationController {
+  private readonly logger = new Logger(CompetitionEventIntegrationController.name);
+
   constructor(
     private readonly competitionEvent: CompetitionEventIntegrationService,
     private readonly users: UsersService,
@@ -43,6 +46,7 @@ export class CompetitionEventIntegrationController {
     @Body() body: GenerateCompetitionEventContentDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    this.logger.log(`POST content/generate-from-prompt for user=${auth.userId}, externalRef=${body.externalRef}`);
     return this.competitionEvent.generateFromPrompt(body, auth);
   }
 
@@ -53,6 +57,7 @@ export class CompetitionEventIntegrationController {
     @Body() body: GenerateCompetitionEventSocialContentDto,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    this.logger.log(`POST social-content/generate for user=${auth.userId}, ruleId=${body.ruleId}, externalRef=${body.externalRef}`);
     return this.competitionEvent.generateSocialContent(body, auth);
   }
 
@@ -62,6 +67,7 @@ export class CompetitionEventIntegrationController {
     @Param('pipelineId') pipelineId: string,
   ) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    this.logger.log(`GET social-content/${pipelineId} for user=${auth.userId}`);
     return this.competitionEvent.getSocialContent(pipelineId, auth);
   }
 

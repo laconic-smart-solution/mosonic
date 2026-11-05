@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { DatabaseModule } from '../database/database.module';
 import { EventsModule } from '../events/events.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { LlmModule } from '../llm/llm.module';
 import { NodesModule } from '../nodes/nodes.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
@@ -21,6 +22,7 @@ import { WorkflowResolveService } from './workflow-resolve.service';
     CreditModule,
     DatabaseModule,
     EventsModule,
+    IntegrationsModule,
     LlmModule,
     NodesModule,
     RepositoriesModule,

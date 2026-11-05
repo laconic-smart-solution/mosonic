@@ -18,6 +18,7 @@ import type {
   WorkflowNodeQueryOptions,
 } from '../interfaces/workflow-node.repository.interface';
 import { mergeTenancyWhere } from './prisma.util';
+import { UserRole } from '../../domain/users/user.types';
 
 const VIDEO_NODE_TYPE_VALUES: WorkflowNodeType[] = [
   'video_presenter',
@@ -35,6 +36,23 @@ type NodeWithTypedConfig = Parameters<typeof hydrateTypedWorkflowNode>[0];
 
 function hydrate(node: NodeWithTypedConfig): WorkflowNodeRecord {
   return hydrateTypedWorkflowNode(node) as unknown as WorkflowNodeRecord;
+}
+
+/** Customer tenancy that still allows system/template workflow nodes. */
+function tenancyWhereForNodes<T extends Record<string, unknown>>(
+  base: T,
+  auth?: TenancyAuth,
+): T | (T & { OR: Array<Record<string, unknown>> }) {
+  if (!auth || auth.role === UserRole.ADMIN) return base;
+  return {
+    ...base,
+    OR: [
+      { userId: auth.userId },
+      { userId: null },
+      { workflow: { isTemplate: true } },
+      { workflow: { userId: null } },
+    ],
+  };
 }
 
 type SyncableNode = {
@@ -56,9 +74,8 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     const base = opts?.templateOnly
       ? { workflowRef, isGenerateMoreOnly: false }
       : { workflowRef };
-    const where = auth ? mergeTenancyWhere(base, auth) : base;
     const rows = await this.prisma.workflowNode.findMany({
-      where,
+      where: tenancyWhereForNodes(base, auth),
       orderBy: { order: 'asc' },
       include: WITH_VIDEO_CONFIG,
     });
@@ -73,9 +90,8 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     const base = opts?.templateOnly
       ? { workflowRef: { in: workflowRefs }, isGenerateMoreOnly: false }
       : { workflowRef: { in: workflowRefs } };
-    const where = auth ? mergeTenancyWhere(base, auth) : base;
     const rows = await this.prisma.workflowNode.findMany({
-      where,
+      where: tenancyWhereForNodes(base, auth),
       include: WITH_VIDEO_CONFIG,
     });
     return rows.map(hydrate);
@@ -86,11 +102,8 @@ export class PrismaWorkflowNodeRepository implements IWorkflowNodeRepository {
     nodeId: string,
     auth?: TenancyAuth,
   ): Promise<WorkflowNodeRecord | null> {
-    const where = auth
-      ? mergeTenancyWhere({ workflowRef, nodeId }, auth)
-      : { workflowRef, nodeId };
     const row = await this.prisma.workflowNode.findFirst({
-      where,
+      where: tenancyWhereForNodes({ workflowRef, nodeId }, auth),
       include: WITH_VIDEO_CONFIG,
     });
     return row ? hydrate(row) : null;

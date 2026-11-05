@@ -67,6 +67,39 @@ describe('AuthController - SSO Exchange', () => {
     );
   });
 
+  it('redirects directly to target without OTP when accessToken is provided', async () => {
+    cookies.writeTokens = jest.fn();
+    eventAppClient.validateExchangeCode.mockResolvedValueOnce({
+      valid: true,
+      email: 'organizer@example.com',
+      redirectPath: '/dashboard',
+      accessToken: 'test-sso-jwt-token',
+    });
+
+    const req = {} as never;
+    const res = {
+      redirect: jest.fn(),
+    } as never;
+
+    await controller.startExchange(
+      'xyz123',
+      '/custom-path',
+      req,
+      undefined,
+      res,
+    );
+
+    expect(eventAppClient.validateExchangeCode).toHaveBeenCalledWith('xyz123');
+    expect(sso.resendOtpByEmail).not.toHaveBeenCalled();
+    expect(cookies.writeTokens).toHaveBeenCalledWith(res, {
+      accessToken: 'test-sso-jwt-token',
+    });
+    expect((res as any).redirect).toHaveBeenCalledWith(
+      302,
+      'https://mosonic.me/custom-path?source=crabonic',
+    );
+  });
+
   it('does not clear cookies when the access token is simply missing/expired (inconclusive)', async () => {
     eventAppClient.validateExchangeCode.mockResolvedValueOnce({
       valid: true,

@@ -33,10 +33,18 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     if (!key) {
       throw new UnauthorizedException('Invalid API key');
     }
-    if (!key.scopes.includes(COMPETITION_EVENT_API_SCOPE)) {
-      throw new ForbiddenException(
-        `API key missing ${COMPETITION_EVENT_API_SCOPE} scope`,
-      );
+    const isCompetitionEventRoute =
+      req.originalUrl?.includes('/competition-event') ||
+      req.url?.includes('/competition-event');
+    if (isCompetitionEventRoute) {
+      if (
+        !key.scopes.includes(COMPETITION_EVENT_API_SCOPE) &&
+        !key.scopes.includes('*')
+      ) {
+        throw new ForbiddenException(
+          `API key missing ${COMPETITION_EVENT_API_SCOPE} scope`,
+        );
+      }
     }
 
     const localUser = await this.users.findByUserId(key.userId);
