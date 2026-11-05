@@ -81,4 +81,14 @@ export class SaveContentDto {
   @IsOptional()
   @IsObject()
   nodeUserEdits?: Record<string, Record<string, unknown>>;
+
+  /** Per-node AI output layers. Used when copying a finished re-run onto the draft. */
+  @IsOptional()
+  @IsObject()
+  nodeOutputs?: Record<string, Record<string, unknown>>;
+
+  /** Per-channel adapt/image layers shown on content channel tabs. */
+  @IsOptional()
+  @IsObject()
+  laneOutputs?: Record<string, Record<string, unknown>>;
 }

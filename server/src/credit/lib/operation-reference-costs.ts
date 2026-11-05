@@ -18,9 +18,11 @@ export const OPERATION_REFERENCE_COSTS: OperationReferenceCost[] = [
   },
   {
     nodeType: 'video_generation_cinematic',
-    provider: 'openai',
+    provider: 'heygen',
     costUsd: 0.48,
   },
+  // Legacy / optional alternate providers kept for admin tables.
+  { nodeType: 'video_generation_cinematic', provider: 'openai', costUsd: 0.48 },
   { nodeType: 'video_generation_cinematic', provider: 'runway', costUsd: 0.5 },
   { nodeType: 'transcription', provider: 'openai', costUsd: 0.006 },
 ];

@@ -17,6 +17,15 @@ export const useWorkflowsPageQuery = (
   })
 }
 
+export const useWorkflowByRuleQuery = (ruleId: string | null) => {
+  return useQuery({
+    queryKey: ["workflow", "rule", ruleId],
+    queryFn: () => workflowService.getByRuleId(ruleId as string),
+    enabled: Boolean(ruleId),
+    retry: false,
+  })
+}
+
 export const useGenerateWorkflow = () => {
   const queryClient = useQueryClient()
   return useMutation({

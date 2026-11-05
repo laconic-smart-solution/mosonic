@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
@@ -41,6 +42,7 @@ function uniquePipelineNodeTypes(nodes: unknown): string[] {
 @Injectable()
 export class PipelineService {
   constructor(
+    @Inject(forwardRef(() => OrchestrationService))
     private readonly orchestration: OrchestrationService,
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelines: IPipelineRepository,
@@ -151,6 +153,12 @@ export class PipelineService {
     useLearnings?: boolean;
     executionMode?: 'auto' | 'step';
     reviewNodeIds?: string[];
+    files?: Array<{
+      buffer: Buffer;
+      originalname: string;
+      mimetype?: string;
+    }>;
+    urls?: string[];
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     return this.orchestration.startPipeline(args);

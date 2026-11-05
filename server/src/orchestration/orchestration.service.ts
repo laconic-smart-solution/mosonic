@@ -88,7 +88,14 @@ import { PipelineNodeCompletionService } from './pipeline-node-completion.servic
 import { validateAndNormalizeReviewNodeIds } from './pipeline-node-review-eligibility.util';
 import { PipelineNodeReviewService } from './pipeline-node-review.service';
 import { RuleOverlayBuilderService } from './rule-overlay-builder.service';
+import { SourcePackBuilderService } from './source-pack-builder.service';
 import { buildApprovalStateFromPolicy } from '../content/content-approval.util';
+import type { UploadedFileLike } from '../preprocessing/preprocessed.types';
+import {
+  emptySourcePack,
+  type SourcePackAsset,
+  parsePipelineSourcePack,
+} from '../pipeline/source-pack.types';
 import {
   buildLinearEdgesFromOrder,
   parseWorkflowEdges,
@@ -141,6 +148,7 @@ export class OrchestrationService {
     private readonly telegramNotify: TelegramNotifyService,
     private readonly viberNotify: ViberNotifyService,
     private readonly whatsappNotify: WhatsAppNotifyService,
+    private readonly sourcePackBuilder: SourcePackBuilderService,
   ) {
     this.useQueue =
       config.get<string>('ORCHESTRATION_USE_QUEUE', 'false').toLowerCase() ===
@@ -154,6 +162,10 @@ export class OrchestrationService {
     useLearnings?: boolean;
     executionMode?: 'auto' | 'step';
     reviewNodeIds?: string[];
+    files?: UploadedFileLike[];
+    urls?: string[];
+    /** Images picked in chat (e.g. attached screenshots), sent to image steps as references. */
+    referenceAssets?: SourcePackAsset[];
     metadata?: {
       source?: 'manual' | 'scheduler' | 'integration' | 'news';
       scheduleId?: string;
@@ -169,8 +181,12 @@ export class OrchestrationService {
     auth: TenancyAuth;
   }): Promise<{ pipelineId: string }> {
     const contentPrompt = input.contentPrompt.trim();
-    if (!contentPrompt) {
-      throw new BadRequestException('contentPrompt must not be empty');
+    const files = input.files ?? [];
+    const urls = (input.urls ?? []).map((u) => u.trim()).filter(Boolean);
+    if (!contentPrompt && files.length === 0 && urls.length === 0) {
+      throw new BadRequestException(
+        'contentPrompt must not be empty unless files or urls are provided',
+      );
     }
 
     const workflow = await this.workflows.findById(
@@ -297,13 +313,39 @@ export class OrchestrationService {
     const experimentId =
       branchMode === 'ab_test' ? `exp_${randomUUID().slice(0, 8)}` : undefined;
 
+    const storageKey = randomUUID();
+    const brandName =
+      rule.brand &&
+      typeof rule.brand === 'object' &&
+      !Array.isArray(rule.brand) &&
+      typeof (rule.brand as { brandName?: unknown }).brandName === 'string'
+        ? (rule.brand as { brandName: string }).brandName
+        : undefined;
+    const sourcePack =
+      files.length > 0 || urls.length > 0
+        ? await this.sourcePackBuilder.build({
+            contentPrompt,
+            files,
+            urls,
+            brandName,
+            storageKey,
+          })
+        : emptySourcePack();
+    if (input.referenceAssets?.length) {
+      sourcePack.assets.push(...input.referenceAssets.slice(0, 3));
+    }
+
     const startedAt = new Date();
+    const pipelineNamePrompt =
+      contentPrompt ||
+      sourcePack.notes.slice(0, 120) ||
+      'Attachment run';
     const pipeline = await this.pipelineRepo.create({
       userId: input.auth.userId,
       workflowRef: workflow.workflowId,
       ruleRef: rule.ruleId,
-      contentPrompt,
-      name: defaultPipelineName(contentPrompt, startedAt),
+      contentPrompt: contentPrompt || sourcePack.notes.slice(0, 2000) || '(attachments)',
+      name: defaultPipelineName(pipelineNamePrompt, startedAt),
       graph: {
         edges: materialized.edges,
         lanes: materialized.lanes,
@@ -341,6 +383,7 @@ export class OrchestrationService {
           ? PipelineUserExecutionMode.Step
           : PipelineUserExecutionMode.Auto,
       ruleOverlay: (ruleOverlay ?? null) as unknown as Prisma.InputJsonValue,
+      sourcePack: sourcePack as unknown as Prisma.InputJsonValue,
       metadata: {
         source: input.metadata?.source ?? 'manual',
         scheduleId: input.metadata?.scheduleId,
@@ -1569,6 +1612,7 @@ export class OrchestrationService {
       rule: resolveExecutionRule(pipeline, rule),
       contentPrompt: pipeline.contentPrompt,
       previousOutputs,
+      sourcePack: parsePipelineSourcePack(pipeline.sourcePack) ?? emptySourcePack(),
     };
   }
 
@@ -1601,6 +1645,10 @@ export class OrchestrationService {
       rule: rule as unknown as Rule,
       contentPrompt,
       previousOutputs: {},
+      sourcePack:
+        parsePipelineSourcePack(
+          (await this.pipelineRepo.findById(pipelineId))?.sourcePack,
+        ) ?? emptySourcePack(),
     };
 
     this.logger.log(

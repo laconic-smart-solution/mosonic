@@ -5,11 +5,13 @@ import {
   VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE,
   VIDEO_GENERATION_PRESENTER_CREDIT_TYPE,
 } from './billable-node-credit-types';
+import { isVideoNodeType } from '../../nodes/video-node-type.util';
 
 export function resolveVideoCreditNodeType(
   config: Record<string, unknown> | undefined,
+  nodeType?: string,
 ): string {
-  return getVideoGenerationMode(config) === 'presenter'
+  return getVideoGenerationMode(config, nodeType) === 'presenter'
     ? VIDEO_GENERATION_PRESENTER_CREDIT_TYPE
     : VIDEO_GENERATION_CINEMATIC_CREDIT_TYPE;
 }
@@ -18,8 +20,8 @@ export function resolveCreditNodeTypeForPipelineNode(
   nodeType: string,
   config: Record<string, unknown> | undefined,
 ): string {
-  if (nodeType === WorkflowNodeType.VideoGeneration) {
-    return resolveVideoCreditNodeType(config);
+  if (isVideoNodeType(nodeType)) {
+    return resolveVideoCreditNodeType(config, nodeType);
   }
   return nodeType;
 }

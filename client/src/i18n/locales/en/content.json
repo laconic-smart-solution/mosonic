@@ -78,7 +78,8 @@
     "image": "Image",
     "video": "Video",
     "transcription": "Transcription",
-    "summary": "Summary"
+    "summary": "Summary",
+    "subtitle": "Subtitles"
   },
   "nodeType": {
     "keyword_planner": "Keywords",
@@ -86,8 +87,11 @@
     "image_generation": "Image Gen",
     "translation": "Translation",
     "video_generation": "Video Gen",
+    "video_presenter": "Presenter video",
+    "video_cinematic": "Cinematic video",
     "transcription": "Transcription",
-    "summarization": "Summary"
+    "summarization": "Summary",
+    "subtitle": "Subtitles"
   },
   "relativeTime": {
     "justNow": "just now",
@@ -134,7 +138,7 @@
     "rejectDraft": "Reject Draft",
     "infoTitle": "Content Info",
     "workflow": "Workflow:",
-    "rule": "Rule:",
+    "rule": "Brand Profile:",
     "pipeline": "Pipeline:",
     "versionTitle": "Version History",
     "nodeStatusTitle": "Node Status",

@@ -1,0 +1,328 @@
+{
+  "session": {
+    "panelTitle": "แชท",
+    "newChat": "แชทใหม่",
+    "untitled": "แชทไม่มีชื่อ",
+    "loading": "กำลังโหลดแชท…",
+    "empty": "ยังไม่มีแชท",
+    "deleteAction": "ลบแชท"
+  },
+  "composer": {
+    "placeholder": "ถามเกี่ยวกับแบรนด์นี้ หรือบอก AI ว่าต้องการสร้างอะไร…",
+    "thinking": "กำลังคิด…",
+    "uploadNeedsRule": "ตั้งค่าโปรไฟล์แบรนด์ก่อน — บอก AI เกี่ยวกับแบรนด์ของคุณ แล้วจึงแนบไฟล์ได้",
+    "uploadedFilesNote": "(แนบไฟล์: {{files}})",
+    "attachedImage": "รูปที่แนบ",
+    "attachedFile": "ไฟล์แนบ"
+  },
+  "empty": {
+    "noRuleTitle": "เลือกโปรไฟล์แบรนด์เพื่อเริ่มต้น",
+    "noRuleSubtitle": "เลือกโปรไฟล์แบรนด์ด้านบน หรือสร้างใหม่ก่อน",
+    "noMessagesTitle": "เริ่มการสนทนา",
+    "noMessagesSubtitle": "ถามคำถามเกี่ยวกับแบรนด์นี้ หรือบอก AI ว่าต้องการสร้างอะไร"
+  },
+  "workspace": {
+    "activeWorkflow": "เวิร์กโฟลว์ที่ใช้งานอยู่",
+    "contents": "เนื้อหา",
+    "noWorkflow": "ยังไม่มีเวิร์กโฟลว์ — ให้ AI สร้างให้",
+    "noContent": "ยังไม่มีเนื้อหาที่สร้างขึ้น",
+    "viewAllContents": "ดูเนื้อหาทั้งหมด",
+    "contentUntitled": "เนื้อหาไม่มีชื่อ",
+    "noRule": "เลือกโปรไฟล์แบรนด์เพื่อดูเวิร์กโฟลว์และเนื้อหา",
+    "cancelRun": "ยกเลิกการรัน"
+  },
+  "brandPanel": {
+    "panelTitle": "โปรไฟล์แบรนด์",
+    "toggleAction": "แสดงโปรไฟล์แบรนด์",
+    "closeAction": "ปิด",
+    "editAction": "แก้ไข",
+    "brandSection": "แบรนด์",
+    "audienceSection": "กลุ่มเป้าหมาย",
+    "channelsSection": "ช่องทาง",
+    "assetsSection": "ไฟล์แบรนด์",
+    "noAssets": "ยังไม่มีไฟล์แบรนด์"
+  },
+  "toolCall": {
+    "searchBrandAssets": "ค้นหาเอกสารแบรนด์แล้ว",
+    "webSearch": "ค้นหาเว็บแล้ว",
+    "getRule": "ตรวจสอบโปรไฟล์แบรนด์แล้ว",
+    "listBrandAssets": "ตรวจสอบไฟล์แบรนด์แล้ว",
+    "requestAssetUpload": "ขอไฟล์แล้ว",
+    "createRuleFromIntake": "เริ่มสร้างโปรไฟล์แบรนด์แล้ว",
+    "updateRule": "อัปเดตโปรไฟล์แบรนด์แล้ว",
+    "fetchWebsiteAssets": "ดึงรูปภาพจากเว็บไซต์แล้ว",
+    "remember": "จดจำข้อมูลแบรนด์แล้ว",
+    "forget": "ลืมข้อมูลแบรนด์แล้ว",
+    "searchBrandMemory": "ค้นหาความทรงจำแบรนด์แล้ว",
+    "askUser": "ขอให้คุณเลือก",
+    "listWorkflows": "ตรวจสอบเวิร์กโฟลว์แล้ว",
+    "generateWorkflow": "สร้างเวิร์กโฟลว์แล้ว",
+    "applyDefaultWorkflow": "ใช้เวิร์กโฟลว์เริ่มต้นแล้ว",
+    "getNodeConfig": "ตรวจสอบโหนดในเวิร์กโฟลว์แล้ว",
+    "updateNodeConfig": "อัปเดตโหนดในเวิร์กโฟลว์แล้ว",
+    "startGeneration": "เริ่มสร้างคอนเทนต์แล้ว",
+    "listPipelines": "ตรวจสอบรันของเวิร์กโฟลว์แล้ว",
+    "getActivePipeline": "ตรวจสอบรันที่กำลังทำงานแล้ว",
+    "getPipelineStatus": "ตรวจสอบสถานะการสร้างแล้ว",
+    "getPipelineLogs": "ตรวจสอบบันทึกการสร้างแล้ว",
+    "listContents": "ตรวจสอบฉบับร่างคอนเทนต์แล้ว",
+    "getContent": "เปิดฉบับร่างคอนเทนต์แล้ว",
+    "saveContent": "บันทึกการแก้ไขคอนเทนต์แล้ว",
+    "approveContent": "อนุมัติคอนเทนต์แล้ว",
+    "rejectContent": "ปฏิเสธคอนเทนต์แล้ว",
+    "rerunContentNode": "รันโหนดคอนเทนต์อีกครั้งแล้ว",
+    "rerunImageNode": "กำลังอัปเดตรูป",
+    "rerunCaptionNode": "กำลังอัปเดตแคปชัน",
+    "rerunTranslationNode": "กำลังอัปเดตคำแปล",
+    "rerunSummaryNode": "กำลังอัปเดตสรุป",
+    "generateMoreImage": "เริ่มสร้างรูปเพิ่มแล้ว",
+    "generatePresenterVideo": "เริ่มสร้างวิดีโอผู้นำเสนอแล้ว",
+    "generateCinematicVideo": "เริ่มสร้างวิดีโอซีเนมาติกแล้ว",
+    "generateMoreTranslation": "เริ่มแปลเพิ่มแล้ว",
+    "generateMoreSummary": "เริ่มสรุปเพิ่มแล้ว",
+    "generateMoreAdapt": "เริ่มแคปชันช่องทางเพิ่มแล้ว",
+    "pipelineResult": "ตรวจผลงานที่สร้างเสร็จแล้ว",
+    "forgetAll": "ล้างบันทึกความจำทั้งหมดแล้ว",
+    "reorderWorkflowNodes": "จัดลำดับเวิร์กโฟลว์ใหม่",
+    "removeWorkflowNode": "ลบขั้นตอนในเวิร์กโฟลว์",
+    "addWorkflowNode": "เพิ่มขั้นตอนในเวิร์กโฟลว์",
+    "setWorkflowChannels": "อัปเดตช่องทางของเวิร์กโฟลว์",
+    "listChannels": "ตรวจช่องทางแล้ว",
+    "checkChannelAuth": "ตรวจการเชื่อมต่อบัญชีแล้ว",
+    "startChannelOauth": "เริ่มเชื่อมต่อบัญชี",
+    "getUpload": "ตรวจร่างอัปโหลดแล้ว",
+    "publishNow": "เผยแพร่โพสต์แล้ว",
+    "schedulePublish": "ตั้งเวลาโพสต์แล้ว",
+    "retryUpload": "ลองอัปโหลดที่ล้มเหลวอีกครั้ง",
+    "listPosts": "ตรวจโพสต์ที่เผยแพร่แล้ว",
+    "getPost": "เปิดโพสต์ที่เผยแพร่แล้ว",
+    "getPostAnalytics": "ตรวจการวิเคราะห์โพสต์แล้ว",
+    "retryPost": "ลองโพสต์ที่ล้มเหลวอีกครั้ง",
+    "suggestRuleImprovement": "เสนอการปรับแบรนด์",
+    "applyRuleSuggestion": "ใช้การปรับแบรนด์แล้ว",
+    "addUploadMedia": "เพิ่มสื่อในโพสต์",
+    "removeUploadMedia": "นำสื่อออกจากโพสต์",
+    "editUploadChannel": "แก้ไขช่องทางของโพสต์",
+    "previewUpload": "ดูตัวอย่างโพสต์",
+    "reschedulePublish": "เปลี่ยนเวลาโพสต์",
+    "cancelSchedule": "ยกเลิกการตั้งเวลาโพสต์",
+    "retryPublish": "ลองเผยแพร่อีกครั้ง",
+    "editContent": "แก้ไขเนื้อหา"
+  },
+  "workflowCard": {
+    "untitled": "เวิร์กโฟลว์",
+    "openCanvas": "เปิดแคนวาส",
+    "waitingNodes": "กำลังจัดรายการโหนด…",
+    "stillGenerating": "ยังสร้างไม่เสร็จ เปิดแคนวาสเพื่อดูต่อ",
+    "observation": "เวิร์กโฟลว์ · {{status}}",
+    "status": {
+      "generating": "กำลังสร้าง",
+      "ready": "พร้อมใช้",
+      "failed": "ล้มเหลว",
+      "archived": "เก็บถาวร",
+      "unknown": "ไม่ทราบสถานะ"
+    },
+    "types": {
+      "keyword_planner": "วางแผนคีย์เวิร์ด",
+      "intelligence": "ค้นหาเว็บ",
+      "text_generation": "ข้อความ",
+      "image_generation": "รูปภาพ",
+      "video_generation": "วิดีโอ",
+      "video_presenter": "วิดีโอผู้นำเสนอ",
+      "video_cinematic": "วิดีโอซีเนมาติก",
+      "translation": "แปลภาษา",
+      "transcription": "ถอดเสียง",
+      "summarization": "สรุป",
+      "branch": "แยกช่องทาง",
+      "adapt": "ปรับให้เข้าช่องทาง",
+      "merge": "รวมผลลัพธ์",
+      "subtitle": "คำบรรยาย"
+    },
+    "title": "เวิร์กโฟลว์",
+    "openCanvasEdit": "เปิดแคนวาสเวิร์กโฟลว์"
+  },
+  "pipelineCard": {
+    "title": "การสร้างคอนเทนต์",
+    "openPipelines": "เปิดไปป์ไลน์",
+    "pausedHint": "การสร้างนี้หยุดรออยู่ ไปต่อได้จากหน้าไปป์ไลน์",
+    "stillRunning": "ยังทำงานอยู่ เปิดหน้าไปป์ไลน์เพื่อดูต่อ",
+    "observation": "ไปป์ไลน์ · {{status}}",
+    "status": {
+      "running": "กำลังทำงาน",
+      "completed": "เสร็จแล้ว",
+      "failed": "ล้มเหลว",
+      "paused": "หยุดรอ",
+      "unknown": "ไม่ทราบสถานะ"
+    }
+  },
+  "contentCard": {
+    "title": "ฉบับร่างคอนเทนต์",
+    "titleUpdatingImage": "กำลังอัปเดตรูป…",
+    "titleUpdatingCaption": "กำลังอัปเดตแคปชัน…",
+    "openContent": "เปิดคอนเทนต์",
+    "working": "กำลังสร้างผลลัพธ์เพิ่ม…",
+    "workingImage": "กำลังอัปเดตรูป…",
+    "workingCaption": "กำลังอัปเดตแคปชัน…",
+    "workingTranslation": "กำลังอัปเดตคำแปล…",
+    "workingSummary": "กำลังอัปเดตสรุป…",
+    "stillWorking": "ยังทำงานอยู่ เปิดคอนเทนต์เพื่อดูต่อ",
+    "observation": "คอนเทนต์ · {{status}}",
+    "hasImage": "รูปภาพ",
+    "hasVideo": "วิดีโอ",
+    "hasTranslation": "คำแปล",
+    "hasSummary": "สรุป",
+    "channelPreview": "ตัวอย่างตามช่องทาง",
+    "allChannels": "ทั้งหมด",
+    "status": {
+      "draft": "ฉบับร่าง",
+      "in_review": "รอตรวจ",
+      "approved": "อนุมัติแล้ว",
+      "rejected": "ปฏิเสธแล้ว",
+      "unknown": "ไม่ทราบสถานะ"
+    },
+    "makeNewVersion": "สร้างเวอร์ชันใหม่",
+    "rejectedReason": "เหตุผล: {{reason}}",
+    "newVersionMessage": "ช่วยสร้างเวอร์ชันใหม่ของคอนเทนต์ที่ถูกปฏิเสธ {{contentId}}",
+    "newVersionMessageWithReason": "ช่วยสร้างเวอร์ชันใหม่ของคอนเทนต์ที่ถูกปฏิเสธ {{contentId}} ข้อเสนอแนะ: {{reason}}"
+  },
+  "askUser": {
+    "confirm": "ยืนยัน",
+    "waiting": "รอการเลือกของคุณ",
+    "urlPlaceholder": "https://yourbrand.com",
+    "urlLabel": "URL เว็บไซต์ของคุณ",
+    "urlInvalid": "กรอกที่อยู่เว็บไซต์ เช่น yourbrand.com",
+    "continue": "ดำเนินการต่อ",
+    "fetchAssets": {
+      "question": "ใช้เว็บไซต์นี้เป็นแหล่งรูปแบรนด์ไหม?",
+      "questionWithSite": "ใช้ {{site}} เป็นแหล่งรูปแบรนด์ไหม?",
+      "use": "ใช้เลย",
+      "skip": "ข้าม"
+    },
+    "plan": {
+      "asked": "คุณขอ",
+      "willChange": "ฉันจะเปลี่ยน",
+      "notPossible": "ทำไม่ได้"
+    }
+  },
+  "stepTrace": {
+    "summary": "ความคิด / การกระทำ / ผลลัพธ์ ({{count}} เครื่องมือ)",
+    "summaryThoughtOnly": "ความคิด",
+    "thought": "ความคิด",
+    "action": "การกระทำ",
+    "observation": "ผลลัพธ์",
+    "details": "แสดงอินพุตและผลลัพธ์",
+    "args": "อินพุต",
+    "result": "ผลลัพธ์",
+    "uploadAction": "อัปโหลด{{assetType}}",
+    "connectAction": "เชื่อมต่อ {{platform}}",
+    "connectRednoteAction": "เชื่อมต่อ RedNote (สแกน QR)",
+    "assetType": {
+      "logo": "โลโก้",
+      "reference_image": "ภาพอ้างอิง",
+      "guideline_document": "เอกสารแนวทาง"
+    },
+    "failedSuffix_one": " · ไม่สำเร็จ {{count}} ขั้น",
+    "failedSuffix_other": " · ไม่สำเร็จ {{count}} ขั้น",
+    "savedNote": "บันทึกความชอบของคุณแล้ว",
+    "genericStep": "ดำเนินการแล้ว"
+  },
+  "contextUsage": {
+    "label": "{{used}} / {{limit}} โทเคน"
+  },
+  "messageTokens": {
+    "label": "{{formatted}} โทเคน",
+    "breakdown": "เข้า {{input}} · ออก {{output}}"
+  },
+  "buildProgress": {
+    "started": "กำลังสร้างโปรไฟล์แบรนด์ของคุณ…",
+    "readingInput": "กำลังอ่านข้อมูลที่คุณให้มา…",
+    "inputProcessed": "กำลังสรุปข้อมูลแบรนด์…",
+    "streaming": "กำลังเขียนโปรไฟล์แบรนด์…",
+    "completedToast": "โปรไฟล์แบรนด์พร้อมแล้ว",
+    "failedToast": "สร้างโปรไฟล์แบรนด์ไม่สำเร็จ"
+  },
+  "toast": {
+    "createSessionFailed": "ไม่สามารถเริ่มแชทใหม่ได้",
+    "deleteSessionFailed": "ไม่สามารถลบแชทได้",
+    "sendMessageFailed": "ไม่สามารถส่งข้อความได้",
+    "cancelRunFailed": "หยุดการรันไม่สำเร็จ",
+    "runActionFailed": "อัปเดตงานที่กำลังสร้างไม่ได้"
+  },
+  "dialogs": {
+    "cancelRun": {
+      "title": "หยุดการรันนี้ไหม?",
+      "subtitle": "การสร้างจะหยุดทันที ขั้นตอนที่เสร็จแล้วจะเก็บผลลัพธ์ไว้ และขั้นตอนที่ยังไม่เสร็จจะไม่ใช้เครดิตเพิ่ม",
+      "confirm": "หยุดการรัน"
+    },
+    "memory": {
+      "action": "ความจำแบรนด์",
+      "title": "ความจำของ “{{name}}”",
+      "subtitle": "บันทึกที่ผู้ช่วยเก็บไว้เกี่ยวกับแบรนด์นี้ — ความชอบ การแก้ไข และข้อเท็จจริง",
+      "empty": "ยังไม่มีบันทึกความจำ ขอให้ผู้ช่วยจำอะไรไว้ แล้วจะแสดงที่นี่",
+      "loadFailed": "โหลดบันทึกความจำไม่สำเร็จ",
+      "type": {
+        "preference": "ความชอบ",
+        "correction": "การแก้ไข",
+        "fact": "ข้อเท็จจริง"
+      }
+    },
+    "actions": {
+      "close": "ปิด"
+    },
+    "toolError": {
+      "code": {
+        "generic": "ข้ามขั้นตอนนี้แล้ว",
+        "one_mutation_per_turn": "ข้ามไว้ก่อน: เปลี่ยนได้ครั้งละหนึ่งอย่างต่อข้อความ",
+        "confirmation_required": "รอการยืนยันจากคุณ",
+        "followup_read_only": "ข้ามไว้: รายงานอัตโนมัติจะไม่เปลี่ยนแปลงอะไร",
+        "order_not_supported": "ลำดับนี้ทำไม่ได้ ปรับได้ที่แคนวาสเวิร์กโฟลว์",
+        "edit_not_supported": "การเปลี่ยนแปลงนี้ทำได้เฉพาะที่แคนวาสเวิร์กโฟลว์",
+        "unsupported_channel": "ยังไม่รองรับช่องทางนี้",
+        "no_change": "ไม่มีอะไรต้องเปลี่ยน",
+        "workflow_exists": "มีเวิร์กโฟลว์อยู่แล้ว",
+        "already_running": "มีการรันอยู่แล้ว",
+        "no_workflow": "ยังไม่มีเวิร์กโฟลว์",
+        "node_not_found": "ไม่พบขั้นตอนนี้ในเวิร์กโฟลว์",
+        "lane_required": "เลือกช่องทางสำหรับขั้นตอนนี้",
+        "lane_taken": "ช่องทางนี้มีขั้นตอนนี้อยู่แล้ว",
+        "already_present": "มีขั้นตอนนี้อยู่แล้ว",
+        "ambiguous_choice": "รอให้คุณเลือกตัวเลือก"
+      },
+      "retryMessage": "ลองอีกครั้ง"
+    }
+  },
+  "runCard": {
+    "running": "กำลังสร้าง",
+    "paused": "หยุดชั่วคราว",
+    "stopped": "หยุดแล้ว",
+    "stepsLabel": "ขั้นตอนเวิร์กโฟลว์",
+    "seconds_other": "{{count}} วิ",
+    "left": {
+      "seconds_other": "อีกประมาณ {{count}} วินาที",
+      "minutes_other": "อีกประมาณ {{count}} นาที",
+      "almost_other": "ใกล้เสร็จแล้ว"
+    },
+    "cancel": "ยกเลิก",
+    "finished": "เสร็จแล้ว",
+    "finishedIn_other": "เสร็จใน {{count}} วินาที",
+    "failedHere": "หยุดที่ขั้นนี้",
+    "genericError": "ขั้นตอนนี้ทำไม่สำเร็จ ส่วนที่ทำเสร็จก่อนหน้านี้บันทึกไว้แล้ว",
+    "tryAgain": "ลองอีกครั้ง",
+    "skipStep": "ข้ามขั้นนี้",
+    "retryMessage": "การรันหยุดที่ \"{{step}}\" ช่วยสร้างใหม่อีกครั้ง",
+    "readyPill": "โพสต์ของคุณพร้อมแล้ว"
+  },
+  "history": {
+    "loadingEarlier": "กำลังโหลดข้อความก่อนหน้า",
+    "startOfChat": "นี่คือจุดเริ่มต้นของแชท {{brand}}",
+    "startOfChatGeneric": "นี่คือจุดเริ่มต้นของแชท",
+    "today": "วันนี้",
+    "yesterday": "เมื่อวาน",
+    "jumpToLatest": "ไปที่ข้อความล่าสุด"
+  },
+  "runBrief": {
+    "textOnly": "ข้อความอย่างเดียว",
+    "change": "เปลี่ยน",
+    "changeMessage": "ขอเปลี่ยนหัวข้อ สไตล์ หรือช่องทางของโพสต์นี้"
+  }
+}

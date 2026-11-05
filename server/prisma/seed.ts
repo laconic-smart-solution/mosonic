@@ -4,6 +4,7 @@ import { DEFAULT_PLANS } from '../src/plan/plan-defaults';
 import type { PlanRecord } from '../src/domain/plans/plan.types';
 import { IMAGE_TEMPLATE_SEEDS } from './seed-data/image-templates.seed-data';
 import { IMAGE_DESIGN_STYLE_SEEDS } from './seed-data/image-design-styles.seed-data';
+import { LLM_TOKEN_RATE_DEFAULTS } from '../src/credit/lib/llm-token-rate.defaults';
 import { SYSTEM_RULE_SEEDS } from './seed-data/system-rules.seed-data';
 
 const prisma = new PrismaClient();
@@ -86,9 +87,47 @@ async function seedImageDesignStyles(): Promise<void> {
   console.log(`Seeded ${IMAGE_DESIGN_STYLE_SEEDS.length} image design styles`);
 }
 
+async function seedLlmTokenRates(): Promise<void> {
+  for (const seed of LLM_TOKEN_RATE_DEFAULTS) {
+    await prisma.llmTokenRate.upsert({
+      where: {
+        provider_model: { provider: seed.provider, model: seed.model },
+      },
+      create: {
+        provider: seed.provider,
+        model: seed.model,
+        inputPerMToken: seed.inputPerMToken,
+        outputPerMToken: seed.outputPerMToken,
+        reasoningPerMToken: seed.reasoningPerMToken ?? null,
+        isActive: true,
+      },
+      update: {
+        inputPerMToken: seed.inputPerMToken,
+        outputPerMToken: seed.outputPerMToken,
+        reasoningPerMToken: seed.reasoningPerMToken ?? null,
+        isActive: true,
+      },
+    });
+  }
+  console.log(
+    `Seeded ${LLM_TOKEN_RATE_DEFAULTS.length} LLM token rates (OpenAI standard $/1M)`,
+  );
+}
+
 async function seedSystemRules(): Promise<void> {
   for (const seed of SYSTEM_RULE_SEEDS) {
-    const { ruleId, name, isSystem, isTemplate, templateCategory, brand, audience, campaign, channels, contentGuidelines } = seed;
+    const {
+      ruleId,
+      name,
+      isSystem,
+      isTemplate,
+      templateCategory,
+      brand,
+      audience,
+      campaign,
+      channels,
+      contentGuidelines,
+    } = seed;
     const existing = await prisma.rule.findUnique({ where: { ruleId } });
     if (existing) {
       await prisma.rule.update({
@@ -145,6 +184,7 @@ async function main(): Promise<void> {
   await assignFreePlans();
   await seedImageTemplates();
   await seedImageDesignStyles();
+  await seedLlmTokenRates();
   await seedSystemRules();
 }
 

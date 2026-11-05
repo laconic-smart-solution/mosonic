@@ -84,6 +84,16 @@ export interface WorkflowNodeConfig {
   sourceType?: NodeMediaSourceType;
   sourceUrl?: string;
   language?: string;
+  /** Subtitle node: output format (srt | vtt). */
+  format?: 'srt' | 'vtt';
+  /** Subtitle node: wrap width per caption line. */
+  maxCharsPerLine?: number;
+  /** Subtitle node: reserved (burn-in not implemented yet; ignored). */
+  burnIn?: boolean;
+  /** Subtitle node: explicit text instead of upstream transcription. */
+  sourceText?: string;
+  /** Subtitle node: known media duration for cue timing. */
+  audioDurationSeconds?: number;
   summaryLength?: NodeSummaryLength;
   sourceNodeRef?: string;
   mode?: string;
@@ -102,6 +112,18 @@ export interface WorkflowNodeConfig {
   heygenExpressiveness?: string;
   heygenMotionPrompt?: string;
   removeBackground?: boolean;
+  /** Cinematic (HeyGen): cinematic_avatar needs a look; heygen_video does not. */
+  cinematicMode?: 'cinematic_avatar' | 'heygen_video';
+  heygenCinematicModel?: 'heygen_video_1' | 'seedance_2' | string;
+  heygenAvatarIds?: string[];
+  heygenReferenceAssetIds?: string[];
+  heygenReferenceImageUrl?: string;
+  /** Brand asset (rule_assets) the HeyGen look was created from. */
+  heygenLookSourceRuleAssetId?: string;
+  heygenVideoMode?: 'text_to_video' | 'image_to_video' | 'reference_to_video';
+  enhancePrompt?: boolean;
+  promptEnhancement?: 'turbo' | 'quality' | 'ultraquality' | 'disabled';
+  seed?: number;
 }
 
 export interface WorkflowNode {

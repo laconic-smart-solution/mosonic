@@ -26,9 +26,14 @@ enum WorkflowNodeType {
   keyword_planner
   text_generation
   image_generation
+  /// Legacy combined video (mode in config). Migrated to video_presenter / video_cinematic.
   video_generation
+  video_presenter
+  video_cinematic
   translation
   transcription
+  /// Local SRT/VTT from transcription text (no AI).
+  subtitle
   summarization
   branch
   adapt
@@ -107,6 +112,30 @@ enum RuleStatus {
   failed
 }
 
+enum RuleAssetType {
+  logo
+  reference_image
+  guideline_document
+}
+
+enum RuleMemoryType {
+  preference
+  correction
+  fact
+}
+
+enum RuleAssetStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
+enum ChatRole {
+  user
+  assistant
+}
+
 enum CreditTopupSource {
   self_serve
   admin
@@ -181,29 +210,29 @@ enum SocialAccountStatus {
 }
 
 model User {
-  userId                 String   @id @default(uuid())
-  authServerUserId       String   @unique
-  email                  String?
-  username               String?
-  firstName              String?
-  lastName               String?
-  avatarUrl              String?
-  role                   UserRole @default(CUSTOMER)
-  status                 UserStatus @default(ACTIVE)
-  lastLoginAt            DateTime?
-  zernioProfileId        String?  @unique
+  userId                  String     @id @default(uuid())
+  authServerUserId        String     @unique
+  email                   String?
+  username                String?
+  firstName               String?
+  lastName                String?
+  avatarUrl               String?
+  role                    UserRole   @default(CUSTOMER)
+  status                  UserStatus @default(ACTIVE)
+  lastLoginAt             DateTime?
+  zernioProfileId         String?    @unique
   /// @deprecated Prefer SocialAccount rows; kept for dual-write / rollback.
-  zernioConnectedAccounts Json    @default("[]")
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  zernioConnectedAccounts Json       @default("[]")
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
 
-  userPlans           UserPlan[]
-  socialAccounts      SocialAccount[]
-  lineConnection      LineConnection?
-  telegramConnection  TelegramConnection?
-  viberConnection     ViberConnection?
-  whatsappConnection  WhatsAppConnection?
-  wechatConnection    WechatConnection?
+  userPlans          UserPlan[]
+  socialAccounts     SocialAccount[]
+  lineConnection     LineConnection?
+  telegramConnection TelegramConnection?
+  viberConnection    ViberConnection?
+  whatsappConnection WhatsAppConnection?
+  wechatConnection   WechatConnection?
 
   @@index([email])
   @@index([username])
@@ -318,7 +347,9 @@ model Plan {
   isActive        Boolean  @default(true)
   description     String?
   features        String[] @default([])
-  /** Publishable channel keys this plan grants (facebook/instagram/youtube/linkedin/tiktok/rednote). */
+  /**
+   * Publishable channel keys this plan grants (facebook/instagram/youtube/linkedin/tiktok/rednote).
+   */
   allowedChannels String[] @default([])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -338,6 +369,8 @@ model UserPlan {
   billingPeriod        DateTime
   creditsUsed          Int            @default(0)
   creditsRemaining     Int
+  /// Billed chat USD (after overhead + margin) not yet converted to a whole credit.
+  chatUnbilledUsd      Float          @default(0)
   status               UserPlanStatus @default(active)
   lowBalanceNotifiedAt DateTime?
   createdAt            DateTime       @default(now())
@@ -433,6 +466,24 @@ model NodeCreditPrice {
   @@map("node_credit_prices")
 }
 
+/**
+ * Admin-editable USD per 1M tokens for chat (and other token-metered LLM calls).
+ */
+model LlmTokenRate {
+  llmTokenRateId     String   @id @default(uuid())
+  provider           String
+  model              String
+  inputPerMToken     Float
+  outputPerMToken    Float
+  reasoningPerMToken Float?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([provider, model])
+  @@map("llm_token_rates")
+}
+
 model CreditLedger {
   id                     String   @id @default(uuid())
   userId                 String
@@ -494,17 +545,17 @@ model CreditTopupPurchase {
 }
 
 model PlanPurchase {
-  planPurchaseId String              @id @default(uuid())
+  planPurchaseId String             @id @default(uuid())
   userId         String
   planId         String
   amount         Float
-  currencyCode   String              @default("THB")
+  currencyCode   String             @default("THB")
   billingPeriod  DateTime
-  transactionId  String              @unique
-  status         PlanPurchaseStatus  @default(pending)
-  purchaseDate   DateTime            @default(now())
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  transactionId  String             @unique
+  status         PlanPurchaseStatus @default(pending)
+  purchaseDate   DateTime           @default(now())
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@index([userId, purchaseDate(sort: Desc)])
   @@index([userId, billingPeriod])
@@ -554,7 +605,13 @@ model WorkflowNode {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  workflow Workflow @relation(fields: [workflowRef], references: [workflowId], onDelete: Cascade)
+  workflow          Workflow                       @relation(fields: [workflowRef], references: [workflowId], onDelete: Cascade)
+  videoConfig       WorkflowVideoNodeConfig?
+  textConfig        WorkflowTextNodeConfig?
+  translationConfig WorkflowTranslationNodeConfig?
+  imageConfig       WorkflowImageNodeConfig?
+  mediaConfig       WorkflowMediaNodeConfig?
+  branchConfig      WorkflowBranchNodeConfig?
 
   @@index([workflowRef, order])
   @@index([userId, workflowRef])
@@ -562,26 +619,26 @@ model WorkflowNode {
 }
 
 model Rule {
-  ruleId           String     @id @default(uuid())
-  userId           String?
-  isSystem         Boolean    @default(false)
-  isTemplate       Boolean    @default(false)
-  templateCategory String?
-  name             String
-  brand            Json       @default("{}")
-  audience         Json       @default("{}")
-  campaign         Json       @default("{}")
-  channels         Json       @default("[]")
-  contentGuidelines Json      @default("{}")
-  originalInput    Json       @default("{}")
-  intake           Json?
-  status           RuleStatus @default(active)
-  versions         Json       @default("[]")
-  approvalPolicy   Json       @default("[]")
-  autonomyPolicy   Json?
-  newsTrigger      Json       @default("{}")
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  ruleId            String     @id @default(uuid())
+  userId            String?
+  isSystem          Boolean    @default(false)
+  isTemplate        Boolean    @default(false)
+  templateCategory  String?
+  name              String
+  brand             Json       @default("{}")
+  audience          Json       @default("{}")
+  campaign          Json       @default("{}")
+  channels          Json       @default("[]")
+  contentGuidelines Json       @default("{}")
+  originalInput     Json       @default("{}")
+  intake            Json?
+  status            RuleStatus @default(active)
+  versions          Json       @default("[]")
+  approvalPolicy    Json       @default("[]")
+  autonomyPolicy    Json?
+  newsTrigger       Json       @default("{}")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   @@index([name])
   @@index([status, updatedAt(sort: Desc)])
@@ -590,27 +647,117 @@ model Rule {
   @@map("rules")
 }
 
+model RuleAsset {
+  ruleAssetId      String          @id @default(uuid())
+  ruleId           String
+  userId           String?
+  type             RuleAssetType
+  status           RuleAssetStatus @default(pending)
+  fileUrl          String
+  relativePath     String?
+  originalFileName String
+  mimeType         String
+  fileSize         Int
+  aiDescription    String?
+  extractedText    String?
+  ragEnabled       Boolean         @default(false)
+  errorMessage     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  chunks           RuleAssetChunk[]
+  videoNodeConfigs WorkflowVideoNodeConfig[]
+
+  @@index([ruleId, createdAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("rule_assets")
+}
+
+model RuleAssetChunk {
+  ruleAssetChunkId String   @id @default(uuid())
+  ruleAssetId      String
+  chunkIndex       Int
+  text             String
+  embedding        Json
+  createdAt        DateTime @default(now())
+
+  ruleAsset RuleAsset @relation(fields: [ruleAssetId], references: [ruleAssetId], onDelete: Cascade)
+
+  @@index([ruleAssetId, chunkIndex])
+  @@map("rule_asset_chunks")
+}
+
+model RuleMemory {
+  ruleMemoryId String         @id @default(uuid())
+  ruleId       String
+  userId       String?
+  type         RuleMemoryType
+  body         String
+  embedding    Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([ruleId, createdAt(sort: Desc)])
+  @@map("rule_memories")
+}
+
+model ChatSession {
+  sessionId String   @id @default(uuid())
+  ruleId    String?
+  userId    String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@unique([ruleId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  messageId    String   @id @default(uuid())
+  sessionId    String
+  role         ChatRole
+  content      String
+  steps        Json?
+  /// Server-kept session state snapshot (assistant rows only); never sent to the client.
+  state        Json?
+  inputTokens  Int?
+  outputTokens Int?
+  createdAt    DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Asc)])
+  @@map("chat_messages")
+}
+
 model Pipeline {
-  pipelineId            String                @id @default(uuid())
+  pipelineId            String                    @id @default(uuid())
   userId                String?
   workflowRef           String
   ruleRef               String
   contentPrompt         String
-  name                  String                @default("")
-  nodes                 Json                  @default("[]")
-  status                PipelineStatus        @default(running)
-  startedAt             DateTime              @default(now())
+  name                  String                    @default("")
+  nodes                 Json                      @default("[]")
+  status                PipelineStatus            @default(running)
+  startedAt             DateTime                  @default(now())
   completedAt           DateTime?
   pausedNodeId          String?
   pausedLaneId          String?
   dispatchMode          PipelineDispatchMode      @default(inline)
   executionMode         PipelineUserExecutionMode @default(auto)
-  graph                 Json                  @default("{}")
+  graph                 Json                      @default("{}")
   ruleOverlay           Json?
-  metadata              Json                  @default("{}")
-  creditsCharged        Int?                  @default(0)
+  /**
+   * Run attachments: notes + classified assets for node context / image edit.
+   */
+  sourcePack            Json?
+  metadata              Json                      @default("{}")
+  creditsCharged        Int?                      @default(0)
   creditChargeBreakdown Json?
-  creditsReconciled     Boolean?              @default(false)
+  creditsReconciled     Boolean?                  @default(false)
 
   @@index([workflowRef, status])
   @@index([ruleRef, startedAt(sort: Desc)])
@@ -619,18 +766,18 @@ model Pipeline {
 }
 
 model PipelineLog {
-  logId        String            @id @default(uuid())
-  pipelineRef  String
-  workflowRef  String
-  nodeId       String
-  nodeType     WorkflowNodeType
-  order        Int?
-  level        PipelineLogLevel
-  status       PipelineLogStatus
-  message      String
-  retryCount   Int               @default(0)
-  timestamp    DateTime
-  expiresAt    DateTime
+  logId       String            @id @default(uuid())
+  pipelineRef String
+  workflowRef String
+  nodeId      String
+  nodeType    WorkflowNodeType
+  order       Int?
+  level       PipelineLogLevel
+  status      PipelineLogStatus
+  message     String
+  retryCount  Int               @default(0)
+  timestamp   DateTime
+  expiresAt   DateTime
 
   @@index([pipelineRef, timestamp(sort: Desc)])
   @@index([expiresAt])
@@ -742,29 +889,29 @@ model Analytics {
 }
 
 model CostEntry {
-  id             String        @id @default(uuid())
-  userId         String
-  pipelineRef    String
-  campaignRef    String
-  contentRef     String?
-  nodeId         String?
-  nodeType       String?
-  provider       String
-  providerModel  String?
-  entryType      CostEntryType
-  inputTokens    Int           @default(0)
-  outputTokens   Int           @default(0)
-  totalTokens    Int           @default(0)
-  imageCount     Int           @default(0)
-  imageSize      String?
-  imageQuality   String?
-  videoSeconds   Int           @default(0)
+  id              String        @id @default(uuid())
+  userId          String
+  pipelineRef     String
+  campaignRef     String
+  contentRef      String?
+  nodeId          String?
+  nodeType        String?
+  provider        String
+  providerModel   String?
+  entryType       CostEntryType
+  inputTokens     Int           @default(0)
+  outputTokens    Int           @default(0)
+  totalTokens     Int           @default(0)
+  imageCount      Int           @default(0)
+  imageSize       String?
+  imageQuality    String?
+  videoSeconds    Int           @default(0)
   videoResolution String?
-  accountCount   Int           @default(0)
-  costUsd        Float
-  billingPeriod  DateTime
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  accountCount    Int           @default(0)
+  costUsd         Float
+  billingPeriod   DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([userId, billingPeriod])
   @@index([userId, pipelineRef])
@@ -828,21 +975,21 @@ model CampaignAutonomyPolicy {
 }
 
 model NewsTriggerLog {
-  id                 String   @id @default(uuid())
+  id                 String    @id @default(uuid())
   runId              String
   group              String
   ruleId             String?
   ranAt              DateTime
   completedAt        DateTime?
-  articlesFetched    Int      @default(0)
-  topArticlesPicked  Int      @default(0)
-  rulesChecked       Int      @default(0)
-  rulesMatched       Int      @default(0)
-  pipelinesTriggered Int      @default(0)
-  details            Json     @default("[]")
+  articlesFetched    Int       @default(0)
+  topArticlesPicked  Int       @default(0)
+  rulesChecked       Int       @default(0)
+  rulesMatched       Int       @default(0)
+  pipelinesTriggered Int       @default(0)
+  details            Json      @default("[]")
   errorMessage       String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("news_trigger_logs")
 }
@@ -878,16 +1025,16 @@ model WebhookSubscription {
 }
 
 model WebhookDelivery {
-  deliveryId      String   @id @default(uuid())
-  subscriptionId  String
-  event           String
-  payload         Json
-  attempts        Int      @default(0)
-  lastStatusCode  Int?
-  lastError       String?
-  deliveredAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  deliveryId     String    @id @default(uuid())
+  subscriptionId String
+  event          String
+  payload        Json
+  attempts       Int       @default(0)
+  lastStatusCode Int?
+  lastError      String?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [subscriptionId], onDelete: Cascade)
 
@@ -921,18 +1068,161 @@ model ApiProviderBillingSettings {
   updatedAt        DateTime @updatedAt
 
   @@map("api_provider_billing_settings")
-  
 }
+
+/// Typed 1:1 config for video_cinematic / video_presenter nodes. `workflow_nodes.config`
+/// JSON is still dual-written during the transition; typed columns win on read.
+model WorkflowVideoNodeConfig {
+  nodeId               String   @id
+  mode                 String?
+  cinematicMode        String?
+  heygenVideoMode      String?
+  duration             Int?
+  aspectRatio          String?
+  heygenVoiceId        String?
+  /// Primary HeyGen look id (stock looks allowed, so not FK-constrained).
+  heygenAvatarId       String?
+  /// Extra cinematic looks (up to 3).
+  heygenAvatarIds      String[] @default([])
+  heygenCinematicModel String?
+  /// Presenter-only fields (Avatar IV / photo avatar).
+  heygenOrientation       String?
+  heygenExpressiveness    String?
+  heygenMotionPrompt      String?
+  heygenBackgroundAssetId String?
+  heygenBackgroundUrl     String?
+  removeBackground        Boolean?
+  heygenAvatarAssetId     String?
+  heygenAvatarPhotoUrl    String?
+  resolution              String?
+  /// FK to a user-owned look when heygenAvatarId is one of the user's avatars.
+  userAvatarLookId     String?
+  /// Brand asset (rule_assets) the look was created from, if any.
+  sourceRuleAssetId    String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  node            WorkflowNode      @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  userAvatarLook  HeygenUserAvatar? @relation(fields: [userAvatarLookId], references: [lookId], onDelete: SetNull)
+  sourceRuleAsset RuleAsset?        @relation(fields: [sourceRuleAssetId], references: [ruleAssetId], onDelete: SetNull)
+
+  @@index([userAvatarLookId])
+  @@index([sourceRuleAssetId])
+  @@map("workflow_video_node_configs")
+}
+
+/// Typed 1:1 config for text-family nodes: text_generation, keyword_planner,
+/// summarization, adapt, intelligence. JSON config is still dual-written.
+model WorkflowTextNodeConfig {
+  nodeId        String   @id
+  laneId        String?
+  channel       String?
+  provider      String?
+  model         String?
+  temperature   Float?
+  maxTokens     Int?
+  outputFormat  String?
+  tone          String?
+  textLength    String?
+  summaryLength String?
+  sourceNodeRef String?
+  contentStyle  String?
+  searchType    String?
+  customPrompt  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  node WorkflowNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@map("workflow_text_node_configs")
+}
+
+/// Typed 1:1 config for translation nodes.
+model WorkflowTranslationNodeConfig {
+  nodeId             String   @id
+  laneId             String?
+  provider           String?
+  model              String?
+  sourceLanguage     String?
+  targetLanguage     String?
+  formalityLevel     String?
+  preserveFormatting Boolean?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  node WorkflowNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@map("workflow_translation_node_configs")
+}
+
+/// Typed 1:1 config for image_generation nodes.
+model WorkflowImageNodeConfig {
+  nodeId         String   @id
+  laneId         String?
+  channel        String?
+  provider       String?
+  model          String?
+  size           String?
+  quality        String?
+  style          String?
+  template       String?
+  designStyle    String?
+  aspectRatio    String?
+  negativePrompt String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  node WorkflowNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@map("workflow_image_node_configs")
+}
+
+/// Typed 1:1 config for media-text nodes: transcription, subtitle.
+model WorkflowMediaNodeConfig {
+  nodeId               String   @id
+  laneId               String?
+  provider             String?
+  model                String?
+  sourceType           String?
+  language             String?
+  sourceUrl            String?
+  format               String?
+  maxCharsPerLine      Int?
+  burnIn               Boolean?
+  sourceText           String?
+  audioDurationSeconds Float?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  node WorkflowNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@map("workflow_media_node_configs")
+}
+
+/// Typed 1:1 config for branch nodes.
+model WorkflowBranchNodeConfig {
+  nodeId    String   @id
+  mode      String?
+  channels  String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  node WorkflowNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@map("workflow_branch_node_configs")
+}
+
 model HeygenUserAvatar {
-  id              String   @id @default(uuid())
-  userId          String
-  lookId          String   @unique
-  name            String
-  previewImageUrl String?
-  avatarType      String   @default("photo_avatar")
-  assetId         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String                    @id @default(uuid())
+  userId           String
+  lookId           String                    @unique
+  name             String
+  previewImageUrl  String?
+  avatarType       String                    @default("photo_avatar")
+  assetId          String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  videoNodeConfigs WorkflowVideoNodeConfig[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("heygen_user_avatars")

@@ -1,5 +1,6 @@
 import enAdmin from "./locales/en/admin.json"
 import enAuth from "./locales/en/auth.json"
+import enChat from "./locales/en/chat.json"
 import enCommon from "./locales/en/common.json"
 import enValidation from "./locales/en/validation.json"
 import enContent from "./locales/en/content.json"
@@ -20,6 +21,7 @@ import enWorkflow from "./locales/en/workflow.json"
 
 import thAdmin from "./locales/th/admin.json"
 import thAuth from "./locales/th/auth.json"
+import thChat from "./locales/th/chat.json"
 import thCommon from "./locales/th/common.json"
 import thValidation from "./locales/th/validation.json"
 import thContent from "./locales/th/content.json"
@@ -40,6 +42,7 @@ import thWorkflow from "./locales/th/workflow.json"
 
 import zhAdmin from "./locales/zh-CN/admin.json"
 import zhAuth from "./locales/zh-CN/auth.json"
+import zhChat from "./locales/zh-CN/chat.json"
 import zhCommon from "./locales/zh-CN/common.json"
 import zhValidation from "./locales/zh-CN/validation.json"
 import zhContent from "./locales/zh-CN/content.json"
@@ -62,6 +65,7 @@ export const I18N_NAMESPACES = [
   "common",
   "validation",
   "auth",
+  "chat",
   "home",
   "marketing",
   "faq",
@@ -87,6 +91,7 @@ export const resources = {
     common: enCommon,
     validation: enValidation,
     auth: enAuth,
+    chat: enChat,
     home: enHome,
     marketing: enMarketing,
     faq: enFaq,
@@ -108,6 +113,7 @@ export const resources = {
     common: thCommon,
     validation: thValidation,
     auth: thAuth,
+    chat: thChat,
     home: thHome,
     marketing: thMarketing,
     faq: thFaq,
@@ -129,6 +135,7 @@ export const resources = {
     common: zhCommon,
     validation: zhValidation,
     auth: zhAuth,
+    chat: zhChat,
     home: zhHome,
     marketing: zhMarketing,
     faq: zhFaq,

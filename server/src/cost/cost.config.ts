@@ -11,6 +11,8 @@ export const OPENAI_LLM_PRICING: Record<
 > = {
   'gpt-4o': { inputPerMToken: 2.5, outputPerMToken: 10.0 },
   'gpt-4o-mini': { inputPerMToken: 0.15, outputPerMToken: 0.6 },
+  'gpt-6-luna': { inputPerMToken: 0.1, outputPerMToken: 0.5 },
+  'gpt-5.4-mini': { inputPerMToken: 0.75, outputPerMToken: 4.5 },
   'gpt-4-turbo': { inputPerMToken: 10.0, outputPerMToken: 30.0 },
   'gpt-4.1': { inputPerMToken: 2.0, outputPerMToken: 8.0 },
   'gpt-4.1-mini': { inputPerMToken: 0.4, outputPerMToken: 1.6 },
@@ -18,7 +20,7 @@ export const OPENAI_LLM_PRICING: Record<
 
 /**
  * USD per image. Key: `${model}_${size}_${quality}` for DALL·E;
- * gpt-image-1 uses simplified keys (OpenAI pricing varies — conservative defaults).
+ * gpt-image-2 uses simplified keys (OpenAI pricing varies — conservative defaults).
  */
 export const OPENAI_IMAGE_PRICING: Record<string, number> = {
   'dall-e-3_1024x1024_standard': 0.04,
@@ -33,15 +35,53 @@ export const OPENAI_IMAGE_PRICING: Record<string, number> = {
   'dall-e-2_512x512': 0.018,
   /** Fallback per image when size/quality keys are unknown */
   'gpt-image-1_default': 0.04,
+  'gpt-image-2_default': 0.04,
 };
 
 /**
- * Video: USD per second by model and resolution (aligned with app defaults: sora-2 family).
+ * Video: USD per second by model and resolution.
+ * Defaults are HeyGen cinematic / presenter cost keys; Sora ids kept for legacy runs.
  */
 export const OPENAI_VIDEO_PRICING: Record<
   string,
   { perSecond: number; resolutions: Record<string, number> }
 > = {
+  heygen_video_1: {
+    perSecond: 0.05,
+    resolutions: { '720p': 0.05, '768p': 0.05, '1080p': 0.08 },
+  },
+  'heygen-video-1': {
+    perSecond: 0.05,
+    resolutions: { '720p': 0.05, '768p': 0.05, '1080p': 0.08 },
+  },
+  seedance_2: {
+    perSecond: 0.05,
+    resolutions: { '720p': 0.05, '1080p': 0.08 },
+  },
+  'heygen-presenter': {
+    perSecond: 0.06,
+    resolutions: { '1080p-9:16': 0.06, '1080p-16:9': 0.06, '1080p': 0.06 },
+  },
+  'heygen-cinematic-avatar:heygen_video_1': {
+    perSecond: 0.05,
+    resolutions: { '720p': 0.05, '1080p': 0.08 },
+  },
+  'heygen-cinematic-avatar:seedance_2': {
+    perSecond: 0.05,
+    resolutions: { '720p': 0.05, '1080p': 0.08 },
+  },
+  'heygen-video:text_to_video': {
+    perSecond: 0.05,
+    resolutions: { '480p': 0.04, '768p': 0.05, '1080p': 0.08, '2k': 0.12 },
+  },
+  'heygen-video:image_to_video': {
+    perSecond: 0.05,
+    resolutions: { '480p': 0.04, '768p': 0.05, '1080p': 0.08, '2k': 0.12 },
+  },
+  'heygen-video:reference_to_video': {
+    perSecond: 0.05,
+    resolutions: { '480p': 0.04, '768p': 0.05, '1080p': 0.08, '2k': 0.12 },
+  },
   'sora-2': {
     perSecond: 0.04,
     resolutions: { '480p': 0.04, '720p': 0.08, '1080p': 0.12 },

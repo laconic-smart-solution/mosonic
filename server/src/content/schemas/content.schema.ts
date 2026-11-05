@@ -35,6 +35,7 @@ export interface ContentOutputs {
   translatedText?: string;
   video?: string;
   transcription?: string;
+  subtitle?: string;
   summary?: string;
 }
 
@@ -45,6 +46,7 @@ export interface ContentUserEdits {
   image?: string;
   video?: string;
   transcription?: string;
+  subtitle?: string;
   summary?: string;
 }
 

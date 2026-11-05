@@ -78,7 +78,8 @@
     "image": "รูปภาพ",
     "video": "วิดีโอ",
     "transcription": "ถอดเสียง",
-    "summary": "สรุป"
+    "summary": "สรุป",
+    "subtitle": "คำบรรยาย"
   },
   "nodeType": {
     "keyword_planner": "คำหลัก",
@@ -86,8 +87,11 @@
     "image_generation": "สร้างรูป",
     "translation": "แปล",
     "video_generation": "สร้างวิดีโอ",
+    "video_presenter": "วิดีโอผู้นำเสนอ",
+    "video_cinematic": "วิดีโอซีเนมาติก",
     "transcription": "ถอดเสียง",
-    "summarization": "สรุป"
+    "summarization": "สรุป",
+    "subtitle": "คำบรรยาย"
   },
   "relativeTime": {
     "justNow": "เมื่อสักครู่",
@@ -134,7 +138,7 @@
     "rejectDraft": "ปฏิเสธร่าง",
     "infoTitle": "ข้อมูลเนื้อหา",
     "workflow": "เวิร์กโฟลว์:",
-    "rule": "กฎ:",
+    "rule": "โปรไฟล์แบรนด์:",
     "pipeline": "ไปป์ไลน์:",
     "versionTitle": "ประวัติเวอร์ชัน",
     "nodeStatusTitle": "สถานะโหนด",

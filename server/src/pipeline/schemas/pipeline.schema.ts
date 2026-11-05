@@ -114,6 +114,13 @@ export interface PipelineCreditChargeEntry {
   creditsEach: number;
 }
 
+export type {
+  ImageAssetRole,
+  PipelineSourcePack,
+  SourcePackAsset,
+  SourcePackAssetKind,
+} from '../source-pack.types';
+
 export interface Pipeline {
   pipelineId: string;
   userId?: string;
@@ -131,6 +138,8 @@ export interface Pipeline {
   executionMode: PipelineUserExecutionMode;
   graph: PipelineGraphSnapshot;
   ruleOverlay: PipelineRuleOverlay | null;
+  /** Run-level notes + classified attachments; null when start had no files/URLs. */
+  sourcePack?: import('../source-pack.types').PipelineSourcePack | null;
   metadata: PipelineMetadata;
   creditsCharged?: number;
   creditChargeBreakdown?: PipelineCreditChargeEntry[];

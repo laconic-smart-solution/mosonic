@@ -15,6 +15,8 @@ import {
   FileServiceImage,
   FileServiceVideo,
 } from "@/features/upload/components/upload-display-media"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import { ChannelStack } from "@/features/posts/lib/channel-stack"
 import {
   POST_STATUS_THEME,
@@ -185,6 +187,15 @@ export function PostListCard({
           ) : null}
         </div>
       </button>
+
+      {showMediaHero ? (
+        <DownloadMediaButton
+          src={mediaUrl!}
+          filename={filenameFromMediaUrl(mediaUrl!, mediaKind!, "post")}
+          label={caption}
+          className="absolute top-2.5 right-11 z-20"
+        />
+      ) : null}
 
       <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/80 px-3 py-2">
         <Link

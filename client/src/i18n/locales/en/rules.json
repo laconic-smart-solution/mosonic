@@ -1,30 +1,30 @@
 {
   "page": {
-    "title": "Rule setup",
-    "loadError": "Could not load rules from the server.",
-    "rulesList": "Rules list",
+    "title": "Brand Profile setup",
+    "loadError": "Could not load brand profiles from the server.",
+    "rulesList": "Brand Profiles list",
     "createByPrompt": "Create by prompt",
     "newsAutoGenerate": "News auto-generate",
     "continue": "Continue",
-    "selectOrCreate": "Select or create a rule",
-    "loadRuleError": "Could not load this rule.",
+    "selectOrCreate": "Select or create a brand profile",
+    "loadRuleError": "Could not load this brand profile.",
     "viewTree": "Tree",
     "viewManage": "Manage",
     "pendingChanges": "{{count}} pending",
     "discardAll": "Discard all",
     "saveChanges": "Save changes",
     "editedJustNow": "just now",
-    "processingRuleName": "Processing rule",
+    "processingRuleName": "Processing brand profile",
     "attachmentsFallback": "attachments"
   },
   "toast": {
-    "ruleSaved": "Rule saved",
-    "couldNotSaveRule": "Could not save rule",
+    "ruleSaved": "Brand profile saved",
+    "couldNotSaveRule": "Could not save brand profile",
     "treeChangesSaved": "Tree changes saved",
     "couldNotSaveTree": "Could not save tree changes",
-    "extractionStarted": "Rule extraction started",
-    "couldNotStartExtraction": "Unable to start rule extraction",
-    "generationFailed": "Rule generation failed",
+    "extractionStarted": "Brand profile extraction started",
+    "couldNotStartExtraction": "Unable to start brand profile extraction",
+    "generationFailed": "Brand profile generation failed",
     "fileTooLarge": "File \"{{name}}\" exceeds maximum size ({{maxMb}} MB).",
     "autonomySaved": "Autonomy policy saved.",
     "couldNotSaveAutonomy": "Could not save autonomy policy.",
@@ -48,38 +48,38 @@
     "failed": "failed"
   },
   "extraction": {
-    "titleFailed": "Rule generation failed",
-    "titleGenerating": "Generating your rule",
-    "subtitle": "Rule extraction",
+    "titleFailed": "Brand profile generation failed",
+    "titleGenerating": "Generating your brand profile",
+    "subtitle": "Brand profile extraction",
     "waitMessage": "Please wait while we process your prompt...",
-    "failedHint": "We could not extract a rule from your input. Try again with more detail or a different source.",
+    "failedHint": "We could not extract a brand profile from your input. Try again with more detail or a different source.",
     "dismiss": "Dismiss",
     "tryAgain": "Try again"
   },
   "createDialog": {
-    "title": "Create rule by prompt",
-    "description": "Enter campaign context and we will create a dummy rule from it.",
+    "title": "Create brand profile by prompt",
+    "description": "Enter campaign context and we will create a dummy brand profile from it.",
     "placeholder": "Describe your brand, audience, channels, and campaign goals..."
   },
   "drawer": {
-    "title": "Rules list",
-    "description": "Select a rule to update the canvas.",
+    "title": "Brand Profiles list",
+    "description": "Select a brand profile to update the canvas.",
     "channels": "Channels: {{list}}",
-    "loadingMore": "Loading more rules...",
+    "loadingMore": "Loading more brand profiles...",
     "scrollToLoadMore": "Scroll to load more"
   },
   "bubbleNode": {
     "detailsTitle": "Node details",
-    "viewOnlyDescription": "Read-only preview. Switch to Manage to edit this rule.",
+    "viewOnlyDescription": "Read-only preview. Switch to Manage to edit this brand profile.",
     "structureDescription": "This node is a structure label."
   },
   "channelsDialog": {
     "atLeastOne": "Select at least one channel."
   },
   "detail": {
-    "campaignRule": "Campaign rule",
+    "campaignRule": "Brand Profile",
     "status": "Status",
-    "navAria": "Rule sections",
+    "navAria": "Brand Profile sections",
     "nav": {
       "overview": "Overview",
       "brand": "Brand",
@@ -87,6 +87,7 @@
       "campaign": "Campaign",
       "channels": "Channels",
       "guidelines": "Guidelines",
+      "assets": "Assets",
       "autonomy": "Autonomy"
     },
     "saving": "Saving…",
@@ -140,7 +141,7 @@
     },
     "channels": {
       "title": "Channels",
-      "subtitle": "Where this rule applies. Select one or more distribution platforms.",
+      "subtitle": "Where this brand profile applies. Select one or more distribution platforms.",
       "distribution": "Distribution",
       "distributionHint": "Check each platform where this campaign should publish."
     },
@@ -157,10 +158,38 @@
     "autonomy": {
       "title": "Autonomous publishing",
       "subtitle": "Optional auto-approve and publish after scheduled pipeline runs (global kill switch applies).",
-      "enable": "Enable autonomy for this rule",
+      "enable": "Enable autonomy for this brand profile",
       "modeOff": "off",
       "modeReviewOptional": "review optional",
       "modeFullAuto": "full auto"
+    },
+    "assets": {
+      "title": "Brand assets",
+      "subtitle": "Logos, reference images, and guideline documents the AI uses as brand context.",
+      "empty": "No assets uploaded yet."
+    }
+  },
+  "assets": {
+    "upload": {
+      "logo": "Upload logo",
+      "reference_image": "Upload reference image",
+      "guideline_document": "Upload guideline PDF"
+    },
+    "type": {
+      "logo": "Logo",
+      "reference_image": "Reference image",
+      "guideline_document": "Guideline document"
+    },
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "ready": "Ready",
+      "failed": "Failed"
+    },
+    "deleteAction": "Delete asset",
+    "toast": {
+      "uploadFailed": "Could not upload asset",
+      "deleteFailed": "Could not delete asset"
     }
   },
   "tree": {
@@ -169,7 +198,8 @@
       "audience": "Audience",
       "campaign": "Campaign",
       "channels": "Channels",
-      "guidelines": "Guidelines"
+      "guidelines": "Guidelines",
+      "assets": "Assets"
     },
     "fields": {
       "brandName": "Brand name",
@@ -183,13 +213,14 @@
       "formats": "Formats",
       "channelNames": "Channel names",
       "dos": "Dos",
-      "donts": "Donts"
+      "donts": "Donts",
+      "assetNames": "Asset names"
     },
     "itemCount": "{{count}} items"
   },
   "newsTrigger": {
-    "missingRuleId": "Missing rule id.",
-    "backToRules": "Back to rules",
+    "missingRuleId": "Missing brand profile id.",
+    "backToRules": "Back to brand profiles",
     "automation": "Automation",
     "title": "News Auto-Generate",
     "description": "Monitor breaking news and draft campaign content for your review.",

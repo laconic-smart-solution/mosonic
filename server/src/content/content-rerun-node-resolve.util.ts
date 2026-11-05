@@ -78,11 +78,22 @@ export function resolveRerunWorkflowNodeId(
   const outputNodeId = requestedNodeId.trim();
   if (!outputNodeId) return null;
 
+  const lanes = collectPipelineLanes(pipelineNodes, graphLanes);
   if (workflowNodes.some((n) => n.nodeId === outputNodeId)) {
+    const children = pipelineNodes.filter((n) => {
+      if (n.nodeId === outputNodeId) return false;
+      return (
+        stripMaterializedNodeSuffix(n.nodeId, lanes).baseId === outputNodeId
+      );
+    });
+    if (children.length === 1) {
+      return {
+        outputNodeId: children[0].nodeId,
+        workflowNodeId: outputNodeId,
+      };
+    }
     return { outputNodeId, workflowNodeId: outputNodeId };
   }
-
-  const lanes = collectPipelineLanes(pipelineNodes, graphLanes);
   const pipelineNode = pipelineNodes.find((n) => n.nodeId === outputNodeId);
   const { baseId, lane } = stripMaterializedNodeSuffix(outputNodeId, lanes);
 

@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { tenancyFromLocalUser } from '../../auth/tenancy.util';
 import { ReplayPipelineJobDto } from '../../admin/dto/admin-query-ext.dto';
+import { TenantQueueService } from '../../orchestration/tenant-queue.service';
 import {
   type NodeJobPayload,
   PIPELINE_NODES_DLQ,
@@ -39,8 +40,7 @@ export class AdminPipelineJobsController {
   constructor(
     @InjectQueue(PIPELINE_NODES_DLQ)
     private readonly dlq: Queue<NodeJobPayload>,
-    @InjectQueue(PIPELINE_NODES_QUEUE)
-    private readonly mainQueue: Queue<NodeJobPayload>,
+    private readonly tenantQueues: TenantQueueService,
   ) {}
 
   @Post('replay')
@@ -65,7 +65,11 @@ export class AdminPipelineJobsController {
         message: `Job ${body.jobId} not found`,
       });
     }
-    await this.mainQueue.add('run-node', job.data, {
+    const mainQueue = this.tenantQueues.forUser<NodeJobPayload>(
+      PIPELINE_NODES_QUEUE,
+      job.data.userId,
+    );
+    await mainQueue.add('run-node', job.data, {
       jobId: pipelineNodeReplayJobId(job.data.pipelineId, job.data.nodeId),
     });
     await job.remove();

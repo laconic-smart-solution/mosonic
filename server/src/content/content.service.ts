@@ -16,6 +16,7 @@ import { CreditService } from '../credit/credit.service';
 import { NodeCreditPriceService } from '../credit/node-credit-price.service';
 import { resolveCreditNodeTypeForPipelineNode } from '../credit/lib/video-credit-node-type.util';
 import { NodeExecutor } from '../orchestration/node-executor.service';
+import { SourcePackBuilderService } from '../orchestration/source-pack-builder.service';
 import type { PreviousOutputs } from '../nodes/types/node-execution.types';
 import {
   WorkflowNodeType,
@@ -34,12 +35,33 @@ import {
   defaultWorkflowNodeConfigForRule,
   parseWorkflowNodeConfigOrThrow,
 } from '../nodes/workflow-node-config.zod';
+import { normalizeVideoNodeType } from '../nodes/video-node-type.util';
+import { generateMoreOutputMissing } from './generate-more-outcome.util';
 import { mergeResolvedOutputs } from './content-output.utils';
 import { resolveRerunWorkflowNodeId } from './content-rerun-node-resolve.util';
 import { buildContentRerunPreviousOutputs } from './content-rerun-previous-outputs.util';
+import { mergeRerunSourcePack } from './content-rerun-source-pack.util';
+import {
+  forcePreviousImageFirst,
+  resolveImageRerunSourcePack,
+} from './image-rerun-source-pack.util';
+import {
+  applyNodeOutputToDraft,
+  buildDraftNodeCatalog,
+  laneFromNodeOutput,
+  type DraftNodeCatalog,
+} from './content-draft-nodes.util';
 import { buildNodeOutputMapFromPipeline } from '../pipeline/pipeline-output-parse';
-import { flattenNodeOutputsToAiOutputs } from './content-node-output.util';
-import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
+import {
+  flattenNodeOutputsFromPipeline,
+  flattenNodeOutputsToAiOutputs,
+} from './content-node-output.util';
+import {
+  emptySourcePack,
+  parsePipelineSourcePack,
+  type PipelineSourcePack,
+} from '../pipeline/source-pack.types';
+import type { UploadedFileLike } from '../preprocessing/preprocessed.types';import type { IContentRepository } from '../repositories/interfaces/content.repository.interface';
 import type {
   ContentPageItemDto,
   ContentPageQueryDto,
@@ -86,6 +108,9 @@ export type ContentDetailResponse = {
   outputs: ReturnType<typeof mergeResolvedOutputs>;
   nodeOutputs: Record<string, Record<string, unknown>>;
   nodeUserEdits: Record<string, Record<string, unknown>>;
+  /** Channel lanes + per-node previews for chat / review channel switchers. */
+  lanes: string[];
+  nodes: DraftNodeCatalog['nodes'];
   approval?: ContentApprovalState;
   variantId?: string | null;
   experimentId?: string | null;
@@ -108,6 +133,8 @@ export type ContentDetailResponse = {
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
+  /** Serializes re-runs of the same draft so "all channels" does not clobber writes. */
+  private readonly rerunChains = new Map<string, Promise<void>>();
 
   constructor(
     @Inject(CONTENT_REPOSITORY)
@@ -117,6 +144,7 @@ export class ContentService {
     private readonly uploadService: UploadService,
     private readonly workflowService: WorkflowService,
     private readonly nodeExecutor: NodeExecutor,
+    private readonly sourcePackBuilder: SourcePackBuilderService,
     private readonly creditService: CreditService,
     private readonly nodeCreditPriceService: NodeCreditPriceService,
     private readonly creditCalculation: CreditCalculationService,
@@ -130,6 +158,41 @@ export class ContentService {
     @Inject(USER_PLAN_REPOSITORY)
     private readonly userPlans: IUserPlanRepository,
   ) {}
+
+  async describeDraftNodes(
+    contentId: string,
+    auth: TenancyAuth,
+  ): Promise<DraftNodeCatalog> {
+    const content = await this.contentRepository.findById(contentId, auth);
+    if (!content) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+    const workflowNodes = await this.workflowNodes.findByWorkflow(
+      content.workflowRef,
+      auth,
+    );
+    const pipeline = await this.pipelines.findById(content.pipelineRef, auth);
+    const snapshot = this.resolveEditableState(content);
+    return buildDraftNodeCatalog({
+      workflowNodes: workflowNodes.map((node) => ({
+        nodeId: node.nodeId,
+        type: String(node.type),
+        order: node.order,
+        lane: node.lane,
+        config: node.config,
+        isGenerateMoreOnly: node.isGenerateMoreOnly === true,
+      })),
+      pipelineNodes: parsePipelineNodes(pipeline?.nodes).map((node) => ({
+        nodeId: node.nodeId,
+        type: String(node.type),
+        order: node.order,
+        lane: node.lane,
+        config: node.config,
+      })),
+      nodeOutputs: snapshot.nodeOutputs,
+      nodeUserEdits: snapshot.nodeUserEdits,
+    });
+  }
 
   async findPage(
     query: ContentPageQueryDto,
@@ -239,6 +302,30 @@ export class ContentService {
       pipelineNodesForCredits,
     );
 
+    const workflowNodesFull = await this.workflowNodes.findByWorkflow(
+      doc.workflowRef,
+      auth,
+    );
+    const catalog = buildDraftNodeCatalog({
+      workflowNodes: workflowNodesFull.map((node) => ({
+        nodeId: node.nodeId,
+        type: String(node.type),
+        order: node.order,
+        lane: node.lane,
+        config: node.config,
+        isGenerateMoreOnly: node.isGenerateMoreOnly === true,
+      })),
+      pipelineNodes: parsePipelineNodes(pipeline?.nodes).map((node) => ({
+        nodeId: node.nodeId,
+        type: String(node.type),
+        order: node.order,
+        lane: node.lane,
+        config: node.config,
+      })),
+      nodeOutputs,
+      nodeUserEdits: snapshot.nodeUserEdits ?? {},
+    });
+
     return {
       contentId: doc.contentId,
       pipelineRef: doc.pipelineRef,
@@ -248,6 +335,8 @@ export class ContentService {
       outputs,
       nodeOutputs,
       nodeUserEdits: snapshot.nodeUserEdits ?? {},
+      lanes: catalog.lanes,
+      nodes: catalog.nodes,
       approval,
       variantId: doc.variantId ?? null,
       experimentId: doc.experimentId ?? null,
@@ -282,14 +371,32 @@ export class ContentService {
       plain.workflowRef,
       auth,
     );
+    const pipeline = await this.pipelines.findById(plain.pipelineRef, auth);
+    const pipelineNodesOrdered = this.pipelineNodesForMerge(pipeline);
+    const nextNodeOutputs = {
+      ...(snapshot.nodeOutputs ?? {}),
+      ...(dto.nodeOutputs ?? {}),
+    };
+    const existingLaneOutputs = this.asRecord(
+      (plain as { laneOutputs?: unknown }).laneOutputs,
+    ) as Record<string, Record<string, unknown>>;
+    const nextLaneOutputs = dto.laneOutputs
+      ? { ...existingLaneOutputs, ...dto.laneOutputs }
+      : existingLaneOutputs;
 
     let nextOutputs: ContentOutputs = {
       ...snapshot.outputs,
-      ...flattenNodeOutputsToAiOutputs(
-        workflowNodesOrdered,
-        snapshot.nodeOutputs ?? {},
-        nextNodeUserEdits,
-      ),
+      ...(pipelineNodesOrdered.length > 0
+        ? flattenNodeOutputsFromPipeline(
+            pipelineNodesOrdered,
+            nextNodeOutputs,
+            nextNodeUserEdits,
+          )
+        : flattenNodeOutputsToAiOutputs(
+            workflowNodesOrdered,
+            nextNodeOutputs,
+            nextNodeUserEdits,
+          )),
     };
     if (dto.newOutputs) {
       const keys: (keyof ContentOutputs)[] = [
@@ -314,8 +421,9 @@ export class ContentService {
         outputs: nextOutputs,
         userEdits: nextUserEdits,
         nodePromptOverrides: snapshot.nodePromptOverrides,
-        nodeOutputs: snapshot.nodeOutputs,
+        nodeOutputs: nextNodeOutputs,
         nodeUserEdits: nextNodeUserEdits,
+        laneOutputs: nextLaneOutputs,
       },
       auth,
     );
@@ -334,7 +442,9 @@ export class ContentService {
       );
       const merged = mergeResolvedOutputs(
         this.resolveEditableState(refreshed),
-        { workflowNodesOrdered },
+        pipelineNodesOrdered.length > 0
+          ? { pipelineNodesOrdered }
+          : { workflowNodesOrdered },
       );
       await this.uploadService.syncResolvedOutputsForContent(
         contentId,
@@ -353,6 +463,10 @@ export class ContentService {
     contentId: string,
     dto: RerunNodeDto,
     auth: TenancyAuth,
+    attachments?: {
+      files?: UploadedFileLike[];
+      urls?: string[];
+    },
   ): Promise<void> {
     const content = await this.contentRepository.findById(contentId, auth);
     if (!content) {
@@ -462,6 +576,16 @@ export class ContentService {
       dto.previousOutputs,
     );
 
+    const editingImage =
+      dto.mode === 'edit' &&
+      ((wfNode.type as unknown as string) === WorkflowNodeType.ImageGeneration ||
+        (wfNode.type as unknown as string) === 'image_generation');
+    if (editingImage && !previousOutputs.image?.trim()) {
+      throw new BadRequestException(
+        'This image has no picture to edit yet.',
+      );
+    }
+
     let nodeForRun = wfNode;
     const pipelineConfig = this.asRecord(pipelineNode?.config);
     const baseConfig = {
@@ -523,22 +647,63 @@ export class ContentService {
       nodeConfig: this.asRecord(nodeForRun.config),
     });
 
-    void this.runRerunExecution({
-      content,
-      pipeline,
-      wfNode: nodeForRun,
-      outputNodeId: rerunTarget.outputNodeId,
-      rule,
-      dto,
-      previousOutputs,
+    const existingPack =
+      parsePipelineSourcePack(pipeline.sourcePack) ?? emptySourcePack();
+    const attachFiles = attachments?.files ?? [];
+    const attachUrls = (attachments?.urls ?? [])
+      .map((u) => u.trim())
+      .filter(Boolean);
+    let sourcePack: PipelineSourcePack = existingPack;
+    if (attachFiles.length > 0 || attachUrls.length > 0) {
+      const brand =
+        rule.brand &&
+        typeof rule.brand === 'object' &&
+        !Array.isArray(rule.brand) &&
+        typeof (rule.brand as { brandName?: unknown }).brandName === 'string'
+          ? (rule.brand as { brandName: string }).brandName
+          : undefined;
+      const fresh = await this.sourcePackBuilder.build({
+        contentPrompt:
+          dto.message?.trim() || pipeline.contentPrompt || '',
+        files: attachFiles,
+        urls: attachUrls,
+        brandName: brand,
+        storageKey: content.contentId,
+      });
+      sourcePack = mergeRerunSourcePack(existingPack, fresh);
+    }
+
+    const hadNewAttachments =
+      attachFiles.length > 0 || attachUrls.length > 0;
+
+    await this.setNodeRerunPending(
+      content.contentId,
+      rerunTarget.outputNodeId,
+      true,
       auth,
-      creditsCharged,
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `Content node re-run execution failed (${contentId}): ${msg}`,
-      );
+    );
+    this.events.emitToContent(content.contentId, 'node:started', {
+      contentId: content.contentId,
+      nodeId: rerunTarget.outputNodeId,
+      nodeType: String(nodeForRun.type),
+      order: 1,
+      totalNodes: 1,
     });
+    this.enqueueRerun(content.contentId, () =>
+      this.runRerunExecution({
+        content,
+        pipeline,
+        wfNode: nodeForRun,
+        outputNodeId: rerunTarget.outputNodeId,
+        rule,
+        dto,
+        previousOutputs,
+        sourcePack,
+        hadNewAttachments,
+        auth,
+        creditsCharged,
+      }),
+    );
   }
 
   async getAvailableNodeTypes(
@@ -550,21 +715,59 @@ export class ContentService {
       throw new NotFoundException(`Content ${contentId} not found`);
     }
     const candidates: WorkflowNodeType[] = [
+      WorkflowNodeType.VideoPresenter,
+      WorkflowNodeType.VideoCinematic,
       WorkflowNodeType.VideoGeneration,
       WorkflowNodeType.Summarization,
       WorkflowNodeType.Translation,
       WorkflowNodeType.ImageGeneration,
+      WorkflowNodeType.Adapt,
     ];
     // "Generate more" is also used to re-generate an existing output type.
     // (Re-run exists too, but generate-more can create a new variant with optional instructions.)
     return candidates;
   }
 
+  /** Puts a generate-more lane on the linked upload so the publish tab appears. */
+  async syncUploadLane(
+    contentId: string,
+    lane: string,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const content = await this.contentRepository.findById(contentId, auth);
+    if (!content) return;
+    const laneKey = lane.trim().toLowerCase();
+    const laneOutputs = this.asRecord(
+      (content as { laneOutputs?: unknown }).laneOutputs,
+    ) as Record<string, Record<string, unknown>>;
+    const layer = laneOutputs[laneKey];
+    const caption =
+      typeof layer?.text === 'string' ? layer.text : undefined;
+    const mediaUrl =
+      typeof layer?.image === 'string'
+        ? layer.image
+        : typeof layer?.video === 'string'
+          ? layer.video
+          : undefined;
+    await this.uploadService.ensureLaneChannelOnContent(
+      contentId,
+      lane,
+      { caption, mediaUrl },
+      auth,
+    );
+  }
+
   async scheduleGenerateNode(
     contentId: string,
     dto: GenerateNodeDto,
     auth: TenancyAuth,
+    attachments?: {
+      files?: UploadedFileLike[];
+      urls?: string[];
+    },
   ): Promise<{ success: true; nodeId: string }> {
+    // Legacy `video_generation` requests become presenter/cinematic by config.mode.
+    dto = { ...dto, type: normalizeVideoNodeType(dto.type, dto.config) };
     if (
       dto.type === WorkflowNodeType.TextGeneration ||
       dto.type === WorkflowNodeType.KeywordPlanner
@@ -623,16 +826,41 @@ export class ContentService {
       throw new BadRequestException(`Invalid node config: ${msg}`);
     }
 
+    const direction =
+      dto.message?.trim() || dto.userPrompt?.trim() || undefined;
+
     const { order } = await this.workflowService.appendWorkflowNode(
       content.workflowRef,
       {
         nodeId,
         type: dto.type,
         config,
-        userPrompt: dto.userPrompt,
+        userPrompt: direction,
       },
       auth,
     );
+
+    const generateMoreLane =
+      typeof (config as { laneId?: unknown }).laneId === 'string'
+        ? (config as { laneId: string }).laneId
+        : typeof (config as { channel?: unknown }).channel === 'string'
+          ? (config as { channel: string }).channel
+          : null;
+    if (generateMoreLane) {
+      await this.uploadService
+        .ensureLaneChannelOnContent(
+          content.contentId,
+          generateMoreLane,
+          {},
+          auth,
+        )
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Could not add ${generateMoreLane} to upload for ${content.contentId}: ${msg}`,
+          );
+        });
+    }
 
     const creditsCharged = await this.chargeForContentNode({
       userId: auth.userId,
@@ -643,6 +871,41 @@ export class ContentService {
       nodeConfig: config as Record<string, unknown>,
     });
 
+    const existingPack =
+      parsePipelineSourcePack(pipeline.sourcePack) ?? emptySourcePack();
+    const attachFiles = attachments?.files ?? [];
+    const attachUrls = (attachments?.urls ?? [])
+      .map((u) => u.trim())
+      .filter(Boolean);
+    let sourcePack: PipelineSourcePack = existingPack;
+    if (attachFiles.length > 0 || attachUrls.length > 0) {
+      const brand =
+        rule.brand &&
+        typeof rule.brand === 'object' &&
+        !Array.isArray(rule.brand) &&
+        typeof (rule.brand as { brandName?: unknown }).brandName === 'string'
+          ? (rule.brand as { brandName: string }).brandName
+          : undefined;
+      const fresh = await this.sourcePackBuilder.build({
+        contentPrompt: direction || pipeline.contentPrompt || '',
+        files: attachFiles,
+        urls: attachUrls,
+        brandName: brand,
+        storageKey: content.contentId,
+      });
+      // Prefer fresh attachments for this variant; keep original pack notes.
+      // Do NOT inject previous_output — Generate More is another shot, not a tweak.
+      sourcePack = mergeRerunSourcePack(existingPack, fresh);
+    }
+
+    // Mark the new step as rendering so status reads pending (not empty) until it lands or fails.
+    await this.setNodeRerunPending(content.contentId, nodeId, true, auth).catch(
+      (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Could not mark generate-more ${nodeId} pending: ${msg}`);
+      },
+    );
+
     void this.runGenerateMoreExecution({
       content,
       pipeline,
@@ -652,6 +915,8 @@ export class ContentService {
       order,
       config,
       previousOutputs: previousOutputsFromDb,
+      sourcePack,
+      contentPrompt: direction || pipeline.contentPrompt,
       auth,
       creditsCharged,
     }).catch((err: unknown) => {
@@ -741,6 +1006,8 @@ export class ContentService {
     switch (type) {
       case WorkflowNodeType.ImageGeneration:
         return v(resolved.image);
+      case WorkflowNodeType.VideoPresenter:
+      case WorkflowNodeType.VideoCinematic:
       case WorkflowNodeType.VideoGeneration:
         return v(resolved.video);
       case WorkflowNodeType.Translation:
@@ -767,6 +1034,8 @@ export class ContentService {
     order: number;
     config: WorkflowNodeConfig;
     previousOutputs: PreviousOutputs;
+    sourcePack: PipelineSourcePack;
+    contentPrompt: string;
     auth: TenancyAuth;
     creditsCharged: number;
   }): Promise<void> {
@@ -779,12 +1048,13 @@ export class ContentService {
       order,
       config,
       previousOutputs,
+      sourcePack,
+      contentPrompt,
       auth,
       creditsCharged,
     } = args;
     const userId = auth.userId;
     try {
-      const contentPrompt = pipeline.contentPrompt;
       const totalNodes = await this.workflowNodes.countByWorkflow(
         content.workflowRef,
         auth,
@@ -796,6 +1066,7 @@ export class ContentService {
           order,
           config,
           workflowRef: content.workflowRef,
+          userPrompt: dto.message?.trim() || dto.userPrompt?.trim() || undefined,
         },
         context: {
           rule: rule as unknown as Parameters<
@@ -803,6 +1074,7 @@ export class ContentService {
           >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
+          sourcePack,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: Math.max(totalNodes, 1),
@@ -810,14 +1082,48 @@ export class ContentService {
         userId: pipeline.userId ?? content.userId ?? undefined,
         ruleId: rule.ruleId,
       });
+      // No file and no render job back = failed, never a silent "done".
+      const missing = generateMoreOutputMissing(dto.type, result.output);
+      if (missing) throw new Error(missing);
+      const laneFromConfig =
+        typeof (config as { laneId?: unknown }).laneId === 'string'
+          ? (config as { laneId: string }).laneId
+          : typeof (config as { channel?: unknown }).channel === 'string'
+            ? (config as { channel: string }).channel
+            : null;
       await this.persistNodeCompletion(
         content.contentId,
         content.workflowRef,
         nodeId,
         result.output,
         auth,
+        { lane: laneFromConfig },
       );
-    } catch {
+      await this.setNodeRerunPending(content.contentId, nodeId, false, auth).catch(
+        () => undefined,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Generate-more node failed (${dto.type} ${nodeId}, content ${content.contentId}): ${msg}`,
+      );
+      // Record the failure on the draft and tell the client, so chat and UI
+      // see "failed" (get_draft_media_status) instead of nothing.
+      await this.markGenerateMoreFailed(
+        content.contentId,
+        nodeId,
+        String(dto.type),
+        msg,
+        auth,
+      ).catch((markErr: unknown) => {
+        const m = markErr instanceof Error ? markErr.message : String(markErr);
+        this.logger.warn(`Could not record generate-more failure ${nodeId}: ${m}`);
+      });
+      this.events.emitToContent(content.contentId, 'node:failed_final', {
+        contentId: content.contentId,
+        nodeId,
+        message: msg,
+      });
       await this.refundContentNodeCharge({
         userId,
         contentId: content.contentId,
@@ -844,6 +1150,8 @@ export class ContentService {
     rule: RuleRecord;
     dto: RerunNodeDto;
     previousOutputs: PreviousOutputs;
+    sourcePack: PipelineSourcePack;
+    hadNewAttachments: boolean;
     auth: TenancyAuth;
     creditsCharged: number;
   }): Promise<void> {
@@ -855,6 +1163,8 @@ export class ContentService {
       rule,
       dto,
       previousOutputs,
+      sourcePack,
+      hadNewAttachments,
       auth,
       creditsCharged,
     } = args;
@@ -862,6 +1172,20 @@ export class ContentService {
     // A follow-up message for this specific re-run overrides the pipeline's
     // original content prompt for this run only — the workflow/pipeline itself is untouched.
     const contentPrompt = dto.message?.trim() || pipeline.contentPrompt;
+    const isImageNode =
+      (wfNode.type as unknown as string) === WorkflowNodeType.ImageGeneration ||
+      (wfNode.type as unknown as string) === 'image_generation';
+    const keepScene = isImageNode && dto.mode === 'edit';
+    const packForRun = isImageNode
+      ? keepScene
+        ? forcePreviousImageFirst(sourcePack, previousOutputs.image ?? '')
+        : resolveImageRerunSourcePack({
+            sourcePack,
+            previousImageUrl: previousOutputs.image,
+            rerunMessage: dto.message?.trim() ?? '',
+            hadNewAttachments,
+          })
+      : sourcePack;
     try {
       const totalNodes = await this.workflowNodes.countByWorkflow(
         content.workflowRef,
@@ -881,6 +1205,7 @@ export class ContentService {
           >[0]['context']['rule'],
           contentPrompt,
           previousOutputs,
+          sourcePack: packForRun,
         },
         pipelineId: pipeline.pipelineId,
         totalNodes: Math.max(totalNodes, 1),
@@ -888,19 +1213,50 @@ export class ContentService {
         userId: pipeline.userId ?? content.userId ?? undefined,
         ruleId: rule.ruleId,
         contentOutputNodeId: outputNodeId,
+        suppressCompletedEmit: true,
+        imageEdit: keepScene
+          ? {
+              instruction: dto.message?.trim() || '',
+              useBrandLogo: dto.useBrandLogo === true,
+            }
+          : undefined,
       });
+      const pipelineNode = parsePipelineNodes(pipeline.nodes).find(
+        (node) => node.nodeId === outputNodeId,
+      );
       await this.persistNodeCompletion(
         content.contentId,
         content.workflowRef,
         outputNodeId,
         result.output,
         auth,
+        {
+          workflowNodeId: wfNode.nodeId,
+          lane: laneFromNodeOutput(
+            outputNodeId,
+            result.output,
+            [],
+            pipelineNode?.lane,
+          ),
+        },
       );
+      this.events.emitToContent(content.contentId, 'node:rerun_completed', {
+        contentId: content.contentId,
+        nodeId: outputNodeId,
+        nodeType: wfNode.type,
+        output: result.output,
+      });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Re-run failed. Please try again.';
+      await this.setNodeRerunPending(
+        content.contentId,
+        outputNodeId,
+        false,
+        auth,
+      );
       this.events.emitToContent(content.contentId, 'node:failed_final', {
         contentId: content.contentId,
         nodeId: outputNodeId,
@@ -1184,33 +1540,155 @@ export class ContentService {
     nodeId: string,
     output: Record<string, unknown>,
     auth: TenancyAuth,
+    extras?: { workflowNodeId?: string; lane?: string | null },
   ): Promise<void> {
     const doc = await this.contentRepository.findByIdLean(contentId, auth);
     if (!doc) return;
     const snapshot = this.resolveEditableState(doc);
-    const mergedNodeOutputs = {
-      ...(snapshot.nodeOutputs ?? {}),
-      [nodeId]: output,
-    };
+    const pipeline = await this.pipelines.findById(doc.pipelineRef, auth);
+    const pipelineNodesOrdered = this.pipelineNodesForMerge(pipeline);
+    const lane = laneFromNodeOutput(
+      nodeId,
+      output,
+      [],
+      extras?.lane,
+    );
+    const aliasNodeIds = [
+      extras?.workflowNodeId,
+      lane && extras?.workflowNodeId
+        ? `${extras.workflowNodeId}__${lane}`
+        : undefined,
+    ].filter((id): id is string => Boolean(id) && id !== nodeId);
+    const copied = applyNodeOutputToDraft({
+      nodeId,
+      output,
+      userEdits: snapshot.userEdits,
+      nodeUserEdits: snapshot.nodeUserEdits ?? {},
+      nodeOutputs: snapshot.nodeOutputs ?? {},
+      laneOutputs: this.asRecord(
+        (doc as { laneOutputs?: unknown }).laneOutputs,
+      ) as Record<string, Record<string, unknown>>,
+      lane,
+      aliasNodeIds,
+    });
     const workflowNodesOrdered = await this.loadWorkflowNodesOrdered(
       workflowRef,
       auth,
     );
     const nextOutputs: ContentOutputs = {
       ...snapshot.outputs,
-      ...flattenNodeOutputsToAiOutputs(
-        workflowNodesOrdered,
-        mergedNodeOutputs,
-        snapshot.nodeUserEdits ?? {},
-      ),
+      ...(pipelineNodesOrdered.length > 0
+        ? flattenNodeOutputsFromPipeline(
+            pipelineNodesOrdered,
+            copied.nodeOutputs,
+            copied.nodeUserEdits,
+          )
+        : flattenNodeOutputsToAiOutputs(
+            workflowNodesOrdered,
+            copied.nodeOutputs,
+            copied.nodeUserEdits,
+          )),
     };
     await this.contentRepository.updateEditableState(
       contentId,
       {
         outputs: nextOutputs,
+        userEdits: copied.userEdits as ContentUserEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: copied.nodeOutputs,
+        nodeUserEdits: copied.nodeUserEdits,
+        laneOutputs: copied.laneOutputs,
+      },
+      auth,
+    );
+    if (lane) {
+      const caption =
+        typeof output.text === 'string' && output.text.trim()
+          ? output.text
+          : typeof copied.laneOutputs[lane]?.text === 'string'
+            ? String(copied.laneOutputs[lane].text)
+            : undefined;
+      const mediaUrl =
+        typeof output.image === 'string' && output.image.trim()
+          ? output.image
+          : typeof output.video === 'string' && output.video.trim()
+            ? output.video
+            : undefined;
+      await this.uploadService
+        .ensureLaneChannelOnContent(
+          contentId,
+          lane,
+          { caption, mediaUrl },
+          auth,
+        )
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Could not sync ${lane} onto upload for ${contentId}: ${msg}`,
+          );
+        });
+    }
+  }
+
+  private enqueueRerun(contentId: string, work: () => Promise<void>): void {
+    const prev = this.rerunChains.get(contentId) ?? Promise.resolve();
+    const next = prev.then(work, work);
+    this.rerunChains.set(contentId, next);
+    void next.finally(() => {
+      if (this.rerunChains.get(contentId) === next) {
+        this.rerunChains.delete(contentId);
+      }
+    });
+  }
+
+  private async markGenerateMoreFailed(
+    contentId: string,
+    nodeId: string,
+    type: string,
+    error: string,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const doc = await this.contentRepository.findByIdLean(contentId, auth);
+    if (!doc) return;
+    const snapshot = this.resolveEditableState(doc);
+    const layer: Record<string, unknown> = {
+      ...(snapshot.nodeOutputs[nodeId] ?? {}),
+      type,
+      error: error.slice(0, 300),
+    };
+    delete layer._pending;
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: snapshot.outputs,
         userEdits: snapshot.userEdits,
         nodePromptOverrides: snapshot.nodePromptOverrides,
-        nodeOutputs: mergedNodeOutputs,
+        nodeOutputs: { ...snapshot.nodeOutputs, [nodeId]: layer },
+        nodeUserEdits: snapshot.nodeUserEdits,
+      },
+      auth,
+    );
+  }
+
+  private async setNodeRerunPending(
+    contentId: string,
+    nodeId: string,
+    pending: boolean,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const doc = await this.contentRepository.findByIdLean(contentId, auth);
+    if (!doc) return;
+    const snapshot = this.resolveEditableState(doc);
+    const layer = { ...(snapshot.nodeOutputs[nodeId] ?? {}) };
+    if (pending) layer._pending = true;
+    else delete layer._pending;
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: snapshot.outputs,
+        userEdits: snapshot.userEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: { ...snapshot.nodeOutputs, [nodeId]: layer },
         nodeUserEdits: snapshot.nodeUserEdits,
       },
       auth,

@@ -10,8 +10,11 @@ const REVIEWABLE_NODE_TYPES = new Set<WorkflowNodeType>([
   "text_generation",
   "image_generation",
   "video_generation",
+  "video_presenter",
+  "video_cinematic",
   "translation",
   "transcription",
+  "subtitle",
   "summarization",
   "adapt",
   "intelligence",
@@ -28,7 +31,7 @@ export function isReviewableWorkflowNodeType(type: WorkflowNodeType): boolean {
 }
 
 function formatReviewableNodeLabel(node: WorkflowNode): string {
-  const base = getWfNodeTypeLabel(backendTypeToCanvas(node.type))
+  const base = getWfNodeTypeLabel(backendTypeToCanvas(node.type, node.config))
   const lane = node.lane?.trim()
   if (lane) {
     return `${base} (${channelLabel(lane)})`

@@ -23,8 +23,10 @@ import {
 } from "@/features/workflow/data/workflow-model"
 import type { BranchChannelHandle } from "@/features/workflow/lib/branch-channels"
 import { useWorkflowFlowVisualTheme } from "@/features/workflow/lib/workflow-flow-theme"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
 import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import { hasBlockingOutgoingEdge } from "@/features/workflow/lib/workflow-node-validation"
 import { cn } from "@/lib/utils"
 import { CreditUsageBadge } from "@/components/core/credit-usage-badge"
@@ -260,11 +262,23 @@ export function WorkflowRfNode({ data, selected }: WorkflowRfNodeProps) {
 
           {data.previewImage?.trim() && !isWaitingReview ? (
             previewImageSrc ? (
-              <img
-                src={previewImageSrc}
-                alt={t("rfNode.previewAlt")}
-                className="max-h-20 w-full rounded-md object-cover"
-              />
+              <div className="group/preview relative">
+                <img
+                  src={previewImageSrc}
+                  alt={t("rfNode.previewAlt")}
+                  className="max-h-20 w-full rounded-md object-cover"
+                />
+                <DownloadMediaButton
+                  src={previewImageSrc}
+                  filename={filenameFromMediaUrl(
+                    data.previewImage,
+                    "image",
+                    "node"
+                  )}
+                  size="xs"
+                  className="nodrag nopan absolute top-1 right-1 opacity-0 transition-opacity group-hover/preview:opacity-100"
+                />
+              </div>
             ) : (
               <MediaLoadPlaceholder
                 progress={previewImage.progress}

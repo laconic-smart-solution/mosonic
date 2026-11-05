@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CreditModule } from '../credit/credit.module';
 import { DatabaseModule } from '../database/database.module';
@@ -26,7 +26,7 @@ import { WorkflowResolveService } from './workflow-resolve.service';
     LlmModule,
     NodesModule,
     RepositoriesModule,
-    RuleModule,
+    forwardRef(() => RuleModule),
   ],
   controllers: [WorkflowController, WorkflowHeygenController],
   providers: [
@@ -36,6 +36,6 @@ import { WorkflowResolveService } from './workflow-resolve.service';
     WorkflowResolveService,
     WorkflowHeygenService,
   ],
-  exports: [WorkflowService, WorkflowResolveService],
+  exports: [WorkflowService, WorkflowResolveService, WorkflowHeygenService],
 })
 export class WorkflowModule {}

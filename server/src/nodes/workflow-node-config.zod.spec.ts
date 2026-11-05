@@ -11,6 +11,7 @@ import {
   aspectRatioToOpenAiImageSize,
   coerceVideoConfigForPersist,
   parseWorkflowNodeConfig,
+  rejectedVideoPatchKeys,
 } from './workflow-node-config.zod';
 
 describe('aspectRatioToOpenAiImageSize', () => {
@@ -76,13 +77,14 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.quality).toBe(NodeImageQuality.Hd);
   });
 
-  it('coerces legacy DALL·E-3-only size when persisting gpt-image-1', () => {
+  it('coerces legacy DALL·E-3-only size when persisting gpt-image-2', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
-      model: 'gpt-image-1',
+      model: 'dall-e-3',
       size: '1792x1024',
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
+    expect(r.data.model).toBe('gpt-image-2');
     expect(r.data.size).toBe('1536x1024');
   });
 
@@ -148,22 +150,22 @@ describe('parseWorkflowNodeConfig', () => {
     expect(r.data.aspectRatio).toBe('4:5');
   });
 
-  it('snaps legacy video duration 15 to 16 seconds', () => {
+  it('snaps cinematic duration 12 to 10 seconds', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
+      duration: 12,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.duration).toBe(10);
+  });
+
+  it('accepts explicit cinematic duration 15', () => {
     const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
       duration: 15,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.data.duration).toBe(16);
-  });
-
-  it('accepts explicit Sora duration 20', () => {
-    const r = parseWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {
-      duration: 20,
-    });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.data.duration).toBe(20);
+    expect(r.data.duration).toBe(15);
   });
 
   it('snaps presenter duration to allowed HeyGen values', () => {
@@ -260,5 +262,24 @@ describe('parseWorkflowNodeConfig', () => {
     expect((r.data as Record<string, unknown>).customPrompt).toBe(
       'Find competitor reels in skincare',
     );
+  });
+});
+
+describe('rejectedVideoPatchKeys', () => {
+  it('accepts presenter keys on video_presenter, rejects cinematic-only and unknown', () => {
+    expect(
+      rejectedVideoPatchKeys(WorkflowNodeType.VideoPresenter, [
+        'heygenVoiceId', 'heygenOrientation', 'heygenExpressiveness', 'heygenMotionPrompt',
+        'heygenBackgroundUrl', 'removeBackground', 'resolution',
+      ]),
+    ).toEqual([]);
+    expect(
+      rejectedVideoPatchKeys(WorkflowNodeType.VideoPresenter, ['cinematicMode', 'bogus', 'heygenVoiceId']),
+    ).toEqual(['cinematicMode', 'bogus']);
+  });
+
+  it('rejects presenter-only keys on video_cinematic; ignores non-video types', () => {
+    expect(rejectedVideoPatchKeys(WorkflowNodeType.VideoCinematic, ['heygenVoiceId', 'cinematicMode'])).toEqual(['heygenVoiceId']);
+    expect(rejectedVideoPatchKeys(WorkflowNodeType.ImageGeneration, ['whatever'])).toEqual([]);
   });
 });

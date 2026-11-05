@@ -372,6 +372,8 @@ export function validateWorkflowGraph(
 
 const TYPES_REQUIRING_TEXT_ANCESTOR = new Set<WorkflowNodeType>([
   WorkflowNodeType.ImageGeneration,
+  WorkflowNodeType.VideoPresenter,
+  WorkflowNodeType.VideoCinematic,
   WorkflowNodeType.VideoGeneration,
   WorkflowNodeType.Translation,
   WorkflowNodeType.Branch,

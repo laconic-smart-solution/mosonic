@@ -72,6 +72,13 @@ export const ROUTE_BREADCRUMB_DEFS: RouteBreadcrumbDef[] = [
     parent: "/admin",
   },
   {
+    pattern: "/admin/token-rates",
+    labelKey: "layout.nav.tokenRates",
+    ns: "admin",
+    href: "/admin/token-rates",
+    parent: "/admin",
+  },
+  {
     pattern: "/admin/plans",
     labelKey: "layout.nav.plans",
     ns: "admin",

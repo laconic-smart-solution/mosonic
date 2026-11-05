@@ -14,8 +14,10 @@ import {
 import i18n from "@/i18n"
 import type { WorkflowNodeType } from "@/shared/types/workflow.type"
 import { Button } from "@/components/ui/button"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
 import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import {
   OUTPUT_GRID,
   type OutputKey,
@@ -99,6 +101,8 @@ export function PipelineTypeIcon({ type }: { type: WorkflowNodeType }) {
     case "translation":
       return <Languages className={ic} />
     case "video_generation":
+    case "video_presenter":
+    case "video_cinematic":
       return <Video className={ic} />
     case "transcription":
       return <Mic className={ic} />
@@ -161,6 +165,12 @@ export function PreviewImageWithOverlay({
           {i18n.t("content:review.remove")}
         </Button>
       </div>
+      <DownloadMediaButton
+        src={media.src}
+        filename={filenameFromMediaUrl(url, "image", title || "content")}
+        label={title}
+        className="pointer-events-auto absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+      />
     </div>
   )
 }
@@ -223,14 +233,21 @@ export function MediaVideoBlock({ url }: { url: string }) {
     )
   }
   return (
-    <video
-      src={media.src}
-      controls
-      className="max-h-[min(420px,60vh)] w-full rounded-lg bg-black object-contain"
-      autoPlay
-      muted
-      playsInline
-    />
+    <div className="group relative w-full">
+      <video
+        src={media.src}
+        controls
+        className="max-h-[min(420px,60vh)] w-full rounded-lg bg-black object-contain"
+        autoPlay
+        muted
+        playsInline
+      />
+      <DownloadMediaButton
+        src={media.src}
+        filename={filenameFromMediaUrl(url, "video", "content")}
+        className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </div>
   )
 }
 
@@ -247,6 +264,17 @@ export function LightboxInner({ url }: { url: string }) {
     )
   }
   return (
-    <img src={media.src} alt="" className="max-h-[80vh] w-full object-contain" />
+    <div className="group relative w-full">
+      <img
+        src={media.src}
+        alt=""
+        className="max-h-[80vh] w-full object-contain"
+      />
+      <DownloadMediaButton
+        src={media.src}
+        filename={filenameFromMediaUrl(url, "image", "content")}
+        className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </div>
   )
 }

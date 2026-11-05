@@ -4,8 +4,10 @@ import { Loader2, RefreshCw, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { DownloadMediaButton } from "@/shared/components/download-media-button"
 import { MediaLoadPlaceholder } from "@/shared/components/media-load-placeholder"
 import { useFileObjectUrl } from "@/shared/hooks/use-file-object-url"
+import { filenameFromMediaUrl } from "@/shared/lib/download-media"
 import { cn } from "@/lib/utils"
 import { uploadMediaService } from "@/shared/services/upload-media.service"
 import type { NodeReviewPayload } from "@/shared/types/pipeline.type"
@@ -15,12 +17,19 @@ const TEXT_NODE_TYPES = new Set([
   "translation",
   "summarization",
   "transcription",
+  "subtitle",
   "adapt",
   "keyword_planner",
   "intelligence",
 ])
 
-const MEDIA_NODE_TYPES = new Set(["image_generation", "video_generation"])
+const MEDIA_NODE_TYPES = new Set([
+  "image_generation",
+  "video_generation",
+  "video_presenter",
+  "video_cinematic",
+])
+const VIDEO_NODE_TYPES = new Set(["video_generation", "video_presenter", "video_cinematic"])
 
 type Props = {
   nodeType: string
@@ -76,7 +85,7 @@ export function WorkflowNodeReviewCard({
   const imagePreviewRef =
     nodeType === "image_generation" ? mediaUrl ?? previewImage : undefined
   const videoPreviewRef =
-    nodeType === "video_generation" ? mediaUrl ?? previewVideo : undefined
+    VIDEO_NODE_TYPES.has(nodeType) ? mediaUrl ?? previewVideo : undefined
   const imageMedia = useFileObjectUrl(imagePreviewRef)
   const videoMedia = useFileObjectUrl(videoPreviewRef)
   const imageSrc =
@@ -151,14 +160,22 @@ export function WorkflowNodeReviewCard({
       {isMedia && nodeType === "image_generation" ? (
         <div className="flex flex-col gap-2">
           {imageSrc ? (
-            <img
-              src={imageSrc}
-              alt={t("stepMode.previewAlt")}
-              className={cn(
-                "w-full rounded-md object-contain",
-                isDialog ? "max-h-64" : "max-h-24 object-cover",
-              )}
-            />
+            <div className="group/preview relative">
+              <img
+                src={imageSrc}
+                alt={t("stepMode.previewAlt")}
+                className={cn(
+                  "w-full rounded-md object-contain",
+                  isDialog ? "max-h-64" : "max-h-24 object-cover",
+                )}
+              />
+              <DownloadMediaButton
+                src={imageSrc}
+                filename={filenameFromMediaUrl(imagePreviewRef, "image", "node")}
+                size={isDialog ? "sm" : "xs"}
+                className="absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover/preview:opacity-100"
+              />
+            </div>
           ) : (
             <MediaLoadPlaceholder
               className={cn(
@@ -200,18 +217,26 @@ export function WorkflowNodeReviewCard({
         </div>
       ) : null}
 
-      {isMedia && nodeType === "video_generation" ? (
+      {isMedia && VIDEO_NODE_TYPES.has(nodeType) ? (
         <div className="flex flex-col gap-2">
           {videoSrc ? (
-            <video
-              src={videoSrc}
-              className={cn(
-                "w-full rounded-md object-contain",
-                isDialog ? "max-h-64" : "max-h-24 object-cover",
-              )}
-              muted
-              controls
-            />
+            <div className="group/preview relative">
+              <video
+                src={videoSrc}
+                className={cn(
+                  "w-full rounded-md object-contain",
+                  isDialog ? "max-h-64" : "max-h-24 object-cover",
+                )}
+                muted
+                controls
+              />
+              <DownloadMediaButton
+                src={videoSrc}
+                filename={filenameFromMediaUrl(videoPreviewRef, "video", "node")}
+                size={isDialog ? "sm" : "xs"}
+                className="absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover/preview:opacity-100"
+              />
+            </div>
           ) : (
             <MediaLoadPlaceholder
               className={cn(

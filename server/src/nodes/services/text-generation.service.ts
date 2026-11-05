@@ -106,14 +106,14 @@ function buildSystemPrompt(
     '',
     '=== CAMPAIGN ===',
     `Goals: ${rule.campaign.goals.join(', ')}`,
-    `Keywords to include naturally: ${rule.campaign.keywords.join(', ')}`,
+    `Keywords (pick at most 2-3 that fit; use them naturally, never as a list): ${rule.campaign.keywords.join(', ')}`,
     `Hashtags: ${rule.campaign.hashtagStrategy.join(', ')}`,
     '',
     '=== CONTENT GUIDELINES ===',
     `Do: ${rule.contentGuidelines.dos.join(', ')}`,
     `Do not: ${rule.contentGuidelines.donts.join(', ')}`,
     `Always include: ${rule.contentGuidelines.requiredElements.join(', ')}`,
-    `SEO keywords: ${rule.contentGuidelines.seoGuidelines.primaryKeywords.join(', ')}`,
+    `SEO keywords (at most 2-3 in the copy, woven into sentences, never listed): ${rule.contentGuidelines.seoGuidelines.primaryKeywords.join(', ')}`,
     '',
     '=== RESTRICTIONS ===',
     rule.brand.brandRestrictions.join('\n'),
@@ -165,12 +165,17 @@ function buildSystemPrompt(
 function buildHumanPrompt(
   contentPrompt: string,
   previousOutputs?: PreviousOutputs,
+  sourcePackNotes?: string,
 ): string {
   const kw = previousOutputs?.keywords?.trim();
+  const notes = sourcePackNotes?.trim();
   return [
     `Content request: ${contentPrompt}`,
     kw
-      ? `Target keywords from the keyword planner (use naturally in the copy, do not stuff):\n${kw}`
+      ? `Target keywords from the keyword planner (use at most 2-3 of them, naturally in sentences; never list them or chain them with commas; readability first):\n${kw}`
+      : '',
+    notes
+      ? `Source attachments for this run (use as factual product/context — do not invent beyond this):\n${notes}`
       : '',
   ]
     .filter(Boolean)
@@ -227,10 +232,15 @@ export class TextGenerationService {
     text: string;
     usage?: { inputTokens: number; outputTokens: number };
   }> {
-    const { rule, contentPrompt, config, previousOutputs } = input;
+    const { rule, contentPrompt, config, previousOutputs, sourcePackNotes } =
+      input;
     const normalized = normalizeTextGenerationConfig(config);
     const systemPrompt = buildSystemPrompt(rule, normalized, previousOutputs);
-    const humanPrompt = buildHumanPrompt(contentPrompt, previousOutputs);
+    const humanPrompt = buildHumanPrompt(
+      contentPrompt,
+      previousOutputs,
+      sourcePackNotes,
+    );
 
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
@@ -277,7 +287,11 @@ export class TextGenerationService {
       normalized,
       input.previousOutputs,
     );
-    const humanPrompt = buildHumanPrompt(contentPrompt, input.previousOutputs);
+    const humanPrompt = buildHumanPrompt(
+      contentPrompt,
+      input.previousOutputs,
+      input.sourcePack?.notes,
+    );
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
       model: normalized.model,
@@ -309,6 +323,7 @@ export class TextGenerationService {
         contentPrompt,
         config: input.config ?? {},
         previousOutputs: input.previousOutputs,
+        sourcePackNotes: input.sourcePack?.notes,
       });
       text = generated.text;
       usage = generated.usage;

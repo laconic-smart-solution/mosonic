@@ -1,4 +1,4 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 
 import OpenAI from 'openai';
 
@@ -19,12 +19,13 @@ import { ImageTemplateClassifierService } from './image-template-classifier.serv
 import { ImageTemplateResolverService } from './image-template-resolver.service';
 import { ImageStyleSelectorService } from './image-style-selector.service';
 import { ImageDesignStyleRepositoryService } from './image-design-style-repository.service';
-import { ImageDesignDirectionService } from './image-design-direction.service';
 import { ImagePromptComposerService } from './image-prompt-composer.service';
 
+import { coerceOpenAiImageMime } from '../openai-image-mime.util';
 import {
   aspectRatioToOpenAiImageSize,
   coerceOpenAiImageSize,
+  OPENAI_IMAGE_GENERATION_MODEL,
 } from '../openai-image-size.util';
 
 import type {
@@ -33,6 +34,12 @@ import type {
   NodeExecutionResult,
   StoredImageOutput,
 } from '../types/node-execution.types';
+import {
+  pixelAssetsFromPack,
+  type SourcePackAsset,
+} from '../../pipeline/source-pack.types';
+import { selectKeepScenePixelAssets } from '../../orchestration/brand-image-assets.util';
+import { sourceImageFetchUrls } from '../../upload/resolve-absolute-media-url.util';
 
 /**
  * DALL·E 3 prompt max length.
@@ -54,7 +61,7 @@ type NormalizedImageConfig = {
   negativePrompt?: string;
 };
 
-function normalizeImageGenerationConfig(
+export function normalizeImageGenerationConfig(
   config: WorkflowNodeConfig | undefined,
 ): NormalizedImageConfig {
   const c = config ?? {};
@@ -64,10 +71,7 @@ function normalizeImageGenerationConfig(
       ? c.provider
       : undefined;
 
-  const model =
-    typeof c.model === 'string' && c.model.trim()
-      ? c.model.trim()
-      : 'gpt-image-1';
+  const model = OPENAI_IMAGE_GENERATION_MODEL;
 
   const aspect =
     typeof c.aspectRatio === 'string' && c.aspectRatio.trim()
@@ -192,18 +196,32 @@ function buildLegacyImagePrompt(
   const textInstruction =
     effectiveTemplate === NodeImageTemplate.Infographic
       ? 'Include only a few short, exact labels drawn directly from the source content below — never copy full sentences as captions, and never add unrelated decorative text.'
-      : 'Do not include any text, captions, logos, or watermarks.';
+      : 'Do not include any text, captions, invented logos, or watermarks. Composite a provided brand_mark reference when one is listed.';
 
   const sections = [
     `Create a ${getImageType(effectiveTemplate)}.`,
+
+    'BRAND',
+    `Brand: ${rule.brand.brandName}`,
+    `Industry: ${rule.brand.industry}`,
+    rule.brand.brandDescription
+      ? `Brand description: ${rule.brand.brandDescription}`
+      : '',
+    `Brand tone: ${rule.brand.brandTone.join(', ')}`,
+    rule.brand.callToAction ? `Call to action: ${rule.brand.callToAction}` : '',
+
+    'AUDIENCE',
+    rule.audience?.description
+      ? `Target audience: ${rule.audience.description}`
+      : '',
+    rule.audience?.location?.length
+      ? `Location: ${rule.audience.location.join(', ')}`
+      : '',
 
     'SOURCE CONTENT',
     quoted,
 
     'VISUAL DIRECTION',
-    `Brand tone: ${rule.brand.brandTone.join(', ')}`,
-    `Industry: ${rule.brand.industry}`,
-
     styleName ? `Design style: ${styleName} — ${stylePrompt ?? ''}` : '',
 
     config.style === 'vivid'
@@ -220,20 +238,28 @@ function buildLegacyImagePrompt(
 
 @Injectable()
 export class ImageGenerationService {
+  private readonly logger = new Logger(ImageGenerationService.name);
+
   constructor(
     private readonly llm: LlmService,
     private readonly templateClassifier: ImageTemplateClassifierService,
     private readonly templateResolver: ImageTemplateResolverService,
     private readonly styleSelector: ImageStyleSelectorService,
     private readonly styleRepository: ImageDesignStyleRepositoryService,
-    private readonly designDirection: ImageDesignDirectionService,
     private readonly promptComposer: ImagePromptComposerService,
   ) {}
 
   async generateImage(
     input: ImageGenerationInput & { workflowRef: string },
   ): Promise<{ image: StoredImageOutput }> {
-    const { rule, previousOutputs, config, workflowRef, contentPrompt } = input;
+    const {
+      rule,
+      previousOutputs,
+      config,
+      workflowRef,
+      contentPrompt,
+      sourcePack,
+    } = input;
 
     const normalized = normalizeImageGenerationConfig(config);
 
@@ -279,34 +305,28 @@ export class ImageGenerationService {
         });
     const styleRow = await this.styleRepository.getByKey(styleKey);
 
-    /**
-     * Template + Style are merged into one coherent design direction FIRST,
-     * so the Prompt Composer only ever sees one already-synthesized idea
-     * instead of two raw source texts side by side (see
-     * ImageDesignDirectionService for why that matters).
-     */
-    const direction = await this.designDirection.compose({
-      templateName: templateRow.name,
-      templatePrompt: templateRow.prompt,
-      styleName: styleRow?.name,
-      stylePrompt: styleRow?.prompt,
-      provider: normalized.provider,
-    });
+    const pixelAssets = pixelAssetsFromPack(sourcePack, 4);
+    const referenceImages = pixelAssets.map((a, i) => ({
+      index: i + 1,
+      label: a.label,
+      role: a.role,
+    }));
 
-    /**
-     * Normal path: Rule + user request + design direction → one coherent
-     * natural-language prompt via the Prompt Composer.
-     * Fallback (composer failed): small legacy metadata-dump prompt.
-     */
     const composedPrompt = await this.promptComposer.compose({
       rule,
       userPrompt: contentPrompt ?? '',
       negativePrompt: normalized.negativePrompt,
-      designDirection: direction,
+      templateName: templateRow.name,
+      templatePrompt: templateRow.prompt,
+      styleName: styleRow?.name,
+      stylePrompt: styleRow?.prompt,
       channel: normalized.channel,
       marketingText: previousOutputs.text,
       effectiveTemplate,
       provider: normalized.provider,
+      sourcePackNotes: sourcePack?.notes,
+      referenceImages:
+        referenceImages.length > 0 ? referenceImages : undefined,
     });
 
     const imagePrompt =
@@ -320,22 +340,11 @@ export class ImageGenerationService {
         styleRow?.prompt,
       );
 
-    const generated = await this.llm.generateImageBase64({
-      provider: normalized.provider,
-      model: normalized.model,
+    const image = await this.renderPromptToImage({
+      workflowRef,
       prompt: imagePrompt,
-      size: normalized.size,
-      quality: normalized.quality,
-      style: normalized.style,
-    });
-
-    const timePart = new Date().toISOString().replace(/[:.]/g, '-');
-
-    const image = await this.llm.uploadImageBase64({
-      base64: generated.base64,
-      mimeType: generated.mimeType,
-      fileName: `workflow-${workflowRef}-image-${timePart}.png`,
-      folderPath: buildFileStorageFolderPath('workflow-images', workflowRef),
+      config,
+      assets: pixelAssets,
     });
 
     return {
@@ -343,11 +352,101 @@ export class ImageGenerationService {
     };
   }
 
+  /** Paint a finished prompt from the image composer. */
+  async renderPromptToImage(args: {
+    workflowRef: string;
+    prompt: string;
+    config?: WorkflowNodeConfig;
+    assets: SourcePackAsset[];
+    requireReferences?: boolean;
+  }): Promise<StoredImageOutput> {
+    const normalized = normalizeImageGenerationConfig(args.config);
+    const generated =
+      args.assets.length > 0
+        ? await this.editWithReferences({
+            provider: normalized.provider,
+            prompt: args.prompt,
+            size: normalized.size,
+            assets: args.assets,
+            requireAll: args.requireReferences === true,
+          })
+        : await this.llm.generateImageBase64({
+            provider: normalized.provider,
+            model: normalized.model,
+            prompt: args.prompt,
+            size: normalized.size,
+            quality: normalized.quality,
+            style: normalized.style,
+          });
+
+    const timePart = new Date().toISOString().replace(/[:.]/g, '-');
+    return this.llm.uploadImageBase64({
+      base64: generated.base64,
+      mimeType: generated.mimeType,
+      fileName: `workflow-${args.workflowRef}-image-${timePart}.png`,
+      folderPath: buildFileStorageFolderPath(
+        'workflow-images',
+        args.workflowRef,
+      ),
+    });
+  }
+
+  private async editWithReferences(args: {
+    provider?: LlmProvider;
+    prompt: string;
+    size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+    assets: SourcePackAsset[];
+    requireAll?: boolean;
+  }): Promise<{ base64: string; mimeType: string }> {
+    const images: Array<{
+      buffer: Buffer;
+      fileName: string;
+      mimeType: string;
+    }> = [];
+
+    for (const asset of args.assets) {
+      const downloaded = await this.downloadSourceImage(asset);
+      if (!downloaded) continue;
+      images.push(downloaded);
+    }
+
+    if (args.requireAll && images.length < args.assets.length) {
+      throw new UnprocessableEntityException(
+        'Could not download the current image or brand logo for this edit.',
+      );
+    }
+
+    if (images.length === 0) {
+      this.logger.warn(
+        'No reference images could be downloaded; falling back to generate',
+      );
+      return this.llm.generateImageBase64({
+        provider: args.provider,
+        model: OPENAI_IMAGE_GENERATION_MODEL,
+        prompt: args.prompt,
+        size: args.size,
+        quality: 'standard',
+        style: 'natural',
+      });
+    }
+
+    return this.llm.editImageBase64({
+      provider: args.provider,
+      prompt: args.prompt,
+      images,
+      size: args.size,
+    });
+  }
+
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {
     if (!input.rule) {
       throw new UnprocessableEntityException(
         'Image generation requires `rule` on NodeExecutionInput',
       );
+    }
+
+    if (input.imageEdit) {
+      return this.executeKeepSceneEdit(input);
     }
 
     const text = input.previousOutputs?.text?.trim();
@@ -366,6 +465,7 @@ export class ImageGenerationService {
         text,
       },
       config: input.config ?? {},
+      sourcePack: input.sourcePack,
     });
 
     const normalized = normalizeImageGenerationConfig(input.config ?? {});
@@ -374,6 +474,97 @@ export class ImageGenerationService {
       output: image.fileUrl,
       image,
 
+      imageCost: {
+        model: normalized.model,
+        size: normalized.size,
+        quality: normalized.quality,
+        count: 1,
+      },
+    };
+  }
+
+  private async downloadSourceImage(asset: SourcePackAsset): Promise<{
+    buffer: Buffer;
+    fileName: string;
+    mimeType: string;
+  } | null> {
+    const urls = sourceImageFetchUrls(asset, {
+      fileServiceUrl: process.env.FILE_SERVICE_URL,
+      publicBaseUrl: process.env.APP_URL ?? process.env.PUBLIC_URL,
+    });
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+        if (!res.ok) {
+          this.logger.warn(
+            `Failed to download source image ${asset.label}: HTTP ${res.status}`,
+          );
+          continue;
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        const { mimeType, ext } = coerceOpenAiImageMime({
+          buffer: buf,
+          declaredMime: asset.mime || res.headers.get('content-type') || undefined,
+          fileName: `${asset.label ?? ''} ${asset.fileUrl ?? ''} ${asset.relativePath ?? ''} ${asset.id}`,
+        });
+        return {
+          buffer: buf,
+          fileName: `ref-${asset.id}.${ext}`,
+          mimeType,
+        };
+      } catch (err) {
+        this.logger.warn(
+          `Failed to download source image ${asset.label}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return null;
+  }
+
+  /** Paint a small change onto the current photo. Does not compose a new scene. */
+  private async executeKeepSceneEdit(
+    input: NodeExecutionInput,
+  ): Promise<NodeExecutionResult> {
+    const useBrandLogo = input.imageEdit?.useBrandLogo === true;
+    const assets = selectKeepScenePixelAssets(input.sourcePack, useBrandLogo);
+    if (assets.length === 0) {
+      throw new UnprocessableEntityException(
+        'Image edit requires the current image as a reference.',
+      );
+    }
+    if (useBrandLogo && !assets.some((asset) => asset.role === 'brand_mark')) {
+      throw new UnprocessableEntityException(
+        'This brand has no ready logo asset. Upload a logo on the Rule, then retry.',
+      );
+    }
+    const lines = assets.map(
+      (asset, index) =>
+        `Image ${index + 1} (${asset.role}): ${asset.label}`,
+    );
+    const logoIndex = assets.findIndex((asset) => asset.role === 'brand_mark');
+    const logoLine =
+      logoIndex >= 0
+        ? `Image ${logoIndex + 1} is the real brand logo file. Composite that exact logo onto Image 1. Do not redraw or invent a different mark.`
+        : 'Do not invent a logo.';
+    const prompt = [
+      'Edit Image 1. Keep its subject, layout, people, and setting.',
+      'Change only what the instruction says.',
+      `Instruction: ${input.imageEdit?.instruction?.trim() || 'Apply a small correction.'}`,
+      ...lines,
+      logoLine,
+    ].join('\n');
+
+    const image = await this.renderPromptToImage({
+      workflowRef: input.workflowRef,
+      prompt,
+      config: input.config,
+      assets,
+      requireReferences: true,
+    });
+    const normalized = normalizeImageGenerationConfig(input.config ?? {});
+    return {
+      output: image.fileUrl,
+      image,
       imageCost: {
         model: normalized.model,
         size: normalized.size,

@@ -1,5 +1,5 @@
 import { canvasTypeToBackend } from "@/features/workflow/data/workflow-model"
-import { effectiveVideoMode } from "@/features/workflow/lib/video-generation-ui"
+import { effectiveVideoMode, isVideoBackendType } from "@/features/workflow/lib/video-generation-ui"
 import type {
   PipelineEstimateBreakdownItem,
   PipelineEstimateResponse,
@@ -12,8 +12,8 @@ export function resolveWfNodeCreditKey(
 ): string | null {
   if (wfType === "branch" || wfType === "merge") return null
   const backend = canvasTypeToBackend(wfType)
-  if (backend === "video_generation") {
-    return effectiveVideoMode(config) === "presenter"
+  if (isVideoBackendType(backend)) {
+    return effectiveVideoMode(config, wfType) === "presenter"
       ? "video_generation_presenter"
       : "video_generation_cinematic"
   }

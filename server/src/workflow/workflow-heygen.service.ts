@@ -8,6 +8,7 @@ import {
 import type { Prisma } from '@prisma/client';
 import type { TenancyAuth } from '../auth/tenancy.types';
 import { PrismaService } from '../database/prisma.service';
+import { fetchUrlToBuffer } from '../upload/fetch-url-to-buffer.util';
 import {
   HeygenAssetsService,
   type HeygenAvatarLook,
@@ -218,6 +219,11 @@ export class WorkflowHeygenService {
     previewUrl: string;
   }> {
     const node = await this.getVideoNode(workflowId, nodeId, auth);
+    if (node.type === WorkflowNodeType.VideoCinematic) {
+      throw new BadRequestException(
+        'Avatars belong to a Presenter video step, not a Cinematic one.',
+      );
+    }
     const result = await this.createAvatarFromUpload(
       file,
       `workflow-${workflowId}-${nodeId}`,
@@ -232,15 +238,18 @@ export class WorkflowHeygenService {
       assetId: result.heygenAvatarAssetId,
     });
 
-    const merged = coerceVideoConfigForPersist({
+    const merged = coerceVideoConfigForPersist(
+      {
       ...((node.config ?? {}) as Record<string, unknown>),
       mode: 'presenter',
       heygenAvatarId: result.heygenAvatarId,
       heygenAvatarAssetId: result.heygenAvatarAssetId,
       heygenAvatarPhotoUrl: result.previewUrl,
-    });
+      },
+      node.type,
+    );
     const config = parseWorkflowNodeConfigOrThrow(
-      WorkflowNodeType.VideoGeneration,
+      node.type as WorkflowNodeType,
       merged,
     );
 
@@ -272,14 +281,17 @@ export class WorkflowHeygenService {
       uploadFile.originalname || 'background.jpg',
     );
 
-    const merged = coerceVideoConfigForPersist({
+    const merged = coerceVideoConfigForPersist(
+      {
       ...((node.config ?? {}) as Record<string, unknown>),
       heygenBackgroundAssetId: assetId,
       heygenBackgroundUrl: url,
       removeBackground: true,
-    });
+      },
+      node.type,
+    );
     const config = parseWorkflowNodeConfigOrThrow(
-      WorkflowNodeType.VideoGeneration,
+      node.type as WorkflowNodeType,
       merged,
     );
 
@@ -313,6 +325,11 @@ export class WorkflowHeygenService {
     return this.heygen.fetchVoicePreviewAudio(voiceId);
   }
 
+  /** Stock / account HeyGen looks (HeyGen API). */
+  listAccountLooks(): Promise<HeygenAvatarLook[]> {
+    return this.heygen.listAvatarLooks();
+  }
+
   async listAvatarLooksForUser(userId: string): Promise<HeygenAvatarLook[]> {
     const rows = await this.prisma.heygenUserAvatar.findMany({
       where: { userId },
@@ -341,14 +358,21 @@ export class WorkflowHeygenService {
     auth: TenancyAuth,
   ): Promise<Record<string, unknown>> {
     const node = await this.getVideoNode(workflowId, nodeId, auth);
-    const merged = coerceVideoConfigForPersist({
+    const combined: Record<string, unknown> = {
       ...((node.config ?? {}) as Record<string, unknown>),
       ...patch,
-    });
+    };
+    // "" / null in the patch means "clear this field" (panel clear/delete).
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null || (typeof value === 'string' && !value.trim())) {
+        delete combined[key];
+      }
+    }
+    const merged = coerceVideoConfigForPersist(combined, node.type);
     let config;
     try {
       config = parseWorkflowNodeConfigOrThrow(
-        WorkflowNodeType.VideoGeneration,
+        node.type as WorkflowNodeType,
         merged,
       );
     } catch (e) {
@@ -358,4 +382,177 @@ export class WorkflowHeygenService {
     await this.workflowNodes.updateConfig(workflowId, nodeId, config, auth);
     return config;
   }
+  /**
+   * Bind a HeyGen look to a presenter / cinematic node from chat (no canvas).
+   * `lookId` must be one of the user's saved looks or a HeyGen account look;
+   * `imageUrls` (a brand portrait) creates a new photo-avatar look first.
+   * Persists through updateConfig, so the typed row + look FK are synced.
+   */
+  async setVideoNodeLook(
+    workflowId: string,
+    nodeId: string,
+    input: {
+      lookId?: string;
+      extraLookIds?: string[];
+      source?: { ruleAssetId: string; imageUrls: string[]; name: string; mimeType?: string };
+    },
+    auth: TenancyAuth,
+  ): Promise<{
+    lookId: string;
+    lookIds: string[];
+    createdFromRuleAssetId?: string;
+    previewUrl?: string;
+    config: Record<string, unknown>;
+  }> {
+    const node = await this.getVideoNode(workflowId, nodeId, auth);
+    if (
+      node.type !== WorkflowNodeType.VideoCinematic &&
+      node.type !== WorkflowNodeType.VideoPresenter
+    ) {
+      throw new BadRequestException(
+        'Looks can be set on video_presenter or video_cinematic steps only.',
+      );
+    }
+
+    let lookId = input.lookId?.trim() ?? '';
+    let previewUrl: string | undefined;
+    let assetId: string | undefined;
+    if (input.source) {
+      const created = await this.createLookFromImageUrls(
+        input.source.imageUrls,
+        input.source.mimeType,
+        input.source.name,
+      );
+      lookId = created.heygenAvatarId;
+      previewUrl = created.previewUrl;
+      assetId = created.heygenAvatarAssetId;
+      await this.recordUserAvatar({
+        userId: auth.userId,
+        lookId,
+        name: input.source.name,
+        previewImageUrl: previewUrl,
+        assetId,
+      });
+    } else {
+      if (!lookId) throw new BadRequestException('lookId or ruleAssetId is required');
+      await this.assertLookUsable(auth.userId, lookId);
+    }
+
+    const extras: string[] = [];
+    for (const raw of input.extraLookIds ?? []) {
+      const id = raw.trim();
+      if (!id || id === lookId || extras.includes(id)) continue;
+      await this.assertLookUsable(auth.userId, id);
+      extras.push(id);
+    }
+
+    const current = { ...((node.config ?? {}) as Record<string, unknown>) };
+    const patch: Record<string, unknown> = { heygenAvatarId: lookId };
+    if (input.source) {
+      patch.heygenLookSourceRuleAssetId = input.source.ruleAssetId;
+      if (assetId) patch.heygenAvatarAssetId = assetId;
+      if (previewUrl) patch.heygenAvatarPhotoUrl = previewUrl;
+    } else {
+      delete current.heygenLookSourceRuleAssetId;
+      delete current.heygenAvatarAssetId;
+      const stored = await this.prisma.heygenUserAvatar.findUnique({
+        where: { lookId },
+        select: { previewImageUrl: true },
+      });
+      if (stored?.previewImageUrl) patch.heygenAvatarPhotoUrl = stored.previewImageUrl;
+      else delete current.heygenAvatarPhotoUrl;
+    }
+    const lookIds = [lookId, ...extras].slice(0, 3);
+    if (node.type === WorkflowNodeType.VideoCinematic) {
+      patch.heygenAvatarIds = lookIds;
+    } else {
+      delete current.heygenAvatarIds;
+    }
+
+    const config = await this.patchVideoNodeConfigFrom(
+      workflowId,
+      nodeId,
+      node.type,
+      { ...current, ...patch },
+      auth,
+    );
+    return {
+      lookId,
+      lookIds,
+      ...(input.source ? { createdFromRuleAssetId: input.source.ruleAssetId } : {}),
+      ...(previewUrl ? { previewUrl } : {}),
+      config,
+    };
+  }
+
+  private async patchVideoNodeConfigFrom(
+    workflowId: string,
+    nodeId: string,
+    type: string,
+    merged: Record<string, unknown>,
+    auth: TenancyAuth,
+  ): Promise<Record<string, unknown>> {
+    let config;
+    try {
+      config = parseWorkflowNodeConfigOrThrow(
+        type as WorkflowNodeType,
+        coerceVideoConfigForPersist(merged, type),
+      );
+    } catch (e) {
+      throw new BadRequestException(e instanceof Error ? e.message : String(e));
+    }
+    await this.workflowNodes.updateConfig(workflowId, nodeId, config, auth);
+    return config as Record<string, unknown>;
+  }
+
+  private async assertLookUsable(userId: string, lookId: string): Promise<void> {
+    const row = await this.prisma.heygenUserAvatar.findUnique({
+      where: { lookId },
+      select: { userId: true },
+    });
+    if (row) {
+      if (row.userId !== userId) throw new ForbiddenException('Avatar not found');
+      return;
+    }
+    const looks = await this.heygen.listAvatarLooks();
+    if (!looks.some((look) => look.lookId === lookId)) {
+      throw new NotFoundException(`HeyGen look ${lookId} not found`);
+    }
+  }
+
+  private async createLookFromImageUrls(
+    urls: string[],
+    mimeType: string | undefined,
+    name: string,
+  ) {
+    let lastError: unknown;
+    for (const url of urls) {
+      try {
+        const { buffer, contentType } = await fetchUrlToBuffer(url, {
+          timeoutMs: 60_000,
+        });
+        const mime = (
+          IMAGE_MIMES.has(contentType.split(';')[0].trim().toLowerCase())
+            ? contentType.split(';')[0].trim()
+            : mimeType || 'image/jpeg'
+        ).toLowerCase();
+        return await this.createAvatarFromUpload(
+          {
+            buffer,
+            mimetype: mime,
+            size: buffer.length,
+            originalname: `${name || 'brand-portrait'}.${mime.includes('png') ? 'png' : 'jpg'}`,
+          } as Express.Multer.File,
+          name || 'Brand portrait',
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (lastError instanceof Error && 'getStatus' in lastError) throw lastError;
+    throw new BadRequestException(
+      `Could not read that brand image${lastError instanceof Error ? `: ${lastError.message}` : ''}`,
+    );
+  }
 }
+

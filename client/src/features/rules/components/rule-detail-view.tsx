@@ -7,6 +7,7 @@ import { BrandSectionForm } from "@/features/rules/components/form/brand-section
 import { CampaignSectionForm } from "@/features/rules/components/form/campaign-section-form"
 import { ChannelsSectionForm } from "@/features/rules/components/form/channels-section-form"
 import { GuidelinesSectionForm } from "@/features/rules/components/form/guidelines-section-form"
+import { AssetsSectionForm } from "@/features/rules/components/form/assets-section-form"
 import { AutonomySectionForm } from "@/features/rules/components/form/autonomy-section-form"
 import { RuleChip, type RuleChipTone } from "./rule-chip"
 
@@ -17,6 +18,7 @@ const NAV_IDS = [
   "detail-campaign",
   "detail-channels",
   "detail-guidelines",
+  "detail-assets",
   "detail-autonomy",
 ] as const
 
@@ -27,6 +29,7 @@ const NAV_KEYS = [
   "campaign",
   "channels",
   "guidelines",
+  "assets",
   "autonomy",
 ] as const
 
@@ -120,6 +123,7 @@ export function RuleDetailView({ form, ruleId }: RuleDetailViewProps) {
             <CampaignSectionForm />
             <ChannelsSectionForm />
             <GuidelinesSectionForm />
+            <AssetsSectionForm ruleId={ruleId} />
             <AutonomySectionForm />
           </div>
         </div>

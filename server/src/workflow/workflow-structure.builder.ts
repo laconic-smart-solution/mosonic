@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { WorkflowQAAnswersDto } from './dto/workflow-qa-answers.dto';
 import { resolveQaNodeChannels } from './workflow-qa-channels.constants';
+import {
+  isVideoNodeType,
+  normalizeVideoNodeType,
+} from '../nodes/video-node-type.util';
 
 export type LogicalWorkflowNode = {
   nodeId: string;
@@ -133,7 +137,8 @@ export function buildWorkflowNodes(
     if (videoChannels.length) {
       nodes.push({
         nodeId: randomUUID(),
-        type: WorkflowNodeType.VideoGeneration,
+        // Wizard default video is Sora cinematic (presenter needs an avatar).
+        type: WorkflowNodeType.VideoCinematic,
         order: order++,
         isLocked: false,
         targetChannels: videoChannels,
@@ -144,6 +149,13 @@ export function buildWorkflowNodes(
   }
 
   return nodes;
+}
+
+/** First video step of any kind (presenter, cinematic or legacy). */
+function findVideoLogical(
+  logical: LogicalWorkflowNode[],
+): LogicalWorkflowNode | undefined {
+  return logical.find((n) => isVideoNodeType(n.type));
 }
 
 function findLogical(
@@ -305,12 +317,12 @@ function toLinearGraph(
     );
   }
 
-  const video = findLogical(logical, WorkflowNodeType.VideoGeneration);
+  const video = findVideoLogical(logical);
   if (video && video.targetChannels.includes(channel)) {
     const copied = copyFromLogical(video, {});
     nodes.push(
       toGenerated(
-        WorkflowNodeType.VideoGeneration,
+        normalizeVideoNodeType(video.type, copied.config),
         order++,
         false,
         copied.config,
@@ -451,13 +463,13 @@ function toMultiChannelGraph(
     );
   }
 
-  const videoLogical = findLogical(logical, WorkflowNodeType.VideoGeneration);
+  const videoLogical = findVideoLogical(logical);
   for (const ch of videoLogical?.targetChannels ?? []) {
     if (!channels.includes(ch)) continue;
     const copied = copyFromLogical(videoLogical, { laneId: ch });
     nodes.push(
       toGenerated(
-        WorkflowNodeType.VideoGeneration,
+        normalizeVideoNodeType(videoLogical!.type, copied.config),
         order++,
         false,
         copied.config,

@@ -21,6 +21,8 @@ function summarizeNodeConfig(
       return `${String(c.sourceLanguage ?? "auto")} → ${String(c.targetLanguage ?? "?")} · ${String(c.formalityLevel ?? "casual")}${c.preserveFormatting === false ? ` · ${t("nodeCard.reflowOk")}` : ""}`
     case "transcription":
       return `Language ${String(c.language ?? "auto")} · ${String(c.sourceType ?? "audio")}`
+    case "subtitle":
+      return `${String(c.format ?? "srt").toUpperCase()} · ${String(c.maxCharsPerLine ?? 42)} chars/line`
     case "keyword_planner":
       return (
         [
@@ -46,7 +48,9 @@ function summarizeNodeConfig(
         t("nodeCard.defaultImageSettings")
       )
     case "video_generation":
-      if (effectiveVideoMode(c) === "presenter") {
+    case "video_presenter":
+    case "video_cinematic":
+      if (effectiveVideoMode(c, backendTypeToCanvas(node.type, c)) === "presenter") {
         return [
           t("nodeCard.presenter"),
           c.duration !== undefined && c.duration !== null
@@ -99,7 +103,7 @@ export function WorkflowNodeCard({ node, onRemove }: WorkflowNodeCardProps) {
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const typeLabel = getWfNodeTypeLabel(backendTypeToCanvas(node.type as WorkflowNodeType))
+  const typeLabel = getWfNodeTypeLabel(backendTypeToCanvas(node.type as WorkflowNodeType, node.config))
 
   return (
     <div

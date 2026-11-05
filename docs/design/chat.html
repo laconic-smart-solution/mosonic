@@ -1,0 +1,99 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0F1F3D;--navy5:#254C94;--navy1:#E8EDF6;--teal:#00C9A7;--teal5:#00A589;--teal0:#E0FAF5;--amber:#F5A623;--amber0:#FEF6E4;--bg:#F7F4EF;--c2:#EDE9E1;--c3:#D9D3C7;--g4:#718096;--g5:#4A5568;--fg:#090C11}
+*{box-sizing:border-box;margin:0}body{font-family:Inter,sans-serif;background:var(--bg);color:var(--fg);width:1440px;height:900px;display:flex;font-size:14px}
+.rail{width:64px;background:var(--navy);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:14px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--navy5));color:#fff;font-weight:700;display:grid;place-items:center}
+.ri{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#9AAED9}.ri.on{background:rgba(0,201,167,.15);color:var(--teal)}
+svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.side{width:272px;border-right:1px solid var(--c2);padding:20px 16px;display:flex;flex-direction:column;gap:18px;background:#FBF9F6}
+.btn-new{display:flex;gap:8px;align-items:center;justify-content:center;background:var(--navy);color:#fff;border-radius:10px;padding:10px;font-weight:600}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--g4);font-weight:600;margin-bottom:8px}
+.sess{padding:9px 10px;border-radius:8px;color:var(--g5);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sess.on{background:#fff;color:var(--fg);font-weight:500;box-shadow:0 1px 2px rgba(15,31,61,.06)}
+.wf{background:#fff;border:1px solid var(--c2);border-radius:12px;padding:12px}
+.node{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;color:var(--g5)}.dot{width:8px;height:8px;border-radius:50%;background:var(--c3)}.dot.d{background:var(--teal)}.dot.r{background:var(--amber);box-shadow:0 0 0 4px var(--amber0)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{height:60px;border-bottom:1px solid var(--c2);display:flex;align-items:center;padding:0 24px;gap:12px}
+.sel{display:flex;align-items:center;gap:10px;border:1px solid var(--c2);background:#fff;border-radius:10px;padding:6px 12px 6px 6px;font-weight:600}
+.bav{width:28px;height:28px;border-radius:7px;background:#C4A98A;color:#fff;display:grid;place-items:center;font-size:12px}
+.pill{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--teal0);color:var(--teal5);font-weight:600}
+.thread{flex:1;overflow:hidden;padding:28px 0;display:flex;flex-direction:column;gap:22px;align-items:center}
+.col{width:720px;display:flex;flex-direction:column;gap:22px}
+.u{align-self:flex-end;background:var(--navy);color:#fff;padding:12px 16px;border-radius:16px 16px 4px 16px;max-width:520px;line-height:1.5}
+.a{display:flex;gap:12px}.av{flex:none;width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--navy5));display:grid;place-items:center;color:#fff}.av svg{width:16px;height:16px}
+.ab{flex:1;display:flex;flex-direction:column;gap:10px;line-height:1.6}
+.steps{border:1px solid var(--c2);background:#fff;border-radius:12px;overflow:hidden}
+.sh{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--g5);font-weight:500;background:#FBF9F6;border-bottom:1px solid var(--c2)}
+.st{display:flex;gap:10px;padding:8px 14px;font-size:13px;align-items:center}.st .ic{width:22px;height:22px;border-radius:6px;background:var(--navy1);color:var(--navy5);display:grid;place-items:center}.st .ic svg{width:13px;height:13px}
+.st .t{flex:1;color:var(--fg)}.st .m{font-family:'JetBrains Mono';font-size:11px;color:var(--g4)}
+.ok{color:var(--teal5)}
+.card{border:1px solid var(--c2);background:#fff;border-radius:14px;padding:14px;display:flex;gap:14px}
+.thumb{width:120px;height:120px;border-radius:10px;background:linear-gradient(135deg,#EDE0CF,#C4A98A);flex:none;position:relative}
+.thumb span{position:absolute;left:8px;top:8px;font-size:10px;background:#fff;padding:2px 6px;border-radius:5px;font-weight:600}
+.ct{font-weight:600}.cs{font-size:13px;color:var(--g5);margin-top:4px}
+.acts{display:flex;gap:8px;margin-top:12px}.b{padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--c2);background:#fff}.b.p{background:var(--teal);border-color:var(--teal);color:var(--navy)}
+.ask{border:1.5px solid var(--amber);background:var(--amber0);border-radius:14px;padding:14px}
+.ask .q{font-weight:600;display:flex;gap:8px;align-items:center}.chips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.chip{background:#fff;border:1px solid var(--c3);border-radius:99px;padding:7px 14px;font-size:13px;font-weight:500}.chip.p{border-color:var(--navy);background:var(--navy);color:#fff}
+.comp{padding:0 0 20px;display:flex;justify-content:center}.cw{width:720px}
+.box{background:#fff;border:1px solid var(--c3);border-radius:16px;padding:14px 14px 10px;box-shadow:0 8px 24px rgba(15,31,61,.06)}
+.ph{color:var(--g4);height:40px}.cb{display:flex;align-items:center;gap:8px}.ib{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--g5)}.ib svg{width:17px;height:17px}
+.send{margin-left:auto;width:36px;height:36px;border-radius:10px;background:var(--navy);color:#fff;display:grid;place-items:center}.send svg{width:17px;height:17px}
+.ctx{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--g4);margin-top:8px;padding:0 4px}.bar{width:90px;height:4px;background:var(--c2);border-radius:9px;overflow:hidden}.bar i{display:block;width:34%;height:100%;background:var(--teal)}
+.brand{width:300px;border-left:1px solid var(--c2);background:#FBF9F6;padding:20px;display:flex;flex-direction:column;gap:18px}
+.bh{display:flex;gap:12px;align-items:center}.bl{width:48px;height:48px;border-radius:12px;background:#C4A98A;color:#fff;display:grid;place-items:center;font-weight:700}
+.kv{font-size:13px;color:var(--g5);line-height:1.55}
+.tags{display:flex;flex-wrap:wrap;gap:6px}.tag{font-size:12px;background:#fff;border:1px solid var(--c2);padding:4px 9px;border-radius:7px}
+.assets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.as{aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,#F2EFEA,#D9C7B0)}
+.as:nth-child(2){background:linear-gradient(135deg,#0F1F3D,#3E63AD)}.as:nth-child(4){background:linear-gradient(135deg,#E0FAF5,#80E5D1)}
+.prog{background:#fff;border:1px solid var(--c2);border-radius:12px;padding:12px}
+</style></head><body>
+<div class="rail"><div class="logo">M</div>
+<div class="ri on"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+<div class="ri"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h4a3 3 0 0 1 3 3V14"/></svg></div>
+<div class="ri"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></div>
+<div class="ri"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+<div class="ri" style="margin-top:auto"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.6 14H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V10a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></div>
+</div>
+<div class="side">
+<div class="btn-new"><svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg>New chat</div>
+<div><div class="lbl">Recent chats</div>
+<div class="sess on">November launch posts</div><div class="sess">Holiday gift guide captions</div><div class="sess">Brand voice tune-up</div><div class="sess">Weekly LINE broadcast</div></div>
+<div><div class="lbl">Active workflow</div><div class="wf">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:13px">Social launch pack</b><span class="pill" style="background:var(--amber0);color:#A86C09">Running</span></div>
+<div class="node"><i class="dot d"></i>Brief &amp; strategy</div><div class="node"><i class="dot d"></i>Caption draft</div><div class="node"><i class="dot r"></i><b style="color:var(--fg);font-weight:500">Image generation</b><span style="margin-left:auto;font-size:11px">2/4</span></div><div class="node"><i class="dot"></i>Translate TH / ZH</div><div class="node"><i class="dot"></i>Review &amp; publish</div>
+<div style="font-size:12.5px;font-weight:600;color:var(--navy5);margin-top:8px">Open canvas →</div></div></div>
+<div><div class="lbl">Contents</div>
+<div class="sess" style="display:flex;justify-content:space-between">Facebook · Now open<span class="pill">Ready</span></div>
+<div class="sess" style="display:flex;justify-content:space-between">Instagram · Carousel<span class="pill" style="background:var(--navy1);color:var(--navy5)">Draft</span></div></div>
+</div>
+<div class="main">
+<div class="top"><div class="sel"><div class="bav">BP</div>Beauty Phoo<svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--g4)"><path d="m6 9 6 6 6-6"/></svg></div><span class="pill">Brand profile ready</span>
+<div style="margin-left:auto;display:flex;gap:6px"><div class="ib"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div><div class="ib"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div></div>
+<div class="thread"><div class="col">
+<div class="u">Make a Facebook launch post for our November skincare edit, and a Thai version too.</div>
+<div class="a"><div class="av"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></div><div class="ab">
+<div class="steps"><div class="sh"><svg viewBox="0 0 24 24" class="ok" style="width:15px;height:15px"><path d="M20 6 9 17l-5-5"/></svg>Worked through 3 steps<span style="margin-left:auto;font-size:12px;color:var(--g4)">8.2s</span><svg viewBox="0 0 24 24" style="width:15px;height:15px"><path d="m18 15-6-6-6 6"/></svg></div>
+<div class="st"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><span class="t">Searched brand documents</span><span class="m">search_brand_assets</span></div>
+<div class="st"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div><span class="t">Checked the workflow</span><span class="m">list_workflows</span></div>
+<div class="st"><div class="ic" style="background:var(--teal0);color:var(--teal5)"><svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9z"/></svg></div><span class="t">Started generation</span><span class="m">start_generation</span></div></div>
+<div>I've started the <b>Social launch pack</b> using your quiet-luxury brand voice. The English caption is ready, and the images are being generated now.</div>
+<div class="card"><div class="thumb"><span>Facebook</span></div><div style="flex:1"><div class="ct">Beautiful You. Beautiful Days.</div><div class="cs">Meet the November skincare edit: soft textures, calm rituals, and 52 brands you love, all in one place. Shop now at Beauty Phoo 🤍</div>
+<div class="acts"><span class="b p">Approve</span><span class="b">Edit</span><span class="b">Regenerate</span></div></div></div>
+<div class="ask"><div class="q"><svg viewBox="0 0 24 24" style="color:#A86C09;width:18px;height:18px"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>How should the Thai version sound?</div>
+<div class="chips"><span class="chip p">Warm &amp; friendly</span><span class="chip">Elegant &amp; formal</span><span class="chip">Playful, Gen Z</span></div></div>
+</div></div>
+</div></div>
+<div class="comp"><div class="cw"><div class="box"><div class="ph">Ask about this brand, or tell the AI what to create…</div>
+<div class="cb"><div class="ib"><svg viewBox="0 0 24 24"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></div><div class="ib"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+<span class="tag" style="background:var(--bg)">Social launch pack</span><div class="send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div></div></div>
+<div class="ctx"><div class="bar"><i></i></div>34% of context used</div></div></div>
+</div>
+<div class="brand"><div class="bh"><div class="bl">BP</div><div><b>Beauty Phoo</b><div style="font-size:12.5px;color:var(--g4)">Skincare · Makeup · Fragrance</div></div><span style="margin-left:auto;font-size:13px;color:var(--navy5);font-weight:600">Edit</span></div>
+<div><div class="lbl">Brand voice</div><div class="kv">Quiet luxury, soft and lifestyle-led. Leads with benefits and feelings, never with harsh claims.</div></div>
+<div><div class="lbl">Audience</div><div class="tags"><span class="tag">Women 22–40</span><span class="tag">Thailand</span><span class="tag">Myanmar</span><span class="tag">Premium buyers</span></div></div>
+<div><div class="lbl">Channels</div><div class="tags"><span class="tag">Facebook</span><span class="tag">Instagram</span><span class="tag">LINE OA</span><span class="tag">TikTok</span></div></div>
+<div><div class="lbl">Assets · 12</div><div class="assets"><div class="as"></div><div class="as"></div><div class="as"></div><div class="as"></div><div class="as"></div><div class="as"></div></div></div>
+<div class="prog"><div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600"><span>Generating images</span><span style="color:var(--g4)">2 of 4</span></div><div class="bar" style="width:100%;margin-top:8px;height:6px"><i style="width:50%;background:var(--amber)"></i></div></div>
+</div>
+</body></html>

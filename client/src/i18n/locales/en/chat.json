@@ -1,0 +1,443 @@
+{
+  "session": {
+    "panelTitle": "Chats",
+    "newChat": "New chat",
+    "untitled": "Untitled chat",
+    "loading": "Loading chats…",
+    "empty": "No chats yet.",
+    "deleteAction": "Delete chat"
+  },
+  "composer": {
+    "placeholder": "Ask about this brand, or tell the AI what to create…",
+    "thinking": "Thinking…",
+    "uploadNeedsRule": "Set up a brand profile first — tell the AI a bit about your brand, then you can attach files.",
+    "uploadedFilesNote": "(Attached: {{files}})",
+    "rednoteConnectedNote": "RedNote is connected.",
+    "stillAnswering": "Still answering…",
+    "attachedImage": "Attached image",
+    "attachedFile": "Attached file"
+  },
+  "empty": {
+    "noRuleTitle": "Select a brand profile to start",
+    "noRuleSubtitle": "Choose a brand profile above, or set one up first.",
+    "noMessagesTitle": "Start the conversation",
+    "noMessagesSubtitle": "Ask a question about this brand, or tell the AI what you'd like to create."
+  },
+  "workspace": {
+    "activeWorkflow": "Active workflow",
+    "contents": "Contents",
+    "noWorkflow": "No workflow yet — ask the AI to build one.",
+    "noContent": "No content generated yet.",
+    "viewAllContents": "View all content",
+    "contentUntitled": "Untitled content",
+    "noRule": "Select a brand profile to see its workflow and content.",
+    "cancelRun": "Cancel run"
+  },
+  "brandPanel": {
+    "panelTitle": "Brand profile",
+    "toggleAction": "Show brand profile",
+    "closeAction": "Close",
+    "editAction": "Edit",
+    "brandSection": "Brand",
+    "audienceSection": "Audience",
+    "channelsSection": "Channels",
+    "assetsSection": "Assets",
+    "noAssets": "No brand assets yet.",
+    "addAssets": "Add assets"
+  },
+  "toolCall": {
+    "searchBrandAssets": "Searched brand documents",
+    "webSearch": "Searched the web",
+    "getRule": "Checked the brand profile",
+    "listBrandAssets": "Checked brand assets",
+    "requestAssetUpload": "Asked for a file",
+    "createRuleFromIntake": "Started building the brand profile",
+    "updateRule": "Updated the brand profile",
+    "fetchWebsiteAssets": "Fetched images from the website",
+    "remember": "Remembered a brand note",
+    "forget": "Forgot a brand note",
+    "searchBrandMemory": "Searched brand memory",
+    "askUser": "Asked you to choose",
+    "listWorkflows": "Checked the workflow",
+    "generateWorkflow": "Generated a workflow",
+    "applyDefaultWorkflow": "Applied the default workflow",
+    "getNodeConfig": "Checked a workflow node",
+    "updateNodeConfig": "Updated a workflow node",
+    "startGeneration": "Started generation",
+    "listPipelines": "Checked workflow runs",
+    "getActivePipeline": "Checked the active run",
+    "getPipelineStatus": "Checked generation status",
+    "getPipelineLogs": "Checked generation logs",
+    "listContents": "Checked content drafts",
+    "getContent": "Opened a content draft",
+    "saveContent": "Saved content edits",
+    "approveContent": "Approved content",
+    "rejectContent": "Rejected content",
+    "rerunContentNode": "Re-ran a content node",
+    "rerunImageNode": "Updating the image",
+    "rerunCaptionNode": "Updating the caption",
+    "rerunTranslationNode": "Updating the translation",
+    "rerunSummaryNode": "Updating the summary",
+    "generateMoreImage": "Started another image",
+    "generatePresenterVideo": "Started a presenter video",
+    "generateCinematicVideo": "Started a cinematic video",
+    "generateMoreTranslation": "Started another translation",
+    "generateMoreSummary": "Started another summary",
+    "generateMoreAdapt": "Started another channel caption",
+    "pipelineResult": "Checked the finished run",
+    "forgetAll": "Cleared all memory notes",
+    "reorderWorkflowNodes": "Reordered the workflow",
+    "removeWorkflowNode": "Removed a workflow step",
+    "addWorkflowNode": "Added a workflow step",
+    "setWorkflowChannels": "Updated the workflow channels",
+    "listChannels": "Checked channels",
+    "checkChannelAuth": "Checked account connection",
+    "startChannelOauth": "Started account connect",
+    "getUpload": "Checked the upload draft",
+    "publishNow": "Published the post",
+    "schedulePublish": "Scheduled the post",
+    "retryUpload": "Retried a failed upload",
+    "listPosts": "Checked published posts",
+    "getPost": "Opened a published post",
+    "getPostAnalytics": "Checked post analytics",
+    "retryPost": "Retried a failed post",
+    "suggestRuleImprovement": "Suggested a brand improvement",
+    "applyRuleSuggestion": "Applied a brand improvement",
+    "addUploadMedia": "Added media to the upload",
+    "removeUploadMedia": "Removed media from the upload",
+    "editUploadChannel": "Changed the upload channels",
+    "previewUpload": "Previewed the post",
+    "reschedulePublish": "Rescheduled the post",
+    "cancelSchedule": "Cancelled the scheduled post",
+    "retryPublish": "Retried publishing",
+    "editContent": "Edited the content"
+  },
+  "workflowCard": {
+    "untitled": "Workflow",
+    "openCanvas": "Open canvas",
+    "waitingNodes": "Building the node list…",
+    "stillGenerating": "Still generating. Open the canvas to keep watching.",
+    "observation": "Workflow · {{status}}",
+    "status": {
+      "generating": "Generating",
+      "ready": "Ready",
+      "failed": "Failed",
+      "archived": "Archived",
+      "unknown": "Unknown"
+    },
+    "types": {
+      "keyword_planner": "Keyword planner",
+      "intelligence": "Web search",
+      "text_generation": "Text",
+      "image_generation": "Image",
+      "video_generation": "Video",
+      "video_presenter": "Presenter video",
+      "video_cinematic": "Cinematic video",
+      "translation": "Translation",
+      "transcription": "Transcription",
+      "summarization": "Summary",
+      "branch": "Branch",
+      "adapt": "Adapt",
+      "merge": "Merge",
+      "subtitle": "Subtitles"
+    },
+    "title": "Workflow",
+    "openCanvasEdit": "Open workflow canvas"
+  },
+  "pipelineCard": {
+    "title": "Generation run",
+    "openPipelines": "Open pipelines",
+    "pausedHint": "This run is paused. Continue it from the pipelines page.",
+    "stillRunning": "Still running. Open pipelines to keep watching.",
+    "observation": "Pipeline · {{status}}",
+    "status": {
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "paused": "Paused",
+      "unknown": "Unknown"
+    }
+  },
+  "contentCard": {
+    "title": "Content draft",
+    "titleUpdatingImage": "Updating image…",
+    "titleUpdatingCaption": "Updating caption…",
+    "openContent": "Open content",
+    "working": "Generating this extra output…",
+    "workingImage": "Updating the image…",
+    "workingCaption": "Updating the caption…",
+    "workingTranslation": "Updating the translation…",
+    "workingSummary": "Updating the summary…",
+    "stillWorking": "Still working. Open content to keep watching.",
+    "observation": "Content · {{status}}",
+    "hasImage": "Image",
+    "hasVideo": "Video",
+    "hasTranslation": "Translation",
+    "hasSummary": "Summary",
+    "channelPreview": "Channel preview",
+    "allChannels": "All",
+    "status": {
+      "draft": "Draft",
+      "in_review": "In review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "unknown": "Unknown"
+    },
+    "regenerateMessage": "Please regenerate content {{contentId}}.",
+    "rejectReason": "I rejected that content. Reason: {{reason}}",
+    "rejectReasonRemember": "I rejected that content. Reason: {{reason}}. Please remember this for the brand profile.",
+    "makeNewVersion": "Make a new version",
+    "rejectedReason": "Reason: {{reason}}",
+    "newVersionMessage": "Please make a new version of the rejected content {{contentId}}.",
+    "newVersionMessageWithReason": "Please make a new version of the rejected content {{contentId}}. Feedback: {{reason}}"
+  },
+  "askUser": {
+    "confirm": "Confirm",
+    "waiting": "Waiting for your choice",
+    "urlPlaceholder": "https://yourbrand.com",
+    "urlLabel": "Your website URL",
+    "urlInvalid": "Enter a website address like yourbrand.com",
+    "continue": "Continue",
+    "fetchAssets": {
+      "question": "Use this site for your brand assets?",
+      "questionWithSite": "Use {{site}} for your brand assets?",
+      "use": "Use it",
+      "skip": "Skip"
+    },
+    "plan": {
+      "asked": "You asked for",
+      "willChange": "I'll change",
+      "notPossible": "Not possible"
+    }
+  },
+  "stepTrace": {
+    "summary": "Thought / Action / Observation ({{count}} tools)",
+    "summaryThoughtOnly": "Thought",
+    "thought": "Thought",
+    "action": "Action",
+    "observation": "Observation",
+    "details": "Show input and result",
+    "args": "Input",
+    "result": "Result",
+    "uploadAction": "Upload {{assetType}}",
+    "connectAction": "Connect {{platform}}",
+    "connectRednoteAction": "Connect RedNote (scan QR)",
+    "assetType": {
+      "logo": "logo",
+      "reference_image": "reference image",
+      "guideline_document": "guideline document"
+    },
+    "workedThrough_one": "Worked through {{count}} step",
+    "workedThrough_other": "Worked through {{count}} steps",
+    "failedSuffix_one": " · {{count}} didn't finish",
+    "failedSuffix_other": " · {{count}} didn't finish",
+    "savedNote": "Saved your preference",
+    "genericStep": "Worked on it"
+  },
+  "contextUsage": {
+    "label": "{{used}} / {{limit}} tokens"
+  },
+  "messageTokens": {
+    "label": "{{formatted}} tokens",
+    "breakdown": "{{input}} in · {{output}} out"
+  },
+  "buildProgress": {
+    "started": "Building your brand profile…",
+    "readingInput": "Reading what you told me…",
+    "inputProcessed": "Working out the brand brief…",
+    "streaming": "Writing the brand profile…",
+    "completedToast": "Brand profile is ready.",
+    "failedToast": "Couldn't finish building the brand profile."
+  },
+  "toast": {
+    "createSessionFailed": "Could not start a new chat",
+    "deleteSessionFailed": "Could not delete chat",
+    "sendMessageFailed": "Could not send message",
+    "stillWorking": "This chat is still working on the last message",
+    "approveFailed": "Could not approve content",
+    "rejectFailed": "Could not reject content",
+    "saveContentFailed": "Could not save content",
+    "saveBrandFailed": "Could not save brand profile",
+    "cancelRunFailed": "Could not stop the run",
+    "runActionFailed": "Could not update the run"
+  },
+  "dialogs": {
+    "loading": "Loading…",
+    "actions": {
+      "approve": "Approve",
+      "edit": "Edit",
+      "regenerate": "Regenerate",
+      "reject": "Reject",
+      "cancel": "Cancel",
+      "notYet": "Not yet",
+      "saveChanges": "Save changes",
+      "saveProfile": "Save profile",
+      "save": "Save",
+      "reset": "Reset",
+      "remove": "Remove",
+      "start": "Start",
+      "startGeneration": "Start generation",
+      "close": "Close"
+    },
+    "checkContent": {
+      "caption": "Caption",
+      "captionForChannel": "{{channel}} caption",
+      "noImage": "No image yet",
+      "tab": {
+        "original": "Original",
+        "translated": "Translation",
+        "summary": "Summary"
+      }
+    },
+    "approve": {
+      "title": "Approve this content?",
+      "subtitle": "It will be approved and queued for publishing."
+    },
+    "editContent": {
+      "title": "Edit content",
+      "hint": "Translations update after you save"
+    },
+    "reject": {
+      "title": "Reject this content?",
+      "subtitle": "Your reason helps the AI do better next time.",
+      "notePlaceholder": "Add a note (optional)…",
+      "remember": "Remember this for the brand profile",
+      "reasons": {
+        "offBrand": "Off-brand tone",
+        "wrongProduct": "Wrong product",
+        "imageQuality": "Image quality",
+        "factualError": "Factual error"
+      }
+    },
+    "editBrand": {
+      "title": "Edit brand profile",
+      "voice": "Brand voice",
+      "avoid": "Always avoid",
+      "addAvoid": "+ Add and press Enter",
+      "fullSetup": "Audience, channels and rules → open full brand setup"
+    },
+    "startGeneration": {
+      "title": "Start “{{name}}”?",
+      "steps_one": "{{count}} step",
+      "steps_other": "{{count}} steps",
+      "promptPlaceholder": "What should this run create?",
+      "estimated": "Estimated usage",
+      "credits_one": "{{count}} credit",
+      "credits_other": "{{count}} credits",
+      "insufficient": "Not enough credits for this run.",
+      "queued": "A run is already going for this brand. This one will wait in the queue."
+    },
+    "upload": {
+      "title": "Add brand assets",
+      "subtitle": "Logos, product shots and brand guidelines.",
+      "drop": "Drop files here or browse",
+      "types": "PNG, JPG, PDF, DOCX, TXT",
+      "submit_one": "Upload {{count}} file",
+      "submit_other": "Upload {{count}} files"
+    },
+    "nodeSettings": {
+      "imagesPerPost": "Images per post",
+      "aspectRatio": "Aspect ratio",
+      "useBrandAssets": "Use brand assets",
+      "addLogoWatermark": "Add logo watermark"
+    },
+    "toolError": {
+      "title": "A step didn't finish",
+      "details": "Details",
+      "retry": "Try again",
+      "skip": "Skip this step",
+      "retryMessage": "Try that again",
+      "skipMessage": "Skip the {{tool}} step and continue.",
+      "code": {
+        "tool_failed": "The tool failed. The rest of the turn kept going.",
+        "error": "The tool failed. The rest of the turn kept going.",
+        "insufficient_credits": "Not enough credits for this step.",
+        "not_found": "Something it needed wasn't found.",
+        "bad_request": "The request wasn't accepted.",
+        "invalid_config": "The node settings aren't valid.",
+        "generic": "This step was skipped.",
+        "one_mutation_per_turn": "Skipped: one change per message. I'll offer it as the next step.",
+        "confirmation_required": "Waiting for your confirmation.",
+        "followup_read_only": "Skipped: automatic reports don't change anything.",
+        "order_not_supported": "That order isn't possible here. Change it on the workflow canvas.",
+        "edit_not_supported": "That change can only be made on the workflow canvas.",
+        "unsupported_channel": "That channel isn't supported.",
+        "no_change": "Nothing needed to change.",
+        "workflow_exists": "A workflow already exists.",
+        "already_running": "A run is already in progress.",
+        "no_workflow": "There's no workflow yet.",
+        "node_not_found": "That step isn't on the workflow.",
+        "lane_required": "Pick a channel for this step.",
+        "lane_taken": "That channel already has this step.",
+        "already_present": "That step is already there.",
+        "ambiguous_choice": "Waiting for you to pick an option."
+      }
+    },
+    "clearConversation": {
+      "action": "Clear conversation",
+      "title": "Clear the conversation for “{{name}}”?",
+      "subtitle": "Only the message history is wiped. The brand profile, workflow and content all stay.",
+      "warning": "You can't undo this.",
+      "confirm": "Clear conversation"
+    },
+    "memory": {
+      "action": "Brand memory",
+      "title": "Memory for “{{name}}”",
+      "subtitle": "Notes the assistant saved about this brand — preferences, corrections, and facts.",
+      "empty": "No memory notes yet. Ask the assistant to remember something and it will show up here.",
+      "loadFailed": "Couldn’t load memory notes.",
+      "type": {
+        "preference": "Preference",
+        "correction": "Correction",
+        "fact": "Fact"
+      }
+    },
+    "cancelRun": {
+      "title": "Stop this run?",
+      "subtitle": "Generation stops now. Finished steps keep their output, and unfinished steps will not use more credits.",
+      "confirm": "Stop run"
+    }
+  },
+  "ruleSelector": {
+    "newBrand": "New brand profile"
+  },
+  "runCard": {
+    "running": "Running",
+    "paused": "Paused",
+    "stopped": "Stopped",
+    "stepsLabel": "Workflow steps",
+    "seconds_one": "{{count}}s",
+    "seconds_other": "{{count}}s",
+    "left": {
+      "seconds_one": "about {{count}}s left",
+      "seconds_other": "about {{count}}s left",
+      "minutes_one": "about {{count}} min left",
+      "minutes_other": "about {{count}} min left",
+      "almost_one": "almost done",
+      "almost_other": "almost done"
+    },
+    "cancel": "Cancel",
+    "finished": "Finished",
+    "finishedIn_one": "Finished in {{count}}s",
+    "finishedIn_other": "Finished in {{count}}s",
+    "failedHere": "stopped here",
+    "genericError": "This step didn't finish. Anything finished before it is saved.",
+    "tryAgain": "Try again",
+    "skipStep": "Skip that step",
+    "retryMessage": "The run stopped at \"{{step}}\". Please try the generation again.",
+    "readyPill": "Your post is ready"
+  },
+  "history": {
+    "loadingEarlier": "Loading earlier messages",
+    "startOfChat": "This is the start of {{brand}}'s chat.",
+    "startOfChatGeneric": "This is the start of the chat.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "jumpToLatest": "Jump to latest"
+  },
+  "runBrief": {
+    "textOnly": "Text only",
+    "change": "Change",
+    "changeMessage": "I want to change the topic, style or channel for this post"
+  }
+}

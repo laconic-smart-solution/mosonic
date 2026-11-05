@@ -53,12 +53,17 @@ function applyLayerToOutputs(
       if (typeof layer.translatedText === 'string')
         out.translatedText = layer.translatedText;
       break;
+    case WorkflowNodeType.VideoPresenter:
+    case WorkflowNodeType.VideoCinematic:
     case WorkflowNodeType.VideoGeneration:
       if (typeof layer.video === 'string') out.video = layer.video;
       break;
     case WorkflowNodeType.Transcription:
       if (typeof layer.transcription === 'string')
         out.transcription = layer.transcription;
+      break;
+    case WorkflowNodeType.Subtitle:
+      if (typeof layer.subtitle === 'string') out.subtitle = layer.subtitle;
       break;
     case WorkflowNodeType.Summarization:
       if (typeof layer.summary === 'string') out.summary = layer.summary;
@@ -141,6 +146,9 @@ export function flattenNodeOutputsBestEffort(
     }
     if (typeof layer.transcription === 'string' && layer.transcription.trim()) {
       out.transcription = layer.transcription;
+    }
+    if (typeof layer.subtitle === 'string' && layer.subtitle.trim()) {
+      out.subtitle = layer.subtitle;
     }
     if (typeof layer.summary === 'string' && layer.summary.trim()) {
       out.summary = layer.summary;

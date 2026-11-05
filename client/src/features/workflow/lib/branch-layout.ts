@@ -490,7 +490,7 @@ export function pipelineGraphToRf(input: PipelineGraphInput): {
     : snapEdges
 
   const rfNodes: WfRfNode[] = snapNodes.map((n) => {
-    const canvasType = backendTypeToCanvas(n.type)
+    const canvasType = backendTypeToCanvas(n.type, n.config)
     const meta = WF_NODE_TYPES.find((t) => t.type === canvasType) ?? WF_NODE_TYPES[0]
     const rfType = rfNodeTypeForCanvas(canvasType)
     const pos = autoPositions.get(n.nodeId) ?? { x: 80, y: CENTER_Y }

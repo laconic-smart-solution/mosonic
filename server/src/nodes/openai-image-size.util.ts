@@ -5,7 +5,10 @@
  * @see https://platform.openai.com/docs/api-reference/images/create
  */
 
-/** Sizes accepted by `gpt-image-1` and similar current OpenAI image models. */
+/** Only image model used for generation, node defaults, and persisted configs. */
+export const OPENAI_IMAGE_GENERATION_MODEL = 'gpt-image-2';
+
+/** Sizes accepted by `gpt-image-2` and similar current OpenAI image models. */
 export const GPT_STYLE_IMAGE_API_SIZES = [
   '1024x1024',
   '1024x1536',
@@ -80,7 +83,7 @@ export function coerceOpenAiImageSize(
   size: string | undefined,
   model: string,
 ): string {
-  const m = (model ?? 'gpt-image-1').trim() || 'gpt-image-1';
+  const m = (model ?? OPENAI_IMAGE_GENERATION_MODEL).trim() || OPENAI_IMAGE_GENERATION_MODEL;
   const s = (size ?? '').trim();
   if (s && isValidOpenAiImageSizeForModel(s, m)) {
     return s;

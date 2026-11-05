@@ -4,7 +4,6 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 import { EventsService } from '../../events/events.service';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
@@ -32,6 +31,7 @@ import {
   ScriptDurationService,
   type ScriptFitMethod,
 } from './script-duration.service';
+import { videoModeForNode, type VideoGenerationMode } from '../video-node-type.util';
 
 /** Inline execution poll (deprecated path when queue is off). */
 const INLINE_POLL_INTERVAL_MS = 5000;
@@ -67,26 +67,6 @@ export interface VideoCompleteResult {
   videoCost: NonNullable<NodeExecutionResult['videoCost']>;
 }
 
-/** OpenAI Sora `seconds` parameter — only these values are valid. */
-export const SORA_VIDEO_DURATIONS = [4, 8, 12, 16, 20] as const;
-export type SoraVideoDuration = (typeof SORA_VIDEO_DURATIONS)[number];
-
-export function normalizeSoraDurationSeconds(
-  raw: number | undefined,
-): SoraVideoDuration {
-  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 8;
-  let best: SoraVideoDuration = SORA_VIDEO_DURATIONS[0];
-  let bestDiff = Math.abs(n - best);
-  for (const s of SORA_VIDEO_DURATIONS) {
-    const d = Math.abs(n - s);
-    if (d < bestDiff) {
-      best = s;
-      bestDiff = d;
-    }
-  }
-  return best;
-}
-
 export const PRESENTER_VIDEO_DURATIONS = [10, 20, 30, 40, 60] as const;
 export type PresenterVideoDuration = (typeof PRESENTER_VIDEO_DURATIONS)[number];
 
@@ -106,7 +86,26 @@ export function normalizePresenterDurationSeconds(
   return best;
 }
 
-/** Global Sora prompt constraints — no on-screen text, logos, or contact details. */
+/** HeyGen cinematic durations; prompt constraints below apply to cinematic prompts — no on-screen text, logos, or contact details. */
+export const CINEMATIC_VIDEO_DURATIONS = [5, 10, 15] as const;
+export type CinematicVideoDuration = (typeof CINEMATIC_VIDEO_DURATIONS)[number];
+
+export function normalizeCinematicDurationSeconds(
+  raw: unknown,
+): CinematicVideoDuration {
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 10;
+  let best: CinematicVideoDuration = CINEMATIC_VIDEO_DURATIONS[1];
+  let bestDiff = Math.abs(n - best);
+  for (const s of CINEMATIC_VIDEO_DURATIONS) {
+    const d = Math.abs(n - s);
+    if (d < bestDiff) {
+      best = s;
+      bestDiff = d;
+    }
+  }
+  return best;
+}
+
 export const VIDEO_OUTPUT_GUARDRAILS = [
   'No on-screen text of any kind: no captions, subtitles, titles, labels, typography, or readable words.',
   'No logos, brand marks, watermarks, app UI, or end cards unless explicitly provided as a reference asset.',
@@ -123,8 +122,6 @@ export type NormalizedVideoConfig = {
   resolution: string;
   aspectRatio: string;
   negativePrompt?: string;
-  secondsForApi: OpenAI.Videos.VideoCreateParams['seconds'];
-  sizeForApi: OpenAI.Videos.VideoCreateParams['size'];
 };
 
 export function normalizeVideoConfig(
@@ -137,8 +134,8 @@ export function normalizeVideoConfig(
       ? durationVal
       : typeof durationVal === 'string' && durationVal.trim()
         ? Number(durationVal)
-        : 8;
-  const duration = normalizeSoraDurationSeconds(
+        : 10;
+  const duration = normalizeCinematicDurationSeconds(
     Number.isFinite(durationRaw) ? durationRaw : undefined,
   );
   const resolution = typeof c.resolution === 'string' ? c.resolution : '720p';
@@ -150,33 +147,13 @@ export function normalizeVideoConfig(
       : undefined;
   const requestedModel = typeof c.model === 'string' ? c.model.trim() : '';
   const allowedModels = new Set([
-    'sora-2',
-    'sora-2-pro',
-    'sora-2-2025-10-06',
-    'sora-2-pro-2025-10-06',
-    'sora-2-2025-12-08',
+    'heygen_video_1',
+    'seedance_2',
+    'heygen-video-1',
   ]);
-  const model = allowedModels.has(requestedModel) ? requestedModel : 'sora-2';
-  const isSoraPro = model.includes('pro');
-
-  const secondsForApi = String(
-    duration,
-  ) as OpenAI.Videos.VideoCreateParams['seconds'];
-
-  /** sora-2 (non-pro) only accepts 720x1280 and 1280x720 per OpenAI API. */
-  const sizeForApi: OpenAI.Videos.VideoCreateParams['size'] = (() => {
-    const wantsHd = resolution === '1080p' && isSoraPro;
-    const portrait =
-      aspectRatio === '9:16' || aspectRatio === '4:5' || aspectRatio === '1:1';
-    if (portrait) {
-      return wantsHd ? '1024x1792' : '720x1280';
-    }
-    if (aspectRatio === '16:9') {
-      return wantsHd ? '1792x1024' : '1280x720';
-    }
-    return wantsHd ? '1024x1792' : '720x1280';
-  })();
-
+  const model = allowedModels.has(requestedModel)
+    ? requestedModel
+    : 'heygen_video_1';
   const negativePrompt =
     typeof c.negativePrompt === 'string' && c.negativePrompt.trim()
       ? c.negativePrompt.trim()
@@ -189,8 +166,6 @@ export function normalizeVideoConfig(
     resolution,
     aspectRatio,
     negativePrompt,
-    secondsForApi,
-    sizeForApi,
   };
 }
 
@@ -198,11 +173,15 @@ export function buildVideoPrompt(
   rule: Rule,
   previousOutputs: { text?: string; image?: string },
   config: NormalizedVideoConfig,
+  sourcePackNotes?: string,
 ): string {
   return [
     'Create a short marketing video for the following content:',
     `"${previousOutputs.text ?? ''}"`,
     '',
+    sourcePackNotes?.trim()
+      ? `Source attachments for this run:\n${sourcePackNotes.trim()}`
+      : '',
     previousOutputs.image
       ? `Match the visual style of this reference image: ${previousOutputs.image}`
       : '',
@@ -245,13 +224,17 @@ export function buildVideoPrompt(
     .join('\n');
 }
 
-export type VideoGenerationMode = 'cinematic' | 'presenter';
+export type { VideoGenerationMode };
 
+/**
+ * Presenter (HeyGen talking avatar) vs cinematic (HeyGen cinematic_avatar / heygen_video).
+ * legacy `video_generation` (or no type) reads `config.mode`.
+ */
 export function getVideoGenerationMode(
   config: WorkflowNodeConfig | undefined,
+  nodeType?: string,
 ): VideoGenerationMode {
-  const mode = config?.mode?.trim();
-  return mode === 'presenter' ? 'presenter' : 'cinematic';
+  return videoModeForNode(nodeType, config);
 }
 
 export function buildPresenterScript(
@@ -279,18 +262,6 @@ export function mapHeygenVideoStatus(
   return 'processing';
 }
 
-export function mapOpenAiVideoStatus(
-  status: OpenAI.Videos.Video['status'],
-): VideoJobStatus {
-  if (status === 'completed') {
-    return 'completed';
-  }
-  if (status === 'failed') {
-    return 'failed';
-  }
-  return 'processing';
-}
-
 @Injectable()
 export class VideoGenerationService {
   private readonly logger = new Logger(VideoGenerationService.name);
@@ -302,33 +273,6 @@ export class VideoGenerationService {
     private readonly heygen: HeygenAssetsService,
     private readonly scriptDuration: ScriptDurationService,
   ) {}
-
-  private getOpenAiClient(provider?: LlmProvider): OpenAI {
-    const resolvedProvider = provider ?? LlmProvider.OpenAI;
-    try {
-      this.llm.assertProviderCapability(resolvedProvider, 'video_generation');
-    } catch (error) {
-      throw new UnprocessableEntityException(
-        error instanceof Error ? error.message : 'Unsupported video provider',
-      );
-    }
-
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY')?.trim();
-    if (!apiKey) {
-      throw new UnprocessableEntityException('OPENAI_API_KEY is not set');
-    }
-    return new OpenAI({ apiKey });
-  }
-
-  private getFileServiceUploadUrl(): string {
-    const baseUrl = this.configService.get<string>('FILE_SERVICE_URL')?.trim();
-    if (!baseUrl) {
-      throw new UnprocessableEntityException(
-        'FILE_SERVICE_URL is not set; required for video storage upload',
-      );
-    }
-    return `${baseUrl.replace(/\/+$/, '')}/upload`;
-  }
 
   async emitProcessing(
     pipelineId: string,
@@ -343,74 +287,6 @@ export class VideoGenerationService {
       });
     } catch {
       // noop
-    }
-  }
-
-  private async uploadVideoBuffer(params: {
-    videoBuffer: Buffer;
-    fileName: string;
-    folderPath: string;
-  }): Promise<{
-    fileUrl: string;
-    relativePath: string;
-    storedFileName: string;
-    originalFileName?: string;
-  }> {
-    const uploadUrl = this.getFileServiceUploadUrl();
-    const attemptUpload = async (mimeType: string) => {
-      const form = new FormData();
-      const blob = new Blob([Uint8Array.from(params.videoBuffer)], {
-        type: mimeType,
-      });
-      form.append('file', blob, params.fileName);
-      form.append('folderPath', params.folderPath);
-
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: form,
-      });
-      if (response.status !== 201) {
-        const responseBody = await response.text().catch(() => '');
-        throw new Error(
-          `Video upload failed with status ${response.status}: ${response.statusText}${responseBody ? ` | body=${responseBody}` : ''}`,
-        );
-      }
-      const payload = (await response.json()) as {
-        success?: boolean;
-        data?: {
-          fileUrl?: string;
-          relativePath?: string;
-          storedFileName?: string;
-          originalFileName?: string;
-        };
-      };
-      const data = payload?.data;
-      if (!payload?.success || !data?.fileUrl || !data?.relativePath) {
-        throw new Error('Video upload returned malformed response envelope');
-      }
-      return {
-        fileUrl: data.fileUrl,
-        relativePath: data.relativePath,
-        storedFileName: data.storedFileName ?? params.fileName,
-        originalFileName: data.originalFileName,
-      };
-    };
-
-    try {
-      const result = await attemptUpload('video/mp4');
-      return await this.maybeMirrorVideoUploadToPublicUploads(
-        result,
-        'video/mp4',
-      );
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('status 400')) {
-        const result = await attemptUpload('application/octet-stream');
-        return await this.maybeMirrorVideoUploadToPublicUploads(
-          result,
-          'application/octet-stream',
-        );
-      }
-      throw error;
     }
   }
 
@@ -664,143 +540,23 @@ export class VideoGenerationService {
     return { video: completed.video, storage: completed.storage };
   }
 
-  /** Phase 1: submit Sora job and return external id (no polling). */
-  async submitVideoJob(
-    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
-  ): Promise<VideoSubmitResult> {
-    const { rule, previousOutputs, config } = input;
-    const sourceText = previousOutputs.text?.trim();
-    if (!sourceText) {
-      throw new UnprocessableEntityException(
-        'Video generation requires `previousOutputs.text` from text_generation node',
-      );
-    }
-    const normalized = normalizeVideoConfig(config);
-    const prompt = buildVideoPrompt(
-      rule,
-      { text: sourceText, image: previousOutputs.image },
-      normalized,
-    );
-
-    const client = this.getOpenAiClient(normalized.provider);
-    const created = await client.videos.create({
-      model: normalized.model,
-      prompt,
-      size: normalized.sizeForApi,
-      seconds: normalized.secondsForApi,
-    });
-
-    return {
-      externalJobId: created.id,
-      estimatedSeconds: normalized.duration,
-      normalized,
-      videoProvider: 'sora',
-    };
-  }
-
-  /** Phase 2: single status poll. */
-  async checkVideoJob(
-    externalJobId: string,
-    provider?: LlmProvider,
-  ): Promise<VideoCheckResult> {
-    const client = this.getOpenAiClient(provider);
-    const result = await client.videos.retrieve(externalJobId);
-    const status = mapOpenAiVideoStatus(result.status);
-    if (status === 'failed') {
-      return {
-        status,
-        error:
-          result.error?.message ||
-          'Sora video generation failed. Please retry.',
-      };
-    }
-    return { status };
-  }
-
-  /** Phase 2 completion: download from provider and upload to file service. */
-  async completeVideoJob(
-    externalJobId: string,
-    input: VideoGenerationInput & {
-      pipelineId: string;
-      nodeId: string;
-      normalized: NormalizedVideoConfig;
-    },
-  ): Promise<VideoCompleteResult> {
-    const client = this.getOpenAiClient(input.normalized.provider);
-    const videoResponse = await client.videos.downloadContent(externalJobId);
-    if (!videoResponse.ok) {
-      throw new Error(
-        `Failed to download generated video (${videoResponse.status} ${videoResponse.statusText})`,
-      );
-    }
-    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
-    const fileName = `${input.nodeId}.mp4`;
-    const storage = await this.uploadVideoBuffer({
-      videoBuffer,
-      fileName,
-      folderPath: buildFileStorageFolderPath('videos', input.pipelineId),
-    });
-
-    return {
-      video: storage.fileUrl,
-      storage,
-      videoCost: {
-        model: input.normalized.model,
-        videoSeconds: input.normalized.duration,
-        videoResolution: input.normalized.resolution,
-      },
-    };
-  }
-
-  /**
-   * Blocking path for inline orchestration (ORCHESTRATION_USE_QUEUE=false).
-   */
-  async generateVideo(
-    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
-  ): Promise<{ video: string; storage: NodeExecutionResult['video'] }> {
-    const { pipelineId, nodeId } = input;
-    const { externalJobId, estimatedSeconds, normalized } =
-      await this.submitVideoJob(input);
-
-    await this.emitProcessing(
-      pipelineId,
-      nodeId,
-      'Video generation started...',
-    );
-
-    const maxAttempts = INLINE_VIDEO_TIMEOUT_MS / INLINE_POLL_INTERVAL_MS;
-    let attempts = 0;
-    let check = await this.checkVideoJob(externalJobId, normalized.provider);
-
-    while (check.status === 'processing') {
-      if (attempts >= maxAttempts) {
-        throw new Error('Video generation timed out after 30 minutes.');
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, INLINE_POLL_INTERVAL_MS),
-      );
-      check = await this.checkVideoJob(externalJobId, normalized.provider);
-      attempts += 1;
-      await this.emitProcessing(
-        pipelineId,
-        nodeId,
-        `Generating video... (~${attempts * (INLINE_POLL_INTERVAL_MS / 1000)}s, est. ${estimatedSeconds}s)`,
-      );
-    }
-
-    if (check.status === 'failed') {
-      throw new Error(
-        check.error ?? 'Sora video generation failed. Please retry.',
-      );
-    }
-
-    const completed = await this.completeVideoJob(externalJobId, {
+  /** `video_presenter` node: always HeyGen, regardless of stored config.mode. */
+  executePresenter(input: NodeExecutionInput): Promise<NodeExecutionResult> {
+    return this.execute({
       ...input,
-      normalized,
+      config: { ...(input.config ?? {}), mode: 'presenter' },
     });
-    return { video: completed.video, storage: completed.storage };
   }
 
+  /** `video_cinematic` node: HeyGen (cinematic_avatar | heygen_video), regardless of stored config.mode. */
+  executeCinematic(input: NodeExecutionInput): Promise<NodeExecutionResult> {
+    return this.execute({
+      ...input,
+      config: { ...(input.config ?? {}), mode: 'cinematic' },
+    });
+  }
+
+  /** Legacy `video_generation`: mode from config. */
   async execute(input: NodeExecutionInput): Promise<NodeExecutionResult> {
     if (!input.rule) {
       throw new UnprocessableEntityException(
@@ -813,6 +569,7 @@ export class VideoGenerationService {
       contentPrompt: input.contentPrompt ?? '',
       previousOutputs: input.previousOutputs ?? {},
       config,
+      sourcePack: input.sourcePack,
       pipelineId: input.pipelineRef,
       nodeId: input.nodeId,
     };
@@ -830,20 +587,234 @@ export class VideoGenerationService {
       };
     }
 
-    const normalized = normalizeVideoConfig(config);
-    const { video, storage } = await this.generateVideo(execInput);
+    const { video, storage, costModel, duration, resolution } =
+      await this.generateCinematicVideo(execInput);
     return {
       output: video,
       video: storage,
       videoCost: {
-        model: normalized.model,
-        videoSeconds: normalized.duration,
-        videoResolution: normalized.resolution,
+        model: costModel,
+        videoSeconds: duration,
+        videoResolution: resolution,
       },
     };
   }
-}
 
+  private resolveCinematicPrompt(input: VideoGenerationInput): string {
+    const fromMessage =
+      input.contentPrompt?.trim() ||
+      input.previousOutputs?.adaptedCaption?.trim() ||
+      input.previousOutputs?.text?.trim() ||
+      '';
+    if (!fromMessage) {
+      throw new UnprocessableEntityException(
+        'Cinematic video requires a scene prompt (node userPrompt or upstream text)',
+      );
+    }
+    return fromMessage;
+  }
+
+  private resolveCinematicAvatarIds(config: WorkflowNodeConfig): string[] {
+    const ids: string[] = [];
+    const arr = (config as { heygenAvatarIds?: unknown }).heygenAvatarIds;
+    if (Array.isArray(arr)) {
+      for (const id of arr) {
+        if (typeof id === 'string' && id.trim()) ids.push(id.trim());
+      }
+    }
+    const single = config.heygenAvatarId?.trim();
+    if (single && !ids.includes(single)) ids.unshift(single);
+    return ids.slice(0, 3);
+  }
+
+  async submitCinematicVideoJob(
+    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
+  ): Promise<VideoSubmitResult> {
+    const config = input.config ?? {};
+    const prompt = this.resolveCinematicPrompt(input);
+    const cinematicMode =
+      (config as { cinematicMode?: string }).cinematicMode === 'heygen_video'
+        ? 'heygen_video'
+        : 'cinematic_avatar';
+    const duration = normalizeCinematicDurationSeconds(config.duration);
+    const aspectRatio =
+      typeof config.aspectRatio === 'string' && config.aspectRatio.trim()
+        ? config.aspectRatio.trim()
+        : '16:9';
+    const resolution =
+      typeof config.resolution === 'string' && config.resolution.trim()
+        ? config.resolution.trim()
+        : cinematicMode === 'heygen_video'
+          ? '768p'
+          : '720p';
+    // heygen-video-1 only accepts 480p/768p/1080p/2k; node defaults carry 720p.
+    const HEYGEN_VIDEO_RES = ['480p', '768p', '1080p', '2k'];
+    const submitResolution =
+      cinematicMode === 'heygen_video' && !HEYGEN_VIDEO_RES.includes(resolution)
+        ? '768p'
+        : resolution;
+
+    await this.emitProcessing(
+      input.pipelineId,
+      input.nodeId,
+      `Cinematic (${cinematicMode}) · ${duration}s · ${aspectRatio}`,
+    );
+
+    let videoId: string;
+
+    if (cinematicMode === 'cinematic_avatar') {
+      const avatarIds = this.resolveCinematicAvatarIds(config);
+      if (!avatarIds.length) {
+        throw new UnprocessableEntityException(
+          'Cinematic avatar mode requires a HeyGen look. Upload or pick one in node settings.',
+        );
+      }
+      const model =
+        (config as { heygenCinematicModel?: string }).heygenCinematicModel ===
+        'seedance_2'
+          ? 'seedance_2'
+          : 'heygen_video_1';
+      const refsRaw = (config as { heygenReferenceAssetIds?: unknown })
+        .heygenReferenceAssetIds;
+      const references =
+        Array.isArray(refsRaw) && refsRaw.length
+          ? refsRaw
+              .filter((id): id is string => typeof id === 'string' && !!id.trim())
+              .map((asset_id) => ({
+                type: 'asset_id' as const,
+                asset_id: asset_id.trim(),
+              }))
+          : undefined;
+      ({ videoId } = await this.heygen.submitCinematicAvatarVideo({
+        prompt,
+        avatarIds,
+        model,
+        durationSeconds: duration,
+        aspectRatio,
+        resolution,
+        enhancePrompt: (config as { enhancePrompt?: boolean }).enhancePrompt,
+        references,
+      }));
+    } else {
+      const heygenVideoMode = ((config as { heygenVideoMode?: string })
+        .heygenVideoMode ?? 'text_to_video') as
+        | 'text_to_video'
+        | 'image_to_video'
+        | 'reference_to_video';
+      const refIds = (config as { heygenReferenceAssetIds?: unknown })
+        .heygenReferenceAssetIds;
+      const referenceAssetIds = Array.isArray(refIds)
+        ? refIds.filter((id): id is string => typeof id === 'string' && !!id.trim())
+        : undefined;
+      const imageUrl = (
+        config as { heygenReferenceImageUrl?: string }
+      ).heygenReferenceImageUrl?.trim();
+      ({ videoId } = await this.heygen.submitHeygenVideoModel({
+        prompt,
+        mode: heygenVideoMode,
+        durationSeconds: duration,
+        aspectRatio,
+        resolution: submitResolution,
+        promptEnhancement: (
+          config as {
+            promptEnhancement?:
+              | 'turbo'
+              | 'quality'
+              | 'ultraquality'
+              | 'disabled';
+          }
+        ).promptEnhancement,
+        seed: (config as { seed?: number }).seed,
+        imageUrl,
+        referenceAssetIds,
+        callbackUrl: this.heygen.resolveCallbackUrl(),
+        callbackId: heygenCallbackId(input.pipelineId, input.nodeId),
+      }));
+    }
+
+    return {
+      externalJobId: videoId,
+      estimatedSeconds: duration,
+      normalized: normalizeVideoConfig(config),
+      videoProvider: 'heygen',
+    };
+  }
+
+  async generateCinematicVideo(
+    input: VideoGenerationInput & { pipelineId: string; nodeId: string },
+  ): Promise<{
+    video: string;
+    storage: VideoCompleteResult['storage'];
+    costModel: string;
+    duration: number;
+    resolution: string;
+  }> {
+    const config = input.config ?? {};
+    const submitted = await this.submitCinematicVideoJob(input);
+    const cinematicMode =
+      (config as { cinematicMode?: string }).cinematicMode === 'heygen_video'
+        ? 'heygen_video'
+        : 'cinematic_avatar';
+    const costModel =
+      cinematicMode === 'heygen_video'
+        ? `heygen-video:${(config as { heygenVideoMode?: string }).heygenVideoMode ?? 'text_to_video'}`
+        : `heygen-cinematic-avatar:${(config as { heygenCinematicModel?: string }).heygenCinematicModel ?? 'heygen_video_1'}`;
+
+    await this.emitProcessing(
+      input.pipelineId,
+      input.nodeId,
+      'Cinematic video generation started...',
+    );
+
+    const deadline = Date.now() + 30 * 60 * 1000;
+    let attempts = 0;
+    const poll = async (): Promise<VideoCheckResult> => {
+      if (cinematicMode === 'heygen_video') {
+        const result = await this.heygen.getHeygenVideoModelStatus(
+          submitted.externalJobId,
+        );
+        return {
+          status: mapHeygenVideoStatus(result.status),
+          error: result.error,
+        };
+      }
+      return this.checkHeyGenVideoJob(submitted.externalJobId);
+    };
+
+    let check = await poll();
+    while (check.status === 'processing') {
+      if (Date.now() > deadline) {
+        throw new Error('Cinematic video generation timed out after 30 minutes.');
+      }
+      await new Promise((r) => setTimeout(r, INLINE_POLL_INTERVAL_MS));
+      attempts += 1;
+      await this.emitProcessing(
+        input.pipelineId,
+        input.nodeId,
+        `Generating cinematic video... (~${attempts * (INLINE_POLL_INTERVAL_MS / 1000)}s, est. ${submitted.estimatedSeconds}s)`,
+      );
+      check = await poll();
+    }
+    if (check.status === 'failed') {
+      throw new Error(check.error ?? 'HeyGen cinematic video failed. Please retry.');
+    }
+
+    const completed = await this.completeHeyGenVideoJob(
+      submitted.externalJobId,
+      input,
+    );
+    return {
+      video: completed.video,
+      storage: completed.storage,
+      costModel,
+      duration: submitted.estimatedSeconds,
+      resolution:
+        typeof config.resolution === 'string' && config.resolution.trim()
+          ? config.resolution.trim()
+          : submitted.normalized.resolution,
+    };
+  }
+}
 function presenterResolutionLabel(config: WorkflowNodeConfig): string {
   return config.heygenOrientation === 'portrait' ? '1080p-9:16' : '1080p-16:9';
 }

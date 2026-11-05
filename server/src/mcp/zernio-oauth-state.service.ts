@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
+import {
+  DEFAULT_OAUTH_RETURN_TO,
+  sanitizeOAuthReturnTo,
+} from './oauth-return-to.util';
 
 const STATE_ALG = 'HS256';
 const STATE_MAX_AGE = '15m';
@@ -19,8 +23,14 @@ export class ZernioOauthStateService implements OnModuleInit {
     this.secret = new TextEncoder().encode(raw);
   }
 
-  async signState(userId: string): Promise<string> {
-    return await new SignJWT({})
+  async signState(
+    userId: string,
+    options?: { returnTo?: string },
+  ): Promise<string> {
+    const returnTo = sanitizeOAuthReturnTo(
+      options?.returnTo ?? DEFAULT_OAUTH_RETURN_TO,
+    );
+    return await new SignJWT({ returnTo })
       .setProtectedHeader({ alg: STATE_ALG })
       .setSubject(userId)
       .setIssuedAt()
@@ -28,7 +38,9 @@ export class ZernioOauthStateService implements OnModuleInit {
       .sign(this.secret);
   }
 
-  async verifyState(token: string): Promise<{ userId: string }> {
+  async verifyState(
+    token: string,
+  ): Promise<{ userId: string; returnTo: string }> {
     try {
       const { payload } = await jwtVerify(token, this.secret, {
         algorithms: [STATE_ALG],
@@ -37,8 +49,12 @@ export class ZernioOauthStateService implements OnModuleInit {
       if (!sub) {
         throw new BadRequestException('Invalid OAuth state');
       }
-      return { userId: sub };
-    } catch {
+      return {
+        userId: sub,
+        returnTo: sanitizeOAuthReturnTo(payload.returnTo),
+      };
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
       throw new BadRequestException('Invalid or expired OAuth state');
     }
   }

@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   UnprocessableEntityException,
+  forwardRef,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { CostService } from '../cost/cost.service';
 import { RecordCostDto } from '../cost/dto/record-cost.dto';
 import { PipelineBudgetExceededError } from '../cost/pipeline-budget-exceeded.error';
@@ -25,6 +27,7 @@ import type {
   VideoJobProvider,
 } from '../nodes/services/video-generation.service';
 import { getVideoGenerationMode } from '../nodes/services/video-generation.service';
+import { withVideoModeForType } from '../nodes/video-node-type.util';
 import type { IPipelineRepository } from '../pipeline/pipeline.repository';
 import { PIPELINE_REPOSITORY } from '../pipeline/pipeline.repository';
 import {
@@ -35,7 +38,6 @@ import type { IRuleRepository } from '../repositories/interfaces/rule.repository
 import { RULE_REPOSITORY } from '../repositories/tokens';
 import { DependencyResolverService } from './dependency-resolver.service';
 import { PipelineNodeCompletionService } from './pipeline-node-completion.service';
-import { PipelineNodeRunnerService } from './pipeline-node-runner.service';
 import { resolveExecutionRule } from './pipeline-execution-rule.util';
 import type { NodeJobPayload } from './types/node-job.payload';
 
@@ -43,7 +45,7 @@ const PIPELINE_LOG_RETENTION_DAYS = 90;
 
 export type VideoFailureContext = {
   videoProvider?: VideoJobProvider;
-  stage?: 'submit' | 'poll' | 'complete' | 'webhook' | 'timeout';
+  stage?: 'preflight' | 'submit' | 'poll' | 'complete' | 'webhook' | 'timeout';
 };
 
 @Injectable()
@@ -53,9 +55,11 @@ export class MediaNodeCompletionService {
   constructor(
     @Inject(PIPELINE_REPOSITORY)
     private readonly pipelineRepo: IPipelineRepository,
+    @Inject(forwardRef(() => DependencyResolverService))
     private readonly resolver: DependencyResolverService,
+    @Inject(forwardRef(() => PipelineNodeCompletionService))
     private readonly completion: PipelineNodeCompletionService,
-    private readonly pipelineNodeRunner: PipelineNodeRunnerService,
+    private readonly moduleRef: ModuleRef,
     private readonly events: EventsService,
     private readonly costService: CostService,
     private readonly loggingService: LoggingService,
@@ -97,7 +101,10 @@ export class MediaNodeCompletionService {
       rule: executionRule,
       contentPrompt: payload.contentPrompt,
       previousOutputs,
-      config: node.config ?? {},
+      config: withVideoModeForType(
+        node.type,
+        (node.config ?? {}) as Record<string, unknown>,
+      ) as WorkflowNodeConfig,
       pipelineId: payload.pipelineId,
       nodeId: payload.nodeId,
     };
@@ -115,7 +122,7 @@ export class MediaNodeCompletionService {
         pipelineRef: payload.pipelineId,
         workflowRef: payload.workflowId,
         nodeId: payload.nodeId,
-        nodeType: WorkflowNodeType.VideoGeneration,
+        nodeType: payload.nodeType ?? WorkflowNodeType.VideoGeneration,
         order: payload.order,
         level: LogLevel.Info,
         status: PipelineLogStatus.Started,
@@ -240,9 +247,9 @@ export class MediaNodeCompletionService {
       return;
     }
     const nodeConfig = (node.config ?? {}) as WorkflowNodeConfig;
-    const mode = getVideoGenerationMode(nodeConfig);
+    const mode = getVideoGenerationMode(nodeConfig, node.type);
     const videoProvider =
-      context?.videoProvider ?? (mode === 'presenter' ? 'heygen' : 'sora');
+      context?.videoProvider ?? 'heygen';
 
     const logMessage = this.formatVideoFailureMessage(
       error,
@@ -280,7 +287,7 @@ export class MediaNodeCompletionService {
         pipelineRef: payload.pipelineId,
         workflowRef: payload.workflowId,
         nodeId: payload.nodeId,
-        nodeType: WorkflowNodeType.VideoGeneration,
+        nodeType: payload.nodeType ?? WorkflowNodeType.VideoGeneration,
         order: payload.order,
         level: LogLevel.Error,
         status: PipelineLogStatus.Failed,
@@ -315,7 +322,15 @@ export class MediaNodeCompletionService {
       payload.pipelineId,
       payload.nodeId,
     );
-    await this.pipelineNodeRunner.handleFinalFailure(payload, error);
+    const { PipelineNodeRunnerService } = require('./pipeline-node-runner.service') as typeof import('./pipeline-node-runner.service');
+      const runner = this.moduleRef.get(PipelineNodeRunnerService, { strict: false });
+      if (!runner) {
+        this.logger.error(
+          `handleFinalFailure: PipelineNodeRunnerService unavailable pipeline=${payload.pipelineId}`,
+        );
+        return;
+      }
+      await runner.handleFinalFailure(payload, error);
   }
 
   private formatVideoFailureMessage(
@@ -324,7 +339,9 @@ export class MediaNodeCompletionService {
     stage?: VideoFailureContext['stage'],
   ): string {
     const label =
-      videoProvider === 'heygen' ? 'Presenter video' : 'Cinematic video';
+      videoProvider === 'sora'
+        ? 'Cinematic video (legacy Sora)'
+        : 'HeyGen video';
     const raw = error.message?.trim();
     if (stage === 'timeout') {
       return (
@@ -356,7 +373,7 @@ export class MediaNodeCompletionService {
       pipelineRef: payload.pipelineId,
       campaignRef: payload.ruleId,
       nodeId: payload.nodeId,
-      nodeType: WorkflowNodeType.VideoGeneration,
+      nodeType: payload.nodeType ?? WorkflowNodeType.VideoGeneration,
       provider: isHeygen ? 'heygen' : LlmProvider.OpenAI,
       providerModel: vc.model,
       entryType: isHeygen ? 'openai_video' : 'openai_video',

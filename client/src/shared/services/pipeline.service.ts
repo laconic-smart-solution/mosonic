@@ -1,3 +1,4 @@
+import { buildRuleExtractFormData } from "@/lib/strategy-input"
 import apiClient from "../api/api-client"
 import type {
   GetPipelineResponse,
@@ -23,7 +24,45 @@ export const pipelineService = {
   startPipeline: async (
     payload: StartPipelinePayload,
   ): Promise<StartPipelineResponse> => {
-    const response = await apiClient.post("/pipeline/start", payload)
+    const attachments = payload.attachments ?? []
+    const hasFiles = attachments.some(
+      (a) => a.type === "file" && a.data instanceof File,
+    )
+    const hasUrls = attachments.some((a) => a.type === "url")
+
+    if (hasFiles || hasUrls) {
+      const fd = buildRuleExtractFormData(
+        payload.contentPrompt ?? "",
+        attachments,
+      )
+      // Rule extract uses `input`; pipeline start uses `contentPrompt`.
+      if (fd.has("input")) {
+        const input = fd.get("input")
+        fd.delete("input")
+        if (typeof input === "string") fd.append("contentPrompt", input)
+      } else if (payload.contentPrompt?.trim()) {
+        fd.append("contentPrompt", payload.contentPrompt.trim())
+      }
+      fd.append("workflowId", payload.workflowId)
+      fd.append("ruleId", payload.ruleId)
+      if (payload.useLearnings !== undefined) {
+        fd.append("useLearnings", String(payload.useLearnings))
+      }
+      if (payload.executionMode) {
+        fd.append("executionMode", payload.executionMode)
+      }
+      if (payload.reviewNodeIds?.length) {
+        fd.append("reviewNodeIds", JSON.stringify(payload.reviewNodeIds))
+      }
+      const response = await apiClient.post("/pipeline/start", fd)
+      return response.data
+    }
+
+    const { attachments: _a, ...json } = payload
+    const response = await apiClient.post("/pipeline/start", {
+      ...json,
+      contentPrompt: json.contentPrompt ?? "",
+    })
     return response.data
   },
 
