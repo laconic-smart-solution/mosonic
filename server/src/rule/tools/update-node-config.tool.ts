@@ -3,7 +3,10 @@ import { z } from 'zod';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import type { LlmService } from '../../llm/llm.service';
 import { WorkflowNodeType } from '../../nodes/schemas/workflow-node.schema';
-import { parseWorkflowNodeConfig } from '../../nodes/workflow-node-config.zod';
+import {
+  parseWorkflowNodeConfig,
+  rejectedVideoPatchKeys,
+} from '../../nodes/workflow-node-config.zod';
 import { DISTRIBUTION_CHANNELS } from '../../workflow/distribution-channels.util';
 import { buildWorkflowEdges } from '../../workflow/workflow-graph-edge-builder.util';
 import { normalizeLaneId } from '../../workflow/workflow-graph.util';
@@ -174,6 +177,18 @@ export function createUpdateNodeConfigTool(
           }
         }
 
+        const rejectedKeys = rejectedVideoPatchKeys(
+          target.type as WorkflowNodeType,
+          configKeys.filter((key) => key !== 'channel' && key !== 'laneId'),
+        );
+        if (rejectedKeys.length) {
+          return toolError(
+            'invalid_config',
+            `${target.type} does not accept: ${rejectedKeys.join(', ')}. Call describe_node_config_fields for valid keys.`,
+            { nodeId: trimmedId, rejectedKeys },
+          );
+        }
+
         const mergedConfig: Record<string, unknown> = {
           ...(target.config ?? {}),
           ...(config ?? {}),
@@ -278,10 +293,10 @@ export function createUpdateNodeConfigTool(
       name: 'update_node_config',
       description:
         'Purpose: change the settings of ONE existing workflow step (its channel lane, prompt or size). Never adds, removes or reorders steps. ' +
-          'Use when: "the image/video is for TikTok" (move that step: set lane; this is not a brand-channel change, no update_rule), "make the text prompt friendlier", "square images". Say the channel changed only when laneChange in the result shows it. ' +
+          'Use when: video_presenter voice/orientation/expressiveness/motion/background (config.heygenVoiceId from list_heygen_voices, heygenOrientation portrait|landscape, heygenExpressiveness low|medium|high, heygenMotionPrompt, heygenBackgroundUrl, removeBackground; look via set_video_node_look); "the image/video is for TikTok" (move that step: set lane; this is not a brand-channel change, no update_rule), "make the text prompt friendlier", "square images". Say the channel changed only when laneChange in the result shows it. ' +
           'Do NOT use: to add or remove a step (add_workflow_node / remove_workflow_node); to change the order (reorder_workflow_nodes); to change which channels the whole workflow makes (set_workflow_channels); to edit a generated caption or image or add the logo (rerun_content_node). ' +
           'Args: nodeId from list_workflows (never guessed); lane one of instagram, facebook, linkedin, tiktok, youtube, rednote (config.channel is treated as a lane move); config fields valid for that step type (call get_node_config first if unsure). The workflow must be ready. Does not run the pipeline. ' +
-          'Errors: node_not_found (re-list, do not guess), invalid_config (setting not available), workflow_not_ready (wait), no_workflow (offer apply_default_workflow).',
+          'Errors: node_not_found (re-list, do not guess), invalid_config (setting not available, or a presenter-only / cinematic-only key on the other video type), workflow_not_ready (wait), no_workflow (offer apply_default_workflow).',
       schema: UPDATE_NODE_CONFIG_SCHEMA,
     },
   );

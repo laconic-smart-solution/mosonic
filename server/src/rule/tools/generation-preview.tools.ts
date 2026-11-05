@@ -6,6 +6,7 @@ import { isTypedVideoNodeType, typedVideoColumnsFromConfig } from '../../nodes/v
 import { preflightVideoNode } from '../../nodes/video-node-preflight.util';
 import type { IContentRepository } from '../../repositories/interfaces/content.repository.interface';
 import { normalizeLaneId } from '../../workflow/workflow-graph.util';
+import { DISTRIBUTION_CHANNELS } from '../../workflow/distribution-channels.util';
 import type { WorkflowService } from '../../workflow/workflow.service';
 import { resolveContentForSession } from './content-scope.util';
 import { runTool, toolError, toolOk } from './tool-error.util';
@@ -106,18 +107,75 @@ export function buildGenerationPreview(nodes: readonly PreviewNode[]): Generatio
   };
 }
 
+/** Words that mean the user asked for a video this run (any of the chat languages). */
+const VIDEO_WORDS = /\b(videos?|reels?|clips?|shorts|footage)\b|\u1017\u102e\u1012\u102e\u101a\u102d\u102f|\u0e27\u0e34\u0e14\u0e35\u0e42\u0e2d|\u89c6\u9891|\u5f71\u7247/iu;
+
+export function requestWantsVideo(text: string): boolean {
+  return VIDEO_WORDS.test(text);
+}
+
+/** What the user asked for this run, next to what the workflow will really make. */
+export type PreviewRequest = {
+  /** Channels named in the request (parseRequest ids). */
+  channels?: string[];
+  wantsVideo?: boolean;
+  /** Brand profile channels (used when the workflow has no channel lanes). */
+  brandChannels?: string[];
+};
+
+export type PreviewGaps = {
+  /** Channels the run will post to, human labels. */
+  channels: string[];
+  /** One version shared by every channel (no channel lanes). */
+  shared: boolean;
+  missingVideo: boolean;
+  missingChannels: string[];
+};
+
+const channelLabel = (id: string) => DISTRIBUTION_CHANNELS.find((c) => c.id === id)?.label ?? id;
+
+/** Pure: the run's real channels and what the request needs that the workflow lacks. */
+export function previewGaps(preview: GenerationPreview, request: PreviewRequest = {}): PreviewGaps {
+  const asked = [...new Set((request.channels ?? []).map((c) => normalizeLaneId(c)))];
+  const brand = [...new Set((request.brandChannels ?? []).map((c) => normalizeLaneId(c)))];
+  const shared = preview.lanes.length === 0;
+  const target = shared ? (asked.length ? asked : brand) : preview.lanes;
+  const known = shared ? brand : preview.lanes;
+  const missingChannels = known.length ? asked.filter((c) => !known.includes(c)) : [];
+  return {
+    channels: target.map(channelLabel),
+    shared,
+    missingVideo: !!request.wantsVideo && preview.videoSteps === 0,
+    missingChannels: missingChannels.map(channelLabel),
+  };
+}
+
 /** ask_user observation shown instead of starting a run the user has not confirmed yet. */
 export function generationPreviewPrompt(input: {
   topic: string;
   preview: GenerationPreview;
   brief?: Record<string, unknown>;
+  request?: PreviewRequest;
 }): string {
   const { preview } = input;
-  const channels = preview.lanes.length ? preview.lanes.join(', ') : 'shared';
+  const gaps = previewGaps(preview, input.request);
+  const channels = gaps.channels.length
+    ? `${gaps.channels.join(', ')}${gaps.shared && gaps.channels.length > 1 ? ' (one shared version)' : ''}`
+    : 'your brand channels (one shared version)';
+  const missing = [
+    ...(gaps.missingVideo ? ['a video step (you asked for a video; this run makes no video)'] : []),
+    ...(gaps.missingChannels.length ? [`${gaps.missingChannels.join(', ')} (not a channel on this workflow yet)`] : []),
+  ];
+  const needsAdding = missing.length > 0;
+  const addLabel = [
+    ...(gaps.missingVideo ? ['video step'] : []),
+    ...gaps.missingChannels,
+  ].join(' + ');
   const question = [
     `Ready to generate "${input.topic.slice(0, 120)}"?`,
     `Channels: ${channels}. Steps: ${preview.steps.length}${preview.videoSteps ? ` (${preview.videoSteps} video, uses video credits)` : ''}.`,
     ...preview.lines.slice(0, 12).map((l) => `- ${l}`),
+    ...(needsAdding ? [`Missing for your request: ${missing.join('; ')}.`, `Add ${addLabel} first?`] : []),
   ].join('\n');
   return JSON.stringify({
     ok: false,
@@ -127,11 +185,17 @@ export function generationPreviewPrompt(input: {
     confirmFor: 'start_generation',
     question,
     preview: { steps: preview.steps, lanes: preview.lanes, issues: preview.issues },
+    gaps,
+    needsAdding,
     ...(input.brief ? { brief: input.brief } : {}),
     message:
-      'Nothing started yet. Show this plan; on Start call start_generation again with the same arguments. On Change, ask what to change (update_node_config / set_video_node_look) and preview again.',
+      (needsAdding
+        ? `Nothing started yet. The workflow lacks what the user asked for (${missing.join('; ')}). On add_missing (or a plain yes): add the missing parts (add_workflow_node video_presenter or video_cinematic - ask which if unclear; set_workflow_channels for a missing channel), then call start_generation again to show the updated plan. On start_post run without them. `
+        : 'Nothing started yet. On Start (or a plain yes) call start_generation again with the same arguments. ') +
+      'This card already asks the user; do not also ask "Start now?" or any yes/no yourself. On Change, ask what to change (update_node_config / set_video_node_look) and preview again.',
     options: [
-      { id: PREVIEW_CONFIRM_OPTION_ID, label: 'Start' },
+      ...(needsAdding ? [{ id: 'add_missing', label: `Add ${addLabel}`.slice(0, 40) }] : []),
+      { id: PREVIEW_CONFIRM_OPTION_ID, label: needsAdding ? 'Start without them' : 'Start' },
       { id: 'change', label: 'Change settings' },
       { id: 'cancel', label: 'Cancel' },
     ],
@@ -271,7 +335,10 @@ export function createGetDraftMediaStatusTool(
             ? 'Say which media failed and why in one line; offer to retry (generate_presenter_video / generate_cinematic_video or rerun_content_node) via ask_user.'
             : media.some((m) => m.status === 'pending')
               ? 'Still rendering: tell the user it will appear on the draft when done.'
-              : undefined,
+              : media.some((m) => m.status === 'empty')
+                ? 'Some media never came back (empty): say it did not appear, do not call it ready; offer to retry via ask_user.'
+                : undefined,
+          allReady: media.length > 0 && media.every((m) => m.status === 'ready'),
         });
       }),
     {

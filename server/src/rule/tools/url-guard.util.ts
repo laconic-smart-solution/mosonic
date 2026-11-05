@@ -74,7 +74,7 @@ export function rejectUntrustedUrl(
     return `"${value}" is a placeholder address, not the brand's website.`;
   }
   if (userTexts && !isUrlFromUser(value, userTexts)) {
-    return `The user has not sent "${value}" in this chat.`;
+    return `Neither the user nor a web search in this chat gave "${value}".`;
   }
   return null;
 }

@@ -134,7 +134,10 @@ import {
   carriedConfirmation,
   matchesCarriedConfirmation,
   confirmedPlanChain,
+  affirmsPendingStartPreview,
   unrequestedProfileChange,
+  waivedRecently,
+  WAIVABLE_CONFIRMATION_TOOLS,
   repeatedPostRequest,
   repeatedPostRequestInState,
   matchesApproval,
@@ -181,7 +184,7 @@ import {
 } from './chat-pipeline-followup.service';
 import type { AgentStep } from '../tools/tool-calling-loop';
 import { buildRunProgress, type ChatRunProgress } from './chat-run-progress.util';
-import { toLangChainHistory } from './chat-history.util';
+import { toLangChainHistory, webSearchTexts } from './chat-history.util';
 import { withReactInstructions } from './react-chat-instructions';
 import { McpService } from '../../mcp/mcp.service';
 import { PlanChannelAccessService } from '../../plan/plan-channel-access.service';
@@ -459,6 +462,14 @@ export class ChatSessionService {
     // keep start_generation bound so setup can end with the post (Option B).
     const postIntent = !!pendingPostIntent(history) || afterUser.goal?.kind === 'make_post';
     if (postIntent) keepTools.add('start_generation');
+    // "Yes" / "Start" typed (or a Yes chip on the AI's own "Start now?") while a
+    // start_generation plan card is still open counts as tapping Start on it.
+    // "Don't ask me, do it yourself all the way to publish": setup guards that only ask first step aside.
+    const waived = waivedRecently(history);
+    const pendingPostText = pendingPostIntent(history);
+    const startAffirmed = affirmsPendingStartPreview(history) || (waived && postIntent);
+    if (startAffirmed) keepTools.add('start_generation');
+    if (waived) for (const t of ['update_rule', 'set_workflow_channels', 'apply_default_workflow', 'check_channel_auth', 'start_channel_oauth', 'publish_now']) keepTools.add(t);
     this.logStateDiff(sessionId, afterUser, {
       userConfirmed,
       stateConfirmed: resolution.positive,
@@ -506,11 +517,13 @@ export class ChatSessionService {
           keepTools,
           sessionBlockFor,
           // Preview before generate: start_generation shows its plan card until the user taps Start.
-          { confirmed: !!confirmedChain?.has('start_generation'), anyConfirmed: confirmedNow },
+          { confirmed: !!confirmedChain?.has('start_generation') || startAffirmed, anyConfirmed: confirmedNow || startAffirmed },
+          webSearchTexts(history),
         )
-      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null));
+      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null), webSearchTexts(history));
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
+    const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
     const latestContentId = facts?.latestPost?.contentId;
 
     const useReasoning =
@@ -564,24 +577,25 @@ export class ChatSessionService {
           if (
             CONFIRMATION_REQUIRED_TOOL_NAMES.has(name) &&
             !confirmedNow &&
+            !(waived && WAIVABLE_CONFIRMATION_TOOLS.has(name)) &&
             !matchesCarriedConfirmation(carried, name, args, { contentId: latestContentId }) &&
             !matchesApproval(turnState.approvals, name, args, { contentId: latestContentId })
           ) {
             return confirmationPromptFor(name, args);
           }
           if (name === 'update_rule') {
-            const notAsked = unrequestedProfileChange(content);
+            const notAsked = unrequestedProfileChange(content, { args, waived, pendingPostText, brandChannels });
             if (notAsked) return notAsked;
           }
           if (ambiguousReply && MUTATING_TOOL_NAMES.has(name)) {
             return ambiguousChoiceObservation(content);
           }
           const planGuard =
-            planBeforeSetupChange({ name, args, userText: content, confirmed: confirmedNow }) ??
-            startAfterSetupChange(name, turnSteps, confirmedNow, { hadWorkflow: !!facts?.workflow, postIntent, userText: content });
+            planBeforeSetupChange({ name, args, userText: content, confirmed: confirmedNow, brandChannels, waived }) ??
+            startAfterSetupChange(name, turnSteps, confirmedNow || waived || (name === 'start_generation' && startAffirmed), { hadWorkflow: !!facts?.workflow, postIntent, userText: content });
           if (planGuard) return planGuard;
           const narrow =
-            (name === 'start_generation' && !confirmedNow
+            (name === 'start_generation' && !confirmedNow && !startAffirmed
               ? repeatedPostRequest(history) ??
                 repeatedPostRequestInState(content, startedPostRequests(turnState))
               : null) ??
@@ -719,10 +733,13 @@ export class ChatSessionService {
           false,
           new Set(),
           sessionBlockFor,
+          undefined,
+          webSearchTexts(history),
         )
-      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null));
+      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null), webSearchTexts(history));
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
+    const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
 
     const useReasoning =
       this.config.get<string>('CHAT_USE_REASONING_MODEL') === 'true';
@@ -861,7 +878,12 @@ export class ChatSessionService {
     keepTools: ReadonlySet<string> = new Set(),
     sessionBlockFor?: (facts: LiveFacts) => string,
     previewGate?: { confirmed: boolean; anyConfirmed?: boolean },
+    /** web_search results from earlier turns; URLs in them are trusted like user text. */
+    priorSearchTexts: string[] = [],
   ) {
+    // URL guard: the user's words plus anything web_search found (earlier or this turn).
+    const searchTexts = [...priorSearchTexts];
+    const urlTexts = () => [...userTexts, ...searchTexts];
     const rule = await this.ruleService.getRuleById(ruleId, auth);
     const assets = await this.ruleAssetService.listByRule(ruleId, auth);
     const memories = await this.ruleMemoryService.listRecent(ruleId, auth);
@@ -921,13 +943,13 @@ export class ChatSessionService {
         this.websiteAssetHandler,
         this.ruleAssetService,
         auth,
-        () => userTexts,
+        urlTexts,
       ),
       createRememberTool(ruleId, this.ruleMemoryService, auth),
       createForgetTool(this.ruleMemoryService, auth),
       createForgetAllTool(ruleId, this.ruleMemoryService, auth),
       createSearchBrandMemoryTool(ruleId, this.ruleMemorySearchService, auth),
-      createWebSearchTool(this.llm),
+      createWebSearchTool(this.llm, (text) => searchTexts.push(text)),
       createAskUserTool(),
       createListWorkflowsTool(ruleId, this.workflows, auth, brandName),
       createGenerateWorkflowTool(ruleId, this.workflows, auth, brandName),
@@ -1150,7 +1172,7 @@ export class ChatSessionService {
       );
     }
 
-    if (intentText === undefined) return { brainPrompt, tools, facts };
+    if (intentText === undefined) return { brainPrompt, tools, facts, brandChannels };
     // State gate + intent groups (~15 tools a turn instead of ~50), plus
     // whatever a pending confirmation / connect flow needs.
     const allowed = selectTurnTools(
@@ -1164,7 +1186,7 @@ export class ChatSessionService {
     );
     const gated = tools.filter((t) => allowed(t.name));
     this.logger.log(`Chat tools this turn: ${gated.length} of ${tools.length}`);
-    return { brainPrompt, tools: gated, facts };
+    return { brainPrompt, tools: gated, facts, brandChannels };
   }
 
   /**
@@ -1279,7 +1301,11 @@ export class ChatSessionService {
     auth: TenancyAuth,
     userTexts: string[] = [],
     sessionBlock = '',
+    priorSearchTexts: string[] = [],
   ) {
+    // URL guard: the user's words plus anything web_search found (earlier or this turn).
+    const searchTexts = [...priorSearchTexts];
+    const urlTexts = () => [...userTexts, ...searchTexts];
     const brainPrompt = withReactInstructions(
       sessionBlock ? `${buildOnboardingPrompt()}\n\n${sessionBlock}` : buildOnboardingPrompt(),
     );
@@ -1295,16 +1321,16 @@ export class ChatSessionService {
           currentRuleId = ruleId;
           await this.sessions.updateById(sessionId, { ruleId }, auth);
         },
-        () => userTexts,
+        urlTexts,
       ),
       createFetchWebsiteAssetsTool(
         () => currentRuleId,
         this.websiteAssetHandler,
         this.ruleAssetService,
         auth,
-        () => userTexts,
+        urlTexts,
       ),
-      createWebSearchTool(this.llm),
+      createWebSearchTool(this.llm, (text) => searchTexts.push(text)),
       createAskUserTool(),
     ];
 

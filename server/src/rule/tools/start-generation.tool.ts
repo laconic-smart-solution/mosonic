@@ -12,7 +12,7 @@ import { normalizeLaneId } from '../../workflow/workflow-graph.util';
 import { runTool, toolError, toolOk } from './tool-error.util';
 import { normalizeLanguage, parseRequest, preflightRequest } from '../capability.util';
 import type { SourcePackAsset } from '../../pipeline/source-pack.types';
-import { buildGenerationPreview, generationPreviewPrompt } from './generation-preview.tools';
+import { buildGenerationPreview, generationPreviewPrompt, requestWantsVideo } from './generation-preview.tools';
 
 export type StartGenerationOptions = {
   /** CHAT_EVAL_DRY_RUN: validate everything, then answer "started" without enqueuing. */
@@ -198,6 +198,11 @@ export function createStartGenerationTool(
             topic: prompt,
             preview: buildGenerationPreview(snapshot.nodes as never),
             brief: { ...brief, ...(workflowCreated ? { workflowCreated: true } : {}) },
+            request: {
+              channels: parsed.channels,
+              wantsVideo: requestWantsVideo(`${options.requestText ?? ''}\n${prompt}`),
+              brandChannels: options.brandChannels,
+            },
           });
         }
         if (options.dryRun) {
@@ -248,6 +253,9 @@ export function createStartGenerationTool(
           ...(workflowCreated ? { workflowCreated: true } : {}),
           brief,
           referenceImagesUsed: refs.length,
+          mediaReady: false,
+          outcome: 'started_not_done',
+          next: 'Only started: no text, image or video exists yet. Say it started; never say anything is ready or done until the run result arrives (or get_draft_media_status shows ready).',
           message: refs.length ? `Used ${refs.length} reference image${refs.length > 1 ? 's' : ''}.` : 'No reference images were used.',
         });
       }),

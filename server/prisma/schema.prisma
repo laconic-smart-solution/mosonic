@@ -1081,6 +1081,16 @@ model WorkflowVideoNodeConfig {
   /// Extra cinematic looks (up to 3).
   heygenAvatarIds      String[] @default([])
   heygenCinematicModel String?
+  /// Presenter-only fields (Avatar IV / photo avatar).
+  heygenOrientation       String?
+  heygenExpressiveness    String?
+  heygenMotionPrompt      String?
+  heygenBackgroundAssetId String?
+  heygenBackgroundUrl     String?
+  removeBackground        Boolean?
+  heygenAvatarAssetId     String?
+  heygenAvatarPhotoUrl    String?
+  resolution              String?
   /// FK to a user-owned look when heygenAvatarId is one of the user's avatars.
   userAvatarLookId     String?
   /// Brand asset (rule_assets) the look was created from, if any.

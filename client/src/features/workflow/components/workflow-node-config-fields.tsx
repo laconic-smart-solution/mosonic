@@ -76,13 +76,19 @@ export type ConfigField =
 
 export function getWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
   const defs = buildWorkflowNodeFieldDefs()
-  // Split video nodes share the legacy field list; the mode field is dropped
-  // (the node type fixes the mode), and visibleWhen picks the matching fields.
-  const videoFields = (defs.video ?? []).filter((field) => field.key !== "mode")
+  // Split video nodes get their own field lists (the node type fixes the mode),
+  // so a stale config.mode can never show the other type's fields.
+  const forMode = (mode: "presenter" | "cinematic") =>
+    (defs.video ?? [])
+      .filter((field) => field.key !== "mode")
+      .filter((field) => !field.visibleWhen || field.visibleWhen.key !== "mode" || field.visibleWhen.value === mode)
+      .map((field) =>
+        field.visibleWhen?.key === "mode" ? { ...field, visibleWhen: undefined } : field,
+      )
   return {
     ...defs,
-    video_presenter: videoFields,
-    video_cinematic: videoFields,
+    video_presenter: forMode("presenter"),
+    video_cinematic: forMode("cinematic"),
   }
 }
 
@@ -659,6 +665,7 @@ export function WorkflowNodeConfigFields({
           workflowId={workflowId}
           nodeId={nodeId}
           canvasType={canvasType}
+          variant={mode === "presenter" ? "presenter" : "cinematic"}
           config={config}
           onPatch={(patch) => patchConfig(patch)}
           compact={compact}

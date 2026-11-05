@@ -137,4 +137,19 @@ describe('createFetchWebsiteAssetsTool', () => {
     }
     expect(handler.discoverImages).not.toHaveBeenCalled();
   });
+
+  it('accepts a URL a web search found, without asking the user again', async () => {
+    const handler = makeHandler([]);
+    const ruleAssetService = makeRuleAssetService();
+    const chatTool = createFetchWebsiteAssetsTool(
+      () => 'rule-1',
+      handler,
+      ruleAssetService,
+      auth,
+      () => ['yes can get images from that website? it is my brand', 'Beauty Phoo official site: https://www.beautyphoo.com'],
+    );
+
+    await chatTool.invoke({ url: 'https://beautyphoo.com' });
+    expect(handler.discoverImages).toHaveBeenCalledWith('https://beautyphoo.com', expect.any(Number));
+  });
 });

@@ -5,8 +5,7 @@ import {
   OBSERVATION_MAX_CHARS,
   REPLAY_TOOL_ASSISTANT_LIMIT,
   toLangChainHistory,
-  truncateObservation,
-} from './chat-history.util';
+  truncateObservation,  webSearchTexts,} from './chat-history.util';
 
 function row(
   partial: Pick<ChatMessageRecord, 'role' | 'content'> &
@@ -24,6 +23,22 @@ function row(
 }
 
 describe('chat-history.util', () => {
+  it('collects web_search results from earlier turns (brand URL found by search)', () => {
+    const texts = webSearchTexts([
+      row({ role: 'user', content: 'can you get images from my brand website?' }),
+      row({
+        role: 'assistant',
+        content: 'found it',
+        steps: [
+          { type: 'action', name: 'web_search', args: { query: 'Beauty Phoo' }, toolCallId: 'w1' },
+          { type: 'observation', name: 'web_search', toolCallId: 'w1', result: 'Official site: https://beautyphoo.com' },
+          { type: 'observation', name: 'list_brand_assets', toolCallId: 'x', result: 'https://other.com' },
+        ],
+      }),
+    ]);
+    expect(texts).toEqual(['Official site: https://beautyphoo.com']);
+  });
+
   it('maps user/assistant text only when there is no tool trace', () => {
     const mapped = toLangChainHistory([
       row({ role: 'user', content: 'hi' }),

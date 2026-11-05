@@ -548,6 +548,9 @@ describe('start_generation', () => {
       status: 'running',
       brief: { topic: 'Black Friday post', channels: ['instagram'], style: null, images: true, referenceImages: 0, notPossible: [] },
       referenceImagesUsed: 0,
+      mediaReady: false,
+      outcome: 'started_not_done',
+      next: expect.stringContaining('never say anything is ready'),
       message: 'No reference images were used.',
     });
     expect(orchestration.startPipeline).toHaveBeenCalledWith({

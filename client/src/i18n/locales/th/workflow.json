@@ -463,7 +463,23 @@
     "voice": "เสียง",
     "voiceSaveFailed": "บันทึกเสียงไม่ได้ บันทึกเวิร์กโฟลว์แล้วลองอีกครั้ง",
     "clickOrDrag": "คลิกหรือลากรูปมาที่นี่",
-    "uploading": "กำลังอัปโหลด…"
+    "uploading": "กำลังอัปโหลด…",
+    "noPreview": "ไม่มีตัวอย่าง",
+    "deleteAvatarAria": "ลบ {{name}}",
+    "voiceHint": "เลือกภาษาและเพศ โหลดเพิ่มได้ตามต้องการ แล้วเลือกเสียง",
+    "uploadedAvatarName": "อวตารที่อัปโหลด",
+    "clearBackground": "ลบพื้นหลัง",
+    "lookStatus": {
+      "pending": "รอดำเนินการ",
+      "processing": "กำลังประมวลผล",
+      "failed": "ล้มเหลว"
+    },
+    "status": {
+      "ready": "พร้อมสร้าง",
+      "notReady": "ต้องตั้งค่า",
+      "avatar": "อวตาร",
+      "voice": "เสียง"
+    }
   },
   "voicePicker": {
     "genderAll": "ทั้งหมด",

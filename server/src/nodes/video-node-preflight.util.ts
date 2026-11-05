@@ -52,7 +52,7 @@ export function preflightVideoNode(
       return {
         ok: false,
         code: 'presenter_setup_required',
-        message: `A presenter video needs a ${labels.join(' and ')}. Set them in chat (list_heygen_looks / set_video_node_look for the look, update_node_config for the voice) or in node settings, then try again.`,
+        message: `A presenter video needs a ${labels.join(' and ')}. Look: list_heygen_looks, then set_video_node_look. Voice: list_heygen_voices, then update_node_config with config.heygenVoiceId. Or set them in node settings, then try again.`,
         missing,
       };
     }

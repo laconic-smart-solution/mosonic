@@ -27,7 +27,7 @@ export function createFetchWebsiteAssetsTool(
   websiteAssetHandler: WebsiteAssetHandler,
   ruleAssetService: RuleAssetService,
   auth: TenancyAuth,
-  /** The user's own messages this session; a URL must come from them. */
+  /** User messages + web_search results this session; a URL must come from them. */
   getUserTexts?: () => string[],
 ) {
   return tool(
@@ -40,7 +40,7 @@ export function createFetchWebsiteAssetsTool(
       if (rejected) {
         return toolError(
           'url_not_provided',
-          `${rejected} Nothing was fetched. Ask the user to paste their real website URL.`,
+          `${rejected} Nothing was fetched. If no web search or message has the brand's site, ask the user to paste it.`,
         );
       }
 
@@ -82,7 +82,7 @@ export function createFetchWebsiteAssetsTool(
     {
       name: 'fetch_website_assets',
       description:
-        "Pull brand images (logo, favicon, hero/og image) from the brand's live website and save them as brand assets. Only call this with a real URL the user gave — never guess one.",
+        "Pull brand images (logo, favicon, hero/og image) from the brand's live website and save them as brand assets. Use the URL the user gave or one web_search found for this brand (don't ask for it again) — never guess one.",
       schema: FETCH_WEBSITE_ASSETS_SCHEMA,
     },
   );

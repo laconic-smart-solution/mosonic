@@ -10,7 +10,8 @@ import { InsufficientCreditsException } from '../../credit/insufficient-credits.
  * ok:false observation so it recovers the same way each time.
  */
 export const TOOL_ERROR_NEXT: Readonly<Record<string, string>> = {
-  capability_mismatch: 'Nothing ran. Call ask_user ONCE with plan = the plan in this result (youAskedFor, willChange, notPossible), a short question, and options yes "Yes" / change "Change". Promise only what will run. On yes: run the willChange tools, then call start_generation again with acceptGaps true.',
+  no_channels: 'Nothing ran: the brand has no channel yet. Call update_rule with channels = the channel(s) the user named (e.g. [{channel:"facebook"}]) - no ask needed when they named it - then call start_generation again (it sets up the default workflow). Only ask_user which channel if they never named one.',
+  capability_mismatch: 'Nothing ran. If the user said not to ask ("don\'t ask", "do it yourself"), skip ask_user: run the willChange tools now, then call start_generation again. Otherwise call ask_user ONCE with plan = the plan in this result (youAskedFor, willChange, notPossible), a short question, and options yes "Yes" / change "Change". Promise only what will run. On yes: run the willChange tools, then call start_generation again with acceptGaps true.',
   capability_gap: 'Nothing ran. Part of the request cannot run (plan.notPossible). Call ask_user ONCE with plan = this plan, a short question, and options yes "Yes" / change "Change". On yes call start_generation again with acceptGaps true. Never claim the unsupported parts will happen.',
   no_workflow: 'Nothing ran. Call ask_user "Set up the default workflow now?" (Yes / Not now); on Yes call apply_default_workflow. Never send the user to the canvas for this.',
   workflow_not_ready: 'The workflow is still being prepared. Tell the user, and offer to check again in a moment (list_workflows). Do not start anything.',

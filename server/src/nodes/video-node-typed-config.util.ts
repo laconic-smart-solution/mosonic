@@ -13,6 +13,19 @@ export function isTypedVideoNodeType(type: unknown): boolean {
   return (TYPED_VIDEO_NODE_TYPES as readonly string[]).includes(String(type));
 }
 
+export const PRESENTER_TYPED_KEYS = [
+  'heygenOrientation',
+  'heygenExpressiveness',
+  'heygenMotionPrompt',
+  'heygenBackgroundAssetId',
+  'heygenBackgroundUrl',
+  'removeBackground',
+  'heygenAvatarAssetId',
+  'heygenAvatarPhotoUrl',
+  'resolution',
+] as const;
+export type PresenterTypedKey = (typeof PRESENTER_TYPED_KEYS)[number];
+
 /** Columns derived from config JSON (FK columns are resolved by the repository). */
 export type TypedVideoConfigColumns = {
   mode: string | null;
@@ -24,11 +37,25 @@ export type TypedVideoConfigColumns = {
   heygenAvatarId: string | null;
   heygenAvatarIds: string[];
   heygenCinematicModel: string | null;
+  /** Presenter-only (Avatar IV / photo avatar). */
+  heygenOrientation: string | null;
+  heygenExpressiveness: string | null;
+  heygenMotionPrompt: string | null;
+  heygenBackgroundAssetId: string | null;
+  heygenBackgroundUrl: string | null;
+  removeBackground: boolean | null;
+  heygenAvatarAssetId: string | null;
+  heygenAvatarPhotoUrl: string | null;
+  resolution: string | null;
   /** Requested brand asset binding (validated before it becomes an FK). */
   sourceRuleAssetId: string | null;
 };
 
-export type TypedVideoConfigRow = Omit<TypedVideoConfigColumns, 'sourceRuleAssetId'> & {
+export type TypedVideoConfigRow = Omit<
+  TypedVideoConfigColumns,
+  'sourceRuleAssetId' | PresenterTypedKey
+> &
+  Partial<Pick<TypedVideoConfigColumns, PresenterTypedKey>> & {
   sourceRuleAssetId?: string | null;
   userAvatarLookId?: string | null;
 };
@@ -62,6 +89,15 @@ export function typedVideoColumnsFromConfig(config: unknown): TypedVideoConfigCo
     heygenAvatarId: str(c.heygenAvatarId),
     heygenAvatarIds: ids.slice(0, 3),
     heygenCinematicModel: str(c.heygenCinematicModel),
+    heygenOrientation: str(c.heygenOrientation),
+    heygenExpressiveness: str(c.heygenExpressiveness),
+    heygenMotionPrompt: str(c.heygenMotionPrompt),
+    heygenBackgroundAssetId: str(c.heygenBackgroundAssetId),
+    heygenBackgroundUrl: str(c.heygenBackgroundUrl),
+    removeBackground: typeof c.removeBackground === 'boolean' ? c.removeBackground : null,
+    heygenAvatarAssetId: str(c.heygenAvatarAssetId),
+    heygenAvatarPhotoUrl: str(c.heygenAvatarPhotoUrl),
+    resolution: str(c.resolution),
     sourceRuleAssetId: str(c.heygenLookSourceRuleAssetId),
   };
 }
@@ -83,6 +119,7 @@ export function overlayTypedVideoConfig(
     ['heygenAvatarId', 'heygenAvatarId'],
     ['heygenCinematicModel', 'heygenCinematicModel'],
     ['sourceRuleAssetId', 'heygenLookSourceRuleAssetId'],
+    ...PRESENTER_TYPED_KEYS.map((k) => [k, k] as [keyof TypedVideoConfigRow, string]),
   ];
   for (const [col, key] of scalar) {
     const v = row[col];

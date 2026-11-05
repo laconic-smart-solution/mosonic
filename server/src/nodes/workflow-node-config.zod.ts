@@ -557,6 +557,44 @@ export function coerceVideoConfigForPersist(
   return next;
 }
 
+/** Keys that only make sense on a cinematic step (rejected on video_presenter). */
+export const CINEMATIC_ONLY_VIDEO_KEYS = [
+  'cinematicMode',
+  'heygenVideoMode',
+  'heygenAvatarIds',
+  'heygenCinematicModel',
+  'heygenReferenceAssetIds',
+  'heygenReferenceImageUrl',
+] as const;
+
+/** Keys that only make sense on a presenter step (rejected on video_cinematic). */
+export const PRESENTER_ONLY_VIDEO_KEYS = [
+  'heygenVoiceId',
+  'heygenOrientation',
+  'heygenExpressiveness',
+  'heygenMotionPrompt',
+  'heygenBackgroundAssetId',
+  'heygenBackgroundUrl',
+  'removeBackground',
+  'heygenAvatarAssetId',
+  'heygenAvatarPhotoUrl',
+] as const;
+
+/**
+ * Patch keys a split video step does not accept: unknown to the video schema,
+ * or belonging to the other split type. Empty for non-video / legacy types.
+ */
+export function rejectedVideoPatchKeys(type: WorkflowNodeType, keys: string[]): string[] {
+  if (type !== WorkflowNodeType.VideoPresenter && type !== WorkflowNodeType.VideoCinematic) {
+    return [];
+  }
+  const allowed = new Set(Object.keys(videoConfigObjectSchema.shape));
+  const wrong = new Set<string>(
+    type === WorkflowNodeType.VideoPresenter ? CINEMATIC_ONLY_VIDEO_KEYS : PRESENTER_ONLY_VIDEO_KEYS,
+  );
+  return keys.filter((k) => !allowed.has(k) || wrong.has(k));
+}
+
 function configShapeKeys(type: WorkflowNodeType): string[] {
   if (isVideoNodeType(type)) {
     return Object.keys(videoConfigObjectSchema.shape);

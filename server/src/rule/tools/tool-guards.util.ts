@@ -576,10 +576,80 @@ export function confirmedPlanChain(
 
 const PROFILE_WORDS = /\b(tone|voice|channels?|audience|name|industry|brand|profile|instagram|facebook|tiktok|linkedin|youtube|rednote|xiaohongshu|location|language|hashtags?|change|update|set|switch|add|remove|only|not)\b|[\u0E00-\u0E7F\u4E00-\u9FFF\u1000-\u109F]/i;
 
+/**
+ * "Don't ask me", "do it yourself", "all the way to publish": the user waived
+ * follow-up questions for this request. Setup guards that only exist to ask
+ * first (plan_first, not_requested, confirm_start, the preview card) step aside.
+ */
+const WAIVE_ASKS =
+  /\b(do(n'?t| not) ask( me)?|stop asking|no (more )?questions|without asking|do it (all )?yourself|do (it|everything) for me|just do it|all the way|handle (it|everything)|figure it out|you decide)\b/i;
+export function waivesQuestions(userText: string): boolean {
+  return WAIVE_ASKS.test(userText);
+}
+
+/** The waiver holds for the request it was given on: this message or one of the last few user rows (e.g. "done" after OAuth). */
+export function waivedRecently(history: readonly { role: string; content: string }[], window = 6): boolean {
+  return history.filter((m) => m.role === 'user').slice(-window).some((m) => waivesQuestions(m.content));
+}
+
+/** Confirm-first tools a waiver ("do it yourself all the way to publish") may run without a card. Deletes / cancels still ask. */
+export const WAIVABLE_CONFIRMATION_TOOLS: ReadonlySet<string> = new Set(['approve_content', 'publish_now']);
+
 /** update_rule only when the user's message is about the brand profile; never a silent side change. */
-export function unrequestedProfileChange(userText: string): string | null {
+export function unrequestedProfileChange(
+  userText: string,
+  opts: { args?: Record<string, unknown>; waived?: boolean; pendingPostText?: string | null; brandChannels?: readonly string[] } = {},
+): string | null {
   if (PROFILE_WORDS.test(userText)) return null;
+  // Adding the channel a pending post needs ("...upload on facebook", then "do it yourself")
+  // is part of that request, not a side change - when only channels change and the
+  // user waived asks or the brand has no channel at all yet.
+  const onlyChannels = !!opts.args && Object.keys(opts.args).length > 0 && Object.keys(opts.args).every((k) => k === 'channels');
+  if (onlyChannels && (opts.waived || opts.brandChannels?.length === 0) && (opts.waived || CHANNEL_WORDS.test(opts.pendingPostText ?? ''))) return null;
   return JSON.stringify({ ok: false, code: 'not_requested', error: 'The user did not ask to change the brand profile. Not run.', next: 'Do not change the profile. Continue with what the user asked.' });
+}
+
+const AFFIRM_REPLY =
+  /^(yes|y|yeah|yep|yup|sure|ok|okay|k|go|go ahead|start|start now|start it|start post|do it|let'?s go|let'?s do it|please|yes please|yes start|ok start|confirm|confirmed|\u101f\u102f\u1010\u103a|\u101f\u102f\u1010\u103a\u1000\u1032\u1037|\u1005\u101c\u102d\u102f\u1000\u103a|\u1005\u1019\u101a\u103a|\u0e43\u0e0a\u0e48|\u0e44\u0e14\u0e49|\u0e40\u0e23\u0e34\u0e48\u0e21|\u0e42\u0e2d\u0e40\u0e04|\u597d|\u597d\u7684|\u662f|\u5f00\u59cb)$/u;
+
+/** A plain yes / start: typed, or a non-negative chip (e.g. Yes on the AI's own "Start now?" ask). */
+export function isAffirmativeReply(content: string): boolean {
+  const norm = (v: string) => v.trim().toLowerCase().replace(/[.!?\s\u104b]+$/u, '');
+  const match = USER_CHOICE_PATTERN.exec(content.trim());
+  const values = match
+    ? [...match[1].split(','), ...match[2].split(',')].map(norm).filter(Boolean)
+    : [norm(content)];
+  if (!values.length || values.some((v) => NEGATIVE_ANSWERS.has(v))) return false;
+  return values.some((v) => v === PLAN_CONFIRM_OPTION_ID || AFFIRM_REPLY.test(v));
+}
+
+/**
+ * A start_generation plan card (preview_confirm) is still open in the last few
+ * assistant turns (no run started since) and the user's latest message is a
+ * plain yes / start. That yes confirms the card, so the user never confirms
+ * twice. A card that proposes adding missing steps/channels (needsAdding) is
+ * not confirmed by a bare yes: that yes means "add them".
+ */
+export function affirmsPendingStartPreview(
+  history: { role: string; content: string; steps?: unknown }[],
+): boolean {
+  const latest = history[history.length - 1];
+  if (latest?.role !== 'user' || !isAffirmativeReply(latest.content)) return false;
+  let assistants = 0;
+  for (let i = history.length - 2; i >= 0 && assistants < 3; i--) {
+    const turn = history[i];
+    if (turn.role === 'user' && !isAffirmativeReply(turn.content) && assistants > 0) return false;
+    if (turn.role !== 'assistant') continue;
+    assistants++;
+    const steps = Array.isArray(turn.steps) ? (turn.steps as TurnStep[]) : [];
+    for (let j = steps.length - 1; j >= 0; j--) {
+      const s = steps[j];
+      if (s?.type !== 'observation' || s.name !== 'start_generation' || typeof s.result !== 'string') continue;
+      if (/"action"\s*:\s*"pipeline_started"/.test(s.result)) return false;
+      if (/"code"\s*:\s*"preview_confirm"/.test(s.result)) return !/"needsAdding"\s*:\s*true/.test(s.result);
+    }
+  }
+  return false;
 }
 
 /** Steps this turn so far, as the tool-calling loop records them. */
@@ -691,8 +761,17 @@ const POST_REQUEST = /\b(post|posts|announce\w*|announcement|campaign|launch|mak
  * the confirmation - instead of changing channels or steps to fit it.
  * "Post only on facebook" / "from now on" (TEMPLATE_WORDS) is a channel change, not a post.
  */
-export function planBeforeSetupChange(input: { name: string; args: Record<string, unknown>; userText: string; confirmed: boolean }): string | null {
-  if (!SETUP_CHANGE_TOOLS.has(input.name) || input.confirmed) return null;
+export function planBeforeSetupChange(input: {
+  name: string;
+  args: Record<string, unknown>;
+  userText: string;
+  confirmed: boolean;
+  /** The brand's saved channels. With none, start_generation cannot run (no_channels), so a plan card is impossible: add the named channel first. */
+  brandChannels?: readonly string[];
+  waived?: boolean;
+}): string | null {
+  if (!SETUP_CHANGE_TOOLS.has(input.name) || input.confirmed || input.waived) return null;
+  if (input.brandChannels && input.brandChannels.length === 0 && input.name !== 'remove_workflow_node') return null;
   if (input.name === 'update_rule' && input.args.channels === undefined) return null;
   const text = input.userText;
   if (/^\s*user choice:/i.test(text) || !POST_REQUEST.test(text) || TEMPLATE_WORDS.test(text) || /\b(steps?|nodes?)\b/i.test(text)) return null;

@@ -11,6 +11,7 @@ import {
   aspectRatioToOpenAiImageSize,
   coerceVideoConfigForPersist,
   parseWorkflowNodeConfig,
+  rejectedVideoPatchKeys,
 } from './workflow-node-config.zod';
 
 describe('aspectRatioToOpenAiImageSize', () => {
@@ -261,5 +262,24 @@ describe('parseWorkflowNodeConfig', () => {
     expect((r.data as Record<string, unknown>).customPrompt).toBe(
       'Find competitor reels in skincare',
     );
+  });
+});
+
+describe('rejectedVideoPatchKeys', () => {
+  it('accepts presenter keys on video_presenter, rejects cinematic-only and unknown', () => {
+    expect(
+      rejectedVideoPatchKeys(WorkflowNodeType.VideoPresenter, [
+        'heygenVoiceId', 'heygenOrientation', 'heygenExpressiveness', 'heygenMotionPrompt',
+        'heygenBackgroundUrl', 'removeBackground', 'resolution',
+      ]),
+    ).toEqual([]);
+    expect(
+      rejectedVideoPatchKeys(WorkflowNodeType.VideoPresenter, ['cinematicMode', 'bogus', 'heygenVoiceId']),
+    ).toEqual(['cinematicMode', 'bogus']);
+  });
+
+  it('rejects presenter-only keys on video_cinematic; ignores non-video types', () => {
+    expect(rejectedVideoPatchKeys(WorkflowNodeType.VideoCinematic, ['heygenVoiceId', 'cinematicMode'])).toEqual(['heygenVoiceId']);
+    expect(rejectedVideoPatchKeys(WorkflowNodeType.ImageGeneration, ['whatever'])).toEqual([]);
   });
 });

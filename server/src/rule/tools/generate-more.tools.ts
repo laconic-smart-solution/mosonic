@@ -58,10 +58,22 @@ async function runGenerateMore(
     },
     deps.auth,
   );
+  if (!result?.nodeId) {
+    return toolError('generate_more_not_started', 'Nothing was started: the run did not return a step. Tell the user it did not start and offer to try again.');
+  }
+  const isVideo = isVideoNodeType(args.type);
+  const status = String(scoped.content.status);
   return showContentPayload(previewFromRecord(scoped.content), {
     action: 'generate_more_started',
     pendingNodeId: result.nodeId,
     pendingNodeType: args.type,
+    // Outcome honesty: this only queued the step; nothing new exists yet.
+    mediaReady: false,
+    outcome: 'started_not_done',
+    contentStatus: status,
+    next: isVideo
+      ? `Only queued: the video is NOT ready and takes several minutes${status === 'approved' ? ' (it is added to this approved post)' : ''}. Say it started and will appear on the post when done; never say it is ready. If it fails it shows as failed in get_draft_media_status - check that before claiming it worked.`
+      : 'Only queued: the new media/text is NOT ready yet. Say it started; never describe it as done or ready until get_draft_media_status (or the draft) shows it.',
   });
 }
 
@@ -391,8 +403,15 @@ export function createGeneratePresenterVideoTool(deps: GenerateMoreDeps) {
         if (missing.length) {
           return toolError(
             'presenter_setup_required',
-            `A presenter video needs a ${missing.join(' and ')}. Add a Presenter video step on the workflow canvas and pick them there, then try again.`,
-            { missing, openCanvas: true, canvasPath: `/workflow/${deps.ruleId}` },
+            `A presenter video needs a ${missing.join(' and ')}. Call list_heygen_looks, then set_video_node_look on the video_presenter node (lookId, or ruleAssetId to turn a brand portrait into a look) after ask_user; call list_heygen_voices, then update_node_config with config.heygenVoiceId on that node. Then try again. (Or pick them in the Presenter step on the canvas.)`,
+            {
+              missing,
+              nextTools: [
+                ...(missing.includes('avatar') ? ['list_heygen_looks', 'set_video_node_look'] : []),
+                ...(missing.includes('voice') ? ['list_heygen_voices', 'update_node_config'] : []),
+              ],
+              canvasPath: `/workflow/${deps.ruleId}`,
+            },
           );
         }
         return runGenerateMore(deps, {
@@ -406,7 +425,7 @@ export function createGeneratePresenterVideoTool(deps: GenerateMoreDeps) {
     {
       name: 'generate_presenter_video',
       description:
-        'Add a PRESENTER video (HeyGen avatar speaking the caption) to an existing draft (Generate more). Costs credits and takes minutes: only after the user confirmed via ask_user. Uses the avatar and voice from the workflow Presenter step; errors presenter_setup_required when none is set (point them to the canvas, do not retry). Not for scenic/b-roll clips (generate_cinematic_video). Does not change the saved workflow (to add the step for future posts use add_workflow_node video_presenter).',
+        'Add a PRESENTER video (HeyGen avatar speaking the caption) to an existing draft (Generate more). Costs credits and takes minutes: only after the user confirmed via ask_user. Uses the avatar and voice from the workflow Presenter step; errors presenter_setup_required when either is missing: then list_heygen_looks + set_video_node_look for the look and list_heygen_voices + update_node_config (config.heygenVoiceId) for the voice on the video_presenter node, each after ask_user, and only then retry. Not for scenic/b-roll clips (generate_cinematic_video). Does not change the saved workflow (to add the step for future posts use add_workflow_node video_presenter).',
       schema: PRESENTER_SCHEMA,
     },
   );

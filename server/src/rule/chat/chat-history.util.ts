@@ -12,6 +12,21 @@ export const REPLAY_TOOL_ASSISTANT_LIMIT = 1;
 /** Cap each replayed observation so history cannot swallow the context window. */
 export const OBSERVATION_MAX_CHARS = 800;
 
+/**
+ * web_search results from earlier assistant turns. A brand URL found there is
+ * trusted like one the user typed, so the chat never re-asks for a site it found.
+ */
+export function webSearchTexts(history: ChatMessageRecord[]): string[] {
+  const out: string[] = [];
+  for (const message of history) {
+    if (message.role !== 'assistant') continue;
+    for (const step of expandLegacySteps(parseAgentSteps(message.steps))) {
+      if (step.type === 'observation' && step.name === 'web_search' && step.result) out.push(step.result);
+    }
+  }
+  return out;
+}
+
 export function parseAgentSteps(raw: unknown): AgentStep[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((step): step is AgentStep => {

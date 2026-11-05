@@ -358,13 +358,17 @@ export class WorkflowHeygenService {
     auth: TenancyAuth,
   ): Promise<Record<string, unknown>> {
     const node = await this.getVideoNode(workflowId, nodeId, auth);
-    const merged = coerceVideoConfigForPersist(
-      {
+    const combined: Record<string, unknown> = {
       ...((node.config ?? {}) as Record<string, unknown>),
       ...patch,
-      },
-      node.type,
-    );
+    };
+    // "" / null in the patch means "clear this field" (panel clear/delete).
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null || (typeof value === 'string' && !value.trim())) {
+        delete combined[key];
+      }
+    }
+    const merged = coerceVideoConfigForPersist(combined, node.type);
     let config;
     try {
       config = parseWorkflowNodeConfigOrThrow(

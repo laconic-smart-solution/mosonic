@@ -463,7 +463,23 @@
     "voice": "语音",
     "voiceSaveFailed": "无法保存语音。请保存工作流后重试。",
     "clickOrDrag": "点击或拖拽图像到此处",
-    "uploading": "上传中…"
+    "uploading": "上传中…",
+    "noPreview": "无预览",
+    "deleteAvatarAria": "删除 {{name}}",
+    "voiceHint": "选择语言和性别，按需加载更多，然后选择一个声音。",
+    "uploadedAvatarName": "已上传的头像",
+    "clearBackground": "移除背景",
+    "lookStatus": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "failed": "失败"
+    },
+    "status": {
+      "ready": "可以生成",
+      "notReady": "需要设置",
+      "avatar": "头像",
+      "voice": "声音"
+    }
   },
   "voicePicker": {
     "genderAll": "全部",

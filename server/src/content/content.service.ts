@@ -36,6 +36,7 @@ import {
   parseWorkflowNodeConfigOrThrow,
 } from '../nodes/workflow-node-config.zod';
 import { normalizeVideoNodeType } from '../nodes/video-node-type.util';
+import { generateMoreOutputMissing } from './generate-more-outcome.util';
 import { mergeResolvedOutputs } from './content-output.utils';
 import { resolveRerunWorkflowNodeId } from './content-rerun-node-resolve.util';
 import { buildContentRerunPreviousOutputs } from './content-rerun-previous-outputs.util';
@@ -897,6 +898,14 @@ export class ContentService {
       sourcePack = mergeRerunSourcePack(existingPack, fresh);
     }
 
+    // Mark the new step as rendering so status reads pending (not empty) until it lands or fails.
+    await this.setNodeRerunPending(content.contentId, nodeId, true, auth).catch(
+      (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Could not mark generate-more ${nodeId} pending: ${msg}`);
+      },
+    );
+
     void this.runGenerateMoreExecution({
       content,
       pipeline,
@@ -1073,6 +1082,9 @@ export class ContentService {
         userId: pipeline.userId ?? content.userId ?? undefined,
         ruleId: rule.ruleId,
       });
+      // No file and no render job back = failed, never a silent "done".
+      const missing = generateMoreOutputMissing(dto.type, result.output);
+      if (missing) throw new Error(missing);
       const laneFromConfig =
         typeof (config as { laneId?: unknown }).laneId === 'string'
           ? (config as { laneId: string }).laneId
@@ -1087,11 +1099,31 @@ export class ContentService {
         auth,
         { lane: laneFromConfig },
       );
+      await this.setNodeRerunPending(content.contentId, nodeId, false, auth).catch(
+        () => undefined,
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
         `Generate-more node failed (${dto.type} ${nodeId}, content ${content.contentId}): ${msg}`,
       );
+      // Record the failure on the draft and tell the client, so chat and UI
+      // see "failed" (get_draft_media_status) instead of nothing.
+      await this.markGenerateMoreFailed(
+        content.contentId,
+        nodeId,
+        String(dto.type),
+        msg,
+        auth,
+      ).catch((markErr: unknown) => {
+        const m = markErr instanceof Error ? markErr.message : String(markErr);
+        this.logger.warn(`Could not record generate-more failure ${nodeId}: ${m}`);
+      });
+      this.events.emitToContent(content.contentId, 'node:failed_final', {
+        contentId: content.contentId,
+        nodeId,
+        message: msg,
+      });
       await this.refundContentNodeCharge({
         userId,
         contentId: content.contentId,
@@ -1607,6 +1639,35 @@ export class ContentService {
         this.rerunChains.delete(contentId);
       }
     });
+  }
+
+  private async markGenerateMoreFailed(
+    contentId: string,
+    nodeId: string,
+    type: string,
+    error: string,
+    auth: TenancyAuth,
+  ): Promise<void> {
+    const doc = await this.contentRepository.findByIdLean(contentId, auth);
+    if (!doc) return;
+    const snapshot = this.resolveEditableState(doc);
+    const layer: Record<string, unknown> = {
+      ...(snapshot.nodeOutputs[nodeId] ?? {}),
+      type,
+      error: error.slice(0, 300),
+    };
+    delete layer._pending;
+    await this.contentRepository.updateEditableState(
+      contentId,
+      {
+        outputs: snapshot.outputs,
+        userEdits: snapshot.userEdits,
+        nodePromptOverrides: snapshot.nodePromptOverrides,
+        nodeOutputs: { ...snapshot.nodeOutputs, [nodeId]: layer },
+        nodeUserEdits: snapshot.nodeUserEdits,
+      },
+      auth,
+    );
   }
 
   private async setNodeRerunPending(

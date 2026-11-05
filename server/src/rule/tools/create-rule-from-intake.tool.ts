@@ -92,7 +92,7 @@ export function createCreateRuleFromIntakeTool(
   ruleService: RuleService,
   auth: TenancyAuth,
   onRuleCreated: (ruleId: string) => Promise<void> | void,
-  /** The user's own messages this session; a URL must come from them. */
+  /** User messages + web_search results this session; a URL must come from them. */
   getUserTexts?: () => string[],
 ) {
   return tool(
@@ -131,7 +131,7 @@ export function createCreateRuleFromIntakeTool(
     {
       name: 'create_rule_from_intake',
       description:
-        "Create a new brand profile from the conversation. Call this as soon as you have EITHER a brand name AND an industry/field, OR a real website URL (a URL alone is enough — extraction reads the live site and fills in the rest, so don't ask the user to repeat what's already on their site). Only ask a clarifying question first if you have neither. Never call it with placeholder or guessed values (never example.com). If the user only said they have a website, ask them to paste it first. Pass everything you've learned as `description`, plus brandName and channels when the user said them; only include `url` if the user gave an actual link (http/https).",
+        "Create a new brand profile from the conversation. Call this as soon as you have EITHER a brand name AND an industry/field, OR a real website URL (a URL alone is enough — extraction reads the live site and fills in the rest, so don't ask the user to repeat what's already on their site). Only ask a clarifying question first if you have neither. Never call it with placeholder or guessed values (never example.com). If web_search already found the brand's site, pass that URL instead of asking; if the user only said they have a website and none was found, ask them to paste it. Pass everything you've learned as `description`, plus brandName and channels when the user said them; include `url` when the user gave a link or web_search found the brand's site (http/https).",
       schema: CREATE_RULE_FROM_INTAKE_SCHEMA,
     },
   );

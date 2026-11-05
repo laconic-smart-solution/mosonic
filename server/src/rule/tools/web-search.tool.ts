@@ -6,11 +6,13 @@ const WEB_SEARCH_SCHEMA = z.object({
   query: z.string().describe('What to search for on the live web.'),
 });
 
-export function createWebSearchTool(llm: LlmService) {
+/** `onResult` lets the chat trust URLs a search found (e.g. the brand's own site). */
+export function createWebSearchTool(llm: LlmService, onResult?: (text: string) => void) {
   return tool(
     async ({ query }) => {
       try {
         const result = await llm.runWebSearchBrief({ prompt: query });
+        if (result.text) onResult?.(result.text);
         return result.text || 'Web search returned no results.';
       } catch (err) {
         return `Web search is unavailable: ${err instanceof Error ? err.message : String(err)}`;

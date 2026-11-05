@@ -463,7 +463,23 @@
     "voice": "Voice",
     "voiceSaveFailed": "Voice could not be saved. Save the workflow and try again.",
     "clickOrDrag": "Click or drag image here",
-    "uploading": "Uploading…"
+    "uploading": "Uploading…",
+    "noPreview": "No preview",
+    "deleteAvatarAria": "Delete {{name}}",
+    "voiceHint": "Pick language and gender, load more as needed, then select a voice.",
+    "uploadedAvatarName": "Uploaded avatar",
+    "clearBackground": "Remove background",
+    "lookStatus": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "failed": "Failed"
+    },
+    "status": {
+      "ready": "Ready to generate",
+      "notReady": "Setup needed",
+      "avatar": "Avatar",
+      "voice": "Voice"
+    }
   },
   "voicePicker": {
     "genderAll": "All",
