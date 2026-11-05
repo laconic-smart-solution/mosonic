@@ -1,3 +1,8 @@
+import { TemplateClassifierService } from '../../pipeline/intake/template-classifier.service';
+import { OutputValidationService } from './output-validation.service';
+import { buildDynamicZodSchema } from './dynamic-zod-schema.builder';
+import { compileSectionsToMarkdown } from '../../content/content-markdown-compiler.util';
+import type { ContentSectionItem } from '../../content/schemas/structured-content.schema';
 import {
   Injectable,
   Logger,
@@ -65,10 +70,36 @@ function normalizeTextGenerationConfig(
   };
 }
 
+
+export function detectExplicitUserFormatting(contentPrompt?: string): boolean {
+  if (!contentPrompt || typeof contentPrompt !== 'string') return false;
+  const p = contentPrompt.trim();
+  if (p.length === 0) return false;
+
+  // Numbered or lettered lists like "1. ", "1) ", "A. "
+  if (/(?:^|\n)\s*(?:\d+[\.\)]|[a-zA-Z][\.\)])\s+/m.test(p)) return true;
+
+  // Markdown headers like "# ", "## ", "### "
+  if (/(?:^|\n)\s*#{1,6}\s+/m.test(p)) return true;
+
+  // Bullet indicators like "- ", "* ", "• ", "✨", "👉", "🔥", "✅", "🛒", "📢", "🏎️"
+  if (/(?:^|\n)\s*(?:[-*•✨👉🔥✅🛒📢🏎️])\s+/m.test(p)) return true;
+
+  // Section placeholder patterns like "[Headline]", "[Key features]", "[CTA]"
+  if (/\[[^\]]{3,40}\]/i.test(p)) return true;
+
+  // Structural cue keywords
+  if (/\b(?:template|format|structure|sections?|layout|outline)\s*[:=]/i.test(p)) return true;
+  if (/\b(?:use this (?:format|template|structure)|following structure|structured as)\b/i.test(p)) return true;
+
+  return false;
+}
+
 function buildSystemPrompt(
   rule: Rule,
   config: NormalizedTextConfig,
   previousOutputs?: PreviousOutputs,
+  hasExplicitUserFormat = false,
 ): string {
   const intelligenceBrief =
     previousOutputs?.intelligenceBrief?.trim() ||
@@ -136,16 +167,29 @@ function buildSystemPrompt(
         ? 'Standard length for the chosen output format.'
         : 'Allow richer detail while staying within maxTokens.',
     '',
-    '=== OUTPUT FORMAT ===',
-    `Format: ${config.outputFormat}`,
-    config.outputFormat === NodeOutputFormat.Paragraph
-      ? 'Write in flowing paragraph form.'
-      : config.outputFormat === NodeOutputFormat.Bullets
-        ? 'Write as concise bullet points.'
-        : 'Write as a short punchy social media caption.',
-    `Maximum length: ${config.maxTokens} tokens.`,
-    'Do not include any explanation, preamble, or metadata.',
-    'Return only the content itself.',
+    ...(hasExplicitUserFormat
+      ? [
+          '=== OUTPUT FORMAT & USER LAYOUT CONTRACT ===',
+          'The user has provided an explicit layout, template, or multi-section formatting structure in their request.',
+          'You MUST follow the user-provided structure, section headers, bullet points, numbered lists, emojis, and layout PRECISELY.',
+          'Do NOT collapse or summarize this content into a single narrative paragraph.',
+          'Preserve all requested sections, bullet lists, bold headings, and emojis in the exact order requested.',
+          `Maximum length: ${Math.max(config.maxTokens, 1200)} tokens.`,
+          'Do not include any explanation, preamble, or metadata.',
+          'Return only the content itself.',
+        ]
+      : [
+          '=== OUTPUT FORMAT ===',
+          `Format: ${config.outputFormat}`,
+          config.outputFormat === NodeOutputFormat.Paragraph
+            ? 'Write in flowing paragraph form.'
+            : config.outputFormat === NodeOutputFormat.Bullets
+              ? 'Write as concise bullet points.'
+              : 'Write as a short punchy social media caption.',
+          `Maximum length: ${config.maxTokens} tokens.`,
+          'Do not include any explanation, preamble, or metadata.',
+          'Return only the content itself.',
+        ]),
     'If this copy may feed AI-generated video: do not include phone numbers, emails, URLs, addresses, QR codes, or instructions to show on-screen text or logos; keep CTAs generic without display-ready contact strings.',
     intelligenceBrief
       ? [
@@ -222,7 +266,11 @@ function chunkToString(content: unknown): string {
 export class TextGenerationService {
   private readonly logger = new Logger(TextGenerationService.name);
 
-  constructor(private readonly llm: LlmService) {}
+  constructor(
+    private readonly llm: LlmService,
+    private readonly classifier: TemplateClassifierService = new TemplateClassifierService(),
+    private readonly outputValidator: OutputValidationService = new OutputValidationService(),
+  ) {}
 
   /**
    * Brand-grounded copy generation. Use from tests or when you already have
@@ -230,17 +278,129 @@ export class TextGenerationService {
    */
   async generateText(input: TextGenerationInput): Promise<{
     text: string;
+    sections?: ContentSectionItem[];
     usage?: { inputTokens: number; outputTokens: number };
   }> {
     const { rule, contentPrompt, config, previousOutputs, sourcePackNotes } =
       input;
     const normalized = normalizeTextGenerationConfig(config);
-    const systemPrompt = buildSystemPrompt(rule, normalized, previousOutputs);
+    const hasExplicitUserFormat = detectExplicitUserFormatting(contentPrompt);
+    if (hasExplicitUserFormat && normalized.maxTokens < 1200) {
+      normalized.maxTokens = 1200;
+    }
+    const systemPrompt = buildSystemPrompt(rule, normalized, previousOutputs, hasExplicitUserFormat);
     const humanPrompt = buildHumanPrompt(
       contentPrompt,
       previousOutputs,
       sourcePackNotes,
     );
+
+    // If explicit formatting or structured template requested, try structured engine
+    if (hasExplicitUserFormat) {
+      const contract = this.classifier.classifyPrompt(contentPrompt);
+      if (contract.isStructured && contract.sections.length > 0) {
+        try {
+          const schema = buildDynamicZodSchema(contract.sections);
+          const structuredModel = this.llm.getChatModelForStructuredOutput<Record<string, unknown>>(
+            schema,
+            {
+              provider: normalized.provider,
+              model: normalized.model,
+              temperature: normalized.temperature,
+              maxTokens: normalized.maxTokens,
+            },
+          );
+
+          const structuredRes = (await structuredModel.invoke([
+            new SystemMessage(systemPrompt),
+            new HumanMessage(humanPrompt),
+          ])) as Record<string, unknown>;
+
+          let sections: ContentSectionItem[] = contract.sections.map((secDef) => {
+            const rawVal = structuredRes?.[secDef.key];
+            if (secDef.kind === 'bullet_list' || secDef.kind === 'numbered_list') {
+              const items = Array.isArray(rawVal) ? rawVal.map(String) : rawVal ? [String(rawVal)] : [];
+              return {
+                key: secDef.key,
+                title: secDef.title,
+                kind: secDef.kind,
+                items,
+                content: items.map((i) => `• ${i}`).join('\n'),
+              };
+            }
+            if (secDef.kind === 'hashtags') {
+              const items = Array.isArray(rawVal) ? rawVal.map(String) : typeof rawVal === 'string' ? rawVal.split(/\s+/).filter(Boolean) : [];
+              return {
+                key: secDef.key,
+                title: secDef.title,
+                kind: secDef.kind,
+                items,
+                content: items.map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' '),
+              };
+            }
+            return {
+              key: secDef.key,
+              title: secDef.title,
+              kind: secDef.kind,
+              content: rawVal != null ? String(rawVal) : '',
+            };
+          });
+
+          // Validate output deterministically
+          const valResult = this.outputValidator.validateSections(sections, contract);
+          if (!valResult.valid) {
+            this.logger.warn(`Initial structured output validation failed: ${valResult.issues.map(i => i.message).join('; ')}. Attempting 1 repair turn.`);
+            try {
+              const repairPrompt = this.outputValidator.buildRepairPrompt(valResult, contract);
+              const repairRes = (await structuredModel.invoke([
+                new SystemMessage(systemPrompt),
+                new HumanMessage(`${humanPrompt}\n\n${repairPrompt}`),
+              ])) as Record<string, unknown>;
+
+              sections = contract.sections.map((secDef) => {
+                const rawVal = repairRes?.[secDef.key] !== undefined ? repairRes[secDef.key] : structuredRes?.[secDef.key];
+                if (secDef.kind === 'bullet_list' || secDef.kind === 'numbered_list') {
+                  const items = Array.isArray(rawVal) ? rawVal.map(String) : rawVal ? [String(rawVal)] : [];
+                  return {
+                    key: secDef.key,
+                    title: secDef.title,
+                    kind: secDef.kind,
+                    items,
+                    content: items.map((i) => `• ${i}`).join('\n'),
+                  };
+                }
+                if (secDef.kind === 'hashtags') {
+                  const items = Array.isArray(rawVal) ? rawVal.map(String) : typeof rawVal === 'string' ? rawVal.split(/\s+/).filter(Boolean) : [];
+                  return {
+                    key: secDef.key,
+                    title: secDef.title,
+                    kind: secDef.kind,
+                    items,
+                    content: items.map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' '),
+                  };
+                }
+                return {
+                  key: secDef.key,
+                  title: secDef.title,
+                  kind: secDef.kind,
+                  content: rawVal != null ? String(rawVal) : '',
+                };
+              });
+            } catch (repairErr) {
+              this.logger.warn(`Structured repair turn failed: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`);
+            }
+          }
+
+          const compiledText = compileSectionsToMarkdown(sections);
+          return {
+            text: compiledText,
+            sections,
+          };
+        } catch (structuredErr) {
+          this.logger.warn(`Structured output generation failed, falling back to plain text: ${structuredErr instanceof Error ? structuredErr.message : String(structuredErr)}`);
+        }
+      }
+    }
 
     const model = this.llm.getChatModelForPlainText({
       provider: normalized.provider,
@@ -282,10 +442,15 @@ export class TextGenerationService {
         `Text generation without intelligence brief | pipeline=${input.pipelineRef ?? 'n/a'} | node=${input.nodeId ?? 'n/a'}`,
       );
     }
+    const hasExplicitUserFormat = detectExplicitUserFormatting(contentPrompt);
+    if (hasExplicitUserFormat && normalized.maxTokens < 1200) {
+      normalized.maxTokens = 1200;
+    }
     const systemPrompt = buildSystemPrompt(
       input.rule,
       normalized,
       input.previousOutputs,
+      hasExplicitUserFormat,
     );
     const humanPrompt = buildHumanPrompt(
       contentPrompt,
@@ -299,8 +464,9 @@ export class TextGenerationService {
       maxTokens: normalized.maxTokens,
     });
     let text = '';
+    let sections: ContentSectionItem[] | undefined;
     let usage: { inputTokens: number; outputTokens: number } | undefined;
-    if (input.onChunk) {
+    if (input.onChunk && !hasExplicitUserFormat) {
       const stream = await model.stream([
         new SystemMessage(systemPrompt),
         new HumanMessage(humanPrompt),
@@ -326,8 +492,16 @@ export class TextGenerationService {
         sourcePackNotes: input.sourcePack?.notes,
       });
       text = generated.text;
+      sections = generated.sections;
       usage = generated.usage;
+      if (input.onChunk && text) {
+        input.onChunk(text);
+      }
     }
-    return usage ? { output: text, usage } : { output: text };
+    return {
+      output: text,
+      ...(sections ? { sections } : {}),
+      ...(usage ? { usage } : {}),
+    };
   }
 }

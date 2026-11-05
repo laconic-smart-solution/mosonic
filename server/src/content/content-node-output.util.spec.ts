@@ -38,4 +38,20 @@ describe('flattenNodeOutputsToAiOutputs adapt', () => {
     );
     expect(out.text).toBe('adapted');
   });
+  it('preserves structured sections and compiles text when empty', () => {
+    const sections = [
+      { key: 'headline', title: 'Headline', kind: 'heading', level: 1, content: 'Super Sound' } as any,
+      { key: 'features', title: 'Features', kind: 'bullet_list', items: ['ANC', '40h battery'] } as any,
+    ];
+    const out = flattenNodeOutputsFromPipeline(
+      [{ nodeId: 'text', type: WorkflowNodeType.TextGeneration, order: 1 }],
+      {
+        text: { sections },
+      },
+    );
+    expect(out.sections).toEqual(sections);
+    expect(out.text).toContain('### Headline');
+    expect(out.text).toContain('Super Sound');
+    expect(out.text).toContain('• ANC');
+  });
 });

@@ -18,6 +18,8 @@ import { HeygenAssetsService } from './services/heygen-assets.service';
 import { ScriptDurationService } from './services/script-duration.service';
 import { VideoGenerationService } from './services/video-generation.service';
 import { AdaptNodeService } from './services/adapt-node.service';
+import { TemplateClassifierService } from '../pipeline/intake/template-classifier.service';
+import { OutputValidationService } from './services/output-validation.service';
 import { IntelligenceNodeService } from './services/intelligence-node.service';
 import { MergeBarrierService } from './services/merge-barrier.service';
 
@@ -39,6 +41,8 @@ const NODE_SERVICES = [
   SubtitleService,
   SummarizationService,
   AdaptNodeService,
+  TemplateClassifierService,
+  OutputValidationService,
   IntelligenceNodeService,
   MergeBarrierService,
 ];

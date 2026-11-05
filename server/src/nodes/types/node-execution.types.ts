@@ -4,6 +4,7 @@ import type {
   WorkflowNodeType,
 } from '../schemas/workflow-node.schema';
 import type { PipelineSourcePack } from '../../pipeline/source-pack.types';
+import type { ContentSectionItem } from '../../content/schemas/structured-content.schema';
 
 export interface PreviousOutputs {
   /** Target keywords from keyword_planner (newline-separated or plain text). */
@@ -22,6 +23,7 @@ export interface PreviousOutputs {
   intelligenceBrief?: string;
   adaptedCaption?: string;
   channel?: string;
+  sections?: ContentSectionItem[];
 }
 
 export interface PipelineContext {
@@ -80,6 +82,7 @@ export interface NodeExecutorOutput {
     adaptedCaption?: string;
     channel?: string;
     merged?: boolean;
+    sections?: ContentSectionItem[];
   };
 }
 
@@ -192,6 +195,7 @@ export interface StoredImageOutput {
 /** Normalized result from a single node execution step (extend as needed). */
 export interface NodeExecutionResult {
   output: string | null;
+  sections?: ContentSectionItem[];
   image?: StoredImageOutput;
   transcription?: string;
   subtitle?: string;

@@ -1,5 +1,7 @@
 import { WorkflowNodeType } from '../nodes/schemas/workflow-node.schema';
 import type { ContentOutputs } from './schemas/content.schema';
+import { compileSectionsToMarkdown } from './content-markdown-compiler.util';
+import type { ContentSectionItem } from './schemas/structured-content.schema';
 
 /** nodeId → executor output object (e.g. `{ image: "..." }`). */
 export type NodeOutputMap = Record<string, Record<string, unknown>>;
@@ -44,6 +46,12 @@ function applyLayerToOutputs(
     case WorkflowNodeType.TextGeneration: {
       const text = adaptTextFromLayer(layer);
       if (text) out.text = text;
+      if (Array.isArray(layer.sections)) {
+        out.sections = layer.sections as ContentSectionItem[];
+        if (!out.text && out.sections.length > 0) {
+          out.text = compileSectionsToMarkdown(out.sections);
+        }
+      }
       break;
     }
     case WorkflowNodeType.ImageGeneration:
@@ -71,6 +79,12 @@ function applyLayerToOutputs(
     case WorkflowNodeType.Adapt: {
       const text = adaptTextFromLayer(layer);
       if (text) out.text = text;
+      if (Array.isArray(layer.sections)) {
+        out.sections = layer.sections as ContentSectionItem[];
+        if (!out.text && out.sections.length > 0) {
+          out.text = compileSectionsToMarkdown(out.sections);
+        }
+      }
       break;
     }
     default:

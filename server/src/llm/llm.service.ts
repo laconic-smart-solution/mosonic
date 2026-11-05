@@ -341,6 +341,37 @@ export class LlmService {
   }
 
   /** Default chat Completions model id (`OPENAI_MODEL`). */
+  /**
+   * Returns a chat model wrapped with structured output validation (Zod schema or JSON schema).
+   * Supports OpenAI native strict JSON Schema, Anthropic function calling, and Google Gemini responseSchema.
+   */
+  getChatModelForStructuredOutput<T>(
+    schema: unknown,
+    options?: {
+      provider?: string;
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      strict?: boolean;
+    },
+  ) {
+    const plainModel = this.getChatModelForPlainText(options);
+    const provider = this.resolveProvider(options?.provider);
+
+    if (provider === LlmProvider.OpenAI) {
+      try {
+        return (plainModel as any).withStructuredOutput(schema, {
+          method: 'jsonSchema',
+          strict: options?.strict ?? true,
+        });
+      } catch {
+        return (plainModel as any).withStructuredOutput(schema);
+      }
+    }
+
+    return (plainModel as any).withStructuredOutput(schema);
+  }
+
   getPlainTextModelId(): string {
     return this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL;
   }

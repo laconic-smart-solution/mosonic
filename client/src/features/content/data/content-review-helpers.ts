@@ -2,7 +2,7 @@ import i18n from "@/i18n"
 import type { WorkflowNodeType } from "@/shared/types/workflow.type"
 import type { ContentOutputs } from "@/shared/types/content.type"
 
-export type OutputKey = keyof ContentOutputs
+export type OutputKey = Exclude<keyof ContentOutputs, "sections">
 
 export const OUTPUT_GRID: OutputKey[][] = [
   ["keywords", "text"],

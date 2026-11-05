@@ -2,6 +2,7 @@ import apiClient from "../api/api-client"
 import type {
   AvailableNodeTypesResponse,
   ContentDetail,
+  ContentSectionItem,
   ContentOutputs,
   ContentPageQueryPayload,
   ContentPageResponse,
@@ -137,6 +138,29 @@ export const contentService = {
   ): Promise<{ uploadId: string }> => {
     const response = await apiClient.post<{ uploadId: string }>(
       `/contents/${contentId}/ensure-upload`
+    )
+    return response.data
+  },
+  updateSection: async (
+    contentId: string,
+    sectionKey: string,
+    payload: { title?: string; content?: string; items?: string[] },
+  ): Promise<{ success: boolean; section: ContentSectionItem; compiledText: string }> => {
+    const response = await apiClient.patch(
+      `/contents/${contentId}/sections/${encodeURIComponent(sectionKey)}`,
+      payload,
+    )
+    return response.data
+  },
+
+  regenerateSection: async (
+    contentId: string,
+    sectionKey: string,
+    payload?: { userInstruction?: string },
+  ): Promise<{ success: boolean; section: ContentSectionItem; compiledText: string }> => {
+    const response = await apiClient.post(
+      `/contents/${contentId}/sections/${encodeURIComponent(sectionKey)}/regenerate`,
+      payload ?? {},
     )
     return response.data
   },
