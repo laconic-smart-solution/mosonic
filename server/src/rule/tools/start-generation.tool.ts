@@ -204,7 +204,14 @@ export function createStartGenerationTool(
           return generationPreviewPrompt({
             topic: prompt,
             preview: buildGenerationPreview(snapshot.nodes as never),
+            workflowId: snapshot.workflow.workflowId,
             brief: { ...brief, ...(workflowCreated ? { workflowCreated: true } : {}) },
+            plan: {
+              youAskedFor: plan.youAskedFor,
+              willChange: plan.willChange,
+              notPossible: plan.notPossible,
+            },
+            attachedImageCount: refs.length,
             request: {
               channels: parsed.channels,
               wantsVideo: requestWantsVideo(`${options.requestText ?? ''}\n${prompt}`),

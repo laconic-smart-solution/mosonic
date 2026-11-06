@@ -105,7 +105,6 @@ describe("parseContentCard", () => {
     )
     expect(card?.action).toBe("publish_started")
   })
-})
 
   it("surfaces pipeline_result as a content draft card", () => {
     const card = parseContentCard(
@@ -138,4 +137,22 @@ describe("parseContentCard", () => {
       ),
     ).toBeNull()
   })
+
+  it("parses content_rerun_failed with failReason from message", () => {
+    const card = parseContentCard(
+      JSON.stringify({
+        ok: true,
+        action: "content_rerun_failed",
+        contentId: "c-fail",
+        status: "draft",
+        message: "Insufficient credits",
+      }),
+    )
+    expect(card).toMatchObject({
+      action: "content_rerun_failed",
+      contentId: "c-fail",
+      failReason: "Insufficient credits",
+    })
+  })
+})
 

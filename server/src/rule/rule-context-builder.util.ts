@@ -1,6 +1,10 @@
 import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 import type { RuleAssetRecord } from '../repositories/interfaces/rule-asset.repository.interface';
 import type { RuleMemoryRecord } from '../repositories/interfaces/rule-memory.repository.interface';
+import {
+  formatVisualIdentityLines,
+  normalizeVisualIdentity,
+} from './visual-identity.util';
 
 type JsonObject = Record<string, unknown>;
 
@@ -43,6 +47,8 @@ export function buildRuleBrainPrompt(
 
   sections.push(`You are the AI brand assistant for "${rule.name}".`);
 
+  const visual = normalizeVisualIdentity(brand.visualIdentity);
+  const visualLines = formatVisualIdentityLines(visual);
   const brandLines = [
     formatField('Industry', brand.industry),
     formatField('Description', brand.brandDescription),
@@ -50,6 +56,7 @@ export function buildRuleBrainPrompt(
     formatField('Voice', brand.brandVoice),
     formatField('Restrictions', brand.brandRestrictions),
     formatField('Call to action', brand.callToAction),
+    ...visualLines,
   ].filter((l): l is string => l !== null);
   if (brandLines.length > 0) {
     sections.push(`## Brand\n${brandLines.join('\n')}`);

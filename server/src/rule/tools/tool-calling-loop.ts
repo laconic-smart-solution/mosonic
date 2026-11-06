@@ -323,6 +323,17 @@ export async function runToolCallingLoop(params: {
     /** Steps recorded so far this turn (earlier observations included). */
     turnSteps: readonly AgentStep[],
   ) => string | null;
+  /**
+   * Deterministic goal/postcondition guard (no LLM). When the model tries to
+   * answer but acceptance is unmet, return forceContinue with an instruction
+   * to inject — bounded by maxContinueRounds.
+   */
+  evaluateCompletion?: (ctx: {
+    answer: string;
+    steps: readonly AgentStep[];
+    ran: readonly string[];
+    failed: readonly string[];
+  }) => { forceContinue: true; instruction: string; unmet?: readonly string[] } | null;
 }): Promise<ToolCallingLoopResult> {
   const { model, tools, maxIterations = 6, onStep } = params;
   const messages = [...params.messages];
@@ -405,12 +416,17 @@ export async function runToolCallingLoop(params: {
    * One extra model call (tools ignored) so the reply describes what the tools
    * actually did, instead of the pre-tool plan. Falls back to `fallback`.
    */
-  const finalReply = async (fallback: string, stopReason: LoopStopReason): Promise<ToolCallingLoopResult> => {
+  const finalReply = async (
+    fallback: string,
+    stopReason: LoopStopReason,
+    goalUnmet: readonly string[] = [],
+  ): Promise<ToolCallingLoopResult> => {
     if (!finalReplyCall) return done(fallback, stopReason);
     // Leftovers only matter when the turn stops without a human gate already asking.
     const leftovers = HUMAN_GATE_STOPS.has(stopReason) ? [] : notRunNow();
-    const instruction = leftovers.length
-      ? `${FINAL_REPLY_INSTRUCTION} Still not done: ${leftovers.join(', ')}. Say plainly which of these are not done yet and ask if they want you to continue.`
+    const still = [...leftovers, ...goalUnmet];
+    const instruction = still.length
+      ? `${FINAL_REPLY_INSTRUCTION} Still not done: ${still.join('; ')}. Say plainly which of these are not done yet and ask if they want you to continue.`
       : FINAL_REPLY_INSTRUCTION;
     try {
       const response = (await boundModel.invoke([
@@ -481,6 +497,32 @@ export async function runToolCallingLoop(params: {
           roundStart = iteration + 1;
           messages.push(new HumanMessage(continueInstruction(leftovers)));
           continue;
+        }
+        // GoalAcceptance / postcondition guard: do not accept a done reply when
+        // the session goal is still unmet (deterministic; no extra LLM call).
+        if (!asks && gatedTools.length === 0) {
+          const goalGuard = params.evaluateCompletion?.({
+            answer: parsed.answer,
+            steps,
+            ran: ranTools,
+            failed: failedTools,
+          });
+          if (goalGuard?.forceContinue) {
+            if (continueRounds < maxContinueRounds) {
+              continueRounds += 1;
+              mutationsThisTurn = 0;
+              nudgedThoughtOnly = false;
+              progressThisRound = false;
+              roundStart = iteration + 1;
+              messages.push(new HumanMessage(goalGuard.instruction));
+              continue;
+            }
+            return finalReply(
+              "That step ran, but the request is not finished yet. Want me to continue?",
+              'answered',
+              goalGuard.unmet ?? [],
+            );
+          }
         }
         return done(parsed.answer, asks ? 'asked_in_text' : gatedTools.length > 0 ? 'confirmation' : 'answered');
       }

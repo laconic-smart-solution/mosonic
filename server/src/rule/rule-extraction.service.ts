@@ -6,6 +6,14 @@ import { formatGenerationTemporalContext } from '../nodes/services/generation-te
 import { intakePurposeSystemHint } from './rule-intake-prompt.util';
 import type { RuleIntakeAnswers } from './rule-intake.types';
 import type { RuleStatus } from './schemas/rule.schema';
+import {
+  normalizeVisualIdentity,
+  type VisualIdentity,
+} from './visual-identity.util';
+import {
+  mergeVisualIdentityEvidence,
+  visualIdentityFromEvidenceText,
+} from './visual-identity-from-html.util';
 
 export interface ExtractedRuleDraft {
   name: string;
@@ -17,6 +25,7 @@ export interface ExtractedRuleDraft {
     brandVoice: string;
     brandRestrictions: string[];
     callToAction: string;
+    visualIdentity?: VisualIdentity;
   };
   audience: {
     description: string;
@@ -120,6 +129,16 @@ export class RuleExtractionService {
           'Only populate it when postingFrequency is "custom". Otherwise return an empty array [].',
           '',
           // ── OUTPUT SCHEMA ──────────────────────────────────────────────────
+
+          'VISUAL IDENTITY RULES:',
+          '- brand.visualIdentity holds theme colors + design understanding.',
+          '- Only set primary/secondary/accent/neutrals to #RRGGBB values that appear in the input (especially a "VISUAL IDENTITY EVIDENCE" block from a website, or colors the user explicitly named).',
+          '- If no hex colors are evidenced, omit those fields and set colorsUnknown: true. NEVER invent hex codes.',
+          '- designKeywords: short tokens from evidence (e.g. minimal, photography, premium).',
+          '- designDirection: 1-3 sentences on layout mood, photography vs illustration, typography feel — grounded in the page/CSS evidence or user text, not generic filler.',
+          '- fonts: only family names seen in CSS evidence or named by the user.',
+          '',
+
           'Return exactly this JSON structure:',
           JSON.stringify(
             {
@@ -132,6 +151,16 @@ export class RuleExtractionService {
                 brandVoice: 'string',
                 brandRestrictions: ['string'],
                 callToAction: 'string',
+                visualIdentity: {
+                  primary: '#RRGGBB or omit',
+                  secondary: '#RRGGBB or omit',
+                  accent: '#RRGGBB or omit',
+                  neutrals: ['#RRGGBB'],
+                  fonts: ['string'],
+                  designKeywords: ['string'],
+                  designDirection: 'string',
+                  colorsUnknown: 'boolean — true when no evidenced hex',
+                },
               },
               audience: {
                 description: 'string',
@@ -200,9 +229,23 @@ export class RuleExtractionService {
       ? parsed.channels.map((ch) => normalizeExtractedChannel(ch))
       : [];
     const campaign = normalizeCampaignDuration(parsed.campaign, new Date());
+    const evidenceVi = visualIdentityFromEvidenceText(rawInput);
+    const llmVi = normalizeVisualIdentity(
+      (parsed.brand as { visualIdentity?: unknown } | undefined)?.visualIdentity,
+    );
+    const visualIdentity = mergeVisualIdentityEvidence(llmVi, evidenceVi);
+    const brand = {
+      ...parsed.brand,
+      ...(visualIdentity ? { visualIdentity } : {}),
+    };
+    // Strip hallucinated visualIdentity if merge produced nothing useful
+    if (!visualIdentity && brand && 'visualIdentity' in brand) {
+      delete (brand as { visualIdentity?: unknown }).visualIdentity;
+    }
     return {
       draft: {
         ...parsed,
+        brand,
         campaign,
         channels,
         status: 'active',

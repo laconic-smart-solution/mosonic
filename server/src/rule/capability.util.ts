@@ -11,8 +11,9 @@ import { normalizeLaneId } from '../workflow/workflow-graph.util';
  *   (set_workflow_channels). Anything else (x/twitter, pinterest, threads...)
  *   is not supported.
  * - Image count: each Image step makes exactly 1 image per run
- *   (image-generation.service: count 1). More images = generate_more_image
- *   after the run. Several images per channel in one run: not supported.
+ *   (image-generation.service: count 1). Multiple Image steps in the same
+ *   lane are executed in one run; upload aggregates their URLs into mediaUrls
+ *   (ordered). generate_more_image remains the post-run alternative.
  * - Reference images: the image step receives up to 4 pixel images
  *   (pixelAssetsFromPack cap): the brand logo plus reference images. Images
  *   attached in this chat are passed through start_generation.
@@ -189,7 +190,7 @@ export function buildCapabilitySummary(c: CapabilityInput): string {
   }
   lines.push(`Runs: ${c.activeRun ? 'one running now (wait or cancel_pipeline)' : 'none running'}. Latest draft: ${c.latestDraft ?? 'none'}.`);
   lines.push('- Channels: Instagram, Facebook, LinkedIn, YouTube, TikTok, RedNote are supported; a missing lane is a changeable setting (set_workflow_channels). X/Twitter, Pinterest, Threads, Snapchat, Medium, Reddit: not supported.');
-  lines.push('- Images per channel: 1 per image step per run. Several images per channel in one run: not supported; after the run each extra image is generate_more_image (changeable, costs credits).');
+  lines.push('- Images per channel: 1 per image step per run. Multiple image steps in one lane run together; their URLs are collected into mediaUrls for publish. generate_more_image still adds extras after a run (costs credits).');
   lines.push(`- Reference images: supported, up to 3 plus the logo go to the image step. Ready brand reference images: ${c.readyReferenceImages}; attached in this chat: ${c.attachedImages}. start_generation passes the attached ones and reports how many were used.`);
   lines.push('- Other languages: a Translation step (add_workflow_node translation, config.targetLanguage) makes one extra language per step; start_generation takes languages and reports no_translation_step when a step is missing. After a run, generate_more_translation adds a language to that draft only.');
   lines.push('- Real screenshots placed pixel-exact in a device-frame mockup: not supported (no compositing step); the image step redraws a mockup using the screenshot as reference.');
@@ -197,7 +198,7 @@ export function buildCapabilitySummary(c: CapabilityInput): string {
   return lines.join('\n');
 }
 
-export type Preflight = { youAskedFor: string; willChange: string[]; notPossible: string[]; missingLanguages?: string[] };
+export type Preflight = { youAskedFor: string[]; willChange: string[]; notPossible: string[]; missingLanguages?: string[] };
 
 /** Compare a request with what the workflow will really do. Empty willChange/notPossible = run as asked. */
 export function preflightRequest(input: {
@@ -228,23 +229,39 @@ export function preflightRequest(input: {
   if (r.channels.length && laneIds.length) {
     const missing = r.channels.filter((c) => !laneIds.includes(c));
     const extra = laneIds.filter((c) => !r.channels.includes(c));
-    if (missing.length || extra.length) willChange.push(`Make the workflow post only to ${list(r.channels)} (set_workflow_channels)`);
+    if (missing.length || extra.length) willChange.push(`Post only to ${list(r.channels)}`);
   }
   if (r.wantsImages) {
     const targets = r.channels.length ? r.channels : laneIds;
     // No lanes: one shared Image step covers every channel.
     const noImg = laneIds.length ? targets.filter((c) => (lanes.find((l) => l.lane === c)?.images ?? 0) === 0) : [];
-    if (!laneIds.length && !input.nodes.some((n) => /image_generation|ImageGeneration/i.test(String(n.type ?? '')))) willChange.push('Add an image step (add_workflow_node image_generation)');
-    else if (noImg.length) willChange.push(`Add an image step for ${list(noImg)} (add_workflow_node image_generation)`);
+    if (!laneIds.length && !input.nodes.some((n) => /image_generation|ImageGeneration/i.test(String(n.type ?? '')))) willChange.push('Add an image step');
+    else if (noImg.length) willChange.push(`Add an image step for ${list(noImg)}`);
   }
   const have = workflowTranslationLanguages(input.nodes);
   const missingLangs = wantedLangs.filter((l) => l !== base && !have.includes(l));
-  if (missingLangs.length) willChange.push(`Add a translation step for ${missingLangs.join(', ')} (add_workflow_node translation, config.targetLanguage)`);
+  if (missingLangs.length) willChange.push(`Add a translation step for ${missingLangs.join(', ')}`);
   for (const u of r.unsupportedChannels) notPossible.push(`${u}: not a supported channel`);
-  if (r.imagesPerChannel && r.imagesPerChannel > 1) notPossible.push(`${r.imagesPerChannel} images per channel in one run: a run makes 1 per channel; I can add more with generate more after it finishes (costs credits)`);
+  if (r.imagesPerChannel && r.imagesPerChannel > 1) {
+    const targets = r.channels.length ? r.channels : laneIds;
+    const need = r.imagesPerChannel;
+    const short = (targets.length ? targets : ['shared']).filter((c) => {
+      const have = laneIds.length
+        ? (lanes.find((l) => l.lane === c)?.images ?? 0)
+        : input.nodes.filter((n) =>
+            /image_generation|ImageGeneration/i.test(String(n.type ?? '')),
+          ).length;
+      return have < need;
+    });
+    if (short.length) {
+      willChange.push(
+        `Add ${need} image steps${targets.length > 1 ? ` for ${list(short)}` : ''} so one run produces ${need} images (each step = 1 image)`,
+      );
+    }
+  }
   if (r.wantsRealScreenshots && input.attachedImages === 0) notPossible.push('Your real screenshots: none attached in this chat yet; upload them and I will pass them to the image step');
   if (r.wantsMockup && r.wantsRealScreenshots) notPossible.push('Pixel-exact screenshots inside a device frame: the image step redraws the mockup using your screenshots as reference');
-  return { youAskedFor: asked.join(', ') || 'a post', willChange, notPossible, missingLanguages: missingLangs };
+  return { youAskedFor: asked.length ? asked : ['a post'], willChange, notPossible, missingLanguages: missingLangs };
 }
 
 /** Latest real request in the chat (skips chip clicks and bare yes/ok/go). */

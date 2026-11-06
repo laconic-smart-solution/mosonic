@@ -31,6 +31,7 @@ import type {
   UpdateNewsTriggerSettingsDto,
 } from './dto/news-trigger-settings.dto';
 import type { RuleDocument } from './schemas/rule.schema';
+import { normalizeVisualIdentity } from './visual-identity.util';
 import {
   GenderOption,
   NewsTriggerCategory,
@@ -95,6 +96,36 @@ export class RuleService {
     private readonly creditService: CreditService,
   ) {}
 
+  /**
+   * Instant brand shell for the Welcome "Start a new brand" CTA —
+   * no LLM extraction, no credit charge. User fills it in via chat.
+   */
+  async createBlankRule(
+    auth: TenancyAuth,
+  ): Promise<{ ruleId: string; name: string }> {
+    const ruleId = randomUUID();
+    const now = new Date();
+    const name = 'Untitled brand';
+    await this.rules.create({
+      ruleId,
+      userId: auth.userId,
+      name,
+      ...this.blankRuleBody(now, {
+        brandName: 'Untitled',
+        brandDescription: '',
+        brandVoice: '',
+        industry: '',
+        callToAction: '',
+        audienceDescription: '',
+        originalType: OriginalInputType.Text,
+        storedAt: `blank://${ruleId}`,
+      }),
+      status: RuleStatus.Active,
+      versions: [],
+    });
+    return { ruleId, name };
+  }
+
   async requestExtraction(
     args: RuleExtractRequest,
     auth: TenancyAuth,
@@ -122,47 +153,14 @@ export class RuleService {
       ruleId,
       userId: auth.userId,
       name: 'Processing rule',
-      brand: {
+      ...this.blankRuleBody(now, {
         brandName: 'Pending',
-        industry: 'Unknown',
         brandDescription: 'Pending extraction',
-        brandTone: [],
         brandVoice: 'Pending extraction',
-        brandRestrictions: [],
+        industry: 'Unknown',
         callToAction: 'Learn more',
-      },
-      audience: {
-        description: 'Pending extraction',
-        ageRange: { min: 18, max: 65 },
-        gender: GenderOption.All,
-        location: [],
-        interests: [],
-        painPoints: [],
-        language: 'en',
-        targetLanguages: ['en'],
-      },
-      campaign: {
-        goals: [],
-        keywords: [],
-        hashtagStrategy: [],
-        contentFormats: [],
-        duration: { startDate: now, endDate: now },
-        postingFrequency: PostingFrequency.Weekly,
-        customSchedule: [],
-      },
-      channels: [],
-      contentGuidelines: {
-        dos: [],
-        donts: [],
-        requiredElements: [],
-        seoGuidelines: {
-          primaryKeywords: [],
-          secondaryKeywords: [],
-          keywordDensity: 'natural, not forced',
-        },
-      },
-      originalInput: {
-        type: originalType,
+        audienceDescription: 'Pending extraction',
+        originalType,
         storedAt:
           originalType === OriginalInputType.File
             ? `multipart://${ruleId}`
@@ -171,7 +169,7 @@ export class RuleService {
               : originalType === OriginalInputType.Structured
                 ? `structured://${ruleId}`
                 : `inline://${now.getTime()}`,
-      },
+      }),
       intake: args.intake ? args.intake : undefined,
       status: RuleStatus.Processing,
       versions: [],
@@ -346,7 +344,25 @@ export class RuleService {
 
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.brand !== undefined) {
-      data.brand = { ...brand, ...dto.brand };
+      const incomingVi = (dto.brand as { visualIdentity?: Record<string, unknown> })
+        .visualIdentity;
+      const prevVi =
+        brand.visualIdentity && typeof brand.visualIdentity === 'object'
+          ? (brand.visualIdentity as Record<string, unknown>)
+          : {};
+      const mergedVi =
+        incomingVi !== undefined
+          ? normalizeVisualIdentity({ ...prevVi, ...incomingVi })
+          : undefined;
+      data.brand = {
+        ...brand,
+        ...dto.brand,
+        ...(incomingVi !== undefined
+          ? mergedVi
+            ? { visualIdentity: mergedVi }
+            : { visualIdentity: undefined }
+          : {}),
+      } as Prisma.InputJsonValue;
     }
     if (dto.audience !== undefined) {
       data.audience = {
@@ -437,6 +453,7 @@ export class RuleService {
     return updated;
   }
 
+  /** Soft-delete: archive so the brand disappears from active lists but stays recoverable. */
   async deleteRule(ruleId: string, auth: TenancyAuth): Promise<void> {
     const existing = await this.rules.findById(ruleId, auth);
     if (!existing) {
@@ -445,8 +462,16 @@ export class RuleService {
     if (existing.isSystem && auth.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Cannot delete a system rule template');
     }
-    if (this.rules.deleteById) {
-      await this.rules.deleteById(ruleId, auth);
+    if (existing.status === RuleStatus.Archived) {
+      return;
+    }
+    const updated = await this.rules.updateById(
+      ruleId,
+      { status: RuleStatus.Archived },
+      auth,
+    );
+    if (!updated) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
     }
   }
 
@@ -471,7 +496,8 @@ export class RuleService {
     if (dto.filter?.status !== undefined) {
       filter.status = dto.filter.status;
     } else {
-      filter.status = { not: 'failed' };
+      // Soft-deleted (archived) and failed shells stay out of default browse lists.
+      filter.status = { notIn: [RuleStatus.Failed, RuleStatus.Archived] };
     }
 
     const { rows: data, total } = await this.rules.findPage(
@@ -644,6 +670,66 @@ export class RuleService {
       autoApprove: false,
       lastTriggeredAt: null,
       totalTriggeredCount: 0,
+    };
+  }
+
+  private blankRuleBody(
+    now: Date,
+    opts: {
+      brandName: string;
+      brandDescription: string;
+      brandVoice: string;
+      industry: string;
+      callToAction: string;
+      audienceDescription: string;
+      originalType: OriginalInputType;
+      storedAt: string;
+    },
+  ) {
+    return {
+      brand: {
+        brandName: opts.brandName,
+        industry: opts.industry,
+        brandDescription: opts.brandDescription,
+        brandTone: [] as string[],
+        brandVoice: opts.brandVoice,
+        brandRestrictions: [] as string[],
+        callToAction: opts.callToAction,
+      },
+      audience: {
+        description: opts.audienceDescription,
+        ageRange: { min: 18, max: 65 },
+        gender: GenderOption.All,
+        location: [] as string[],
+        interests: [] as string[],
+        painPoints: [] as string[],
+        language: 'en',
+        targetLanguages: ['en'],
+      },
+      campaign: {
+        goals: [] as string[],
+        keywords: [] as string[],
+        hashtagStrategy: [] as string[],
+        contentFormats: [] as string[],
+        duration: { startDate: now, endDate: now },
+        postingFrequency: PostingFrequency.Weekly,
+        customSchedule: [] as string[],
+      },
+      channels: [] as Prisma.InputJsonValue[],
+      contentGuidelines: {
+        dos: [] as string[],
+        donts: [] as string[],
+        requiredElements: [] as string[],
+        seoGuidelines: {
+          primaryKeywords: [] as string[],
+          secondaryKeywords: [] as string[],
+          keywordDensity: 'natural, not forced',
+        },
+      },
+      originalInput: {
+        type: opts.originalType,
+        storedAt: opts.storedAt,
+      },
     };
   }
 

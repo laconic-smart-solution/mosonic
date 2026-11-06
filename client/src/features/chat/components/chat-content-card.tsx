@@ -25,6 +25,8 @@ import {
   contentCardPendingTitleKey,
   contentCardWorkingKey,
   imageUrlFromNodeOutput,
+  nodeIdsMatch,
+  nodeOutputError,
   nodeStillPending,
 } from "../lib/rerun-node-label"
 import { ChatApproveContentDialog } from "./dialogs/chat-approve-content-dialog"
@@ -87,6 +89,7 @@ function previewFromDetail(data: {
     pendingNodeType: null,
     saved: false,
     rejectReason: null,
+    failReason: null,
     lanes: Array.isArray(data.lanes) ? data.lanes : [],
     nodes: Array.isArray(data.nodes) ? data.nodes : [],
   }
@@ -96,7 +99,6 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
   const { t } = useTranslation("chat")
   const [view, setView] = useState(snapshot)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [timedOut, setTimedOut] = useState(false)
   const [dialog, setDialog] = useState<ContentDialog>(null)
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
   const chatActions = useChatActions()
@@ -116,9 +118,9 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         lanes: snapshot.lanes.length > 0 ? snapshot.lanes : same ? prev.lanes : [],
         nodes: snapshot.nodes.length > 0 ? snapshot.nodes : same ? prev.nodes : [],
         rejectReason: snapshot.rejectReason ?? (same ? prev.rejectReason : null),
+        failReason: snapshot.failReason ?? (same ? prev.failReason : null),
       }
     })
-    setTimedOut(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- catalogKey stands in for lanes/nodes
   }, [
     snapshot.contentId,
@@ -135,6 +137,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
     snapshot.hasTranslation,
     snapshot.hasSummary,
     snapshot.rejectReason,
+    snapshot.failReason,
     catalogKey,
   ])
 
@@ -157,6 +160,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           pendingNodeId: v.pendingNodeId,
           pendingNodeType: v.pendingNodeType,
           rejectReason: v.rejectReason,
+          failReason: v.failReason,
           textPreview: next.textPreview || v.textPreview,
           lanes: next.lanes.length > 0 ? next.lanes : v.lanes,
           nodes: next.nodes.length > 0 ? next.nodes : v.nodes,
@@ -201,28 +205,40 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         action: "show_content",
         pendingNodeId: null,
         pendingNodeType: null,
+        failReason: null,
         hasImage: nextImage ? true : v.hasImage,
       }))
       if (nextImage) setImageUrl(nextImage)
     }
 
+    const markFailed = (reason: string) => {
+      if (cancelled) return
+      setView((v) => ({
+        ...v,
+        action: "content_rerun_failed",
+        pendingNodeId: null,
+        pendingNodeType: null,
+        failReason: reason.trim() || t("contentCard.updateFailedGeneric"),
+      }))
+    }
+
     const unsubDone = onContentNodeRerunCompleted((payload) => {
       if (payload.contentId !== contentId) return
-      if (pendingId && payload.nodeId !== pendingId) return
+      if (!nodeIdsMatch(pendingId, payload.nodeId)) return
       const url =
         typeof payload.output?.image === "string" ? payload.output.image.trim() : null
       markReady(url || null)
     })
     const unsubFail = onContentNodeFailedFinal((payload) => {
       if (payload.contentId !== contentId) return
-      if (pendingId && payload.nodeId !== pendingId) return
-      markReady(null)
+      if (!nodeIdsMatch(pendingId, payload.nodeId)) return
+      markFailed(payload.message || t("contentCard.updateFailedGeneric"))
     })
 
     const tick = async () => {
       if (Date.now() - started > POLL_LIMIT_MS) {
-        if (!cancelled) setTimedOut(true)
-        return false
+        markFailed(t("contentCard.updateTimedOut"))
+        return true
       }
       try {
         const data = await contentService.getById(contentId)
@@ -230,6 +246,9 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         const stillPending = pendingId
           ? nodeStillPending(data.nodeOutputs, pendingId)
           : false
+        const failedMsg = pendingId
+          ? nodeOutputError(data.nodeOutputs, pendingId)
+          : null
         const nextUrl =
           imageUrlFromNodeOutput(data.nodeOutputs, pendingId) ??
           (typeof data.outputs?.image === "string" ? data.outputs.image.trim() : null)
@@ -238,6 +257,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           setView((v) => ({
             ...next,
             rejectReason: v.rejectReason,
+            failReason: v.failReason,
             pendingNodeId: pendingId,
             pendingNodeType: pendingType,
             action: v.action,
@@ -246,9 +266,14 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           }))
           return false
         }
+        if (failedMsg) {
+          markFailed(failedMsg)
+          return true
+        }
         setView({
           ...previewFromDetail(data),
           rejectReason: view.rejectReason,
+          failReason: null,
           pendingNodeId: null,
           pendingNodeType: null,
           action: "show_content",
@@ -275,7 +300,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
       leaveContentRoom(contentId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll while this pending job is active
-  }, [view.action, view.contentId, view.pendingNodeId, view.pendingNodeType])
+  }, [view.action, view.contentId, view.pendingNodeId, view.pendingNodeType, t])
 
   const channels = useMemo(
     () => collectContentChannels(view.lanes, view.nodes),
@@ -310,6 +335,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
   const rejected = view.status === "rejected"
   const decided = view.status === "approved" || rejected
   const pending = PENDING_ACTIONS.has(view.action)
+  const failed = view.action === "content_rerun_failed"
   const isImageJob = view.pendingNodeType === "image_generation"
   const TitleIcon = isImageJob ? ImageIcon : FileText
   const closeDialog = (open: boolean) => {
@@ -334,7 +360,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
     <div
       className={cn(
         "w-full overflow-hidden rounded-2xl border border-canvas-200 dark:border-white/8 bg-white dark:bg-navy-700 shadow-sm",
-        rejected && "border-[#D64545]/40 dark:border-[#D64545]/40",
+        (rejected || failed) && "border-[#D64545]/40 dark:border-[#D64545]/40",
       )}
     >
       <div
@@ -369,7 +395,9 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
             <div className="min-w-0 space-y-1">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-navy-700 dark:text-[#E8EDF6]">
                 <TitleIcon className="size-3.5 shrink-0" aria-hidden />
-                {t(contentCardPendingTitleKey(pending ? view.pendingNodeType : null))}
+                {failed
+                  ? t("contentCard.titleUpdateFailed")
+                  : t(contentCardPendingTitleKey(pending ? view.pendingNodeType : null))}
               </p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {rejected ? (
@@ -452,6 +480,14 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
             </p>
           ) : null}
 
+          {failed ? (
+            <p className="text-xs text-[#D64545]">
+              {view.failReason
+                ? t("contentCard.updateFailed", { reason: view.failReason })
+                : t("contentCard.updateFailedGeneric")}
+            </p>
+          ) : null}
+
           {displayText ? (
             <div className="rounded-xl bg-canvas-50/80 dark:bg-navy-800/50 px-3 py-2.5">
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -470,9 +506,6 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
               <Loader2 className="size-3 animate-spin" aria-hidden />
               {t(contentCardWorkingKey(view.pendingNodeType))}
             </p>
-          ) : null}
-          {timedOut && pending ? (
-            <p className="text-[11px] text-muted-foreground">{t("contentCard.stillWorking")}</p>
           ) : null}
         </div>
       </div>

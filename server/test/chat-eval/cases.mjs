@@ -416,7 +416,7 @@ SCRIPTS.push(
 // ---- Capability mismatch cases (2026-11-03): gap must be caught BEFORE anything runs.
 const obsHas = (re) => (t) => t.observations.some((o) => re.test(o.result));
 const noRunYet = () => ({ label: 'nothing ran before the user confirmed', test: (t) => !obsHas(/"action":"pipeline_started"/)(t) });
-const gapCaught = () => ({ label: 'gap caught before running', test: (t) => !obsHas(/"action":"pipeline_started"/)(t) && (obsHas(/capability_(mismatch|gap)/)(t) || t.actions.some((a) => a.name === 'ask_user') || /(not (supported|possible)|can.?t|cannot|1 image|one image|upload)/i.test(t.reply)) });
+const gapCaught = () => ({ label: 'gap caught before running', test: (t) => !obsHas(/"action":"pipeline_started"/)(t) && (obsHas(/capability_(mismatch|gap)/)(t) || obsHas(/"willChange"/)(t) || t.actions.some((a) => a.name === 'ask_user') || /(not (supported|possible)|can.?t|cannot|add .+ image|image steps?|upload)/i.test(t.reply)) });
 const planCard = () => ({ label: 'plan card (ask_user with plan) or plain gap statement', test: (t) => t.actions.some((a) => a.name === 'ask_user' && a.args && a.args.plan) || /(not (supported|possible)|can.?t|cannot)/i.test(t.reply) });
 const promisesOnlyWhatRuns = () => ({ label: 'does not promise 3 images per channel or pixel-exact screenshots', test: (t) => !/(3|three) (mockup )?images (each|per)[^.?]*\b(will|i.ll)\b|exact (copy|screenshot)/i.test(t.reply) || /not|can.?t|cannot/i.test(t.reply) });
 const dryStart = () => ({ label: 'run started (dry-run)', test: obsHas(/"action":"pipeline_started"[\s\S]*"dryRun":true|"dryRun":true[\s\S]*"action":"pipeline_started"/) });
@@ -584,4 +584,117 @@ SCRIPTS.push(
     // The plan card's chip, sent after the newer card (an old browser tab).
     { id: 'ST9c', src: 'state / stale', say: 'User choice: start_post (Start)', expect: [noRunYet(), c.dryRunOnly()] },
   ]),
+);
+
+const goalNotFalselyDone = () => ({
+  label: 'does not treat update_rule alone as done',
+  test: (t) => {
+    const tools = t.actions.map((a) => a.name);
+    const onlySetup = tools.length > 0 && tools.every((n) => ['get_rule', 'update_rule', 'ask_user', 'list_workflows', 'remember'].includes(n));
+    const updated = tools.includes('update_rule');
+    const asked = tools.includes('ask_user') || tools.includes('start_generation') || tools.includes('add_workflow_node');
+    if (updated && onlySetup && !asked) return false;
+    return true;
+  },
+});
+const multiImagePlanPath = () => ({
+  label: 'plans multi-image via nodes or confirm (not false notPossible-only stop)',
+  test: (t) => {
+    const started = obsHas(/"action":"pipeline_started"/)(t);
+    if (started) return t.observations.some((o) => /"dryRun":true/.test(o.result));
+    const planObs = t.observations.some((o) => /"willChange"|add_workflow_node|"plan"/i.test(o.result));
+    const tools = t.actions.some((a) => ['ask_user', 'add_workflow_node', 'start_generation', 'set_workflow_channels'].includes(a.name));
+    const replyOk = /image steps?|add .+image|plan|confirm|start/i.test(t.reply);
+    return planObs || tools || replyOk;
+  },
+});
+const noEmptyMediaPromise = () => ({
+  label: 'does not claim media uploaded when mediaUrls empty',
+  test: (t) => {
+    const blob = t.observations.map((o) => o.result).join('\n');
+    if (/mediaUrls"\s*:\s*\[\s*\]/.test(blob) && /published|uploaded successfully/i.test(t.reply)) return false;
+    return true;
+  },
+});
+
+SCRIPTS.push(
+  {
+    id: 'P1',
+    title: 'Phase1 outcomes: FB 4 images / video-before-node / empty media honesty',
+    turns: [
+      {
+        id: 'P1-FB4a',
+        src: 'RD transcript / 4 service images Facebook',
+        say: 'Create a Facebook-only post with 4 distinct service images and ask me before publishing',
+        expect: [multiImagePlanPath(), goalNotFalselyDone(), noRunYet(), c.dryRunOnly(), c.english()],
+      },
+      {
+        id: 'P1-VID',
+        src: 'RD transcript / video-before-node',
+        say: 'Make a presenter video for Instagram',
+        expect: [
+          noRunYet(),
+          c.either(c.called('ask_user'), c.called('get_node_config'), c.called('add_workflow_node'), c.replyMatches(/video|look|voice|node|step/i, 'mentions video setup')),
+          c.dryRunOnly(),
+        ],
+      },
+      {
+        id: 'P1-MEDIA',
+        src: 'RD transcript / upload empty mediaUrls',
+        say: 'publish my latest draft now',
+        expect: [
+          noEmptyMediaPromise(),
+          c.either(c.called('preview_upload'), c.called('get_upload'), c.called('ask_user'), c.replyMatches(/preview|media|upload|draft|connect/i, 'checks upload readiness')),
+        ],
+      },
+    ],
+  },
+);
+
+SCRIPTS.push(
+  {
+    id: 'WA1',
+    title: 'Workflow awareness: FB 4 images must use willChange (myu mirror), not impossible / wait',
+    turns: [
+      {
+        id: 'WA1a',
+        src: 'myu / 4 service images one FB post',
+        say: 'Create one Facebook post with 4 distinct service images for our beauty brand',
+        next: (t) => (t.askUser ? chip(t, /yes|start_post|start/i) : null),
+        expect: [
+          {
+            label: 'does not claim 4 images impossible',
+            test: (t) => !/\b(can'?t|cannot|impossible|not possible|not supported|unable to)\b.{0,80}\b(4|four)\b.{0,40}\bimages?\b/i.test(t.reply)
+              && !t.observations.some((o) => o.name === 'ask_user' && /false_impossibility|can'?t do 4|not possible.{0,40}4/i.test(o.result)),
+          },
+          {
+            label: 'plans willChange N image steps or adds nodes / starts',
+            test: (t) => {
+              const blob = t.observations.map((o) => o.result).join('\n');
+              const will = /willChange|Add \d+ image steps|add_workflow_node/i.test(blob);
+              const tools = t.actions.some((a) => ['ask_user', 'add_workflow_node', 'start_generation'].includes(a.name));
+              return will || tools;
+            },
+          },
+          {
+            label: 'after yes (auto-chip) does not stop on setup-only / wait',
+            test: (t) => {
+              if (/wait (until|for|till).{0,40}(four|4).{0,20}image/i.test(t.reply)) return false;
+              const tools = t.actions.map((a) => a.name);
+              // If no ask_user happened, only check the first-turn plan path.
+              if (!(t.followUps && t.followUps.length)) return true;
+              const setupOnly = tools.length > 0 && tools.every((n) =>
+                ['update_rule', 'ask_user', 'get_rule', 'list_workflows', 'remember'].includes(n));
+              if (setupOnly) return false;
+              return t.actions.some((a) =>
+                ['add_workflow_node', 'start_generation', 'set_workflow_channels', 'apply_default_workflow'].includes(a.name),
+              ) || /image step|starting|generat/i.test(t.reply);
+            },
+          },
+          c.dryRunOnly(),
+          c.english(),
+        ],
+      },
+    ],
+  },
 );

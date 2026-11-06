@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -37,6 +39,13 @@ import { RuleService } from './rule.service';
 @Controller('rules')
 export class RuleController {
   constructor(private readonly ruleService: RuleService) {}
+
+  /** Creates an active "Untitled brand" shell (no extraction / no credits). */
+  @Post()
+  createBlank(@Req() req: Request) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.ruleService.createBlankRule(auth);
+  }
 
   @Get('system-templates')
   getSystemTemplates(@Query('category') category?: string) {
@@ -155,5 +164,13 @@ export class RuleController {
   getRuleById(@Req() req: Request, @Param('ruleId') ruleId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.ruleService.getRuleById(ruleId, auth);
+  }
+
+  /** Soft-delete: sets status to archived (hidden from active brand lists). */
+  @Delete(':ruleId')
+  @HttpCode(204)
+  async deleteRule(@Req() req: Request, @Param('ruleId') ruleId: string) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    await this.ruleService.deleteRule(ruleId, auth);
   }
 }

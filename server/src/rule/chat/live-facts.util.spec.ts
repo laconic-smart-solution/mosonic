@@ -106,3 +106,28 @@ describe('live fact helpers', () => {
     ).toBe(false);
   });
 });
+
+describe('renderLiveState with graph snapshot', () => {
+  it('appends the live workflow graph block', () => {
+    const text = renderLiveState({
+      ...base,
+      workflow: { status: 'ready', steps: '1. Text\n2. Image' },
+      graph: {
+        hasWorkflow: true,
+        status: 'ready',
+        sharedImageGeneration: 0,
+        totalImageGeneration: 1,
+        lanes: [
+          {
+            lane: 'facebook',
+            imageGeneration: 1,
+            types: { adapt: 1, image_generation: 1 },
+          },
+        ],
+      },
+    });
+    expect(text).toContain('## Workflow graph (live; overrides earlier chat claims)');
+    expect(text).toContain('facebook: image_generation=1');
+    expect(text).toContain('N image_generation nodes');
+  });
+});

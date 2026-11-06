@@ -9,9 +9,25 @@
     "noRules": "ไม่พบโปรไฟล์แบรนด์",
     "tones": "โทน: {{value}}",
     "channels": "ช่องทาง: {{value}}",
-    "updated": "อัปเดต: {{date}}",
+    "updated": "อัปเดต {{date}}",
     "viewMore": "ดูเพิ่มเติม",
     "loadingMore": "กำลังโหลด..."
+  },
+  "welcome": {
+    "title": "ยินดีต้อนรับ",
+    "subtitle": "เลือกแบรนด์เพื่อทำงานต่อ หรือเริ่มแบรนด์ใหม่",
+    "startNewBrand": "เริ่มแบรนด์ใหม่",
+    "brandList": "รายการแบรนด์",
+    "emptyList": "ยังไม่มีแบรนด์ เริ่มแบรนด์ใหม่เพื่อเริ่มต้น",
+    "deleteBrand": "ลบ {{name}}",
+    "deleteTitle": "ลบแบรนด์นี้ไหม?",
+    "deleteSubtitle": "{{name}} จะหายจากรายการแบรนด์ หากต้องการกู้คืน ติดต่อฝ่ายสนับสนุนได้",
+    "deleteCancel": "เก็บไว้",
+    "deleteConfirm": "ลบแบรนด์",
+    "createdToast": "สร้าง {{name}} แล้ว",
+    "deletedToast": "ลบ {{name}} แล้ว",
+    "createFailed": "สร้างแบรนด์ไม่สำเร็จ",
+    "deleteFailed": "ลบแบรนด์ไม่สำเร็จ"
   },
   "userStrip": {
     "loading": "กำลังโหลด…",

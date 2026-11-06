@@ -188,6 +188,10 @@ export class UploadService {
       const trunkMedia = trunkMediaFromPipelineNodes(nodes);
       // Per-lane media only; fall back to true trunk (unlaned) nodes — never
       // flattened resolvedOutputs.image/video (those include other lanes' media).
+      const images =
+        laneMedia.images.length > 0 ? laneMedia.images : trunkMedia.images;
+      const videos =
+        laneMedia.videos.length > 0 ? laneMedia.videos : trunkMedia.videos;
       const laneResolved: ResolvedContentOutputs = {
         ...resolvedOutputs,
         text:
@@ -201,18 +205,36 @@ export class UploadService {
           (typeof adaptOut?.summary === 'string'
             ? adaptOut.summary
             : undefined) ?? resolvedOutputs.summary,
-        image: laneMedia.image ?? trunkMedia.image,
-        video: laneMedia.video ?? trunkMedia.video,
+        image: images.length ? images[images.length - 1] : undefined,
+        video: videos.length ? videos[videos.length - 1] : undefined,
       };
       const caption = resolveAutomappedCaption(map.caption, laneResolved);
       const mediaUrl = resolveAutomappedMediaUrl(map.media, laneResolved);
+      // Prefer the full ordered list for carousel / multi-image publish.
+      // Video mapping: videos only. Image mapping (or unset): all images, else videos.
+      let mediaUrls: string[] = [];
+      if (map.media === 'video') {
+        mediaUrls = videos.length ? [...videos] : mediaUrl ? [mediaUrl] : [];
+      } else if (map.media === 'image' || map.media == null) {
+        mediaUrls = images.length
+          ? [...images]
+          : mediaUrl
+            ? [mediaUrl]
+            : videos.length
+              ? [...videos]
+              : [];
+      } else {
+        mediaUrls = mediaUrl ? [mediaUrl] : [];
+      }
+      // Keep mediaUrl aligned with the first carousel item (or single).
+      const primaryMediaUrl = mediaUrls[0] ?? mediaUrl ?? null;
       const skipped = adaptNode?.status === PipelineNodeExecutionStatus.Skipped;
       return {
         channel: ruleCh.channel,
         included: !skipped,
         caption,
-        mediaUrl,
-        mediaUrls: [],
+        mediaUrl: primaryMediaUrl,
+        mediaUrls,
         youtubeTitle: null,
         status: UploadChannelStatus.Pending,
         scheduledAt: null,

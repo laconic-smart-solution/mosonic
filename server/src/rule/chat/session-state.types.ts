@@ -25,6 +25,11 @@ export type PendingAsk = {
   confirmFor?: string;
   /** Args of the blocked call a confirmation card stands for. */
   args?: Record<string, unknown>;
+  /**
+   * Tools implied by a capability plan.willChange (e.g. add_workflow_node, start_generation).
+   * On Yes / start_post, become the pending plan chain so the model must run them.
+   */
+  willChangeTools?: string[];
 };
 export type PendingConnect = { kind: 'connect'; turn: number; channel: string; via: 'oauth' | 'qr' };
 export type PendingRun = {
@@ -63,10 +68,26 @@ export type Approval = {
   expiresTurn: number;
 };
 
+/** Acceptance criteria for the active goal — independent of the latest tool call. */
+export type GoalAcceptance = {
+  /** Target distribution channels (normalized lane ids). */
+  channels?: string[];
+  /** Distinct images expected on the draft / upload (e.g. 4 service images). */
+  imageCount?: number;
+  /** After draft is ready, ask before publish. */
+  askPublish?: boolean;
+  /** Plain-language criteria for UI / verifier. */
+  criteria?: string[];
+};
+
 export type ChatGoal = {
   kind: 'make_post' | 'publish' | 'setup_brand' | 'edit_workflow';
   detail?: string;
   turn: number;
+  /** What “done” means. Saving preferences alone never satisfies a make_post goal. */
+  acceptance?: GoalAcceptance;
+  /** Set only after postconditions verified (artifacts exist). */
+  satisfied?: boolean;
 };
 
 export type ChatSessionState = {

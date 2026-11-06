@@ -100,6 +100,25 @@ describe('buildRuleBrainPrompt', () => {
     expect(prompt).toContain('Our brand voice is warm and direct.');
   });
 
+
+  it('surfaces visualIdentity theme colors and design keywords', () => {
+    const prompt = buildRuleBrainPrompt(
+      makeRule({
+        brand: {
+          industry: 'beauty',
+          visualIdentity: {
+            primary: '#1b4f72',
+            designKeywords: ['minimal', 'photography'],
+            designDirection: 'Clean photography-led layout',
+          },
+        },
+      }),
+    );
+    expect(prompt).toContain('#1b4f72');
+    expect(prompt).toContain('minimal');
+    expect(prompt).toContain('photography-led');
+  });
+
   it('omits the memory section when there are no memories', () => {
     const prompt = buildRuleBrainPrompt(makeRule());
     expect(prompt).not.toContain('## Brand memory');

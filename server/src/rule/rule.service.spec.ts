@@ -46,6 +46,11 @@ describe('RuleService updates', () => {
     const rulesRepo = {
       findById: jest.fn().mockResolvedValue(overrideRule),
       updateById: jest.fn().mockResolvedValue({ ...overrideRule }),
+      create: jest.fn().mockImplementation(async (data: { ruleId: string; name: string }) => ({
+        ...overrideRule,
+        ...data,
+      })),
+      deleteById: jest.fn(),
       findSystemTemplates: jest.fn().mockResolvedValue([
         {
           ruleId: 'sys-rule-1',
@@ -153,5 +158,40 @@ describe('RuleService updates', () => {
     expect(rulesRepo.findSystemTemplates).toHaveBeenCalledWith('E-Commerce');
     expect(result).toHaveLength(1);
     expect(result[0].isSystem).toBe(true);
+  });
+
+  it('creates an Untitled brand shell without extraction', async () => {
+    const { service, rulesRepo } = createService();
+    const created = await service.createBlankRule(auth);
+    expect(created.name).toBe('Untitled brand');
+    expect(created.ruleId).toBeTruthy();
+    expect(rulesRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Untitled brand',
+        status: 'active',
+        userId: auth.userId,
+        brand: expect.objectContaining({ brandName: 'Untitled' }),
+      }),
+    );
+  });
+
+  it('soft-deletes by archiving instead of hard delete', async () => {
+    const { service, rulesRepo } = createService();
+    await service.deleteRule('rule-1', auth);
+    expect(rulesRepo.updateById).toHaveBeenCalledWith(
+      'rule-1',
+      { status: 'archived' },
+      auth,
+    );
+    expect(rulesRepo.deleteById).not.toHaveBeenCalled();
+  });
+
+  it('blocks customer from deleting a system rule template', async () => {
+    const systemRule = { ...existingRule, ruleId: 'sys-1', isSystem: true, userId: null };
+    const { service, rulesRepo } = createService(systemRule);
+    await expect(service.deleteRule('sys-1', auth)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(rulesRepo.updateById).not.toHaveBeenCalled();
   });
 });

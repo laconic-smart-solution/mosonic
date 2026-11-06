@@ -54,6 +54,9 @@ import {
   SuspendedPage,
   NotFoundPage,
 } from "../constants/lazyload"
+import PlanCardPreviewPage from "@/features/chat/pages/plan-card-preview-page"
+import StepsAccordionPreviewPage from "@/features/chat/pages/steps-accordion-preview-page"
+import WelcomePreviewPage from "@/features/home/pages/welcome-preview-page"
 
 export const router = createBrowserRouter([
   {
@@ -197,6 +200,22 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: "/dev/plan-card-preview",
+          element: <PlanCardPreviewPage />,
+        },
+        {
+          path: "/dev/steps-accordion-preview",
+          element: <StepsAccordionPreviewPage />,
+        },
+        {
+          path: "/dev/welcome-preview",
+          element: <WelcomePreviewPage />,
+        },
+      ]
+    : []),
   {
     path: "*",
     element: <NotFoundPage />,
