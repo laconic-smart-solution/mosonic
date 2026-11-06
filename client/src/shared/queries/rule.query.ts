@@ -11,6 +11,33 @@ import {
   type RulesPageablePayload,
 } from "../services/rule.service"
 
+export function useCreateBlankRuleMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => ruleService.createBlank(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+    },
+    onError: (err) => {
+      toastApiError(err, "home:welcome.createFailed")
+    },
+  })
+}
+
+export function useDeleteRuleMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ruleId: string) => ruleService.deleteRule(ruleId),
+    onSuccess: (_data, ruleId) => {
+      void queryClient.invalidateQueries({ queryKey: ["rules", "pageable"] })
+      void queryClient.removeQueries({ queryKey: ["rule", ruleId] })
+    },
+    onError: (err) => {
+      toastApiError(err, "home:welcome.deleteFailed")
+    },
+  })
+}
+
 export function useExtractRuleMutation() {
   return useMutation({
     mutationFn: (payload: ExtractRulePayload) => ruleService.extract(payload),

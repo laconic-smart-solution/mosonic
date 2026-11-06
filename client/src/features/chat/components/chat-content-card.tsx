@@ -25,6 +25,8 @@ import {
   contentCardPendingTitleKey,
   contentCardWorkingKey,
   imageUrlFromNodeOutput,
+  nodeIdsMatch,
+  nodeOutputError,
   nodeStillPending,
 } from "../lib/rerun-node-label"
 import { ChatApproveContentDialog } from "./dialogs/chat-approve-content-dialog"
@@ -87,6 +89,7 @@ function previewFromDetail(data: {
     pendingNodeType: null,
     saved: false,
     rejectReason: null,
+    failReason: null,
     lanes: Array.isArray(data.lanes) ? data.lanes : [],
     nodes: Array.isArray(data.nodes) ? data.nodes : [],
   }
@@ -96,7 +99,6 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
   const { t } = useTranslation("chat")
   const [view, setView] = useState(snapshot)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [timedOut, setTimedOut] = useState(false)
   const [dialog, setDialog] = useState<ContentDialog>(null)
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
   const chatActions = useChatActions()
@@ -116,9 +118,9 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         lanes: snapshot.lanes.length > 0 ? snapshot.lanes : same ? prev.lanes : [],
         nodes: snapshot.nodes.length > 0 ? snapshot.nodes : same ? prev.nodes : [],
         rejectReason: snapshot.rejectReason ?? (same ? prev.rejectReason : null),
+        failReason: snapshot.failReason ?? (same ? prev.failReason : null),
       }
     })
-    setTimedOut(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- catalogKey stands in for lanes/nodes
   }, [
     snapshot.contentId,
@@ -135,6 +137,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
     snapshot.hasTranslation,
     snapshot.hasSummary,
     snapshot.rejectReason,
+    snapshot.failReason,
     catalogKey,
   ])
 
@@ -157,6 +160,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           pendingNodeId: v.pendingNodeId,
           pendingNodeType: v.pendingNodeType,
           rejectReason: v.rejectReason,
+          failReason: v.failReason,
           textPreview: next.textPreview || v.textPreview,
           lanes: next.lanes.length > 0 ? next.lanes : v.lanes,
           nodes: next.nodes.length > 0 ? next.nodes : v.nodes,
@@ -201,28 +205,40 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         action: "show_content",
         pendingNodeId: null,
         pendingNodeType: null,
+        failReason: null,
         hasImage: nextImage ? true : v.hasImage,
       }))
       if (nextImage) setImageUrl(nextImage)
     }
 
+    const markFailed = (reason: string) => {
+      if (cancelled) return
+      setView((v) => ({
+        ...v,
+        action: "content_rerun_failed",
+        pendingNodeId: null,
+        pendingNodeType: null,
+        failReason: reason.trim() || t("contentCard.updateFailedGeneric"),
+      }))
+    }
+
     const unsubDone = onContentNodeRerunCompleted((payload) => {
       if (payload.contentId !== contentId) return
-      if (pendingId && payload.nodeId !== pendingId) return
+      if (!nodeIdsMatch(pendingId, payload.nodeId)) return
       const url =
         typeof payload.output?.image === "string" ? payload.output.image.trim() : null
       markReady(url || null)
     })
     const unsubFail = onContentNodeFailedFinal((payload) => {
       if (payload.contentId !== contentId) return
-      if (pendingId && payload.nodeId !== pendingId) return
-      markReady(null)
+      if (!nodeIdsMatch(pendingId, payload.nodeId)) return
+      markFailed(payload.message || t("contentCard.updateFailedGeneric"))
     })
 
     const tick = async () => {
       if (Date.now() - started > POLL_LIMIT_MS) {
-        if (!cancelled) setTimedOut(true)
-        return false
+        markFailed(t("contentCard.updateTimedOut"))
+        return true
       }
       try {
         const data = await contentService.getById(contentId)
@@ -230,6 +246,9 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         const stillPending = pendingId
           ? nodeStillPending(data.nodeOutputs, pendingId)
           : false
+        const failedMsg = pendingId
+          ? nodeOutputError(data.nodeOutputs, pendingId)
+          : null
         const nextUrl =
           imageUrlFromNodeOutput(data.nodeOutputs, pendingId) ??
           (typeof data.outputs?.image === "string" ? data.outputs.image.trim() : null)
@@ -238,6 +257,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           setView((v) => ({
             ...next,
             rejectReason: v.rejectReason,
+            failReason: v.failReason,
             pendingNodeId: pendingId,
             pendingNodeType: pendingType,
             action: v.action,
@@ -246,9 +266,14 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           }))
           return false
         }
+        if (failedMsg) {
+          markFailed(failedMsg)
+          return true
+        }
         setView({
           ...previewFromDetail(data),
           rejectReason: view.rejectReason,
+          failReason: null,
           pendingNodeId: null,
           pendingNodeType: null,
           action: "show_content",
@@ -275,7 +300,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
       leaveContentRoom(contentId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll while this pending job is active
-  }, [view.action, view.contentId, view.pendingNodeId, view.pendingNodeType])
+  }, [view.action, view.contentId, view.pendingNodeId, view.pendingNodeType, t])
 
   const channels = useMemo(
     () => collectContentChannels(view.lanes, view.nodes),
@@ -307,20 +332,10 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
   const statusKey = ["draft", "in_review", "approved", "rejected"].includes(view.status)
     ? view.status
     : "unknown"
-  const flags = [
-    (channelPreview ? Boolean(channelPreview.imageUrl) : view.hasImage)
-      ? t("contentCard.hasImage")
-      : null,
-    view.hasVideo ? t("contentCard.hasVideo") : null,
-    (channelPreview?.hasTranslation ?? view.hasTranslation)
-      ? t("contentCard.hasTranslation")
-      : null,
-    (channelPreview?.hasSummary ?? view.hasSummary) ? t("contentCard.hasSummary") : null,
-  ].filter(Boolean)
-
   const rejected = view.status === "rejected"
   const decided = view.status === "approved" || rejected
   const pending = PENDING_ACTIONS.has(view.action)
+  const failed = view.action === "content_rerun_failed"
   const isImageJob = view.pendingNodeType === "image_generation"
   const TitleIcon = isImageJob ? ImageIcon : FileText
   const closeDialog = (open: boolean) => {
@@ -344,14 +359,14 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
   return (
     <div
       className={cn(
-        "w-full space-y-2.5 rounded-2xl border border-canvas-200 dark:border-white/8 bg-white dark:bg-navy-700 p-3",
-        rejected && "border-[#D64545]/40 dark:border-[#D64545]/40",
+        "w-full overflow-hidden rounded-2xl border border-canvas-200 dark:border-white/8 bg-white dark:bg-navy-700 shadow-sm",
+        (rejected || failed) && "border-[#D64545]/40 dark:border-[#D64545]/40",
       )}
     >
       <div
         role="button"
         tabIndex={0}
-        className="cursor-pointer space-y-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+        className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-inset"
         onClick={() => setDialog("check")}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -360,79 +375,8 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           }
         }}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-navy-700 dark:text-[#E8EDF6]">
-              <TitleIcon className="size-3.5 shrink-0" aria-hidden />
-              {t(contentCardPendingTitleKey(pending ? view.pendingNodeType : null))}
-            </p>
-            {rejected ? (
-              <span className="mt-1 inline-flex items-center rounded-full bg-[#FDECEC] dark:bg-[#D64545]/12 px-2 py-0.5 text-[11px] font-semibold text-[#D64545]">
-                {t("contentCard.status.rejected")}
-              </span>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">{t(`contentCard.status.${statusKey}`)}</p>
-            )}
-          </div>
-          <Link
-            to={`/content/${view.contentId}`}
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 text-[11px] font-medium text-navy-500 dark:text-navy-200 underline-offset-2 hover:underline"
-          >
-            {t("contentCard.openContent")}
-          </Link>
-        </div>
-
-        {channels.length > 0 ? (
-          <div
-            className="flex flex-wrap gap-1"
-            role="tablist"
-            aria-label={t("contentCard.channelPreview")}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {channels.map((channel) => {
-              const active = selectedChannel === channel
-              return (
-                <button
-                  key={channel}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setSelectedChannel(channel)}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
-                    active
-                      ? "border-teal-500/40 bg-teal-50 text-teal-800 dark:border-teal-400/40 dark:bg-teal-400/10 dark:text-teal-200"
-                      : "border-canvas-200 dark:border-white/10 bg-canvas-50 dark:bg-navy-800 text-canvas-700 dark:text-navy-200 hover:border-canvas-300",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex size-3.5 items-center justify-center rounded-full text-[7px] font-bold",
-                      LANE_PILL[channel] ?? "bg-muted text-muted-foreground",
-                    )}
-                    aria-hidden
-                  >
-                    {channelLabel(channel).slice(0, 2)}
-                  </span>
-                  {channelLabel(channel)}
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
-
-        {rejected && view.rejectReason ? (
-          <p className="text-xs text-[#D64545]">
-            {t("contentCard.rejectedReason", { reason: view.rejectReason })}
-          </p>
-        ) : null}
-        {displayText ? (
-          <p className="line-clamp-3 text-xs text-canvas-700 dark:text-navy-200">{displayText}</p>
-        ) : null}
         {pending && isImageJob ? (
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-canvas-200 dark:border-white/10 bg-canvas-50/80 dark:bg-navy-800/50 px-3 py-6">
+          <div className="flex items-center gap-2 border-b border-dashed border-canvas-200 dark:border-white/10 bg-canvas-50/80 dark:bg-navy-800/50 px-3 py-8">
             <Loader2 className="size-4 shrink-0 animate-spin text-teal-500" aria-hidden />
             <p className="text-[12px] text-muted-foreground">{t(contentCardWorkingKey(view.pendingNodeType))}</p>
           </div>
@@ -441,25 +385,132 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
           <FileServiceImage
             url={displayImage}
             alt=""
-            className="max-h-40 w-full rounded-xl object-cover"
-            loadingClassName="flex max-h-40 min-h-24 w-full items-center justify-center rounded-xl bg-canvas-50 dark:bg-navy-800 text-[11px] text-muted-foreground"
+            className="max-h-52 w-full object-cover"
+            loadingClassName="flex max-h-52 min-h-32 w-full items-center justify-center bg-canvas-50 dark:bg-navy-800 text-[11px] text-muted-foreground"
           />
         ) : null}
-        {!pending && flags.length > 0 ? (
-          <p className="text-[11px] text-muted-foreground">{flags.join(" · ")}</p>
-        ) : null}
-        {pending && !isImageJob ? (
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" aria-hidden />
-            {t(contentCardWorkingKey(view.pendingNodeType))}
-          </p>
-        ) : null}
-        {timedOut && pending ? (
-          <p className="text-[11px] text-muted-foreground">{t("contentCard.stillWorking")}</p>
-        ) : null}
+
+        <div className="space-y-2.5 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 space-y-1">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-navy-700 dark:text-[#E8EDF6]">
+                <TitleIcon className="size-3.5 shrink-0" aria-hidden />
+                {failed
+                  ? t("contentCard.titleUpdateFailed")
+                  : t(contentCardPendingTitleKey(pending ? view.pendingNodeType : null))}
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {rejected ? (
+                  <span className="inline-flex items-center rounded-full bg-[#FDECEC] dark:bg-[#D64545]/12 px-2 py-0.5 text-[11px] font-semibold text-[#D64545]">
+                    {t("contentCard.status.rejected")}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-canvas-100 dark:bg-navy-800 px-2 py-0.5 text-[11px] font-medium text-canvas-700 dark:text-navy-200">
+                    {t(`contentCard.status.${statusKey}`)}
+                  </span>
+                )}
+                {selectedChannel ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "flex size-3.5 items-center justify-center rounded-full text-[7px] font-bold",
+                        LANE_PILL[selectedChannel] ?? "bg-muted text-muted-foreground",
+                      )}
+                      aria-hidden
+                    >
+                      {channelLabel(selectedChannel).slice(0, 2)}
+                    </span>
+                    {channelLabel(selectedChannel)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <Link
+              to={`/content/${view.contentId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 text-[11px] font-medium text-navy-500 dark:text-navy-200 underline-offset-2 hover:underline"
+            >
+              {t("contentCard.openContent")}
+            </Link>
+          </div>
+
+          {channels.length > 1 ? (
+            <div
+              className="flex flex-wrap gap-1"
+              role="tablist"
+              aria-label={t("contentCard.channelPreview")}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              {channels.map((channel) => {
+                const active = selectedChannel === channel
+                return (
+                  <button
+                    key={channel}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setSelectedChannel(channel)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                      active
+                        ? "border-teal-500/40 bg-teal-50 text-teal-800 dark:border-teal-400/40 dark:bg-teal-400/10 dark:text-teal-200"
+                        : "border-canvas-200 dark:border-white/10 bg-canvas-50 dark:bg-navy-800 text-canvas-700 dark:text-navy-200 hover:border-canvas-300",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-3.5 items-center justify-center rounded-full text-[7px] font-bold",
+                        LANE_PILL[channel] ?? "bg-muted text-muted-foreground",
+                      )}
+                      aria-hidden
+                    >
+                      {channelLabel(channel).slice(0, 2)}
+                    </span>
+                    {channelLabel(channel)}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {rejected && view.rejectReason ? (
+            <p className="text-xs text-[#D64545]">
+              {t("contentCard.rejectedReason", { reason: view.rejectReason })}
+            </p>
+          ) : null}
+
+          {failed ? (
+            <p className="text-xs text-[#D64545]">
+              {view.failReason
+                ? t("contentCard.updateFailed", { reason: view.failReason })
+                : t("contentCard.updateFailedGeneric")}
+            </p>
+          ) : null}
+
+          {displayText ? (
+            <div className="rounded-xl bg-canvas-50/80 dark:bg-navy-800/50 px-3 py-2.5">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("contentCard.captionLabel")}
+              </p>
+              <p className="line-clamp-5 text-sm leading-relaxed text-navy-700 dark:text-[#E8EDF6]">
+                {displayText}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t("contentCard.noCaption")}</p>
+          )}
+
+          {pending && !isImageJob ? (
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+              {t(contentCardWorkingKey(view.pendingNodeType))}
+            </p>
+          ) : null}
+        </div>
       </div>
       {rejected ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 px-3 pb-3">
           <Button
             size="sm"
             className={chatDialogButton.primary}
@@ -472,7 +523,7 @@ export function ChatContentCard({ snapshot }: { snapshot: ContentCardSnapshot })
         </div>
       ) : null}
       {!decided ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 px-3 pb-3">
           <Button size="sm" className={chatDialogButton.positive} disabled={pending} onClick={() => setDialog("approve")}>
             {t("dialogs.actions.approve")}
           </Button>

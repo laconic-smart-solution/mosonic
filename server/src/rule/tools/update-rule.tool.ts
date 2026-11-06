@@ -26,6 +26,22 @@ const UPDATE_RULE_SCHEMA = z.object({
       brandVoice: z.string().optional(),
       brandRestrictions: z.array(z.string()).optional(),
       callToAction: z.string().optional(),
+      visualIdentity: z
+        .object({
+          primary: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional(),
+          secondary: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional(),
+          accent: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional(),
+          neutrals: z.array(z.string()).optional(),
+          fonts: z.array(z.string()).optional(),
+          logoAssetId: z.string().optional(),
+          designKeywords: z.array(z.string()).optional(),
+          designDirection: z.string().optional(),
+          colorsUnknown: z.boolean().optional(),
+        })
+        .optional()
+        .describe(
+          'Theme colors + design direction. Only set hex when the user/site evidenced them — never invent colors.',
+        ),
     })
     .optional()
     .describe(

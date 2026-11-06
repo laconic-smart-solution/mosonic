@@ -12,11 +12,13 @@ import {
   PLAN_CONFIRM_OPTION_ID,
   approvalArgsKey,
   isNegativeReply,
+  matchesPostIntent,
   normalizeRequest,
   parseUserChoice,
   NEGATIVE_ANSWERS,
 } from '../tools/tool-guards.util';
 import { ASK_USER_TOOL_NAME } from '../tools/ask-user.tool';
+import { willChangeLinesToTools } from './workflow-graph-snapshot.util';
 import { connectedChannels, latestPostPublished, type LiveFacts } from './live-facts.util';
 import {
   SESSION_STATE_VERSION,
@@ -30,6 +32,7 @@ import {
   type PendingItem,
   type PendingRun,
 } from './session-state.types';
+import { inferGoalAcceptance } from './goal-acceptance.util';
 
 export const MAX_PENDING = 4;
 export const MAX_APPROVALS = 3;
@@ -169,7 +172,14 @@ function validPending(p: unknown): p is PendingItem {
   if (!isObj(p) || !isNum(p.turn)) return false;
   switch (p.kind) {
     case 'ask':
-      return isStr(p.question) && strArr(p.optionIds) && (p.optionLabels === undefined || strArr(p.optionLabels)) && (p.confirmFor === undefined || isStr(p.confirmFor)) && (p.args === undefined || isObj(p.args));
+      return (
+        isStr(p.question) &&
+        strArr(p.optionIds) &&
+        (p.optionLabels === undefined || strArr(p.optionLabels)) &&
+        (p.confirmFor === undefined || isStr(p.confirmFor)) &&
+        (p.args === undefined || isObj(p.args)) &&
+        (p.willChangeTools === undefined || strArr(p.willChangeTools))
+      );
     case 'connect':
       return isStr(p.channel) && (p.via === 'oauth' || p.via === 'qr');
     case 'run':
@@ -323,11 +333,18 @@ export function reduceUserMessage(
           expiresTurn: s.turn + MAX_CONNECT_DETOUR_TURNS,
         });
       }
-      if (!isNo && pickedIds.includes(PLAN_CONFIRM_OPTION_ID)) {
-        const chain: PendingChain = { kind: 'chain', turn: s.turn, tools: [...PLAN_CHAIN_TOOLS] };
+      const affirmPlan =
+        pickedIds.includes(PLAN_CONFIRM_OPTION_ID) ||
+        pickedIds.some((id) => id === 'yes' || id === 'y' || id === 'ok');
+      if (!isNo && affirmPlan && (pickedIds.includes(PLAN_CONFIRM_OPTION_ID) || (ask.willChangeTools?.length ?? 0) > 0)) {
+        const tools =
+          ask.willChangeTools && ask.willChangeTools.length > 0
+            ? ask.willChangeTools
+            : [...PLAN_CHAIN_TOOLS];
+        const chain: PendingChain = { kind: 'chain', turn: s.turn, tools, source: 'plan' };
         s.pending = s.pending.filter((p) => p.kind !== 'chain');
         s.pending.push(chain);
-        resolution.chain = PLAN_CHAIN_TOOLS;
+        resolution.chain = new Set(tools);
       }
       if (!isNo) {
         const goalKind = pickedIds.map((id) => GOAL_CHIPS[id]).find(Boolean);
@@ -352,6 +369,26 @@ export function reduceUserMessage(
       s.pending = s.pending.filter((p) => p !== notRunChain);
     }
   }
+
+  // Free-text content task -> Goal.make_post (chips already handled above).
+  // Short ask answers / continue replies / bare choice chips must not replace an
+  // existing goal unless the user literally picked a GOAL_CHIPS id.
+  const choiceOnly = /^\s*user choice:/i.test(text);
+  const bareContinue = CONTINUE_REPLY.test(text.trim()) || BARE_YES.test(text.trim());
+  if (!choiceOnly && !bareContinue && matchesPostIntent(text)) {
+    const acceptance = inferGoalAcceptance(text);
+    const next = {
+      kind: 'make_post' as const,
+      turn: s.turn,
+      detail: clip(text),
+      ...(acceptance ? { acceptance } : {}),
+      satisfied: false as const,
+    };
+    if (!s.goal || s.goal.kind === 'make_post') {
+      s.goal = next;
+    }
+  }
+
   return { state: enforceCaps(s), resolution };
 }
 
@@ -397,6 +434,13 @@ export function reduceObservation(
     const confirmFor = isStr(payload?.confirmFor) ? payload.confirmFor : undefined;
     if (obs.name !== ASK_USER_TOOL_NAME && !confirmFor) return s;
     const cardArgs = confirmFor === 'fetch_website_assets' && isStr(payload?.url) && payload.url ? { ...args, url: payload.url } : args;
+    const planRaw = isObj(payload?.plan) ? (payload.plan as Record<string, unknown>) : null;
+    const willChangeLines = Array.isArray(planRaw?.willChange)
+      ? (planRaw!.willChange as unknown[]).filter(isStr).map((x) => x.trim()).filter(Boolean)
+      : [];
+    const willChangeTools = willChangeLines.length
+      ? willChangeLinesToTools(willChangeLines)
+      : undefined;
     const ask: PendingAsk = {
       kind: 'ask',
       turn: s.turn,
@@ -404,6 +448,7 @@ export function reduceObservation(
       optionIds: options.map((o) => (isStr(o.id) ? o.id : '').trim().toLowerCase()),
       optionLabels: options.map((o) => (isStr(o.label) ? o.label : '').trim().toLowerCase()),
       ...(confirmFor ? { confirmFor, args: cardArgs } : {}),
+      ...(willChangeTools && willChangeTools.length ? { willChangeTools } : {}),
     };
     s.pending = s.pending.filter((p) => p.kind !== 'ask');
     s.pending.push(ask);
@@ -621,6 +666,8 @@ export type StatePending = {
   askConfirmFor?: string;
   chainTools: string[];
   approvalTools: string[];
+  /** Unfinished make_post Goal: keep generation tools even on short ask answers. */
+  goalTools: string[];
 };
 
 export function statePendingFor(state: ChatSessionState, resolution?: UserMessageResolution | null): StatePending {
@@ -629,6 +676,7 @@ export function statePendingFor(state: ChatSessionState, resolution?: UserMessag
     ...(resolution?.ask?.confirmFor ? { askConfirmFor: resolution.ask.confirmFor } : {}),
     chainTools: state.pending.flatMap((p) => (p.kind === 'chain' ? p.tools : [])),
     approvalTools: state.approvals.map((a) => a.tool),
+    goalTools: state.goal?.kind === 'make_post' ? ['start_generation', 'apply_default_workflow'] : [],
   };
 }
 
@@ -686,11 +734,26 @@ export function renderSessionState(
     ...(answered ? [opts.firstOption ? `${answered}: the first option "${clip(opts.firstOption, 60)}"` : answered] : []),
     ...state.pending.filter((p) => !opts.minimal || p.kind === 'ask').map((p) => describePending(p, false)),
   ];
-  const goal = state.goal ? `Goal: ${state.goal.kind}${state.goal.detail ? ` "${clip(state.goal.detail, 60)}"` : ''} (t${state.goal.turn})` : null;
+  const goalAccept =
+    state.goal?.acceptance?.criteria?.length
+      ? `; need: ${state.goal.acceptance.criteria.join('; ')}`
+      : state.goal?.acceptance?.imageCount
+        ? `; need: ${state.goal.acceptance.imageCount} images`
+        : '';
+  const goal = state.goal
+    ? `Goal: ${state.goal.kind}${state.goal.detail ? ` "${clip(state.goal.detail, 60)}"` : ''}${goalAccept}${state.goal.satisfied ? ' [done]' : ''} (t${state.goal.turn})`
+    : null;
+  const resumeGoal =
+    !!state.goal &&
+    (state.goal.kind === 'make_post' || state.goal.kind === 'publish') &&
+    (!!opts.answeredAsk || state.stage === 'no_brand' || state.stage === 'brand_no_workflow');
   const build = (recent: ChatSessionState['recent'], choices: ChatSessionState['choices']) => {
     const lines: string[] = [];
     if (!opts.minimal && state.stage) lines.push(`Stage: ${state.stage}`);
     if (goal) lines.push(goal);
+    if (resumeGoal) {
+      lines.push('Goal not done - after handling this answer, continue the Goal (do not stop after brand create/update alone).');
+    }
     if (pendingItems.length) lines.push(`Pending: ${pendingItems.join('; ')}`);
     if (!opts.minimal && state.approvals.length) lines.push(`Approvals: ${state.approvals.map(describeApproval).join('; ')}`);
     if (!opts.minimal && choices.length) lines.push(`Choices: ${choices.map((c) => `${c.key}=${c.value} (t${c.turn})`).join('; ')}`);

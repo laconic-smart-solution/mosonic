@@ -1,0 +1,83 @@
+/* Welcome page tokens + layout (Designer handoff welcome-handoff.md). */
+.welcome-root {
+  --welcome-canvas: #f7f4ef;
+  --welcome-card: #ffffff;
+  --welcome-border: #d9d3c7;
+  --welcome-fg: #0f1f3d;
+  --welcome-muted: #4a5568;
+  --welcome-tint: #e0f4ef;
+  --welcome-ink: #254c94;
+  --welcome-art-paper: #ffffff;
+  --welcome-art-line: #d9d3c7;
+  background: var(--welcome-canvas);
+  color: var(--welcome-fg);
+}
+.dark .welcome-root {
+  --welcome-canvas: #0b1220;
+  --welcome-card: #121a2b;
+  --welcome-border: #243044;
+  --welcome-fg: #f3f1ec;
+  --welcome-muted: #9aa3b5;
+  --welcome-tint: #0e2a26;
+  --welcome-ink: #9bb8ed;
+  --welcome-art-paper: #18243a;
+  --welcome-art-line: #35435c;
+  color-scheme: dark;
+}
+.welcome-root svg { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.welcome-art { pointer-events: none; user-select: none; }
+.welcome-art-paper { fill: var(--welcome-art-paper); stroke: var(--welcome-art-line); }
+
+.welcome-hero { position: relative; isolation: isolate; text-align: center; padding: 44px 24px 34px; }
+.welcome-orbit { position: absolute; z-index: -1; left: 0; top: 41px; width: 270px; height: 200px; }
+.welcome-hero-art { position: absolute; z-index: -1; right: 0; top: 34px; width: 275px; height: 210px; }
+.welcome-empty .welcome-orbit { height: 140px; top: 20px; }
+@media (max-width: 900px) { .welcome-orbit { opacity: .4; } .welcome-hero-art { opacity: .35; } }
+@media (max-width: 520px) { .welcome-orbit, .welcome-hero-art { display: none; } }
+
+.welcome-eyebrow { display: flex; justify-content: center; align-items: center; gap: 9px; font-size: 10px; font-weight: 600; letter-spacing: 2.2px; text-transform: uppercase; color: var(--welcome-muted); }
+.welcome-eyebrow svg { width: 18px; height: 18px; color: #00a589; }
+.welcome-title { font: 600 clamp(52px, 7vw, 68px)/.98 "Cormorant Garamond", Georgia, serif; letter-spacing: -2px; margin-top: 10px; }
+.welcome-sub { color: var(--welcome-muted); font-size: 14px; line-height: 1.6; margin: 15px 0 22px; }
+
+.welcome-cta { display: inline-flex; gap: 10px; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border: 1px solid transparent; border-radius: 9999px; background: #00c9a7; color: #0f1f3d; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 5px 14px #00a58918; transition: background .18s, box-shadow .18s; }
+.welcome-cta:hover:not(:disabled) { background: #00b89a; box-shadow: 0 6px 20px #00a58930; }
+.welcome-cta:disabled { opacity: .7; cursor: progress; }
+.welcome-cta svg { width: 18px; height: 18px; }
+.welcome-cta:focus-visible, .welcome-brand:focus-visible { outline: 3px solid var(--welcome-ink); outline-offset: 4px; }
+
+.welcome-count { font-size: 11px; font-weight: 600; border-radius: 9999px; padding: 1px 8px; background: var(--welcome-tint); color: #007764; }
+.dark .welcome-count { color: #67dcc3; }
+.welcome-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .welcome-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .welcome-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.welcome-brand { display: flex; flex-direction: column; min-width: 0; min-height: 136px; height: 100%; padding: 18px; border: 1px solid var(--welcome-border); background: var(--welcome-card); border-radius: 14px; color: var(--welcome-fg); text-decoration: none; text-align: left; transition: border-color .18s, transform .18s, box-shadow .18s; }
+.welcome-brand:hover { border-color: #00a589; box-shadow: 0 5px 16px #0f1f3d0a; transform: translateY(-2px); }
+.welcome-go { position: absolute; right: 16px; top: 24px; width: 16px; height: 16px; color: var(--welcome-muted); pointer-events: none; transition: color .18s; }
+.welcome-card:hover .welcome-go { color: #00a589; }
+.welcome-avatar { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 13px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #eee3d7; color: #755330; }
+.welcome-avatar[data-tone="teal"] { background: var(--welcome-tint); color: #007764; }
+.welcome-avatar[data-tone="blue"] { background: #e8edf6; color: #254c94; }
+.dark .welcome-avatar { background: #332b25; color: #deb896; }
+.dark .welcome-avatar[data-tone="teal"] { background: var(--welcome-tint); color: #67dcc3; }
+.dark .welcome-avatar[data-tone="blue"] { background: #1e304f; color: #a8c5f8; }
+.welcome-brand-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding-right: 18px; }
+.welcome-date { margin-top: auto; font-size: 11px; color: var(--welcome-muted); }
+
+.welcome-empty-box { display: flex; align-items: center; justify-content: center; gap: 54px; padding: 22px 40px; border: 1px dashed var(--welcome-border); border-radius: 16px; background: var(--welcome-card); }
+.welcome-empty-art { width: 226px; height: 205px; flex-shrink: 0; }
+@media (max-width: 900px) { .welcome-empty-box { gap: 20px; } }
+@media (max-width: 520px) { .welcome-empty-box { flex-direction: column; text-align: center; padding: 24px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-cta, .welcome-brand, .welcome-go { transition: none; }
+  .welcome-brand:hover { transform: none; }
+}
+
+.welcome-foot { margin-top: 8px; text-align: center; font-size: 11px; letter-spacing: .2px; color: var(--welcome-muted); }
+
+/* Designer polish: visible dashed border in dark; CTA label always navy on teal. */
+.dark .welcome-empty-box { border: 2px dashed #3d4f6a; }
+.welcome-root .welcome-cta, .welcome-root .welcome-cta:hover, .welcome-root .welcome-cta svg { color: #0f1f3d; }
+

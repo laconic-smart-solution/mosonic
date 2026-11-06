@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../../llm/llm.service';
 import type { Rule } from '../../rule/schemas/rule.schema';
+import { formatVisualIdentityLines } from '../../rule/visual-identity.util';
 import {
   LlmProvider,
   NodeImageTemplate,
@@ -79,6 +80,8 @@ const SUBJECT_RULES = [
   'Do not translate the offering into an abstract feeling (progress, mastery, relief) unless the user explicitly asked for metaphor.',
   'Do not replace the product with a unrelated lifestyle tableau.',
   'People in the scene must match the target audience (age range, location cues, clothing, setting).',
+  'When Visual identity lists theme colors, put those hex (or clear color names) in Must include — do not invent a different brand palette.',
+  'When a logo / brand_mark reference is present, composite it; when design keywords exist, reflect them in Style.',
   'If the template is Photorealistic or Lifestyle, include the word "photorealistic" in Use or Style.',
 ].join('\n');
 
@@ -102,6 +105,7 @@ function formatRuleContext(rule: Rule): string[] {
       ? `${audience.ageRange.min}–${audience.ageRange.max}`
       : '';
 
+  const visualLines = formatVisualIdentityLines(brand?.visualIdentity);
   return [
     '=== BRAND ===',
     `Brand name: ${brand?.brandName?.trim() || '(not specified)'}`,
@@ -113,6 +117,9 @@ function formatRuleContext(rule: Rule): string[] {
     brand?.brandRestrictions?.length
       ? `Restrictions: ${joinList(brand.brandRestrictions)}`
       : '',
+    ...(visualLines.length
+      ? ['Visual identity:', ...visualLines.map((l) => `- ${l}`)]
+      : []),
     '',
     '=== AUDIENCE (must be visible in the scene) ===',
     optionalLine('Description', audience?.description) ||

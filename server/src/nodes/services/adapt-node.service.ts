@@ -19,6 +19,7 @@ import type {
   PreviousOutputs,
 } from '../types/node-execution.types';
 import { extractUsageFromAiMessage } from '../langchain-usage.util';
+import { parseMarkdownToSections } from '../../content/content-markdown-compiler.util';
 
 type AdaptConfig = {
   channel?: string;
@@ -115,10 +116,16 @@ export class AdaptNodeService {
 
     const usage = extractUsageFromAiMessage(res);
 
-    const outputPayload: Record<string, string> = {
+    const hasStructuredSections = Array.isArray(previous.sections) && previous.sections.length > 0;
+    const adaptedSections = hasStructuredSections
+      ? parseMarkdownToSections(adaptedText)
+      : undefined;
+
+    const outputPayload: Record<string, unknown> = {
       text: adaptedText,
       adaptedCaption: adaptedText,
       channel: channelEntry.channel,
+      ...(adaptedSections && adaptedSections.length > 0 ? { sections: adaptedSections } : {}),
     };
 
     if (mapping.caption === CaptionMappingSource.TranslatedText) {
@@ -129,6 +136,7 @@ export class AdaptNodeService {
 
     return {
       output: JSON.stringify(outputPayload),
+      ...(adaptedSections && adaptedSections.length > 0 ? { sections: adaptedSections } : {}),
       usage,
     };
   }

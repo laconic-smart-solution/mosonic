@@ -2,8 +2,10 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChatActiveWorkflowCard } from "./chat-active-workflow-card"
 import { ChatContentList } from "./chat-content-list"
+import { ChatPostList } from "./chat-post-list"
 
 function WorkspaceSection({
   title,
@@ -22,7 +24,7 @@ function WorkspaceSection({
   )
 }
 
-/** One brand profile = one chat thread, so there is no session list here — just workflow + drafts. */
+/** One brand profile = one chat thread — workflow plus Contents | Posts lists. */
 export function ChatWorkspacePanel({ ruleId }: { ruleId: string | null }) {
   const { t } = useTranslation("chat")
 
@@ -35,9 +37,31 @@ export function ChatWorkspacePanel({ ruleId }: { ruleId: string | null }) {
               <WorkspaceSection title={t("workspace.activeWorkflow")}>
                 <ChatActiveWorkflowCard ruleId={ruleId} />
               </WorkspaceSection>
-              <WorkspaceSection title={t("workspace.contents")}>
-                <ChatContentList ruleId={ruleId} />
-              </WorkspaceSection>
+              <Tabs defaultValue="contents" className="gap-3">
+                <TabsList
+                  variant="line"
+                  className="h-auto w-full justify-start gap-0 rounded-none border-b border-canvas-200 p-0 dark:border-white/8"
+                >
+                  <TabsTrigger
+                    value="contents"
+                    className="flex-none rounded-none px-3 pb-2 text-xs data-active:shadow-none"
+                  >
+                    {t("workspace.tabs.contents")}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="posts"
+                    className="flex-none rounded-none px-3 pb-2 text-xs data-active:shadow-none"
+                  >
+                    {t("workspace.tabs.posts")}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="contents" className="mt-0 outline-none">
+                  <ChatContentList ruleId={ruleId} />
+                </TabsContent>
+                <TabsContent value="posts" className="mt-0 outline-none">
+                  <ChatPostList ruleId={ruleId} />
+                </TabsContent>
+              </Tabs>
             </>
           ) : (
             <p className="px-1 text-xs text-muted-foreground">{t("workspace.noRule")}</p>

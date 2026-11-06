@@ -102,6 +102,11 @@ export const chatService = {
   deleteSession: async (sessionId: string): Promise<void> => {
     await apiClient.delete(`/chat/sessions/${sessionId}`)
   },
+  /** Bind a brand onto a ruleless onboarding session (after file-based extract). */
+  bindRule: async (sessionId: string, ruleId: string): Promise<ChatSession> => {
+    const response = await apiClient.patch(`/chat/sessions/${sessionId}/rule`, { ruleId })
+    return response.data
+  },
   listMessages: async (
     sessionId: string,
     params: { before?: string; limit?: number } = {},
@@ -120,3 +125,4 @@ export const chatService = {
     return response.data
   },
 }
+

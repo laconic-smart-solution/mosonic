@@ -69,7 +69,11 @@ function draftService(
   return {
     describeDraftNodes: jest.fn().mockResolvedValue({ lanes, nodes }),
     saveContent: jest.fn().mockResolvedValue({ success: true }),
-    scheduleRerun: jest.fn().mockResolvedValue(undefined),
+    scheduleRerun: jest.fn().mockImplementation(async (_id: string, dto: { nodeId: string }) => ({
+      outputNodeId: dto.nodeId,
+      workflowNodeId: dto.nodeId,
+      nodeType: 'image_generation',
+    })),
   } as unknown as ContentService;
 }
 

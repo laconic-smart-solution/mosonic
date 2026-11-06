@@ -1,11 +1,13 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -22,6 +24,52 @@ export class AgeRangeDto {
 
   @IsNumber()
   max!: number;
+}
+
+const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export class VisualIdentityDto {
+  @IsOptional()
+  @IsString()
+  @Matches(HEX_COLOR, { message: 'primary must be a #hex color' })
+  primary?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(HEX_COLOR, { message: 'secondary must be a #hex color' })
+  secondary?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(HEX_COLOR, { message: 'accent must be a #hex color' })
+  accent?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  neutrals?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fonts?: string[];
+
+  @IsOptional()
+  @IsString()
+  logoAssetId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  designKeywords?: string[];
+
+  @IsOptional()
+  @IsString()
+  designDirection?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  colorsUnknown?: boolean;
 }
 
 export class BrandDto {
@@ -47,6 +95,11 @@ export class BrandDto {
 
   @IsString()
   callToAction!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => VisualIdentityDto)
+  visualIdentity?: VisualIdentityDto;
 }
 
 export class AudienceDto {

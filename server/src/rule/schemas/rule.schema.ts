@@ -57,6 +57,22 @@ export interface AgeRange {
   max: number;
 }
 
+/**
+ * Structured brand look. Hex colors only when evidenced (site CSS/meta or user).
+ * Longer prose may also live on a guideline_document asset for RAG.
+ */
+export interface VisualIdentity {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+  neutrals?: string[];
+  fonts?: string[];
+  logoAssetId?: string;
+  designKeywords?: string[];
+  designDirection?: string;
+  colorsUnknown?: boolean;
+}
+
 export interface Brand {
   brandName: string;
   industry: string;
@@ -65,6 +81,7 @@ export interface Brand {
   brandVoice: string;
   brandRestrictions: string[];
   callToAction: string;
+  visualIdentity?: VisualIdentity;
 }
 
 export interface Audience {

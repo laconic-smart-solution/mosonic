@@ -671,6 +671,56 @@ describe('ChatSessionService.sendMessage onboarding (no Rule bound yet)', () => 
   });
 });
 
+
+describe('ChatSessionService.bindRuleToSession', () => {
+  it('binds a ruleId onto a ruleless session', async () => {
+    const { service, sessions, ruleService } = makeService({
+      session: { sessionId: 'session-1', ruleId: null },
+    });
+    sessions.updateById.mockResolvedValue({
+      sessionId: 'session-1',
+      ruleId: 'rule-from-files',
+      userId: 'user-1',
+      title: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    ruleService.getRuleById.mockResolvedValue({ ruleId: 'rule-from-files' });
+
+    const result = await service.bindRuleToSession('session-1', 'rule-from-files', auth);
+
+    expect(ruleService.getRuleById).toHaveBeenCalledWith('rule-from-files', auth);
+    expect(sessions.updateById).toHaveBeenCalledWith(
+      'session-1',
+      { ruleId: 'rule-from-files' },
+      auth,
+    );
+    expect(result.ruleId).toBe('rule-from-files');
+  });
+
+  it('is a no-op when the session already has that ruleId', async () => {
+    const { service, sessions, ruleService } = makeService({
+      session: { sessionId: 'session-1', ruleId: 'rule-1' },
+    });
+    ruleService.getRuleById.mockResolvedValue({ ruleId: 'rule-1' });
+
+    const result = await service.bindRuleToSession('session-1', 'rule-1', auth);
+
+    expect(sessions.updateById).not.toHaveBeenCalled();
+    expect(result.ruleId).toBe('rule-1');
+  });
+
+  it('rejects binding a different ruleId onto an already-bound session', async () => {
+    const { service } = makeService({
+      session: { sessionId: 'session-1', ruleId: 'rule-1' },
+    });
+
+    await expect(
+      service.bindRuleToSession('session-1', 'rule-other', auth),
+    ).rejects.toThrow(/already bound/i);
+  });
+});
+
 describe('ChatSessionService.sendMessage per-session lock', () => {
   beforeEach(() => {
     (runToolCallingLoop as jest.Mock).mockResolvedValue({

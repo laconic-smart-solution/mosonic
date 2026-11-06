@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   contentCardWorkingKey,
+  nodeIdsMatch,
+  nodeOutputError,
   nodeStillPending,
   pendingNodeTypeFromResult,
   rerunToolLabelKey,
@@ -52,5 +54,30 @@ describe("nodeStillPending", () => {
     expect(
       nodeStillPending({ "n-1": { image: "https://old.png", _pending: true } }, "n-1"),
     ).toBe(true)
+  })
+
+  it("matches catalog id to materialized lane suffix", () => {
+    expect(
+      nodeStillPending({ "n-1__instagram": { _pending: true } }, "n-1"),
+    ).toBe(true)
+  })
+})
+
+describe("nodeIdsMatch", () => {
+  it("treats uuid__lane as the same node as uuid", () => {
+    expect(nodeIdsMatch("img-1", "img-1__tiktok")).toBe(true)
+    expect(nodeIdsMatch("img-1__tiktok", "img-1")).toBe(true)
+    expect(nodeIdsMatch("img-1", "img-2")).toBe(false)
+  })
+})
+
+describe("nodeOutputError", () => {
+  it("reads terminal error after _pending is cleared", () => {
+    expect(
+      nodeOutputError({ "n-1": { error: "Refunded", _pending: true } }, "n-1"),
+    ).toBeNull()
+    expect(nodeOutputError({ "n-1": { error: "Refunded" } }, "n-1")).toBe(
+      "Refunded",
+    )
   })
 })

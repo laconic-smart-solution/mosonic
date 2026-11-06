@@ -1,4 +1,4 @@
-﻿import {
+import {
   buildGenerationPreview,
   generationPreviewPrompt,
   previewGaps,
@@ -30,8 +30,12 @@ describe('plan card shows what the user asked for', () => {
       request: { channels: ['tiktok'], wantsVideo: true, brandChannels: ['instagram'] },
     }));
     expect(out.question).not.toContain('shared');
-    expect(out.question).toContain('Channels: TikTok');
     expect(out.question).toContain('Add video step + TikTok first?');
+    expect(out.gaps.channels).toEqual(['TikTok']);
+    expect(out.gaps.missingVideo).toBe(true);
+    expect(out.estimate.images).toBe(1);
+    expect(out.estimate.credits).toBeGreaterThan(1);
+    expect(out.estimate.basis).toBe('list_price');
     expect(out.needsAdding).toBe(true);
     expect(out.options[0].id).toBe('add_missing');
     expect(out.options.map((o: { id: string }) => o.id)).toContain(PREVIEW_CONFIRM_OPTION_ID);
@@ -40,7 +44,9 @@ describe('plan card shows what the user asked for', () => {
 
   it('no gaps: plain Start card with brand channels', () => {
     const out = JSON.parse(generationPreviewPrompt({ topic: 't', preview: imageOnly, request: { brandChannels: ['instagram'] } }));
-    expect(out.question).toContain('Channels: Instagram.');
+    expect(out.gaps.channels).toEqual(['Instagram']);
+    expect(out.estimate.images).toBe(1);
+    expect(out.estimate.credits).toBeGreaterThan(1);
     expect(out.needsAdding).toBe(false);
     expect(out.options[0]).toEqual({ id: PREVIEW_CONFIRM_OPTION_ID, label: 'Start' });
   });

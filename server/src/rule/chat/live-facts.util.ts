@@ -4,6 +4,11 @@
  * is unchanged from when it was built inline), and code reads the fields
  * instead of regex-scraping the prompt.
  */
+import {
+  renderWorkflowGraphSnapshot,
+  type WorkflowGraphSnapshot,
+} from './workflow-graph-snapshot.util';
+
 export type LiveFacts = {
   /** null = this brand has no workflow yet. */
   workflow: { status: string; steps: string } | null;
@@ -18,6 +23,11 @@ export type LiveFacts = {
   /** null = the account lookup failed (the line is left out). */
   accounts: { channel: string; label: string; connected: boolean }[] | null;
   memoryCount: number;
+  /**
+   * Authoritative lane/node graph (esp. image_generation counts).
+   * Always set by buildLiveState when available; beats stale chat claims.
+   */
+  graph?: WorkflowGraphSnapshot | null;
 };
 
 export const LIVE_STATE_HEADER =
@@ -53,6 +63,9 @@ export function renderLiveState(facts: LiveFacts): string {
     );
   }
   lines.push(`Saved memory notes: ${facts.memoryCount}.`);
+  if (facts.graph) {
+    lines.push('', renderWorkflowGraphSnapshot(facts.graph));
+  }
   return lines.join('\n');
 }
 

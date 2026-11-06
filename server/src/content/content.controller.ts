@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UploadedFiles,
@@ -32,6 +33,8 @@ import {
 import { GenerateNodeDto } from './dto/generate-node.dto';
 import { RerunNodeDto } from './dto/rerun-node.dto';
 import { SaveContentDto } from './dto/save-content.dto';
+import { UpdateSectionDto } from './dto/update-section.dto';
+import { RegenerateSectionDto } from './dto/regenerate-section.dto';
 import { parseContentRerunMultipart } from './parse-content-rerun-multipart';
 import { parseContentGenerateMultipart } from './parse-content-generate-multipart';
 import { ContentService } from './content.service';
@@ -181,6 +184,30 @@ export class ContentController {
   async reject(@Req() req: Request, @Param('contentId') contentId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
     return this.contentService.rejectContent(contentId, auth);
+  }
+
+  @Patch(':contentId/sections/:sectionKey')
+  @UsePipes(bodyPipe)
+  async updateSection(
+    @Req() req: Request,
+    @Param('contentId') contentId: string,
+    @Param('sectionKey') sectionKey: string,
+    @Body() body: UpdateSectionDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.contentService.updateSection(contentId, sectionKey, body, auth);
+  }
+
+  @Post(':contentId/sections/:sectionKey/regenerate')
+  @UsePipes(bodyPipe)
+  async regenerateSection(
+    @Req() req: Request,
+    @Param('contentId') contentId: string,
+    @Param('sectionKey') sectionKey: string,
+    @Body() body: RegenerateSectionDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.contentService.regenerateSection(contentId, sectionKey, body, auth);
   }
 
   @Get(':contentId')

@@ -7,6 +7,7 @@ import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UploadModule } from '../upload/upload.module';
 import { WorkflowModule } from '../workflow/workflow.module';
+import { NodesModule } from '../nodes/nodes.module';
 import { ContentController } from './content.controller';
 import { FileProxyController } from './file-proxy.controller';
 import { FileProxyService } from './file-proxy.service';
@@ -24,6 +25,7 @@ import { ContentService } from './content.service';
     forwardRef(() => OrchestrationModule),
     forwardRef(() => UploadModule),
     forwardRef(() => WorkflowModule),
+    forwardRef(() => NodesModule),
   ],
   controllers: [ContentController, FileProxyController, ImageFileController],
   providers: [ContentService, FileProxyService, ImageFileService],

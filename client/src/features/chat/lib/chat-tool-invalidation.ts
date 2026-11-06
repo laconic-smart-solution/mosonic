@@ -33,6 +33,10 @@ const TOOL_QUERY_KEYS: Record<string, QueryKey[]> = {
   update_node_config: WORKFLOW,
 
   start_generation: RUN,
+  // Synthetic follow-up observation when a chat-started run ends.
+  pipeline_result: RUN,
+  // Follow-up get_content reveals a newly finished draft — refresh the rail.
+  get_content: CONTENT,
   rerun_content_node: RUN,
   generate_more_image: RUN,
   generate_presenter_video: RUN,

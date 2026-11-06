@@ -11,6 +11,7 @@ import { PdfHandler } from './pdf.handler';
 import { DocxHandler } from './docx.handler';
 import { TextHandler } from './text.handler';
 import { ImageHandler } from './image.handler';
+import { extractVisualIdentityFromHtml } from '../../rule/visual-identity-from-html.util';
 
 const BROWSER_LIKE_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -93,6 +94,8 @@ export class UrlHandler {
 
       if (ct.includes('html') || buf.subarray(0, 512).includes(60)) {
         const html = buf.toString('utf8');
+        // Read CSS/meta colors BEFORE stripping <style> (evidence-only; no invention).
+        const visual = extractVisualIdentityFromHtml(html);
         const $ = cheerio.load(html);
         $('script, style, noscript, iframe, svg').remove();
         const title = normalizeWhitespace($('title').first().text());
@@ -108,6 +111,7 @@ export class UrlHandler {
           title ? `Title: ${title}` : '',
           metaDescription ? `Description: ${metaDescription}` : '',
           bodyText,
+          visual.evidenceText,
         ].filter(Boolean);
         const text = parts.join('\n\n');
         if (!text.trim()) {

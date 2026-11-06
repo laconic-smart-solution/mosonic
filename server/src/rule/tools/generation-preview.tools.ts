@@ -10,6 +10,7 @@ import { DISTRIBUTION_CHANNELS } from '../../workflow/distribution-channels.util
 import type { WorkflowService } from '../../workflow/workflow.service';
 import { resolveContentForSession } from './content-scope.util';
 import { runTool, toolError, toolOk } from './tool-error.util';
+import { estimatePipelineCredits } from './estimate-run-credits.util';
 
 /** ask_user option id on the start_generation preview card (same id the plan-confirm card uses). */
 export const PREVIEW_CONFIRM_OPTION_ID = 'start_post';
@@ -151,17 +152,24 @@ export function previewGaps(preview: GenerationPreview, request: PreviewRequest 
 }
 
 /** ask_user observation shown instead of starting a run the user has not confirmed yet. */
+export type PreviewPlan = {
+  youAskedFor: string | string[];
+  willChange: string[];
+  notPossible: string[];
+};
+
 export function generationPreviewPrompt(input: {
   topic: string;
   preview: GenerationPreview;
+  workflowId?: string;
   brief?: Record<string, unknown>;
   request?: PreviewRequest;
+  plan?: PreviewPlan;
+  attachedImageCount?: number;
+  brandImageCount?: number;
 }): string {
   const { preview } = input;
   const gaps = previewGaps(preview, input.request);
-  const channels = gaps.channels.length
-    ? `${gaps.channels.join(', ')}${gaps.shared && gaps.channels.length > 1 ? ' (one shared version)' : ''}`
-    : 'your brand channels (one shared version)';
   const missing = [
     ...(gaps.missingVideo ? ['a video step (you asked for a video; this run makes no video)'] : []),
     ...(gaps.missingChannels.length ? [`${gaps.missingChannels.join(', ')} (not a channel on this workflow yet)`] : []),
@@ -171,12 +179,35 @@ export function generationPreviewPrompt(input: {
     ...(gaps.missingVideo ? ['video step'] : []),
     ...gaps.missingChannels,
   ].join(' + ');
-  const question = [
-    `Ready to generate "${input.topic.slice(0, 120)}"?`,
-    `Channels: ${channels}. Steps: ${preview.steps.length}${preview.videoSteps ? ` (${preview.videoSteps} video, uses video credits)` : ''}.`,
-    ...preview.lines.slice(0, 12).map((l) => `- ${l}`),
-    ...(needsAdding ? [`Missing for your request: ${missing.join('; ')}.`, `Add ${addLabel} first?`] : []),
-  ].join('\n');
+  // Short title only: the client renders channels + node list from `preview`. Never put tool instructions in `question`.
+  const question = needsAdding
+    ? `Ready to generate "${input.topic.slice(0, 120)}"? Add ${addLabel} first?`
+    : `Ready to generate "${input.topic.slice(0, 120)}"?`;
+
+  const missingByLabel = new Set(gaps.missingChannels.map((l) => l.toLowerCase()));
+  const steps = preview.steps.map((s) => {
+    const laneLabel = s.lane ? channelLabel(s.lane).toLowerCase() : '';
+    const badge =
+      s.lane && missingByLabel.has(laneLabel)
+        ? ('adding' as const)
+        : s.issue
+          ? ('updated' as const)
+          : undefined;
+    return badge ? { ...s, badge } : s;
+  });
+
+  const runEst = estimatePipelineCredits(steps);
+  const images = runEst.images;
+  const credits = runEst.credits;
+
+  const plan = input.plan
+    ? {
+        youAskedFor: input.plan.youAskedFor,
+        willChange: input.plan.willChange.filter((x) => x.trim()),
+        notPossible: input.plan.notPossible.filter((x) => x.trim()),
+      }
+    : undefined;
+
   return JSON.stringify({
     ok: false,
     code: 'preview_confirm',
@@ -184,10 +215,17 @@ export function generationPreviewPrompt(input: {
     type: 'single',
     confirmFor: 'start_generation',
     question,
-    preview: { steps: preview.steps, lanes: preview.lanes, issues: preview.issues },
+    topic: input.topic.slice(0, 200),
+    ...(input.workflowId ? { workflowId: input.workflowId } : {}),
+    preview: { steps, lanes: preview.lanes, issues: preview.issues, videoSteps: preview.videoSteps },
     gaps,
     needsAdding,
+    estimate: { images, credits, basis: 'list_price' as const },
+    ...(typeof input.attachedImageCount === 'number' ? { attachedImageCount: input.attachedImageCount } : {}),
+    ...(typeof input.brandImageCount === 'number' ? { brandImageCount: input.brandImageCount } : {}),
+    ...(plan ? { plan } : {}),
     ...(input.brief ? { brief: input.brief } : {}),
+    // Internal next-step hint for the model only. The client must NOT render this.
     message:
       (needsAdding
         ? `Nothing started yet. The workflow lacks what the user asked for (${missing.join('; ')}). On add_missing (or a plain yes): add the missing parts (add_workflow_node video_presenter or video_cinematic - ask which if unclear; set_workflow_channels for a missing channel), then call start_generation again to show the updated plan. On start_post run without them. `

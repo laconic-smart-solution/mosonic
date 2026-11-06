@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { BrainCircuit, Eraser } from "lucide-react"
 import { toast } from "sonner"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 
@@ -19,25 +20,33 @@ import { ChatUploadAssetsDialog } from "@/features/chat/components/dialogs/chat-
 import { ChatActionsContext, type ChatActions } from "@/features/chat/hooks/use-chat-actions"
 import { useActiveChatSession } from "@/features/chat/hooks/use-active-chat-session"
 import { useChatSteps } from "@/features/chat/hooks/use-chat-steps"
+import { useInvalidateOnRunTerminal } from "@/features/chat/hooks/use-invalidate-on-run-terminal"
 import { useRuleBuildProgress } from "@/features/chat/hooks/use-rule-build-progress"
-import { useQueryClient } from "@tanstack/react-query"
 import { flattenChatMessagePages } from "@/features/chat/lib/chat-message-pages"
 import {
   createPendingUserMessage,
   withPendingUserMessage,
 } from "@/features/chat/lib/optimistic-chat-message"
+import { HomeWelcome } from "@/features/home/components/home-welcome"
 import {
   readHomeOauthReturn,
   stripHomeOauthParams,
 } from "@/features/home/lib/home-oauth-return"
 import { RedNoteQrConnectDialog } from "@/features/settings/components/rednote-qr-connect-dialog"
 import { useChatMessagesQuery, useSendChatMessageMutation } from "@/shared/queries/chat.query"
+import {
+  useCreateBlankRuleMutation,
+  useExtractRuleMutation,
+} from "@/shared/queries/rule.query"
+import { chatService } from "@/shared/services/chat.service"
+import { toastApiError } from "@/shared/lib/toast-error"
 import { useSyncZernioAccountsMutation } from "@/shared/queries/zernio.query"
 import type { ContextUsage } from "@/shared/services/chat.service"
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { t } = useTranslation("chat")
+  const { t: tHome } = useTranslation("home")
   const { t: tSettings } = useTranslation("settings")
   const [searchParams, setSearchParams] = useSearchParams()
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -50,6 +59,7 @@ export default function HomePage() {
   const brandPanelRef = useRef<HTMLDivElement>(null)
   const handledOAuthRef = useRef(false)
   const syncMutation = useSyncZernioAccountsMutation()
+  const createBlankRuleMutation = useCreateBlankRuleMutation()
 
   const {
     ruleOptions,
@@ -65,6 +75,18 @@ export default function HomePage() {
   } = useActiveChatSession()
 
   const selectedRule = ruleOptions.find((r) => r.ruleId === selectedRuleId)
+  const showWelcome = !selectedRuleId
+
+  async function startUntitledBrand() {
+    if (createBlankRuleMutation.isPending) return
+    try {
+      const created = await createBlankRuleMutation.mutateAsync()
+      toast.success(tHome("welcome.createdToast", { name: created.name }))
+      selectRule(created.ruleId)
+    } catch {
+      // toast via mutation onError
+    }
+  }
 
   useEffect(() => {
     setContextUsage(null)
@@ -95,6 +117,7 @@ export default function HomePage() {
 
   const messagesQuery = useChatMessagesQuery(activeSessionId ?? undefined)
   const sendMessageMutation = useSendChatMessageMutation()
+  const extractRuleMutation = useExtractRuleMutation()
   const { messages: threadMessages, historicalIds } = useMemo(() => {
     const flat = flattenChatMessagePages(messagesQuery.data?.pages)
     const pending =
@@ -117,12 +140,51 @@ export default function HomePage() {
   // Run follow-up replies arrive over the socket, not from our own send - refetch the thread.
   const { liveSteps, isFollowUp, prepareSession } = useChatSteps(activeSessionId, (sessionId) => {
     void queryClient.invalidateQueries({ queryKey: ["chat-messages", sessionId] })
+    // Follow-up get_content / pipeline_result may land after the run card finishes.
+    void queryClient.invalidateQueries({ queryKey: ["contents"] })
+    void queryClient.invalidateQueries({ queryKey: ["content"] })
+    void queryClient.invalidateQueries({ queryKey: ["posts"] })
   })
+  useInvalidateOnRunTerminal()
   const { step: ruleBuildStep, startTracking: startTrackingRuleBuild } = useRuleBuildProgress()
 
   // A running generation never locks the composer; only a reply being written does
   // (our own send, or the short automatic report when a run finishes).
   const isBusy = sendMessageMutation.isPending || isFollowUp
+
+
+  async function bootstrapBrandFromFiles(files: File[], text: string): Promise<string> {
+    const sessionId = activeSessionId ?? (await createSession())
+    if (!sessionId) throw new Error("no session")
+
+    const form = new FormData()
+    const input =
+      text.trim() ||
+      t("composer.bootstrapFromFilesInput", {
+        defaultValue: "Build a brand profile from the attached files.",
+      })
+    form.append("input", input)
+    for (const file of files) form.append("files", file)
+
+    let ruleId: string
+    try {
+      ;({ ruleId } = await extractRuleMutation.mutateAsync(form))
+    } catch (err) {
+      toastApiError(err, "rules:toast.couldNotStartExtraction")
+      throw err
+    }
+
+    try {
+      await chatService.bindRule(sessionId, ruleId)
+    } catch (err) {
+      toastApiError(err, "chat:toast.bindRuleFailed")
+      throw err
+    }
+
+    bindRuleToCurrentSession(ruleId)
+    startTrackingRuleBuild(ruleId)
+    return ruleId
+  }
 
   async function handleSend(text: string) {
     const trimmed = text.trim()
@@ -160,6 +222,23 @@ export default function HomePage() {
     else brandPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
   }
 
+  if (showWelcome) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 w-full overflow-hidden bg-canvas-100 dark:bg-navy-900">
+        <HomeWelcome
+          rules={ruleOptions}
+          isLoadingRules={isLoadingRules}
+          isLoadingMore={isLoadingMoreRules}
+          canViewMore={canViewMoreRules}
+          onViewMore={onViewMoreRules}
+          onSelectRule={selectRule}
+          creating={createBlankRuleMutation.isPending}
+          onCreated={(ruleId) => selectRule(ruleId)}
+        />
+      </div>
+    )
+  }
+
   return (
     <ChatActionsContext.Provider value={chatActions}>
     <div className="flex h-full min-h-0 min-w-0 w-full overflow-hidden bg-canvas-100 dark:bg-navy-900">
@@ -175,8 +254,8 @@ export default function HomePage() {
             canViewMore={canViewMoreRules}
             onSelectRule={selectRule}
             onViewMore={onViewMoreRules}
-            onNewBrand={() => {
-              // Unbound chat = onboarding; the AI creates the new brand profile (create_rule_from_intake).
+            onNewBrand={() => void startUntitledBrand()}
+            onLeaveBrand={() => {
               setDraft("")
               selectRule(null)
             }}
@@ -236,6 +315,7 @@ export default function HomePage() {
           onSubmit={handleSend}
           busy={isBusy}
           ruleId={selectedRuleId}
+          onBootstrapFromFiles={bootstrapBrandFromFiles}
         />
       </div>
 
@@ -284,3 +364,4 @@ export default function HomePage() {
     </ChatActionsContext.Provider>
   )
 }
+

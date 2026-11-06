@@ -26,10 +26,17 @@
   "workspace": {
     "activeWorkflow": "Active workflow",
     "contents": "Contents",
+    "tabs": {
+      "contents": "Contents",
+      "posts": "Posts"
+    },
     "noWorkflow": "No workflow yet — ask the AI to build one.",
     "noContent": "No content generated yet.",
+    "noPosts": "No posts yet.",
     "viewAllContents": "View all content",
+    "viewAllPosts": "View all posts",
     "contentUntitled": "Untitled content",
+    "postUntitled": "Untitled post",
     "noRule": "Select a brand profile to see its workflow and content.",
     "cancelRun": "Cancel run"
   },
@@ -162,6 +169,7 @@
     "title": "Content draft",
     "titleUpdatingImage": "Updating image…",
     "titleUpdatingCaption": "Updating caption…",
+    "titleUpdateFailed": "Update failed",
     "openContent": "Open content",
     "working": "Generating this extra output…",
     "workingImage": "Updating the image…",
@@ -169,6 +177,9 @@
     "workingTranslation": "Updating the translation…",
     "workingSummary": "Updating the summary…",
     "stillWorking": "Still working. Open content to keep watching.",
+    "updateFailed": "Update failed: {{reason}}",
+    "updateFailedGeneric": "That update failed. Credits were refunded — try again.",
+    "updateTimedOut": "That update took too long. Open content to check, or try again.",
     "observation": "Content · {{status}}",
     "hasImage": "Image",
     "hasVideo": "Video",
@@ -207,7 +218,134 @@
     "plan": {
       "asked": "You asked for",
       "willChange": "I'll change",
-      "notPossible": "Not possible"
+      "notPossible": "Not possible",
+      "notPossibleYet": "Not possible yet"
+    },
+    "preview": {
+      "readyTitle": "Ready to generate",
+      "stepCount": "{{count}} steps",
+      "videoSteps": "{{count}} video",
+      "stepsLabel": "Workflow steps",
+      "apply": "Apply",
+      "noSettings": "No editable settings on this step.",
+      "needsSetup": "Needs setup",
+      "missingVideo": "No video step for this request",
+      "missingChannel": "{{channel}} not on this workflow",
+      "nodeType": {
+        "keyword_planner": "Keyword planner",
+        "web_search": "Web search",
+        "intelligence": "Intelligence",
+        "text_generation": "Write caption",
+        "image_generation": "Image",
+        "translation": "Translation",
+        "branch": "Branch",
+        "adapt": "Adapt",
+        "merge": "Merge",
+        "summary": "Summary",
+        "video_presenter": "Presenter video",
+        "video_cinematic": "Cinematic video",
+        "video_generation": "Video",
+        "adaptFor": "Adapt for {{channel}}",
+        "imageFor": "Image · {{channel}}"
+      },
+      "reviewTitle": "Review this plan",
+      "close": "Close",
+      "stepsRuns": "{{count}} steps · runs top to bottom",
+      "badgeAdding": "adding",
+      "badgeUpdated": "updated",
+      "creditsApprox": "~{{count}} credits",
+      "footerCost": "{{images}} images · ~{{credits}} credits",
+      "cancel": "Cancel",
+      "changeSettings": "Change settings",
+      "startWithCredits": "Start · ~{{count}} credits",
+      "tabs": {
+        "basics": "Basics",
+        "advanced": "Advanced",
+        "style": "Style",
+        "size": "Size",
+        "references": "References",
+        "prompt": "Prompt",
+        "text": "Text",
+        "hashtags": "Hashtags"
+      },
+      "fields": {
+        "topic": "Topic",
+        "market": "Market",
+        "keywords": "Keywords to use",
+        "addKeyword": "Add a keyword",
+        "useBrandKeywords": "Use saved brand keywords",
+        "imageType": "Image type",
+        "mood": "Mood",
+        "brandColors": "Brand colours",
+        "useBrandPalette": "Use brand palette",
+        "logo": "Logo",
+        "addLogo": "Add logo",
+        "howManyImages": "How many images",
+        "wasN": "was {{n}}",
+        "size": "Size",
+        "useAttached": "Use attached screenshots",
+        "useBrandImages": "Use saved brand images ({{count}})",
+        "add": "+ add",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Optional notes for the image",
+        "length": "Length",
+        "tone": "Tone",
+        "language": "Language",
+        "extraNote": "Extra note",
+        "hashtagNote": "Hashtag notes",
+        "hashtagPlaceholder": "e.g. keep under 5 hashtags"
+      },
+      "imageTypes": {
+        "website_mockup": "Website mockup",
+        "photo": "Photo",
+        "illustration": "Illustration",
+        "watercolor": "Watercolor"
+      },
+      "moods": {
+        "clean": "Clean",
+        "bold": "Bold",
+        "playful": "Playful"
+      },
+      "markets": {
+        "thailand": "Thailand",
+        "global": "Global"
+      },
+      "lengths": {
+        "short": "Short (≤150)",
+        "medium": "Medium"
+      },
+      "tones": {
+        "casual": "Casual",
+        "professional": "Professional",
+        "friendly": "Fun"
+      },
+      "hints": {
+        "watercolorSkipped": "Saved preference “watercolor” not used this time",
+        "imageCountNotInOneRun": "More than 1 image per channel in one run is not supported yet — extras need generate-more after (credits).",
+        "sizeTab": "Size tab · 1:1 is best for Facebook feed",
+        "attachedCount": "{{count}} attached in chat · used as reference",
+        "promptMapsToNegative": "Saved as the image negative / notes field.",
+        "languageDisplayOnly": "Language chips are a note for this run; add a Translation step to persist another language.",
+        "hashtagsDisplayOnly": "Hashtag notes are not saved on the node yet.",
+        "keywordAdvanced": "Saved on the keyword step as custom prompt when supported."
+      },
+      "nodeBlurb": {
+        "keyword_planner": "Finds topics & hashtags",
+        "text_generation": "Writes the caption",
+        "adapt": "Rewrites the caption for {{channel}}",
+        "image_generation": "Makes the {{channel}} pictures"
+      },
+      "footerImages_one": "{{count}} image",
+      "footerImages_other": "{{count}} images",
+      "footerCredits_one": "~{{count}} credit",
+      "footerCredits_other": "~{{count}} credits",
+      "footerListPrice": "(list price)",
+      "footerCreditsWhenStart": "Credits apply when you start",
+      "start": "Start",
+      "startWithCredits_one": "Start · ~{{count}} credit",
+      "startWithCredits_other": "Start · ~{{count}} credits",
+      "creditsApprox_one": "~{{count}} credit",
+      "creditsApprox_other": "~{{count}} credits"
     }
   },
   "stepTrace": {
@@ -232,7 +370,15 @@
     "failedSuffix_one": " · {{count}} didn't finish",
     "failedSuffix_other": " · {{count}} didn't finish",
     "savedNote": "Saved your preference",
-    "genericStep": "Worked on it"
+    "genericStep": "Worked on it",
+    "sectionPlan": "Plan",
+    "sectionThinking": "Thinking",
+    "sectionDoing": "Doing",
+    "planEmpty": "No workflow changes needed for this request.",
+    "summaryWorking": "Working · {{done}} of {{total}} steps",
+    "summaryWaiting": "Waiting for your choice · {{done}} of {{total}}",
+    "summaryDone": "Done · {{done}} of {{total}} steps",
+    "summaryFailed": "Stopped · {{done}} of {{total}} steps"
   },
   "contextUsage": {
     "label": "{{used}} / {{limit}} tokens"
@@ -399,7 +545,8 @@
     }
   },
   "ruleSelector": {
-    "newBrand": "New brand profile"
+    "newBrand": "Start a new brand",
+    "allBrands": "All brands"
   },
   "runCard": {
     "running": "Running",

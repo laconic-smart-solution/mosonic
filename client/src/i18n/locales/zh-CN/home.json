@@ -9,9 +9,25 @@
     "noRules": "未找到品牌档案。",
     "tones": "语调：{{value}}",
     "channels": "渠道：{{value}}",
-    "updated": "更新：{{date}}",
+    "updated": "更新于 {{date}}",
     "viewMore": "查看更多",
     "loadingMore": "加载中…"
+  },
+  "welcome": {
+    "title": "欢迎",
+    "subtitle": "选择一个品牌继续，或新建品牌。",
+    "startNewBrand": "开始新品牌",
+    "brandList": "品牌列表",
+    "emptyList": "还没有品牌。开始一个新品牌吧。",
+    "deleteBrand": "删除 {{name}}",
+    "deleteTitle": "删除这个品牌？",
+    "deleteSubtitle": "{{name}} 将从品牌列表中移除。如需恢复，请联系支持。",
+    "deleteCancel": "保留品牌",
+    "deleteConfirm": "删除品牌",
+    "createdToast": "已创建 {{name}}",
+    "deletedToast": "已删除 {{name}}",
+    "createFailed": "无法创建品牌",
+    "deleteFailed": "无法删除品牌"
   },
   "userStrip": {
     "loading": "加载中…",

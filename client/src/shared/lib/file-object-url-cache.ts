@@ -24,6 +24,19 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>()
 
+/** Backoff between retries of a failed file fetch (3 retries ? 4 attempts). */
+export const FETCH_RETRY_DELAYS_MS = [400, 1200, 3000]
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer)
+      resolve()
+    }, { once: true })
+  })
+}
+
 function isPassthroughUrl(raw: string): boolean {
   return (
     raw.startsWith("data:") ||
@@ -66,6 +79,7 @@ function releaseEntry(key: string, entry: CacheEntry) {
     URL.revokeObjectURL(entry.blobUrl)
   }
   cache.delete(key)
+  rawByKey.delete(key)
 }
 
 async function fetchBlobForKey(
@@ -89,35 +103,47 @@ async function fetchBlobForKey(
   notify(entry)
 
   try {
-    const response = await apiClient.get("/api/file/v1/file", {
-      params: { relativePath },
-      responseType: "blob",
-      signal: controller.signal,
-      onDownloadProgress: (event) => {
-        const total = event.total ?? 0
-        if (total > 0) {
-          entry.progress = Math.min(
-            99,
-            Math.round((event.loaded / total) * 100)
-          )
-        } else if (event.loaded > 0) {
-          entry.progress = null
+    let response: { data: unknown } | undefined
+    for (let attempt = 0; ; attempt++) {
+      try {
+        response = await apiClient.get("/api/file/v1/file", {
+          params: { relativePath },
+          responseType: "blob",
+          signal: controller.signal,
+          onDownloadProgress: (event) => {
+            const total = event.total ?? 0
+            if (total > 0) {
+              entry.progress = Math.min(
+                99,
+                Math.round((event.loaded / total) * 100)
+              )
+            } else if (event.loaded > 0) {
+              entry.progress = null
+            }
+            notify(entry)
+          },
+        })
+        break
+      } catch (err) {
+        if (controller.signal.aborted || attempt >= FETCH_RETRY_DELAYS_MS.length) {
+          throw err
         }
-        notify(entry)
-      },
-    })
+        await sleep(FETCH_RETRY_DELAYS_MS[attempt], controller.signal)
+        if (controller.signal.aborted) return
+      }
+    }
 
     if (controller.signal.aborted) return
 
     const current = cache.get(key)
     if (!current || current !== entry) return
 
-    entry.blobUrl = URL.createObjectURL(response.data as Blob)
+    entry.blobUrl = URL.createObjectURL(response!.data as Blob)
     entry.status = "ready"
     entry.progress = 100
     entry.abortController = undefined
     notify(entry)
-  } catch (err) {
+  } catch {
     if (controller.signal.aborted) return
 
     const current = cache.get(key)
@@ -130,7 +156,11 @@ async function fetchBlobForKey(
   }
 }
 
+/** Raw value per cache key, so errored entries can be re-fetched later. */
+const rawByKey = new Map<string, string>()
+
 function ensureLoading(key: string, raw: string, entry: CacheEntry) {
+  rawByKey.set(key, raw)
   if (entry.status === "loading" || entry.status === "ready") return
   void fetchBlobForKey(key, raw, entry)
 }
@@ -192,4 +222,18 @@ export function invalidateFileObjectUrlCache(raw: string): void {
   entry.abortController?.abort()
   if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl)
   cache.delete(key)
+}
+
+/**
+ * Re-fetch every errored entry that still has subscribers (e.g. after the
+ * assets list refetches) so one failed load is never permanent.
+ */
+export function retryErroredFileObjectUrls(): void {
+  for (const [key, entry] of cache) {
+    if (entry.status !== "error" || entry.refCount <= 0) continue
+    const raw = rawByKey.get(key)
+    if (!raw) continue
+    entry.status = "idle"
+    ensureLoading(key, raw, entry)
+  }
 }

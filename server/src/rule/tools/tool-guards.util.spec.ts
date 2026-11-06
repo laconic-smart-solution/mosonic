@@ -15,6 +15,7 @@ import {
   workflowAlreadyBuilt,
   planBeforeSetupChange,
   startAfterSetupChange,
+  matchesPostIntent,
   pendingPostIntent,
 } from './tool-guards.util';
 
@@ -498,6 +499,11 @@ describe('first post after brand setup (Option B, live Duco case)', () => {
     const started = [...history.slice(0, 4), { role: 'assistant', content: 'Started.', steps: [{ type: 'observation', name: 'start_generation', result: '{"ok":true,"action":"pipeline_started"}' }] }, { role: 'user', content: 'facebook' }];
     expect(pendingPostIntent(started)).toBeNull();
     expect(pendingPostIntent([{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'Hi' }, { role: 'user', content: 'facebook' }])).toBeNull();
+  });
+  it('matches content/campaign/video free-text as post intent', () => {
+    expect(matchesPostIntent('create a campaign about summer')).toBe(true);
+    expect(matchesPostIntent('generate a video for launch')).toBe(true);
+    expect(matchesPostIntent('beauty')).toBe(false);
   });
   it('a channel answer with no workflow yet may set up and start the remembered post', () => {
     const firstPost = { hadWorkflow: false, postIntent: true, userText: 'facebook' };

@@ -1,6 +1,10 @@
 import type { RuleRecord } from '../repositories/interfaces/rule.repository.interface';
 import type { RuleAssetRecord } from '../repositories/interfaces/rule-asset.repository.interface';
 import type { RuleMemoryRecord } from '../repositories/interfaces/rule-memory.repository.interface';
+import {
+  formatVisualIdentityLines,
+  normalizeVisualIdentity,
+} from './visual-identity.util';
 
 type JsonObject = Record<string, unknown>;
 
@@ -43,6 +47,8 @@ export function buildRuleBrainPrompt(
 
   sections.push(`You are the AI brand assistant for "${rule.name}".`);
 
+  const visual = normalizeVisualIdentity(brand.visualIdentity);
+  const visualLines = formatVisualIdentityLines(visual);
   const brandLines = [
     formatField('Industry', brand.industry),
     formatField('Description', brand.brandDescription),
@@ -50,6 +56,7 @@ export function buildRuleBrainPrompt(
     formatField('Voice', brand.brandVoice),
     formatField('Restrictions', brand.brandRestrictions),
     formatField('Call to action', brand.callToAction),
+    ...visualLines,
   ].filter((l): l is string => l !== null);
   if (brandLines.length > 0) {
     sections.push(`## Brand\n${brandLines.join('\n')}`);
@@ -131,7 +138,7 @@ export function buildOnboardingPrompt(): string {
     'GREETING: if the latest message is only a greeting or small talk (hello, hi, hey, สวัสดี, 你好, etc.) with no brand info and no task, do NOT ask for the brand name yet. Put a warm 1-2 sentence welcome saying what you can do INSIDE the ask_user question text, since that question is all the user sees (never only "Where would you like to start?"): set up their brand, then plan and make posts for their channels. Then call ask_user with type single, a short question like "Where would you like to start?" and exactly these options (translated into the user\'s language): "Set up my brand", "Make a post", "Paste my website", "Just exploring". Do not give yourself a new product name; you may say Mosonic or just "I".',
     'For a bare greeting the ask_user question must be this full text (translate it for Thai/Chinese users): "Hi! I can set up your brand, then plan and make posts for your channels. Where would you like to start?" Never write ask_user JSON or option ids in your reply text; call the tool.',
     'After a website is read (create_rule_from_intake with a url, or fetch_website_assets), use what the site shows to fill missing basics such as industry, and confirm once in one line, e.g. "Looks like <brand> is a beauty and cosmetics store. Right?" (ask_user Yes / Not quite). This replaces any earlier unanswered question; never leave two questions open. If only a few assets came back from a big shop, say what was found (e.g. "I found your logo and 1 banner") and offer to grab product images.',
-    'If they want a post ("I want to make a post") but have no brand yet, say it warmly and ask one thing, e.g. "Let\'s set up your brand first, it takes a minute. What\'s it called?" - never a bare "What\'s your brand name?". Remember the post intent and offer it once the brand is saved.',
+    'If they want a post ("I want to make a post") but have no brand yet, say it warmly and ask one thing, e.g. "Let\'s set up your brand first, it takes a minute. What\'s it called?" - never a bare "What\'s your brand name?". Remember the post intent; after create_rule_from_intake succeeds, continue that Goal in the same or next turn (call start_generation when ready) - do not stop after brand create alone.',
     'If the first message already has brand info (a name, what they sell, a URL) or a task, skip the welcome and act on it.',
     'When they pick Set up my brand (or Make a post, which needs a brand first), ask the brand questions ONE at a time: first the brand name, then what they do, then which channels. Never list several questions in one reply. If they defer ("you decide", "just make a post", "I don\'t have a brand"), never re-ask: use their name or handle as the brand, infer the field from the post topic (One Piece post -> anime content) and create now; ask at most for channels.',
     'Paste my website: ask them to paste the link. Just exploring: briefly say what you can help with and invite them to try anything, no form.',

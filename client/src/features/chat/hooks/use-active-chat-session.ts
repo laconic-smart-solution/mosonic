@@ -5,7 +5,7 @@ import { useChatSessionsQuery, useCreateChatSessionMutation } from "@/shared/que
 import { useRulesPageQuery } from "@/shared/queries/rule.query"
 import type { RuleListItem } from "@/shared/services/rule.service"
 
-const RULES_PAGE_LIMIT = 5
+const RULES_PAGE_LIMIT = 8
 
 /**
  * Owns which Rule and which chat session are active, synced into the URL
@@ -30,15 +30,18 @@ export function useActiveChatSession() {
   })
 
   useEffect(() => {
+    // Wait until page 1 has settled so an empty result can clear stale cards
+    // after the last brand is soft-deleted.
+    if (rulesPage === 1 && rulesPageQuery.isFetching && !rulesPageQuery.data) return
     const pageData = rulesPageQuery.data?.data ?? []
-    if (!pageData.length) return
     setRuleOptions((prev) => {
       const base = rulesPage === 1 ? [] : prev
+      if (rulesPage === 1 && pageData.length === 0) return []
       const map = new Map(base.map((r) => [r.ruleId, r]))
       for (const item of pageData) map.set(item.ruleId, item)
       return Array.from(map.values())
     })
-  }, [rulesPage, rulesPageQuery.data?.data])
+  }, [rulesPage, rulesPageQuery.data, rulesPageQuery.isFetching])
 
   /** Explicit user-driven rule switch — also resets the session. */
   const selectRule = useCallback(

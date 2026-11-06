@@ -24,10 +24,17 @@
   "workspace": {
     "activeWorkflow": "当前工作流",
     "contents": "内容",
+    "tabs": {
+      "contents": "内容",
+      "posts": "帖子"
+    },
     "noWorkflow": "尚无工作流 — 让 AI 为你创建一个。",
     "noContent": "尚未生成任何内容。",
+    "noPosts": "尚无帖子。",
     "viewAllContents": "查看全部内容",
+    "viewAllPosts": "查看全部帖子",
     "contentUntitled": "未命名内容",
+    "postUntitled": "未命名帖子",
     "noRule": "选择品牌档案以查看其工作流和内容。",
     "cancelRun": "取消运行"
   },
@@ -159,6 +166,7 @@
     "title": "内容草稿",
     "titleUpdatingImage": "正在更新图片…",
     "titleUpdatingCaption": "正在更新文案…",
+    "titleUpdateFailed": "更新失败",
     "openContent": "打开内容",
     "working": "正在生成额外结果…",
     "workingImage": "正在更新图片…",
@@ -166,6 +174,9 @@
     "workingTranslation": "正在更新翻译…",
     "workingSummary": "正在更新摘要…",
     "stillWorking": "仍在处理。打开内容页继续查看。",
+    "updateFailed": "更新失败：{{reason}}",
+    "updateFailedGeneric": "更新失败，积分已退回 — 请重试。",
+    "updateTimedOut": "更新超时。请打开内容页查看，或重试。",
     "observation": "内容 · {{status}}",
     "hasImage": "图片",
     "hasVideo": "视频",
@@ -199,9 +210,134 @@
       "skip": "跳过"
     },
     "plan": {
-      "asked": "你的要求",
-      "willChange": "我会调整",
-      "notPossible": "无法实现"
+      "asked": "你要求的",
+      "willChange": "我将更改",
+      "notPossible": "无法做到",
+      "notPossibleYet": "暂时无法做到"
+    },
+    "preview": {
+      "readyTitle": "准备生成",
+      "stepCount": "{{count}} 个步骤",
+      "videoSteps": "{{count}} 个视频",
+      "stepsLabel": "工作流步骤",
+      "apply": "应用",
+      "noSettings": "此步骤没有可编辑设置",
+      "needsSetup": "需要设置",
+      "missingVideo": "缺少视频步骤",
+      "missingChannel": "工作流中没有 {{channel}}",
+      "nodeType": {
+        "keyword_planner": "关键词规划",
+        "web_search": "Web search",
+        "intelligence": "Intelligence",
+        "text_generation": "撰写文案",
+        "image_generation": "Image generation",
+        "translation": "Translation",
+        "branch": "Branch",
+        "adapt": "Adapt",
+        "merge": "Merge",
+        "summary": "Summary",
+        "video_presenter": "Presenter video",
+        "video_cinematic": "Cinematic video",
+        "video_generation": "Video",
+        "adaptFor": "适配 {{channel}}",
+        "imageFor": "图片 · {{channel}}"
+      },
+      "reviewTitle": "确认此计划",
+      "close": "关闭",
+      "stepsRuns": "{{count}} 个步骤 · 从上到下运行",
+      "badgeAdding": "新增",
+      "badgeUpdated": "已更新",
+      "creditsApprox": "约 {{count}} 积分",
+      "footerCost": "{{images}} 张图片 · 约 {{credits}} 积分",
+      "cancel": "取消",
+      "changeSettings": "更改设置",
+      "startWithCredits": "开始 · 约 {{count}} 积分",
+      "tabs": {
+        "basics": "Basics",
+        "advanced": "Advanced",
+        "style": "Style",
+        "size": "Size",
+        "references": "References",
+        "prompt": "Prompt",
+        "text": "Text",
+        "hashtags": "Hashtags"
+      },
+      "fields": {
+        "topic": "Topic",
+        "market": "Market",
+        "keywords": "Keywords to use",
+        "addKeyword": "Add a keyword",
+        "useBrandKeywords": "Use saved brand keywords",
+        "imageType": "Image type",
+        "mood": "Mood",
+        "brandColors": "Brand colours",
+        "useBrandPalette": "Use brand palette",
+        "logo": "Logo",
+        "addLogo": "Add logo",
+        "howManyImages": "How many images",
+        "wasN": "was {{n}}",
+        "size": "Size",
+        "useAttached": "Use attached screenshots",
+        "useBrandImages": "Use saved brand images ({{count}})",
+        "add": "+ add",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Optional notes for the image",
+        "length": "Length",
+        "tone": "Tone",
+        "language": "Language",
+        "extraNote": "Extra note",
+        "hashtagNote": "Hashtag notes",
+        "hashtagPlaceholder": "e.g. keep under 5 hashtags"
+      },
+      "imageTypes": {
+        "website_mockup": "Website mockup",
+        "photo": "Photo",
+        "illustration": "Illustration",
+        "watercolor": "Watercolor"
+      },
+      "moods": {
+        "clean": "Clean",
+        "bold": "Bold",
+        "playful": "Playful"
+      },
+      "markets": {
+        "thailand": "Thailand",
+        "global": "Global"
+      },
+      "lengths": {
+        "short": "Short (≤150)",
+        "medium": "Medium"
+      },
+      "tones": {
+        "casual": "Casual",
+        "professional": "Professional",
+        "friendly": "Fun"
+      },
+      "hints": {
+        "watercolorSkipped": "Saved preference “watercolor” not used this time",
+        "imageCountNotInOneRun": "More than 1 image per channel in one run is not supported yet — extras need generate-more after (credits).",
+        "sizeTab": "Size tab · 1:1 is best for Facebook feed",
+        "attachedCount": "{{count}} attached in chat · used as reference",
+        "promptMapsToNegative": "Saved as the image negative / notes field.",
+        "languageDisplayOnly": "Language chips are a note for this run; add a Translation step to persist another language.",
+        "hashtagsDisplayOnly": "Hashtag notes are not saved on the node yet.",
+        "keywordAdvanced": "Saved on the keyword step as custom prompt when supported."
+      },
+      "nodeBlurb": {
+        "keyword_planner": "Finds topics & hashtags",
+        "text_generation": "Writes the caption",
+        "adapt": "Rewrites the caption for {{channel}}",
+        "image_generation": "Makes the {{channel}} pictures"
+      },
+      "footerImages_one": "{{count}} 张图片",
+      "footerImages_other": "{{count}} 张图片",
+      "footerCredits_one": "约 {{count}} 积分",
+      "footerCredits_other": "约 {{count}} 积分",
+      "footerListPrice": "（标价）",
+      "footerCreditsWhenStart": "开始时扣积分",
+      "start": "开始",
+      "startWithCredits_one": "开始 · 约 {{count}} 积分",
+      "startWithCredits_other": "开始 · 约 {{count}} 积分"
     }
   },
   "stepTrace": {
@@ -224,7 +360,17 @@
     "failedSuffix_one": " · {{count}} 步未完成",
     "failedSuffix_other": " · {{count}} 步未完成",
     "savedNote": "已保存你的偏好",
-    "genericStep": "已处理"
+    "genericStep": "已处理",
+    "sectionPlan": "计划",
+    "sectionThinking": "思考",
+    "sectionDoing": "执行",
+    "planEmpty": "此请求无需更改工作流。",
+    "summaryWorking": "进行中 · {{done}} / {{total}} 步",
+    "summaryWaiting": "等待你的选择 · {{done}} / {{total}}",
+    "summaryDone": "完成 · {{done}} / {{total}} 步",
+    "summaryFailed": "已停止 · {{done}} / {{total}} 步",
+    "workedThrough_one": "Worked through {{count}} step",
+    "workedThrough_other": "Worked through {{count}} steps"
   },
   "contextUsage": {
     "label": "{{used}} / {{limit}} tokens"

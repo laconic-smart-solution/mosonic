@@ -1,4 +1,5 @@
 import { ChatPlanLines } from "./chat-plan-lines"
+import { ChatGenerationPreview } from "./chat-generation-preview"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { CircleHelp, TriangleAlert } from "lucide-react"
@@ -29,6 +30,10 @@ export function ChatAskUser({
 }) {
   const { t } = useTranslation("chat")
   const shown = displayAskUserPrompt(prompt, t)
+
+  if (prompt.confirmFor === "start_generation" && prompt.preview?.steps?.length) {
+    return <ChatGenerationPreview prompt={prompt} disabled={disabled} onChoose={onChoose} />
+  }
   const [selected, setSelected] = useState<string[]>([])
   /** Option waiting for its URL (inputType "url"), shown as a field inside the card. */
   const [urlOptionId, setUrlOptionId] = useState<string | null>(null)
