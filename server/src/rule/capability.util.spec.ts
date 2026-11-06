@@ -19,6 +19,21 @@ describe('preflightRequest', () => {
     const plan = preflightRequest({ request: parseRequest('instagram photo post'), nodes, attachedImages: 0 });
     expect(plan.willChange.join(' ')).toMatch(/image step for Instagram/);
   });
+it('mockup + screenshot with attachments is possible (redraw), not notPossible', () => {
+    const nodes = [
+      { nodeId: 't', type: 'text_generation' },
+      { nodeId: 'a', type: 'adapt', lane: 'facebook' },
+      { nodeId: 'i', type: 'image_generation', lane: 'facebook' },
+    ];
+    const plan = preflightRequest({
+      request: parseRequest('mock up image of the website screenshot for facebook'),
+      nodes,
+      attachedImages: 1,
+    });
+    expect(plan.notPossible.join(' ')).not.toMatch(/Pixel-exact|device frame/i);
+    expect(plan.youAskedFor.join(' ')).toMatch(/facebook/i);
+  });
+
   it('N images per channel proposes adding N image steps (not notPossible)', () => {
     const fbAdapt = { nodeId: 'a', type: 'adapt', lane: 'facebook' };
     const fbImg = { nodeId: 'i1', type: 'image_generation', lane: 'facebook' };

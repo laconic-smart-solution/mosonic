@@ -178,6 +178,30 @@ export class RuleService {
     void this.runExtraction(ruleId, args, auth);
     return { ruleId };
   }
+  /**
+   * Run the same website/text extraction pipeline into an existing rule
+   * (Welcome "Untitled brand" shell). Does not create a new rule.
+   * On failure keeps the rule active so chat can continue.
+   */
+  async requestExtractionIntoRule(
+    ruleId: string,
+    args: RuleExtractRequest,
+    auth: TenancyAuth,
+  ): Promise<{ ruleId: string }> {
+    await this.creditService.assertCreditsForNodeType(
+      auth.userId,
+      RULE_GENERATION_NODE_TYPE,
+    );
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+    void this.runExtraction(ruleId, args, auth, {
+      failureStatus: RuleStatus.Active,
+    });
+    return { ruleId };
+  }
+
 
   /**
    * Start extraction from a plain prompt and wait until the rule is active.
@@ -540,6 +564,7 @@ export class RuleService {
     ruleId: string,
     args: RuleExtractRequest,
     auth: TenancyAuth,
+    opts?: { failureStatus?: RuleStatus },
   ): Promise<void> {
     try {
       this.events.emitToRule(ruleId, 'rule:started', { ruleId });
@@ -645,7 +670,7 @@ export class RuleService {
       this.events.emitToRule(ruleId, 'rule:completed', { ruleId });
     } catch (error) {
       this.logger.error(`Rule extraction failed for ${ruleId}`, error as Error);
-      await this.rules.updateById(ruleId, { status: 'failed' }, auth);
+      await this.rules.updateById(ruleId, { status: opts?.failureStatus ?? RuleStatus.Failed }, auth);
       const message =
         error instanceof BadRequestException
           ? (httpExceptionMessage(error) ?? 'Rule generation failed')
