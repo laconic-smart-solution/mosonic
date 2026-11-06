@@ -96,7 +96,7 @@ export function createFetchWebsiteAssetsTool(
       const next =
         'Next: if the user asked for a post, call update_rule (channels they named), apply_default_workflow, then start_generation — do not stop at assets alone.';
       return seeded
-        ? `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Seeded brand name/description from the site. ${next}`
+        ? `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Seeded brand name from the site and started full brand extraction into this profile. ${next}`
         : `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. They'll finish processing shortly — call list_brand_assets to check. ${next}`;
     },
     {

@@ -61,16 +61,21 @@ describe('RuleService updates', () => {
       ]),
     };
 
+    const creditService = {
+      assertCreditsForNodeType: jest.fn().mockResolvedValue(undefined),
+      deductCredits: jest.fn().mockResolvedValue(undefined),
+    };
+
     const service = new RuleService(
       rulesRepo as never,
       {} as never,
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      creditService as never,
     );
 
-    return { service, rulesRepo };
+    return { service, rulesRepo, creditService };
   };
 
   it('rejects empty PATCH payloads', async () => {
@@ -160,6 +165,33 @@ describe('RuleService updates', () => {
     expect(result[0].isSystem).toBe(true);
   });
 
+  it('requestExtractionIntoRule reuses runExtraction on the existing ruleId', async () => {
+    const { service, rulesRepo, creditService } = createService();
+    (rulesRepo.findById as jest.Mock).mockResolvedValue({
+      ruleId: 'blank-1',
+      userId: auth.userId,
+      name: 'Untitled brand',
+      status: 'active',
+    });
+    const spy = jest
+      .spyOn(service as never, 'runExtraction' as never)
+      .mockResolvedValue(undefined as never);
+    const out = await service.requestExtractionIntoRule(
+      'blank-1',
+      { input: 'Brand website: https://www.beautyphoo.com', files: [], urls: ['https://www.beautyphoo.com'] },
+      auth,
+    );
+    expect(out).toEqual({ ruleId: 'blank-1' });
+    expect(creditService.assertCreditsForNodeType).toHaveBeenCalled();
+    expect(rulesRepo.create).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(
+      'blank-1',
+      expect.objectContaining({ urls: ['https://www.beautyphoo.com'] }),
+      auth,
+      expect.objectContaining({ failureStatus: 'active' }),
+    );
+    spy.mockRestore();
+  });
   it('creates an Untitled brand shell without extraction', async () => {
     const { service, rulesRepo } = createService();
     const created = await service.createBlankRule(auth);

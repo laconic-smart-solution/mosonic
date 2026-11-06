@@ -54,7 +54,7 @@ import { createWebSearchTool } from '../tools/web-search.tool';
 import { createGetRuleTool } from '../tools/get-rule.tool';
 import { createListBrandAssetsTool } from '../tools/list-brand-assets.tool';
 import { createRequestAssetUploadTool } from '../tools/request-asset-upload.tool';
-import { createCreateRuleFromIntakeTool } from '../tools/create-rule-from-intake.tool';
+import { channelsNamedIn, createCreateRuleFromIntakeTool, intakeFromArgs } from '../tools/create-rule-from-intake.tool';
 import { createUpdateRuleTool } from '../tools/update-rule.tool';
 import { createFetchWebsiteAssetsTool } from '../tools/fetch-website-assets.tool';
 import { createRememberTool } from '../tools/remember.tool';
@@ -1121,6 +1121,7 @@ export class ChatSessionService {
           const current = await this.ruleService.getRuleById(rid, auth);
           if (!isBlankBrand(current as never)) return;
           const name = brandNameFromWebsiteUrl(siteUrl);
+          // Immediate shell rename so Untitled disappears while extraction runs.
           await this.ruleService.patchRule(
             rid,
             {
@@ -1129,6 +1130,17 @@ export class ChatSessionService {
                 brandName: name,
                 brandDescription: `Brand website: ${siteUrl}`,
               },
+            },
+            auth,
+          );
+          // Full site extract into THIS rule (same pipeline as create_rule_from_intake).
+          await this.ruleService.requestExtractionIntoRule(
+            rid,
+            {
+              input: `Brand website: ${siteUrl}. Extract the brand profile from this site.`,
+              files: [],
+              urls: [siteUrl],
+              intake: intakeFromArgs(name, channelsNamedIn(urlTexts())),
             },
             auth,
           );
