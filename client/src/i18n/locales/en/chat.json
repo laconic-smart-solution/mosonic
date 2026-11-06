@@ -26,10 +26,17 @@
   "workspace": {
     "activeWorkflow": "Active workflow",
     "contents": "Contents",
+    "tabs": {
+      "contents": "Contents",
+      "posts": "Posts"
+    },
     "noWorkflow": "No workflow yet — ask the AI to build one.",
     "noContent": "No content generated yet.",
+    "noPosts": "No posts yet.",
     "viewAllContents": "View all content",
+    "viewAllPosts": "View all posts",
     "contentUntitled": "Untitled content",
+    "postUntitled": "Untitled post",
     "noRule": "Select a brand profile to see its workflow and content.",
     "cancelRun": "Cancel run"
   },

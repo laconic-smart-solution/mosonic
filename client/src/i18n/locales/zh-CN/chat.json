@@ -24,10 +24,17 @@
   "workspace": {
     "activeWorkflow": "当前工作流",
     "contents": "内容",
+    "tabs": {
+      "contents": "内容",
+      "posts": "帖子"
+    },
     "noWorkflow": "尚无工作流 — 让 AI 为你创建一个。",
     "noContent": "尚未生成任何内容。",
+    "noPosts": "尚无帖子。",
     "viewAllContents": "查看全部内容",
+    "viewAllPosts": "查看全部帖子",
     "contentUntitled": "未命名内容",
+    "postUntitled": "未命名帖子",
     "noRule": "选择品牌档案以查看其工作流和内容。",
     "cancelRun": "取消运行"
   },

@@ -26,6 +26,8 @@ export type ContentCardSnapshot = {
 
 const SHOW_ACTIONS = new Set([
   "show_content",
+  // Automatic follow-up after a chat-started run (synthetic pipeline_result).
+  "pipeline_result",
   "generate_more_started",
   "content_rerun_started",
   "content_approved",
@@ -76,12 +78,23 @@ export function parseContentCard(result: string): ContentCardSnapshot | null {
     if (obj.ok !== true) return null
     if (typeof obj.action !== "string" || !SHOW_ACTIONS.has(obj.action)) return null
     if (typeof obj.contentId !== "string" || !obj.contentId.trim()) return null
+    const action =
+      obj.action === "pipeline_result" ? "show_content" : obj.action
+    const draftStatuses = new Set(["draft", "in_review", "approved", "rejected"])
+    const status =
+      obj.action === "pipeline_result"
+        ? typeof obj.status === "string" && draftStatuses.has(obj.status)
+          ? obj.status
+          : "draft"
+        : typeof obj.status === "string"
+          ? obj.status
+          : "draft"
     return {
-      action: obj.action,
+      action,
       contentId: obj.contentId,
       pipelineId: typeof obj.pipelineId === "string" ? obj.pipelineId : "",
       workflowId: typeof obj.workflowId === "string" ? obj.workflowId : "",
-      status: typeof obj.status === "string" ? obj.status : "draft",
+      status,
       textPreview: typeof obj.textPreview === "string" ? obj.textPreview : "",
       translatedPreview:
         typeof obj.translatedPreview === "string" ? obj.translatedPreview : "",

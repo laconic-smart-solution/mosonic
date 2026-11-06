@@ -62,7 +62,7 @@ export function ChatContentList({ ruleId }: { ruleId: string }) {
           item={item}
           index={index}
           compact
-          onOpen={(id, uid) => navigate(uid ? `/upload/${uid}` : `/content/${id}`)}
+          onOpen={(id) => navigate(`/content/${id}`)}
         />
       ))}
       <Link

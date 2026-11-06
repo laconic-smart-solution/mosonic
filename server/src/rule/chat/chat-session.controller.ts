@@ -1,14 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { tenancyFromLocalUser } from '../../auth/tenancy.util';
 import { User } from '../../users/schemas/user.schema';
 import { ChatSessionService } from './chat-session.service';
+import { BindChatSessionRuleDto } from './dto/bind-chat-session-rule.dto';
 import { CreateChatSessionDto } from './dto/create-chat-session.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 
 /**
- * Only "list sessions for a rule" stays rule-scoped in the URL — everything
+ * Only "list sessions for a rule" stays rule-scoped in the URL â€” everything
  * else resolves ownership from the session row itself, since a session may
  * not have a ruleId yet (see ChatSessionService's onboarding flow).
  */
@@ -35,6 +36,17 @@ export class ChatSessionController {
     return this.chatSessionService.createSession(body.ruleId, body.title, auth);
   }
 
+
+  /** Bind a brand profile onto a ruleless onboarding session (after file-based extract). */
+  @Patch('chat/sessions/:sessionId/rule')
+  bindRule(
+    @Req() req: Request,
+    @Param('sessionId') sessionId: string,
+    @Body() body: BindChatSessionRuleDto,
+  ) {
+    const auth = tenancyFromLocalUser(req.auth!.localUser as User);
+    return this.chatSessionService.bindRuleToSession(sessionId, body.ruleId, auth);
+  }
   @Delete('chat/sessions/:sessionId')
   async remove(@Req() req: Request, @Param('sessionId') sessionId: string) {
     const auth = tenancyFromLocalUser(req.auth!.localUser as User);
@@ -53,7 +65,7 @@ export class ChatSessionController {
     return this.chatSessionService.getRunProgress(sessionId, pipelineId, auth);
   }
 
-  /** Cursor-paged thread: ?before=<messageId>&limit=<1..100, default 30> → { messages, hasMore, nextCursor }. */
+  /** Cursor-paged thread: ?before=<messageId>&limit=<1..100, default 30> â†’ { messages, hasMore, nextCursor }. */
   @Get('chat/sessions/:sessionId/messages')
   listMessages(
     @Req() req: Request,
@@ -80,3 +92,4 @@ export class ChatSessionController {
     return this.chatSessionService.sendMessage(sessionId, body.content, auth, { evalDryRun });
   }
 }
+

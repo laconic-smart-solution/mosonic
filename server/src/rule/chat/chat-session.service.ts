@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   forwardRef,
   Inject,
@@ -74,7 +75,7 @@ import { createSearchBrandMemoryTool } from '../tools/search-brand-memory.tool';
 import { createAskUserTool } from '../tools/ask-user.tool';
 import { createListWorkflowsTool } from '../tools/list-workflows.tool';
 import { buildIntentText, pendingFlowTools, selectTurnTools } from './chat-tool-gating.util';
-import { previewFromRecord } from '../tools/content-scope.util';
+import { previewFromRecord, showContentPayload } from '../tools/content-scope.util';
 import { TEXT_ONLY_REQUEST, attachedImageAssetIds, buildCapabilitySummary, latestRequestText, normalizeLanguage } from '../capability.util';
 import { toImageAsset } from '../../orchestration/brand-image-assets.util';
 import { buildGreetingResult, isBareGreeting, sanitizeReply } from './onboarding-greeting.util';
@@ -207,7 +208,7 @@ import {
 } from './session-state.util';
 
 const HISTORY_LIMIT = 20;
-/** Page size for the thread UI (GET messages) — separate from the AI's HISTORY_LIMIT context window. */
+/** Page size for the thread UI (GET messages) â€” separate from the AI's HISTORY_LIMIT context window. */
 export const MESSAGE_PAGE_DEFAULT = 30;
 export const MESSAGE_PAGE_MAX = 100;
 
@@ -266,7 +267,7 @@ export type ChatTurnResult = {
   userMessage: ChatMessageRecord;
   assistantMessage: ChatMessageRecord;
   contextUsage: ContextUsage;
-  /** Current session row — lets the client notice create_rule_from_intake bound a ruleId mid-turn. */
+  /** Current session row â€” lets the client notice create_rule_from_intake bound a ruleId mid-turn. */
   session: ChatSessionRecord;
 };
 
@@ -343,7 +344,7 @@ export class ChatSessionService {
     return [createListHeygenLooksTool(deps), createSetVideoNodeLookTool(deps), createListHeygenVoicesTool(deps)];
   }
 
-  /** One session per Rule — reopens the existing one instead of creating a duplicate. */
+  /** One session per Rule â€” reopens the existing one instead of creating a duplicate. */
   async createSession(
     ruleId: string | undefined,
     title: string | undefined,
@@ -368,7 +369,7 @@ export class ChatSessionService {
     return this.sessions.findByRuleId(ruleId, auth);
   }
 
-  /** All of the user's chats regardless of rule — what the sidebar shows. */
+  /** All of the user's chats regardless of rule â€” what the sidebar shows. */
   async listAllSessions(auth: TenancyAuth) {
     return this.sessions.findByUserId(auth);
   }
@@ -458,10 +459,14 @@ export class ChatSessionService {
       chain: confirmedChain,
       statePending,
     });
-    // An earlier post request no run has started yet (typed or the Make a post chip):
-    // keep start_generation bound so setup can end with the post (Option B).
+    // An earlier post request no run has started yet (typed, Make a post chip, or
+    // unfinished Session Goal): keep generation tools even when this message is a
+    // short ask_user answer that does not match POST_INTENT.
     const postIntent = !!pendingPostIntent(history) || afterUser.goal?.kind === 'make_post';
-    if (postIntent) keepTools.add('start_generation');
+    if (postIntent) {
+      keepTools.add('start_generation');
+      keepTools.add('apply_default_workflow');
+    }
     // "Yes" / "Start" typed (or a Yes chip on the AI's own "Start now?") while a
     // start_generation plan card is still open counts as tapping Start on it.
     // "Don't ask me, do it yourself all the way to publish": setup guards that only ask first step aside.
@@ -520,7 +525,14 @@ export class ChatSessionService {
           { confirmed: !!confirmedChain?.has('start_generation') || startAffirmed, anyConfirmed: confirmedNow || startAffirmed },
           webSearchTexts(history),
         )
-      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null), webSearchTexts(history));
+      : this.buildOnboardingContext(
+          sessionId,
+          auth,
+          userTexts,
+          sessionBlockFor(null),
+          webSearchTexts(history),
+          afterUser.goal?.kind === 'make_post',
+        );
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
     const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
@@ -736,7 +748,14 @@ export class ChatSessionService {
           undefined,
           webSearchTexts(history),
         )
-      : this.buildOnboardingContext(sessionId, auth, userTexts, sessionBlockFor(null), webSearchTexts(history));
+      : this.buildOnboardingContext(
+          sessionId,
+          auth,
+          userTexts,
+          sessionBlockFor(null),
+          webSearchTexts(history),
+          loadedState.goal?.kind === 'make_post',
+        );
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
     const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
@@ -776,6 +795,66 @@ export class ChatSessionService {
         content: resultText,
       }),
     ];
+
+    // Prefetch the finished draft so the chat UI always has a show_content card,
+    // even if the model only writes "checking the draft" and skips get_content.
+    const finishedContentId =
+      typeof observation.contentId === 'string' && observation.contentId.trim()
+        ? observation.contentId.trim()
+        : null;
+    if (observation.ok === true && finishedContentId && session.ruleId) {
+      try {
+        const row = await this.contents.findById(finishedContentId, auth);
+        if (row && row.ruleRef === session.ruleId) {
+          const catalog = await this.contentService.describeDraftNodes(
+            finishedContentId,
+            auth,
+          );
+          const showText = showContentPayload(previewFromRecord(row), {
+            lanes: catalog.lanes,
+            nodes: catalog.nodes,
+          });
+          const getToolCallId = `get-content-${pipelineId}`;
+          syntheticSteps.push(
+            {
+              type: 'action',
+              name: 'get_content',
+              args: { contentId: finishedContentId },
+              toolCallId: getToolCallId,
+            },
+            {
+              type: 'observation',
+              name: 'get_content',
+              toolCallId: getToolCallId,
+              result: showText,
+            },
+          );
+          injected.push(
+            new AIMessage({
+              content: '',
+              tool_calls: [
+                {
+                  id: getToolCallId,
+                  name: 'get_content',
+                  args: { contentId: finishedContentId },
+                },
+              ],
+            }),
+            new ToolMessage({
+              tool_call_id: getToolCallId,
+              name: 'get_content',
+              content: showText,
+            }),
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Follow-up get_content prefetch for ${finishedContentId} failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
 
     this.events.emitToChatSession(sessionId, 'chat:started', {
       sessionId,
@@ -920,7 +999,7 @@ export class ChatSessionService {
       brandChannels,
       nodes: workflow ? (workflow.nodes as never) : null,
       activeRun: !!facts.workflow && !!facts.activeRun,
-      // Just "content <id>, status …" - the full Live state line is already above.
+      // Just "content <id>, status â€¦" - the full Live state line is already above.
       latestDraft: latestDraftText(facts),
       styleNote,
       readyReferenceImages: assets.filter((a) => String(a.type) === 'reference_image' && String(a.status) === 'ready').length,
@@ -1302,6 +1381,7 @@ export class ChatSessionService {
     userTexts: string[] = [],
     sessionBlock = '',
     priorSearchTexts: string[] = [],
+    hasPostGoal = false,
   ) {
     // URL guard: the user's words plus anything web_search found (earlier or this turn).
     const searchTexts = [...priorSearchTexts];
@@ -1309,7 +1389,7 @@ export class ChatSessionService {
     const brainPrompt = withReactInstructions(
       sessionBlock ? `${buildOnboardingPrompt()}\n\n${sessionBlock}` : buildOnboardingPrompt(),
     );
-    // create_rule_from_intake can bind a ruleId mid-turn — fetch_website_assets
+    // create_rule_from_intake can bind a ruleId mid-turn â€” fetch_website_assets
     // reads this closure so it works later in the same turn, not just next time.
     let currentRuleId: string | null = null;
 
@@ -1322,6 +1402,7 @@ export class ChatSessionService {
           await this.sessions.updateById(sessionId, { ruleId }, auth);
         },
         urlTexts,
+        () => hasPostGoal,
       ),
       createFetchWebsiteAssetsTool(
         () => currentRuleId,
@@ -1400,6 +1481,24 @@ export class ChatSessionService {
     }
   }
 
+  /**
+   * Bind a brand profile onto a ruleless onboarding session (e.g. after the
+   * client bootstraps a Rule from attached files via /rules/extract).
+   * No-op when the session already has this ruleId; refuses a different one.
+   */
+  async bindRuleToSession(sessionId: string, ruleId: string, auth: TenancyAuth) {
+    const session = await this.getOwnedSession(sessionId, auth);
+    if (session.ruleId && session.ruleId !== ruleId) {
+      throw new BadRequestException(
+        'This chat is already bound to a different brand profile',
+      );
+    }
+    await this.ruleService.getRuleById(ruleId, auth);
+    if (session.ruleId === ruleId) return session;
+    const updated = await this.sessions.updateById(sessionId, { ruleId }, auth);
+    return updated ?? { ...session, ruleId };
+  }
+
   private async getOwnedSession(sessionId: string, auth: TenancyAuth) {
     const session = await this.sessions.findById(sessionId, auth);
     if (!session) {
@@ -1408,3 +1507,5 @@ export class ChatSessionService {
     return session;
   }
 }
+
+

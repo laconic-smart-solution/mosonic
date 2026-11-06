@@ -12,6 +12,7 @@ import {
   PLAN_CONFIRM_OPTION_ID,
   approvalArgsKey,
   isNegativeReply,
+  matchesPostIntent,
   normalizeRequest,
   parseUserChoice,
   NEGATIVE_ANSWERS,
@@ -352,6 +353,20 @@ export function reduceUserMessage(
       s.pending = s.pending.filter((p) => p !== notRunChain);
     }
   }
+
+  // Free-text content task -> Goal.make_post (chips already handled above).
+  // Short ask answers / continue replies / bare choice chips must not replace an
+  // existing goal unless the user literally picked a GOAL_CHIPS id.
+  const choiceOnly = /^\s*user choice:/i.test(text);
+  const bareContinue = CONTINUE_REPLY.test(text.trim()) || BARE_YES.test(text.trim());
+  if (!choiceOnly && !bareContinue && matchesPostIntent(text)) {
+    if (!s.goal) {
+      s.goal = { kind: 'make_post', turn: s.turn, detail: clip(text) };
+    } else if (s.goal.kind === 'make_post') {
+      s.goal = { kind: 'make_post', turn: s.turn, detail: clip(text) };
+    }
+  }
+
   return { state: enforceCaps(s), resolution };
 }
 
@@ -621,6 +636,8 @@ export type StatePending = {
   askConfirmFor?: string;
   chainTools: string[];
   approvalTools: string[];
+  /** Unfinished make_post Goal: keep generation tools even on short ask answers. */
+  goalTools: string[];
 };
 
 export function statePendingFor(state: ChatSessionState, resolution?: UserMessageResolution | null): StatePending {
@@ -629,6 +646,7 @@ export function statePendingFor(state: ChatSessionState, resolution?: UserMessag
     ...(resolution?.ask?.confirmFor ? { askConfirmFor: resolution.ask.confirmFor } : {}),
     chainTools: state.pending.flatMap((p) => (p.kind === 'chain' ? p.tools : [])),
     approvalTools: state.approvals.map((a) => a.tool),
+    goalTools: state.goal?.kind === 'make_post' ? ['start_generation', 'apply_default_workflow'] : [],
   };
 }
 
@@ -687,10 +705,17 @@ export function renderSessionState(
     ...state.pending.filter((p) => !opts.minimal || p.kind === 'ask').map((p) => describePending(p, false)),
   ];
   const goal = state.goal ? `Goal: ${state.goal.kind}${state.goal.detail ? ` "${clip(state.goal.detail, 60)}"` : ''} (t${state.goal.turn})` : null;
+  const resumeGoal =
+    !!state.goal &&
+    (state.goal.kind === 'make_post' || state.goal.kind === 'publish') &&
+    (!!opts.answeredAsk || state.stage === 'no_brand' || state.stage === 'brand_no_workflow');
   const build = (recent: ChatSessionState['recent'], choices: ChatSessionState['choices']) => {
     const lines: string[] = [];
     if (!opts.minimal && state.stage) lines.push(`Stage: ${state.stage}`);
     if (goal) lines.push(goal);
+    if (resumeGoal) {
+      lines.push('Goal not done - after handling this answer, continue the Goal (do not stop after brand create/update alone).');
+    }
     if (pendingItems.length) lines.push(`Pending: ${pendingItems.join('; ')}`);
     if (!opts.minimal && state.approvals.length) lines.push(`Approvals: ${state.approvals.map(describeApproval).join('; ')}`);
     if (!opts.minimal && choices.length) lines.push(`Choices: ${choices.map((c) => `${c.key}=${c.value} (t${c.turn})`).join('; ')}`);

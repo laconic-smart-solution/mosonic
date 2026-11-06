@@ -780,7 +780,16 @@ export function planBeforeSetupChange(input: {
   return toolError('plan_first', 'Not run: this is a post request; check it with start_generation before changing channels or steps.');
 }
 
-const POST_INTENT = /\b(make|create|want|need|do|write)\b.*\bposts?\b|\bannounce|\bpost (about|for|on)\b/i;
+/**
+ * Free-text asks to make/create a post, content, campaign, or video.
+ * Used for pendingPostIntent history scan and session Goal seeding.
+ */
+export const POST_INTENT =
+  /\b(make|create|want|need|do|write|generate|produce)\b.{0,60}\b(posts?|content|campaign|videos?)\b|\b(announce|launch)\b|\bpost (about|for|on)\b|\b(campaign|video) (about|for|on|of)\b/i;
+
+export function matchesPostIntent(text: string): boolean {
+  return POST_INTENT.test(text);
+}
 
 /**
  * An earlier user post request ("I want to make a post about One Piece") that
@@ -793,7 +802,7 @@ export function pendingPostIntent(history: { role: string; content: string; step
       const started = (row.steps as TurnStep[]).some((st) => st?.type === 'observation' && st.name === 'start_generation' && typeof st.result === 'string' && /"action"\s*:\s*"pipeline_started"/.test(st.result));
       if (started) return null;
     }
-    if (row.role === 'user' && !/^\s*user choice:/i.test(row.content) && POST_INTENT.test(row.content)) return row.content;
+    if (row.role === 'user' && !/^\s*user choice:/i.test(row.content) && matchesPostIntent(row.content)) return row.content;
   }
   return null;
 }

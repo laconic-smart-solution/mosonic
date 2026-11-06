@@ -162,4 +162,23 @@ describe('channels the user named (Facebook-only brand must not get 5 lanes)', (
       { channel: 'instagram', priority: 'high' },
     ]);
   });
+
+  it('nudges continuing a post Goal instead of only waiting for the next message', async () => {
+    const ruleService = { requestExtraction: jest.fn().mockResolvedValue({ ruleId: 'rule-1' }) } as unknown as RuleService;
+    const chatTool = createCreateRuleFromIntakeTool(
+      ruleService,
+      auth,
+      jest.fn(),
+      () => ['I want to make a post about One Piece'],
+      () => true,
+    );
+    const result = await chatTool.invoke({
+      description: 'Anime brand',
+      brandName: 'Duco',
+    });
+    expect(result).toContain('Continue the user');
+    expect(result).toContain('start_generation');
+    expect(result).not.toMatch(/from your next message/);
+  });
+
 });

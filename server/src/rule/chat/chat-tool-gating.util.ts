@@ -222,6 +222,7 @@ export function pendingFlowTools(
     if (sp.askConfirmFor) keep.add(sp.askConfirmFor);
     if (sp.connect) for (const name of CONNECT_FLOW_TOOLS) keep.add(name);
     for (const name of sp.chainTools) keep.add(name);
+    for (const name of sp.goalTools ?? []) keep.add(name);
     if (sp.approvalTools.length) {
       for (const name of sp.approvalTools) keep.add(name);
       keep.add('get_upload');
