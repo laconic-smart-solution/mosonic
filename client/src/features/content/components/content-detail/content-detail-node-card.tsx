@@ -15,6 +15,8 @@ import {
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
 import { PreviewImageWithOverlay, MediaVideoBlock, type CardRunState } from "./content-detail-review-ui"
+import { StructuredSectionEditor } from "./structured-section-editor"
+import type { ContentSectionItem } from "@/shared/types/content.type"
 
 export type ContentDetailNodeCardProps = {
   nodeKey: OutputKey
@@ -37,6 +39,9 @@ export type ContentDetailNodeCardProps = {
   uploadMedia: (key: "image" | "video", file: File) => void
   /** When set, error-state Retry uses this (e.g. synthetic generate-more vs re-run). */
   onRetry?: () => void | Promise<void>
+  contentId?: string
+  sections?: ContentSectionItem[]
+  onSectionsChange?: (sections: ContentSectionItem[], compiled?: string) => void
 }
 
 export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
@@ -58,6 +63,9 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
     setLightboxUrl,
     uploadMedia,
     onRetry,
+    contentId,
+    sections,
+    onSectionsChange,
   } = props
 
   const interactionsLocked =
@@ -110,26 +118,43 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
         ) : null}
 
         {isTextLike ? (
-          <>
-            <Textarea
-              value={displayText}
+          sections && sections.length > 0 && contentId ? (
+            <StructuredSectionEditor
+              contentId={contentId}
+              sections={sections}
+              compiledText={displayText}
               disabled={interactionsLocked}
-              onChange={(e) => {
-                updateOutput(key, e.target.value)
-                if (run.stream) {
-                  setRunState(key, {
-                    phase: "idle",
-                    stream: "",
-                  })
+              onChange={(updated, compiled) => {
+                if (onSectionsChange) {
+                  onSectionsChange(updated, compiled)
+                }
+                if (compiled !== undefined) {
+                  updateOutput(key, compiled)
                 }
               }}
-              className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary/40"
             />
-            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Pencil className="size-3 shrink-0" />
-              Edit directly; save from the sidebar.
-            </p>
-          </>
+          ) : (
+            <>
+              <Textarea
+                value={displayText}
+                disabled={interactionsLocked}
+                onChange={(e) => {
+                  updateOutput(key, e.target.value)
+                  if (run.stream) {
+                    setRunState(key, {
+                      phase: "idle",
+                      stream: "",
+                    })
+                  }
+                }}
+                className="min-h-[120px] resize-y border-0 bg-transparent px-1 py-1 text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
+              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Pencil className="size-3 shrink-0" />
+                Edit directly; save from the sidebar.
+              </p>
+            </>
+          )
         ) : null}
 
         {key === "image" && (

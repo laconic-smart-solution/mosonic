@@ -70,6 +70,31 @@ export type ContentStatsResponse = {
   byStatus: Partial<Record<ContentStatus, number>>
 }
 
+export type ContentSectionKind =
+  | 'heading'
+  | 'paragraph'
+  | 'bullet_list'
+  | 'numbered_list'
+  | 'call_to_action'
+  | 'hashtags'
+  | 'quote'
+  | 'rich_text'
+  | 'link'
+  | 'image_direction'
+  | 'video_scene'
+  | 'script_segment'
+  | 'custom'
+
+export type ContentSectionItem = {
+  key: string
+  title: string
+  kind: ContentSectionKind
+  content?: string
+  items?: string[]
+  level?: number
+  metadata?: Record<string, unknown>
+}
+
 export type ContentOutputs = {
   keywords?: string
   text?: string
@@ -78,6 +103,7 @@ export type ContentOutputs = {
   summary?: string
   image?: string
   video?: string
+  sections?: ContentSectionItem[]
 }
 
 export type ContentDraftNodeView = {

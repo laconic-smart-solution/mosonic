@@ -1286,6 +1286,8 @@ export function UploadContentReviewPanel({
                       }
                       setLightboxUrl={setLightboxUrl}
                       uploadMedia={uploadMedia}
+                      contentId={contentId}
+                      sections={data?.outputs?.sections}
                     />
                   )
                 })}

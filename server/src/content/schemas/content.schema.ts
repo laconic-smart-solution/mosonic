@@ -1,4 +1,5 @@
 import { ContentStatus as PrismaContentStatus } from '@prisma/client';
+import type { ContentSectionItem } from './structured-content.schema';
 
 export const ContentStatus = {
   ...PrismaContentStatus,
@@ -37,6 +38,7 @@ export interface ContentOutputs {
   transcription?: string;
   subtitle?: string;
   summary?: string;
+  sections?: ContentSectionItem[];
 }
 
 export interface ContentUserEdits {
@@ -48,6 +50,7 @@ export interface ContentUserEdits {
   transcription?: string;
   subtitle?: string;
   summary?: string;
+  sections?: ContentSectionItem[];
 }
 
 export interface ContentVersionEntry {
