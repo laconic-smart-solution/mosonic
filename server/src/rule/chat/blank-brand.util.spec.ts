@@ -1,4 +1,10 @@
-import { blankBrandAskBlock, isBlankBrand } from './blank-brand.util';
+import {
+  blankBrandAskBlock,
+  brandHasIntakeSeed,
+  brandNameFromWebsiteUrl,
+  isBlankBrand,
+  shouldGateBlankBrand,
+} from './blank-brand.util';
 
 describe('isBlankBrand', () => {
   const blank = {
@@ -20,6 +26,36 @@ describe('isBlankBrand', () => {
   });
   it('null rule is not blank (onboarding covers no-brand)', () => {
     expect(isBlankBrand(null)).toBe(false);
+  });
+});
+
+describe('shouldGateBlankBrand', () => {
+  const blank = {
+    name: 'Untitled brand',
+    brand: { brandName: 'Untitled', brandDescription: '', brandVoice: '', industry: '' },
+  };
+
+  it('gates a bare Untitled shell with no assets', () => {
+    expect(shouldGateBlankBrand(blank, [])).toBe(true);
+  });
+  it('lifts the gate once logo/reference assets exist (after Use it)', () => {
+    expect(shouldGateBlankBrand(blank, [{ type: 'logo' }])).toBe(false);
+    expect(shouldGateBlankBrand(blank, [{ type: 'reference_image' }])).toBe(false);
+  });
+  it('still gates when only unrelated asset types exist', () => {
+    expect(shouldGateBlankBrand(blank, [{ type: 'guideline_document' }])).toBe(true);
+  });
+});
+
+describe('brandHasIntakeSeed / brandNameFromWebsiteUrl', () => {
+  it('detects logo and reference_image only', () => {
+    expect(brandHasIntakeSeed([{ type: 'logo' }])).toBe(true);
+    expect(brandHasIntakeSeed([{ type: 'guideline_document' }])).toBe(false);
+    expect(brandHasIntakeSeed([])).toBe(false);
+  });
+  it('derives a display name from the host', () => {
+    expect(brandNameFromWebsiteUrl('https://www.beautyphoo.com/')).toBe('Beautyphoo');
+    expect(brandNameFromWebsiteUrl('https://brew-co.coffee')).toBe('Brew-co');
   });
 });
 

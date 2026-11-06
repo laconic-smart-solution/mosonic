@@ -79,7 +79,7 @@ import { previewFromRecord, showContentPayload } from '../tools/content-scope.ut
 import { TEXT_ONLY_REQUEST, attachedImageAssetIds, buildCapabilitySummary, latestRequestText, normalizeLanguage } from '../capability.util';
 import { buildRegistrySummary } from '../capability-registry';
 import { toImageAsset } from '../../orchestration/brand-image-assets.util';
-import { BLANK_BRAND_BLOCKED_TOOLS, BLANK_BRAND_PROMPT, isBlankBrand } from './blank-brand.util';
+import { BLANK_BRAND_BLOCKED_TOOLS, BLANK_BRAND_PROMPT, brandNameFromWebsiteUrl, isBlankBrand, shouldGateBlankBrand } from './blank-brand.util';
 import { buildGreetingResult, isBareGreeting, sanitizeReply } from './onboarding-greeting.util';
 import { isMultiStepRequest } from './multi-step.util';
 import { createGenerateWorkflowTool } from '../tools/generate-workflow.tool';
@@ -1050,9 +1050,9 @@ export class ChatSessionService {
     const searchTexts = [...priorSearchTexts];
     const urlTexts = () => [...userTexts, ...searchTexts];
     const rule = await this.ruleService.getRuleById(ruleId, auth);
-    // Welcome "Start a new brand" shell: intake first, no post/intro/generate yet.
-    const blankBrand = isBlankBrand(rule as never);
     const assets = await this.ruleAssetService.listByRule(ruleId, auth);
+    // Welcome "Start a new brand" shell: intake first; site assets also lift the gate.
+    const blankBrand = shouldGateBlankBrand(rule as never, assets as never);
     const memories = await this.ruleMemoryService.listRecent(ruleId, auth);
 
     // Every rule-aware turn binds every tool's schema to the model, which is
@@ -1117,6 +1117,22 @@ export class ChatSessionService {
         this.ruleAssetService,
         auth,
         urlTexts,
+        async (rid, siteUrl) => {
+          const current = await this.ruleService.getRuleById(rid, auth);
+          if (!isBlankBrand(current as never)) return;
+          const name = brandNameFromWebsiteUrl(siteUrl);
+          await this.ruleService.patchRule(
+            rid,
+            {
+              name,
+              brand: {
+                brandName: name,
+                brandDescription: `Brand website: ${siteUrl}`,
+              },
+            },
+            auth,
+          );
+        },
       ),
       createRememberTool(ruleId, this.ruleMemoryService, auth),
       createForgetTool(this.ruleMemoryService, auth),

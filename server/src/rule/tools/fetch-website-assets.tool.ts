@@ -29,6 +29,11 @@ export function createFetchWebsiteAssetsTool(
   auth: TenancyAuth,
   /** User messages + web_search results this session; a URL must come from them. */
   getUserTexts?: () => string[],
+  /**
+   * Optional: after images save, seed an Untitled Welcome shell (name +
+   * description from the URL) so the blank-brand gate lifts next turn.
+   */
+  seedBlankBrand?: (ruleId: string, url: string) => Promise<void>,
 ) {
   return tool(
     async ({ url }) => {
@@ -77,7 +82,22 @@ export function createFetchWebsiteAssetsTool(
       if (saved.length === 0) {
         return `Found images on ${url} but none could be saved.`;
       }
-      return `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. They'll finish processing shortly — call list_brand_assets to check.`;
+
+      let seeded = false;
+      if (seedBlankBrand) {
+        try {
+          await seedBlankBrand(ruleId, url.trim());
+          seeded = true;
+        } catch {
+          // seeding is best-effort; assets are already saved
+        }
+      }
+
+      const next =
+        'Next: if the user asked for a post, call update_rule (channels they named), apply_default_workflow, then start_generation — do not stop at assets alone.';
+      return seeded
+        ? `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Seeded brand name/description from the site. ${next}`
+        : `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. They'll finish processing shortly — call list_brand_assets to check. ${next}`;
     },
     {
       name: 'fetch_website_assets',

@@ -27,6 +27,29 @@ export function isBlankBrand(rule: RuleLike | null | undefined): boolean {
   return true;
 }
 
+/** Logo / site images already pulled in — enough to lift the blank-brand gate. */
+export function brandHasIntakeSeed(
+  assets: ReadonlyArray<{ type?: unknown }> | null | undefined,
+): boolean {
+  if (!assets?.length) return false;
+  return assets.some((a) => {
+    const t = String(a.type ?? '');
+    return t === 'logo' || t === 'reference_image';
+  });
+}
+
+/**
+ * Gate for chat: blank shell AND no site/logo assets yet.
+ * After "Use it" / fetch_website_assets, assets exist so generation tools return
+ * even if name/description have not been patched yet.
+ */
+export function shouldGateBlankBrand(
+  rule: RuleLike | null | undefined,
+  assets?: ReadonlyArray<{ type?: unknown }> | null,
+): boolean {
+  return isBlankBrand(rule) && !brandHasIntakeSeed(assets);
+}
+
 /** Tools that make or ship content: unbound while the brand is blank. */
 export const BLANK_BRAND_BLOCKED_TOOLS: ReadonlySet<string> = new Set([
   'start_generation',
@@ -51,7 +74,8 @@ export const BLANK_BRAND_PROMPT = [
   'This brand was just created and has no name, description, or website yet - there is nothing to introduce.',
   'Your first job is intake: ask for the brand name plus a website URL and/or a one or two line description.',
   'Save answers with update_rule (name, brand.brandName, brand.brandDescription); for a URL use fetch_website_assets.',
-  'Do NOT offer to make a post, introduce the brand, or start generation until the brand has a name and a description or website. Generation tools are unavailable until then.',
+  'After fetch_website_assets succeeds, call update_rule with brandName (from the site) and a short brandDescription, set channels the user named (e.g. facebook), then apply_default_workflow and start_generation if they asked for a post — do not stop at "assets saved".',
+  'Do NOT offer to make a post, introduce the brand, or start generation until the brand has a name and a description or website assets. Generation tools stay unavailable until then.',
 ].join('\n');
 
 const POST_OPTION =
@@ -71,4 +95,19 @@ export function blankBrandAskBlock(args: {
     args.options.some((o) => POST_OPTION.test(o.id) || POST_OPTION.test(o.label));
   if (!offersPost) return null;
   return 'brand_empty: this brand has no name, description, or website yet, so there is nothing to post about. Do not offer posts, intros, or generation. Ask for the brand name and a website URL or a short description first (ask_user options like "Paste my website" (inputType url) / "Describe my brand", or plain text).';
+}
+
+/**
+ * Best-effort display name from a brand URL host (www.beautyphoo.com → Beautyphoo).
+ * Used to seed an Untitled shell after fetch_website_assets so the intake gate lifts.
+ */
+export function brandNameFromWebsiteUrl(url: string): string {
+  try {
+    const host = new URL(url.trim()).hostname.replace(/^www\./i, '');
+    const base = (host.split('.')[0] || host).trim();
+    if (!base) return 'My brand';
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch {
+    return 'My brand';
+  }
 }
