@@ -115,6 +115,38 @@ describe('reduceUserMessage', () => {
     expect(s.goal).toMatchObject({ kind: 'make_post' });
   });
 
+  it('free-text make a post sets Goal.make_post with detail', () => {
+    const { state } = reduceUserMessage(emptyState(), 'Make a post about iced coffee for our launch');
+    expect(state.goal).toMatchObject({ kind: 'make_post' });
+    expect(state.goal?.detail).toMatch(/iced coffee/i);
+    expect(statePendingFor(state).goalTools).toEqual(['start_generation', 'apply_default_workflow']);
+  });
+
+  it('answering ask_user with a short industry reply does not clear make_post Goal', () => {
+    let s = reduceUserMessage(emptyState(), 'I want to make a post about One Piece').state;
+    expect(s.goal?.kind).toBe('make_post');
+    s = reduceObservation(s, askObs('What industry is your brand?', ['beauty', 'food', 'other']));
+    const r = reduceUserMessage(s, 'beauty');
+    expect(r.state.goal?.kind).toBe('make_post');
+    expect(r.state.goal?.detail).toMatch(/One Piece/i);
+    expect(r.resolution.ask).not.toBeNull();
+    const rendered = renderSessionState(r.state, { answeredAsk: r.resolution.ask, minimal: true });
+    expect(rendered).toContain('Goal: make_post');
+    expect(rendered).toContain('Goal not done');
+    expect(statePendingFor(r.state, r.resolution).goalTools).toContain('start_generation');
+  });
+
+  it('a bare continue / choice chip alone does not replace make_post with setup_brand', () => {
+    let s = reduceUserMessage(emptyState(), 'create a campaign video about summer sale').state;
+    expect(s.goal?.kind).toBe('make_post');
+    s = reduceUserMessage(s, 'ok').state;
+    expect(s.goal?.kind).toBe('make_post');
+    s = reduceObservation(s, askObs('Where to start?', ['setup_brand', 'make_post']));
+    // Literally picking setup_brand may set that goal; free text must not.
+    s = reduceUserMessage(s, 'just beauty products').state;
+    expect(s.goal?.kind).toBe('make_post');
+  });
+
   it('expires approvals, connects, chains and goals', () => {
     let s = readState([cardRow]).state;
     s = reduceUserMessage(s, 'yes').state; // turn 2, expires 5

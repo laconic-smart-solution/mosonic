@@ -4,6 +4,7 @@ import type { TenancyAuth } from '../../auth/tenancy.types';
 import type { RuleService } from '../rule.service';
 import { toolError } from './tool-error.util';
 import { rejectUntrustedUrl } from './url-guard.util';
+import { matchesPostIntent } from './tool-guards.util';
 import type { RuleIntakeAnswers } from '../rule-intake.types';
 
 const CREATE_RULE_FROM_INTAKE_SCHEMA = z.object({
@@ -94,6 +95,8 @@ export function createCreateRuleFromIntakeTool(
   onRuleCreated: (ruleId: string) => Promise<void> | void,
   /** User messages + web_search results this session; a URL must come from them. */
   getUserTexts?: () => string[],
+  /** True when Session Goal (or history) still wants a post/content after brand create. */
+  hasPostGoal?: () => boolean,
 ) {
   return tool(
     async ({ description, url, brandName, channels }) => {
@@ -126,7 +129,12 @@ export function createCreateRuleFromIntakeTool(
       );
       await onRuleCreated(ruleId);
 
-      return "Started building the brand profile. I'll have full brand context from your next message — extraction is running in the background.";
+      const texts = getUserTexts?.() ?? [];
+      const continuePost =
+        hasPostGoal?.() === true || texts.some((t) => matchesPostIntent(t));
+      return continuePost
+        ? "Started building the brand profile. Extraction is running in the background. Continue the user's post/content Goal now or next turn (call start_generation when ready); do not stop after brand create alone."
+        : "Started building the brand profile. I'll have full brand context from your next message - extraction is running in the background.";
     },
     {
       name: 'create_rule_from_intake',

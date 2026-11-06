@@ -210,7 +210,9 @@ export function buildPipelineResultObservation(args: {
     hasImage: args.hasImage,
     error: args.error,
     instruction: ok
-      ? 'The generation run you started earlier just finished. Call get_content with this contentId to check it, then tell the user in a sentence or two that it is ready (mention if an image is missing). Do not start another run or change anything.'
+      ? args.contentId
+        ? 'The generation run you started earlier just finished. The draft (get_content / show_content) is already attached in this turn — tell the user in a sentence or two that it is ready (mention if an image is missing). Do not call get_content again, and do not start another run or change anything.'
+        : 'The generation run you started earlier just finished but no contentId is known yet. Call get_content (omit contentId) to load the latest draft, then tell the user in a sentence or two that it is ready. Do not start another run or change anything.'
       : 'The generation run you started earlier stopped. Explain in plain language which step failed and why, say what was kept, and offer to try again. Do not start another run yourself.',
   };
 }

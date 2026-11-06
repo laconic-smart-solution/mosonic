@@ -106,3 +106,36 @@ describe("parseContentCard", () => {
     expect(card?.action).toBe("publish_started")
   })
 })
+
+  it("surfaces pipeline_result as a content draft card", () => {
+    const card = parseContentCard(
+      JSON.stringify({
+        ok: true,
+        action: "pipeline_result",
+        contentId: "c-9",
+        pipelineId: "pipe-9",
+        status: "completed",
+        hasImage: true,
+      }),
+    )
+    expect(card).toMatchObject({
+      action: "show_content",
+      contentId: "c-9",
+      status: "draft",
+      hasImage: true,
+    })
+  })
+
+  it("ignores pipeline_result without contentId", () => {
+    expect(
+      parseContentCard(
+        JSON.stringify({
+          ok: true,
+          action: "pipeline_result",
+          pipelineId: "pipe-9",
+          status: "completed",
+        }),
+      ),
+    ).toBeNull()
+  })
+

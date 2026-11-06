@@ -1,12 +1,18 @@
+import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { FileText } from "lucide-react"
 
 import { FileServiceImage } from "@/features/upload/components/upload-display-media"
+import { retryErroredFileObjectUrls } from "@/shared/lib/file-object-url-cache"
 import { useRuleAssetsQuery } from "@/shared/queries/rule-asset.query"
 
 export function ChatBrandAssetList({ ruleId }: { ruleId: string }) {
   const { t } = useTranslation("chat")
   const assetsQuery = useRuleAssetsQuery(ruleId)
+  // A refetch of the list retries any thumbnail whose earlier load failed.
+  useEffect(() => {
+    if (assetsQuery.dataUpdatedAt) retryErroredFileObjectUrls()
+  }, [assetsQuery.dataUpdatedAt])
   const assets = (assetsQuery.data ?? []).filter((a) => a.status === "ready")
 
   const images = assets.filter((a) => a.type === "logo" || a.type === "reference_image")

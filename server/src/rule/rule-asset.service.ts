@@ -13,6 +13,8 @@ import { RuleService } from './rule.service';
 
 const IMAGE_ASSET_TYPES = new Set(['logo', 'reference_image']);
 
+const AI_DESCRIBABLE_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']);
+
 @Injectable()
 export class RuleAssetService {
   private readonly logger = new Logger(RuleAssetService.name);
@@ -78,6 +80,11 @@ export class RuleAssetService {
   ): Promise<void> {
     try {
       if (IMAGE_ASSET_TYPES.has(type)) {
+        // Vision API accepts png/jpeg/gif/webp only; store others (e.g. SVG logos) without a description.
+        if (!AI_DESCRIBABLE_IMAGE_MIME.has(file.mimetype?.toLowerCase())) {
+          await this.ruleAssets.updateById(ruleAssetId, { status: 'ready' });
+          return;
+        }
         const description = await this.llm.describeImageForExtraction(
           file.buffer,
           file.mimetype,

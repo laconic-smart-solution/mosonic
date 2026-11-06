@@ -17,10 +17,17 @@ type ChatComposerProps = {
   busy?: boolean
   /** Files attach as brand assets on this Rule — null while the chat is still ruleless. */
   ruleId: string | null
+  /**
+   * When the chat has no brand yet, bootstrap one from attached files (extract + bind)
+   * and return the new ruleId so assets can be uploaded before the message is sent.
+   */
+  onBootstrapFromFiles?: (files: File[], text: string) => Promise<string>
 }
 
-function inferAssetType(file: File): RuleAssetType {
-  return file.type.startsWith("image/") ? "reference_image" : "guideline_document"
+function inferAssetType(file: File, index: number): RuleAssetType {
+  if (!file.type.startsWith("image/")) return "guideline_document"
+  // First image in a ruleless bootstrap is treated as the logo.
+  return index === 0 ? "logo" : "reference_image"
 }
 
 export function ChatComposer({
@@ -30,6 +37,7 @@ export function ChatComposer({
   disabled = false,
   busy = false,
   ruleId,
+  onBootstrapFromFiles,
 }: ChatComposerProps) {
   const { t } = useTranslation("chat")
   const uploadAssetMutation = useUploadRuleAssetMutation()
@@ -38,23 +46,34 @@ export function ChatComposer({
     const urls = attachments
       .filter((a) => a.type === "url" && typeof a.data === "string")
       .map((a) => a.data as string)
-    const files = attachments.filter(
+    const fileAttachments = attachments.filter(
       (a) => a.type === "file" && a.data instanceof File,
     )
+    const files = fileAttachments.map((a) => a.data as File)
 
+    let effectiveRuleId = ruleId
     let uploaded: { ruleAssetId: string; type: string; fileUrl: string }[] = []
+
     if (files.length > 0) {
-      if (!ruleId) {
-        toast.error(t("composer.uploadNeedsRule"))
-        return
+      if (!effectiveRuleId) {
+        if (!onBootstrapFromFiles) {
+          toast.error(t("composer.uploadNeedsRule"))
+          return
+        }
+        try {
+          effectiveRuleId = await onBootstrapFromFiles(files, text)
+        } catch {
+          // Caller / mutation toasts the extract or bind failure.
+          return
+        }
       }
       try {
         uploaded = await Promise.all(
-          files.map((a) =>
+          files.map((file, index) =>
             uploadAssetMutation.mutateAsync({
-              ruleId,
-              file: a.data as File,
-              type: inferAssetType(a.data as File),
+              ruleId: effectiveRuleId as string,
+              file,
+              type: inferAssetType(file, index),
             }),
           ),
         )

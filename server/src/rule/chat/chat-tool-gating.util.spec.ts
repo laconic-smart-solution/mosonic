@@ -195,3 +195,25 @@ describe('content + upload expansions (A-D)', () => {
     expect(selectTurnTools('add my photo', { ...state, hasContent: false })('add_upload_media')).toBe(false);
   });
 });
+
+describe('pendingFlowTools unfinished make_post Goal', () => {
+  it('keeps start_generation from statePending.goalTools even without POST_INTENT on latest message', () => {
+    const history = [
+      { role: 'user', content: 'I want to make a post about One Piece' },
+      { role: 'assistant', content: 'What industry?' },
+      { role: 'user', content: 'beauty' },
+    ];
+    const keep = pendingFlowTools(history, {
+      statePending: {
+        connect: false,
+        chainTools: [],
+        approvalTools: [],
+        goalTools: ['start_generation', 'apply_default_workflow'],
+      },
+    });
+    expect(keep.has('start_generation')).toBe(true);
+    expect(keep.has('apply_default_workflow')).toBe(true);
+    // Latest message alone would not select post tools via intent.
+    expect(selectTurnTools('beauty', { hasWorkflow: false, hasContent: false, hasActiveRun: false }, keep)('start_generation')).toBe(true);
+  });
+});

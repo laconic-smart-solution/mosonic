@@ -28,3 +28,14 @@ describe("queryKeysForToolSteps", () => {
     expect(keys).toContainEqual(["usage", "summary"])
   })
 })
+
+  it("maps pipeline_result and get_content to content keys", () => {
+    const keys = queryKeysForToolSteps([
+      { type: "observation", name: "pipeline_result", result: "ok" },
+      { type: "observation", name: "get_content", result: "ok" },
+    ])
+    expect(keys).toContainEqual(["contents"])
+    expect(keys).toContainEqual(["content"])
+    expect(keys).toContainEqual(["pipeline"])
+  })
+
