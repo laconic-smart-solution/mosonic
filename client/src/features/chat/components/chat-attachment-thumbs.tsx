@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next"
 import { Paperclip } from "lucide-react"
 
+import { FileServiceImage } from "@/features/upload/components/upload-display-media"
 import type { ChatAttachment } from "../lib/chat-attachments"
 
 /** Image thumbnails (or a small file chip) for files attached to a user message. */
@@ -10,12 +11,12 @@ export function ChatAttachmentThumbs({ attachments }: { attachments: ChatAttachm
     <div className="flex flex-wrap justify-end gap-1.5">
       {attachments.map((a) =>
         a.url && a.type !== "guideline_document" ? (
-          <img
+          <FileServiceImage
             key={a.id}
-            src={a.url}
+            url={a.url}
             alt={t("composer.attachedImage")}
             className="size-24 rounded-xl border border-canvas-200 dark:border-white/8 object-cover"
-            loading="lazy"
+            loadingClassName="size-24 rounded-xl border border-canvas-200 dark:border-white/8"
           />
         ) : (
           <span

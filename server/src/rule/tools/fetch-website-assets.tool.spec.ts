@@ -152,4 +152,33 @@ describe('createFetchWebsiteAssetsTool', () => {
     await chatTool.invoke({ url: 'https://beautyphoo.com' });
     expect(handler.discoverImages).toHaveBeenCalledWith('https://beautyphoo.com', expect.any(Number));
   });
+
+  it('calls seedBlankBrand after a successful save', async () => {
+    const images = [
+      {
+        sourceUrl: 'https://brew-co.coffee/favicon.png',
+        buffer: Buffer.from('a'),
+        mimeType: 'image/png',
+        originalFileName: 'favicon.png',
+        kind: 'icon' as const,
+      },
+    ];
+    const handler = makeHandler(images);
+    const ruleAssetService = makeRuleAssetService();
+    const seed = jest.fn().mockResolvedValue(undefined);
+    const chatTool = createFetchWebsiteAssetsTool(
+      () => 'rule-1',
+      handler,
+      ruleAssetService,
+      auth,
+      () => ['https://brew-co.coffee'],
+      seed,
+    );
+
+    const result = await chatTool.invoke({ url: 'https://brew-co.coffee' });
+
+    expect(seed).toHaveBeenCalledWith('rule-1', 'https://brew-co.coffee');
+    expect(result).toContain('Seeded brand name');
+    expect(result).toContain('do not stop at assets alone');
+  });
 });
