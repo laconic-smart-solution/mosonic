@@ -260,7 +260,8 @@ export function preflightRequest(input: {
     }
   }
   if (r.wantsRealScreenshots && input.attachedImages === 0) notPossible.push('Your real screenshots: none attached in this chat yet; upload them and I will pass them to the image step');
-  if (r.wantsMockup && r.wantsRealScreenshots) notPossible.push('Pixel-exact screenshots inside a device frame: the image step redraws the mockup using your screenshots as reference');
+  // Mockup + real screenshots is supported via redraw-as-reference — do NOT put that in notPossible
+  // (it used to surface as "Not possible yet" and block the demo). Pixel-exact compositing stays documented in buildCapabilitySummary only.
   return { youAskedFor: asked.length ? asked : ['a post'], willChange, notPossible, missingLanguages: missingLangs };
 }
 
