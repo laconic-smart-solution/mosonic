@@ -166,6 +166,7 @@
     "title": "ฉบับร่างคอนเทนต์",
     "titleUpdatingImage": "กำลังอัปเดตรูป…",
     "titleUpdatingCaption": "กำลังอัปเดตแคปชัน…",
+    "titleUpdateFailed": "อัปเดตไม่สำเร็จ",
     "openContent": "เปิดคอนเทนต์",
     "working": "กำลังสร้างผลลัพธ์เพิ่ม…",
     "workingImage": "กำลังอัปเดตรูป…",
@@ -173,6 +174,9 @@
     "workingTranslation": "กำลังอัปเดตคำแปล…",
     "workingSummary": "กำลังอัปเดตสรุป…",
     "stillWorking": "ยังทำงานอยู่ เปิดคอนเทนต์เพื่อดูต่อ",
+    "updateFailed": "อัปเดตไม่สำเร็จ: {{reason}}",
+    "updateFailedGeneric": "อัปเดตไม่สำเร็จ เครดิตคืนแล้ว — ลองอีกครั้ง",
+    "updateTimedOut": "อัปเดตนานเกินไป เปิดคอนเทนต์เพื่อตรวจ หรือลองอีกครั้ง",
     "observation": "คอนเทนต์ · {{status}}",
     "hasImage": "รูปภาพ",
     "hasVideo": "วิดีโอ",
@@ -206,9 +210,134 @@
       "skip": "ข้าม"
     },
     "plan": {
-      "asked": "คุณขอ",
-      "willChange": "ฉันจะเปลี่ยน",
-      "notPossible": "ทำไม่ได้"
+      "asked": "ที่คุณขอ",
+      "willChange": "ที่จะเปลี่ยน",
+      "notPossible": "ทำไม่ได้",
+      "notPossibleYet": "ยังทำไม่ได้"
+    },
+    "preview": {
+      "readyTitle": "พร้อมสร้าง",
+      "stepCount": "{{count}} ขั้นตอน",
+      "videoSteps": "วิดีโอ {{count}}",
+      "stepsLabel": "ขั้นตอนเวิร์กโฟลว์",
+      "apply": "บันทึก",
+      "noSettings": "ขั้นตอนนี้ไม่มีค่าที่แก้ได้",
+      "needsSetup": "ต้องตั้งค่า",
+      "missingVideo": "ยังไม่มีขั้นวิดีโอตามที่ขอ",
+      "missingChannel": "ยังไม่มี {{channel}} ในเวิร์กโฟลว์",
+      "nodeType": {
+        "keyword_planner": "วางแผนคีย์เวิร์ด",
+        "web_search": "Web search",
+        "intelligence": "Intelligence",
+        "text_generation": "เขียนแคปชัน",
+        "image_generation": "Image generation",
+        "translation": "Translation",
+        "branch": "Branch",
+        "adapt": "Adapt",
+        "merge": "Merge",
+        "summary": "Summary",
+        "video_presenter": "Presenter video",
+        "video_cinematic": "Cinematic video",
+        "video_generation": "Video",
+        "adaptFor": "ปรับสำหรับ {{channel}}",
+        "imageFor": "รูป · {{channel}}"
+      },
+      "reviewTitle": "ตรวจแผนนี้",
+      "close": "ปิด",
+      "stepsRuns": "{{count}} ขั้นตอน · รันจากบนลงล่าง",
+      "badgeAdding": "กำลังเพิ่ม",
+      "badgeUpdated": "อัปเดต",
+      "creditsApprox": "~{{count}} เครดิต",
+      "footerCost": "{{images}} รูป · ~{{credits}} เครดิต",
+      "cancel": "ยกเลิก",
+      "changeSettings": "เปลี่ยนการตั้งค่า",
+      "startWithCredits": "เริ่ม · ~{{count}} เครดิต",
+      "tabs": {
+        "basics": "Basics",
+        "advanced": "Advanced",
+        "style": "Style",
+        "size": "Size",
+        "references": "References",
+        "prompt": "Prompt",
+        "text": "Text",
+        "hashtags": "Hashtags"
+      },
+      "fields": {
+        "topic": "Topic",
+        "market": "Market",
+        "keywords": "Keywords to use",
+        "addKeyword": "Add a keyword",
+        "useBrandKeywords": "Use saved brand keywords",
+        "imageType": "Image type",
+        "mood": "Mood",
+        "brandColors": "Brand colours",
+        "useBrandPalette": "Use brand palette",
+        "logo": "Logo",
+        "addLogo": "Add logo",
+        "howManyImages": "How many images",
+        "wasN": "was {{n}}",
+        "size": "Size",
+        "useAttached": "Use attached screenshots",
+        "useBrandImages": "Use saved brand images ({{count}})",
+        "add": "+ add",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Optional notes for the image",
+        "length": "Length",
+        "tone": "Tone",
+        "language": "Language",
+        "extraNote": "Extra note",
+        "hashtagNote": "Hashtag notes",
+        "hashtagPlaceholder": "e.g. keep under 5 hashtags"
+      },
+      "imageTypes": {
+        "website_mockup": "Website mockup",
+        "photo": "Photo",
+        "illustration": "Illustration",
+        "watercolor": "Watercolor"
+      },
+      "moods": {
+        "clean": "Clean",
+        "bold": "Bold",
+        "playful": "Playful"
+      },
+      "markets": {
+        "thailand": "Thailand",
+        "global": "Global"
+      },
+      "lengths": {
+        "short": "Short (≤150)",
+        "medium": "Medium"
+      },
+      "tones": {
+        "casual": "Casual",
+        "professional": "Professional",
+        "friendly": "Fun"
+      },
+      "hints": {
+        "watercolorSkipped": "Saved preference “watercolor” not used this time",
+        "imageCountNotInOneRun": "More than 1 image per channel in one run is not supported yet — extras need generate-more after (credits).",
+        "sizeTab": "Size tab · 1:1 is best for Facebook feed",
+        "attachedCount": "{{count}} attached in chat · used as reference",
+        "promptMapsToNegative": "Saved as the image negative / notes field.",
+        "languageDisplayOnly": "Language chips are a note for this run; add a Translation step to persist another language.",
+        "hashtagsDisplayOnly": "Hashtag notes are not saved on the node yet.",
+        "keywordAdvanced": "Saved on the keyword step as custom prompt when supported."
+      },
+      "nodeBlurb": {
+        "keyword_planner": "Finds topics & hashtags",
+        "text_generation": "Writes the caption",
+        "adapt": "Rewrites the caption for {{channel}}",
+        "image_generation": "Makes the {{channel}} pictures"
+      },
+      "footerImages_one": "{{count}} รูป",
+      "footerImages_other": "{{count}} รูป",
+      "footerCredits_one": "~{{count}} เครดิต",
+      "footerCredits_other": "~{{count}} เครดิต",
+      "footerListPrice": "(ราคาตั้งต้น)",
+      "footerCreditsWhenStart": "คิดเครดิตเมื่อเริ่ม",
+      "start": "เริ่ม",
+      "startWithCredits_one": "เริ่ม · ~{{count}} เครดิต",
+      "startWithCredits_other": "เริ่ม · ~{{count}} เครดิต"
     }
   },
   "stepTrace": {
@@ -231,7 +360,17 @@
     "failedSuffix_one": " · ไม่สำเร็จ {{count}} ขั้น",
     "failedSuffix_other": " · ไม่สำเร็จ {{count}} ขั้น",
     "savedNote": "บันทึกความชอบของคุณแล้ว",
-    "genericStep": "ดำเนินการแล้ว"
+    "genericStep": "ดำเนินการแล้ว",
+    "sectionPlan": "แผน",
+    "sectionThinking": "เหตุผล",
+    "sectionDoing": "กำลังทำ",
+    "planEmpty": "ไม่ต้องเปลี่ยน workflow สำหรับคำขอนี้",
+    "summaryWorking": "กำลังทำงาน · {{done}} จาก {{total}} ขั้นตอน",
+    "summaryWaiting": "รอคุณเลือก · {{done}} จาก {{total}}",
+    "summaryDone": "เสร็จแล้ว · {{done}} จาก {{total}} ขั้นตอน",
+    "summaryFailed": "หยุด · {{done}} จาก {{total}} ขั้นตอน",
+    "workedThrough_one": "Worked through {{count}} step",
+    "workedThrough_other": "Worked through {{count}} steps"
   },
   "contextUsage": {
     "label": "{{used}} / {{limit}} โทเคน"

@@ -37,24 +37,54 @@ function extractMediaFromNode(node: PipelineNodeLike): {
   return { image, video };
 }
 
-/** Last-wins lane image/video from completed pipeline nodes on this lane. */
-export function laneMediaFromPipelineNodes(
+export type LaneMedia = {
+  /** Ordered image URLs from every completed image node on this lane (or trunk). */
+  images: string[];
+  /** Last image (compat with single-slot callers). */
+  image?: string;
+  /** Last video URL on the lane/trunk. */
+  video?: string;
+  videos: string[];
+};
+
+function collectMedia(
   pipelineNodes: PipelineNodeLike[],
-  lane: string,
-): { image?: string; video?: string } {
-  const target = normalizeLaneId(lane);
-  let image: string | undefined;
-  let video: string | undefined;
+  predicate: (nodeLane: string | null) => boolean,
+): LaneMedia {
+  const images: string[] = [];
+  const videos: string[] = [];
+  const seenImg = new Set<string>();
+  const seenVid = new Set<string>();
 
   for (const node of pipelineNodes) {
     const nodeLane = node.lane ? normalizeLaneId(node.lane) : null;
-    if (nodeLane !== target) continue;
+    if (!predicate(nodeLane)) continue;
     const media = extractMediaFromNode(node);
-    if (media.image) image = media.image;
-    if (media.video) video = media.video;
+    if (media.image && !seenImg.has(media.image)) {
+      seenImg.add(media.image);
+      images.push(media.image);
+    }
+    if (media.video && !seenVid.has(media.video)) {
+      seenVid.add(media.video);
+      videos.push(media.video);
+    }
   }
 
-  return { image, video };
+  return {
+    images,
+    image: images.length ? images[images.length - 1] : undefined,
+    videos,
+    video: videos.length ? videos[videos.length - 1] : undefined,
+  };
+}
+
+/** All completed image/video URLs on this lane, order preserved (pipeline node order). */
+export function laneMediaFromPipelineNodes(
+  pipelineNodes: PipelineNodeLike[],
+  lane: string,
+): LaneMedia {
+  const target = normalizeLaneId(lane);
+  return collectMedia(pipelineNodes, (nodeLane) => nodeLane === target);
 }
 
 /**
@@ -63,17 +93,6 @@ export function laneMediaFromPipelineNodes(
  */
 export function trunkMediaFromPipelineNodes(
   pipelineNodes: PipelineNodeLike[],
-): { image?: string; video?: string } {
-  let image: string | undefined;
-  let video: string | undefined;
-
-  for (const node of pipelineNodes) {
-    const nodeLane = node.lane ? normalizeLaneId(node.lane) : null;
-    if (nodeLane) continue;
-    const media = extractMediaFromNode(node);
-    if (media.image) image = media.image;
-    if (media.video) video = media.video;
-  }
-
-  return { image, video };
+): LaneMedia {
+  return collectMedia(pipelineNodes, (nodeLane) => !nodeLane);
 }

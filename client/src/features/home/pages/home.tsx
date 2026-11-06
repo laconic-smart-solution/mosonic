@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { BrainCircuit, Eraser } from "lucide-react"
 import { toast } from "sonner"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 
@@ -21,19 +22,22 @@ import { useActiveChatSession } from "@/features/chat/hooks/use-active-chat-sess
 import { useChatSteps } from "@/features/chat/hooks/use-chat-steps"
 import { useInvalidateOnRunTerminal } from "@/features/chat/hooks/use-invalidate-on-run-terminal"
 import { useRuleBuildProgress } from "@/features/chat/hooks/use-rule-build-progress"
-import { useQueryClient } from "@tanstack/react-query"
 import { flattenChatMessagePages } from "@/features/chat/lib/chat-message-pages"
 import {
   createPendingUserMessage,
   withPendingUserMessage,
 } from "@/features/chat/lib/optimistic-chat-message"
+import { HomeWelcome } from "@/features/home/components/home-welcome"
 import {
   readHomeOauthReturn,
   stripHomeOauthParams,
 } from "@/features/home/lib/home-oauth-return"
 import { RedNoteQrConnectDialog } from "@/features/settings/components/rednote-qr-connect-dialog"
 import { useChatMessagesQuery, useSendChatMessageMutation } from "@/shared/queries/chat.query"
-import { useExtractRuleMutation } from "@/shared/queries/rule.query"
+import {
+  useCreateBlankRuleMutation,
+  useExtractRuleMutation,
+} from "@/shared/queries/rule.query"
 import { chatService } from "@/shared/services/chat.service"
 import { toastApiError } from "@/shared/lib/toast-error"
 import { useSyncZernioAccountsMutation } from "@/shared/queries/zernio.query"
@@ -42,6 +46,7 @@ import type { ContextUsage } from "@/shared/services/chat.service"
 export default function HomePage() {
   const navigate = useNavigate()
   const { t } = useTranslation("chat")
+  const { t: tHome } = useTranslation("home")
   const { t: tSettings } = useTranslation("settings")
   const [searchParams, setSearchParams] = useSearchParams()
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -54,6 +59,7 @@ export default function HomePage() {
   const brandPanelRef = useRef<HTMLDivElement>(null)
   const handledOAuthRef = useRef(false)
   const syncMutation = useSyncZernioAccountsMutation()
+  const createBlankRuleMutation = useCreateBlankRuleMutation()
 
   const {
     ruleOptions,
@@ -69,6 +75,18 @@ export default function HomePage() {
   } = useActiveChatSession()
 
   const selectedRule = ruleOptions.find((r) => r.ruleId === selectedRuleId)
+  const showWelcome = !selectedRuleId
+
+  async function startUntitledBrand() {
+    if (createBlankRuleMutation.isPending) return
+    try {
+      const created = await createBlankRuleMutation.mutateAsync()
+      toast.success(tHome("welcome.createdToast", { name: created.name }))
+      selectRule(created.ruleId)
+    } catch {
+      // toast via mutation onError
+    }
+  }
 
   useEffect(() => {
     setContextUsage(null)
@@ -204,6 +222,23 @@ export default function HomePage() {
     else brandPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
   }
 
+  if (showWelcome) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 w-full overflow-hidden bg-canvas-100 dark:bg-navy-900">
+        <HomeWelcome
+          rules={ruleOptions}
+          isLoadingRules={isLoadingRules}
+          isLoadingMore={isLoadingMoreRules}
+          canViewMore={canViewMoreRules}
+          onViewMore={onViewMoreRules}
+          onSelectRule={selectRule}
+          creating={createBlankRuleMutation.isPending}
+          onCreated={(ruleId) => selectRule(ruleId)}
+        />
+      </div>
+    )
+  }
+
   return (
     <ChatActionsContext.Provider value={chatActions}>
     <div className="flex h-full min-h-0 min-w-0 w-full overflow-hidden bg-canvas-100 dark:bg-navy-900">
@@ -219,8 +254,8 @@ export default function HomePage() {
             canViewMore={canViewMoreRules}
             onSelectRule={selectRule}
             onViewMore={onViewMoreRules}
-            onNewBrand={() => {
-              // Unbound chat = onboarding; the AI creates the new brand profile (create_rule_from_intake).
+            onNewBrand={() => void startUntitledBrand()}
+            onLeaveBrand={() => {
               setDraft("")
               selectRule(null)
             }}

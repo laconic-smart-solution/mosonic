@@ -117,6 +117,10 @@ export function createRerunContentNodeTool(
 
         const followUp = message?.trim() || undefined;
         const logoInMessage = /\blogo\b/i.test(followUp ?? '');
+        const scheduled: {
+          outputNodeId: string;
+          nodeType: string;
+        }[] = [];
         for (const target of targets) {
           if (target.type === 'image_generation' && !target.preview) {
             return toolError(
@@ -126,7 +130,7 @@ export function createRerunContentNodeTool(
             );
           }
           const image = target.type === 'image_generation';
-          await contentService.scheduleRerun(
+          const started = await contentService.scheduleRerun(
             scoped.content.contentId,
             {
               nodeId: target.nodeId,
@@ -138,14 +142,19 @@ export function createRerunContentNodeTool(
             },
             auth,
           );
+          scheduled.push({
+            outputNodeId: started.outputNodeId,
+            nodeType: started.nodeType,
+          });
         }
 
+        // pendingNodeId must be the materialized output id used for _pending + socket events.
         return showContentPayload(previewFromRecord(scoped.content), {
           action: 'content_rerun_started',
           ...(reopen ? { status: ContentStatus.draft, reopened: true } : {}),
-          pendingNodeId: targets[0]?.nodeId ?? null,
-          pendingNodeType: targets[0]?.type ?? null,
-          pendingNodeIds: targets.map((node: DraftNodeView) => node.nodeId),
+          pendingNodeId: scheduled[0]?.outputNodeId ?? null,
+          pendingNodeType: scheduled[0]?.nodeType ?? targets[0]?.type ?? null,
+          pendingNodeIds: scheduled.map((row) => row.outputNodeId),
         });
       }),
     {

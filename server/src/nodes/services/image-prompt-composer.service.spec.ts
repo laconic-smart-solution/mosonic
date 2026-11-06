@@ -13,6 +13,11 @@ describe('ImagePromptComposerService', () => {
       brandVoice: 'Friendly but professional',
       callToAction: 'Start creating',
       brandRestrictions: ['never mention competitors'],
+      visualIdentity: {
+        primary: '#1b4f72',
+        secondary: '#f5cba7',
+        designKeywords: ['minimal', 'photography'],
+      },
     },
     audience: {
       description: 'Thai SME owners aged 30-50',
@@ -76,6 +81,9 @@ describe('ImagePromptComposerService', () => {
     expect(capturedPrompt).toContain('Thai SME owners aged 30-50');
     expect(capturedPrompt).toContain('Thailand');
     expect(capturedPrompt).toContain('Start creating');
+    expect(capturedPrompt).toContain('#1b4f72');
+    expect(capturedPrompt).toContain('Visual identity');
+    expect(capturedPrompt).toContain('minimal');
     expect(capturedPrompt).toContain(
       'Composition notes (apply to THIS brand\'s subject; do not drop the subject): one dominant focal subject, fill the frame',
     );

@@ -7,11 +7,55 @@ import {
   X,
   FileText,
   Globe,
+  ImageIcon,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { randomUuid } from "@/lib/random-uuid"
 import { normalizeHttpUrl, urlDisplayLabel } from "@/lib/strategy-urls"
+
+export function fileMatchesAccept(
+  file: Pick<File, "name" | "type">,
+  accept: string,
+): boolean {
+  const tokens = accept
+    .split(",")
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean)
+  if (tokens.length === 0) return true
+  const name = file.name.toLowerCase()
+  const type = (file.type || "").toLowerCase()
+  return tokens.some((token) => {
+    if (token === "*/*") return true
+    if (token.endsWith("/*")) return type.startsWith(`${token.slice(0, -1)}`)
+    if (token.startsWith(".")) {
+      return name.endsWith(token) || type.endsWith(token.slice(1))
+    }
+    return type === token
+  })
+}
+
+/** Clipboard screenshots usually land in `items`; some browsers also fill `files`. */
+export function filesFromClipboard(data: DataTransfer): File[] {
+  const fromList = Array.from(data.files ?? [])
+  if (fromList.length > 0) return fromList
+  const out: File[] = []
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind !== "file") continue
+    const file = item.getAsFile()
+    if (file) out.push(file)
+  }
+  return out
+}
+
+export function pastedFileLabel(file: Pick<File, "name" | "type">): string {
+  if (file.name?.trim()) return file.name
+  if (file.type.startsWith("image/")) {
+    const ext = file.type.split("/")[1] || "png"
+    return `pasted-image.${ext}`
+  }
+  return "pasted-file"
+}
 
 export interface Attachment {
   id: string
@@ -135,26 +179,37 @@ export function PromptArea({
     setExpanded(false)
   }
 
-  function handleFiles(files: FileList | null) {
-    if (!files) return
-    const next: Attachment[] = Array.from(files).map((f) => ({
+  function handleFiles(files: FileList | File[] | null) {
+    if (!files || (files as FileList | File[]).length === 0) return
+    const list = Array.from(files as ArrayLike<File>)
+    const next: Attachment[] = list.map((f) => ({
       id: randomUuid(),
       type: "file",
-      label: f.name,
+      label: pastedFileLabel(f),
       data: f,
     }))
     setAttachments((prev) => [...prev, ...next])
+    setExpanded(true)
   }
 
   /**
-   * A paste that is nothing but one or more links (no other prose) becomes
-   * URL attachment chips instead of raw text — users don't discover a
-   * separate "add link" affordance, they just paste the link where they're
-   * typing. A paste mixed with ordinary text is left alone: surgically
-   * pulling a URL out of a sentence would be surprising and could drop
-   * words around it.
+   * Paste priority:
+   * 1. Image/file from the clipboard (Ctrl+V screenshot) → file chip when files are enabled
+   * 2. A paste that is nothing but one or more links → URL chips
+   * Mixed prose + URL is left alone so we don't strip words around a link.
    */
   function handleTextareaPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (enableFiles && !disabled) {
+      const pastedFiles = filesFromClipboard(e.clipboardData).filter((file) =>
+        fileMatchesAccept(file, acceptFileTypes),
+      )
+      if (pastedFiles.length > 0) {
+        e.preventDefault()
+        handleFiles(pastedFiles)
+        return
+      }
+    }
+
     const pasted = e.clipboardData.getData("text")
     const parts = pasted
       .split(/[\s,]+/)
@@ -247,9 +302,13 @@ export function PromptArea({
                   )}
                 >
                   {att.type === "file" ? (
-                    <FileText className="h-3 w-3" />
+                    att.data instanceof File && att.data.type.startsWith("image/") ? (
+                      <AttachmentImageThumb file={att.data} />
+                    ) : (
+                      <FileText className="h-3 w-3 shrink-0" />
+                    )
                   ) : (
-                    <Globe className="h-3 w-3" />
+                    <Globe className="h-3 w-3 shrink-0" />
                   )}
                   <span className="max-w-[calc(100vw-6rem)] truncate sm:max-w-[200px]">
                     {att.label}
@@ -395,5 +454,27 @@ function ToolButton({
     >
       <Icon className="h-4 w-4" />
     </button>
+  )
+}
+
+function AttachmentImageThumb({ file }: { file: File }) {
+  const [src, setSrc] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  if (!src) {
+    return <ImageIcon className="h-3 w-3 shrink-0" aria-hidden />
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="size-4 shrink-0 rounded-[3px] object-cover"
+    />
   )
 }

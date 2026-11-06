@@ -125,7 +125,9 @@ export function ChatMessageBubble({
             onChoose={onChoose}
           />
         ) : null}
-        <ChatMessageTokenMeta message={message} align={isUser ? "end" : "start"} />
+        {isUser || !(message.steps && message.steps.length > 0 && !onlyAskUser) ? (
+          <ChatMessageTokenMeta message={message} align={isUser ? "end" : "start"} />
+        ) : null}
       </div>
     </div>
   )

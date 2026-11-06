@@ -475,7 +475,11 @@ export class ContentService {
       files?: UploadedFileLike[];
       urls?: string[];
     },
-  ): Promise<void> {
+  ): Promise<{
+    outputNodeId: string;
+    workflowNodeId: string;
+    nodeType: string;
+  }> {
     const content = await this.contentRepository.findById(contentId, auth);
     if (!content) {
       throw new NotFoundException(`Content ${contentId} not found`);
@@ -712,6 +716,13 @@ export class ContentService {
         creditsCharged,
       }),
     );
+
+    // Chat cards poll / listen using this id — must match setNodeRerunPending + emits.
+    return {
+      outputNodeId: rerunTarget.outputNodeId,
+      workflowNodeId: rerunTarget.workflowNodeId,
+      nodeType: String(nodeForRun.type),
+    };
   }
 
   async getAvailableNodeTypes(
@@ -1259,15 +1270,22 @@ export class ContentService {
         error instanceof Error
           ? error.message
           : 'Re-run failed. Please try again.';
-      await this.setNodeRerunPending(
+      // Persist error + clear _pending so chat polling sees a terminal failure
+      // (same shape as generate-more), not an endless "updating" state.
+      await this.markGenerateMoreFailed(
         content.contentId,
         outputNodeId,
-        false,
+        String(wfNode.type),
+        message,
         auth,
-      );
+      ).catch((markErr: unknown) => {
+        const m = markErr instanceof Error ? markErr.message : String(markErr);
+        this.logger.warn(`Could not record re-run failure ${outputNodeId}: ${m}`);
+      });
       this.events.emitToContent(content.contentId, 'node:failed_final', {
         contentId: content.contentId,
         nodeId: outputNodeId,
+        nodeType: String(wfNode.type),
         message,
       });
       await this.refundContentNodeCharge({

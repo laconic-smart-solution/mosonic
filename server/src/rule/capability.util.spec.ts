@@ -11,7 +11,7 @@ describe('preflightRequest', () => {
 
   it('a no-lane workflow without an Image step still needs one', () => {
     const plan = preflightRequest({ request: parseRequest('instagram photo post'), nodes: [text], attachedImages: 0 });
-    expect(plan.willChange).toEqual(['Add an image step (add_workflow_node image_generation)']);
+    expect(plan.willChange).toEqual(['Add an image step']);
   });
 
   it('a lane with no image is still flagged', () => {
@@ -19,6 +19,18 @@ describe('preflightRequest', () => {
     const plan = preflightRequest({ request: parseRequest('instagram photo post'), nodes, attachedImages: 0 });
     expect(plan.willChange.join(' ')).toMatch(/image step for Instagram/);
   });
+  it('N images per channel proposes adding N image steps (not notPossible)', () => {
+    const fbAdapt = { nodeId: 'a', type: 'adapt', lane: 'facebook' };
+    const fbImg = { nodeId: 'i1', type: 'image_generation', lane: 'facebook' };
+    const plan = preflightRequest({
+      request: parseRequest('Facebook post with 4 service images'),
+      nodes: [text, fbAdapt, fbImg],
+      attachedImages: 0,
+    });
+    expect(plan.notPossible.join(' ')).not.toMatch(/images per channel in one run/i);
+    expect(plan.willChange.some((w) => /4 image steps/i.test(w))).toBe(true);
+  });
+
 });
 
 describe('translation capability (B)', () => {
@@ -55,4 +67,6 @@ describe('translation capability (B)', () => {
     expect(out).toMatch(/translates to zh/);
     expect(out).toMatch(/Other languages/);
   });
+
+
 });

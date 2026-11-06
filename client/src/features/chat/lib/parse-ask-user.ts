@@ -18,9 +18,71 @@ export type AskUserPrompt = {
   url?: string
   /** Plan confirm card lines. */
   plan?: AskUserPlan
+  /** Structured generation preview (start_generation gate). */
+  preview?: AskUserPreview
+  topic?: string
+  workflowId?: string
+  gaps?: AskUserPreviewGaps
+  needsAdding?: boolean
+  /** Rough credit/image estimate for the footer (UI). */
+  estimate?: { images: number; credits: number; basis?: "list_price" }
+  attachedImageCount?: number
+  brandImageCount?: number
 }
 
-export type AskUserPlan = { youAskedFor: string; willChange: string[]; notPossible: string[] }
+export type AskUserPlan = {
+  /** Bullet lines (preferred) or a single sentence. */
+  youAskedFor: string | string[]
+  willChange: string[]
+  notPossible: string[]
+}
+
+
+/** Drop internal tool ids from plan lines so the card never shows them. */
+export function sanitizePlanLine(line: string): string {
+  return line
+    .replace(/\s*\((?:set_workflow_channels|add_workflow_node|update_node_config|start_generation|generate_more_image|generate_more_translation|apply_default_workflow|generate_workflow|set_video_node_look)[^)]*\)/gi, "")
+    .replace(/\b(?:set_workflow_channels|add_workflow_node|update_node_config|start_generation|generate_more_image|generate_more_translation)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+,/g, ",")
+    .trim()
+}
+
+/** Normalize plan.youAskedFor to bullet lines for the card. */
+export function planAskedLines(plan: AskUserPlan): string[] {
+  if (Array.isArray(plan.youAskedFor)) return plan.youAskedFor.map((s) => sanitizePlanLine(s)).filter(Boolean)
+  const raw = plan.youAskedFor.trim()
+  if (!raw) return []
+  // Prefer "; " / " · " splits when the server sent a joined string.
+  if (raw.includes("; ")) return raw.split("; ").map((s) => sanitizePlanLine(s)).filter(Boolean)
+  return [sanitizePlanLine(raw)].filter(Boolean)
+}
+
+
+export type GenerationPreviewStep = {
+  nodeId: string
+  type: string
+  order: number
+  lane: string | null
+  settings: Record<string, unknown>
+  issue?: string
+  /** Designer badge on the step list. */
+  badge?: "adding" | "updated"
+}
+
+export type AskUserPreview = {
+  steps: GenerationPreviewStep[]
+  lanes: string[]
+  issues: string[]
+  videoSteps?: number
+}
+
+export type AskUserPreviewGaps = {
+  channels: string[]
+  shared: boolean
+  missingVideo: boolean
+  missingChannels: string[]
+}
 
 const URL_OPTION_PATTERN = /\b(url|website|web site|link)\b/i
 
@@ -53,8 +115,32 @@ export function parseAskUserPrompt(result: string): AskUserPrompt | null {
     }
     const confirmFor = typeof obj.confirmFor === "string" ? obj.confirmFor : undefined
     const url = typeof obj.url === "string" && obj.url.trim() ? obj.url.trim() : undefined
+    // Never surface model/tool next-step hints (e.g. start_generation preview) as UI notice.
     const notice =
-      confirmFor && confirmFor !== "fetch_website_assets" && typeof obj.message === "string" && obj.message.trim() ? obj.message.trim() : undefined
+      confirmFor &&
+      confirmFor !== "fetch_website_assets" &&
+      confirmFor !== "start_generation" &&
+      typeof obj.message === "string" &&
+      obj.message.trim() &&
+      !isInternalToolMessage(obj.message)
+        ? obj.message.trim()
+        : undefined
+    const preview = parsePreview(obj.preview)
+    const gaps = parseGaps(obj.gaps)
+    let plan = parsePlan(obj.plan)
+    if (!plan && obj.brief && typeof obj.brief === "object") {
+      const brief = obj.brief as Record<string, unknown>
+      const notPossible = Array.isArray(brief.notPossible)
+        ? brief.notPossible.filter((x): x is string => typeof x === "string" && !!x.trim())
+        : []
+      if (notPossible.length || typeof brief.topic === "string") {
+        plan = {
+          youAskedFor: typeof brief.topic === "string" ? brief.topic : "",
+          willChange: [],
+          notPossible,
+        }
+      }
+    }
     return {
       action: "ask_user",
       type: obj.type,
@@ -63,7 +149,15 @@ export function parseAskUserPrompt(result: string): AskUserPrompt | null {
       ...(confirmFor ? { confirmFor } : {}),
       ...(notice ? { notice } : {}),
       ...(url ? { url } : {}),
-      ...(parsePlan(obj.plan) ? { plan: parsePlan(obj.plan)! } : {}),
+      ...(plan ? { plan } : {}),
+      ...(preview ? { preview } : {}),
+      ...(typeof obj.topic === "string" && obj.topic.trim() ? { topic: obj.topic.trim() } : {}),
+      ...(typeof obj.workflowId === "string" && obj.workflowId.trim() ? { workflowId: obj.workflowId.trim() } : {}),
+      ...(gaps ? { gaps } : {}),
+      ...(obj.needsAdding === true ? { needsAdding: true } : {}),
+      ...(parseEstimate(obj.estimate) ? { estimate: parseEstimate(obj.estimate)! } : {}),
+      ...(typeof obj.attachedImageCount === "number" ? { attachedImageCount: obj.attachedImageCount } : {}),
+      ...(typeof obj.brandImageCount === "number" ? { brandImageCount: obj.brandImageCount } : {}),
     }
   } catch {
     return null
@@ -142,10 +236,84 @@ export function dedupeAskQuestion(text: string, question?: string): string {
 function parsePlan(raw: unknown): AskUserPlan | null {
   if (!raw || typeof raw !== "object") return null
   const p = raw as Record<string, unknown>
-  const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()) : [])
-  const youAskedFor = typeof p.youAskedFor === "string" ? p.youAskedFor.trim() : ""
+  const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : [])
+  let youAskedFor: string | string[] = ""
+  if (Array.isArray(p.youAskedFor)) youAskedFor = strs(p.youAskedFor)
+  else if (typeof p.youAskedFor === "string") youAskedFor = p.youAskedFor.trim()
   const willChange = strs(p.willChange)
   const notPossible = strs(p.notPossible)
-  if (!youAskedFor && willChange.length === 0 && notPossible.length === 0) return null
+  const askedEmpty = Array.isArray(youAskedFor) ? youAskedFor.length === 0 : !youAskedFor
+  if (askedEmpty && willChange.length === 0 && notPossible.length === 0) return null
   return { youAskedFor, willChange, notPossible }
 }
+
+function parseEstimate(raw: unknown): { images: number; credits: number; basis?: "list_price" } | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const e = raw as Record<string, unknown>
+  const images = typeof e.images === "number" ? e.images : undefined
+  const credits = typeof e.credits === "number" ? e.credits : undefined
+  if (images === undefined || credits === undefined) return undefined
+  return {
+    images,
+    credits,
+    ...(e.basis === "list_price" ? { basis: "list_price" as const } : {}),
+  }
+}
+
+/** Tool next-step hints that must never appear in the chat card. */
+export function isInternalToolMessage(text: string): boolean {
+  return /nothing started yet|call start_generation|on start \(|on add_missing|do not also ask|update_node_config|set_video_node_look|this card already asks/i.test(text)
+}
+
+/** Short title for the generation preview card (no step dump). */
+export function displayGenerationTitle(prompt: AskUserPrompt): string {
+  if (prompt.topic?.trim()) return prompt.topic.trim()
+  const m = /^Ready to generate "([^"]+)"\?/i.exec(prompt.question.trim())
+  if (m) return m[1]
+  return prompt.question.split("\n")[0]?.trim() || prompt.question.trim()
+}
+
+function parsePreview(raw: unknown): AskUserPreview | null {
+  if (!raw || typeof raw !== "object") return null
+  const p = raw as Record<string, unknown>
+  if (!Array.isArray(p.steps)) return null
+  const steps: GenerationPreviewStep[] = []
+  for (const item of p.steps) {
+    if (!item || typeof item !== "object") continue
+    const s = item as Record<string, unknown>
+    if (typeof s.nodeId !== "string" || typeof s.type !== "string") continue
+    const settings =
+      s.settings && typeof s.settings === "object" && !Array.isArray(s.settings)
+        ? (s.settings as Record<string, unknown>)
+        : {}
+    steps.push({
+      nodeId: s.nodeId,
+      type: s.type,
+      order: typeof s.order === "number" ? s.order : steps.length,
+      lane: typeof s.lane === "string" && s.lane.trim() ? s.lane : null,
+      settings,
+      ...(typeof s.issue === "string" && s.issue.trim() ? { issue: s.issue.trim() } : {}),
+      ...(s.badge === "adding" || s.badge === "updated" ? { badge: s.badge } : {}),
+    })
+  }
+  if (steps.length === 0) return null
+  return {
+    steps,
+    lanes: Array.isArray(p.lanes) ? p.lanes.filter((x): x is string => typeof x === "string") : [],
+    issues: Array.isArray(p.issues) ? p.issues.filter((x): x is string => typeof x === "string") : [],
+    ...(typeof p.videoSteps === "number" ? { videoSteps: p.videoSteps } : {}),
+  }
+}
+
+function parseGaps(raw: unknown): AskUserPreviewGaps | null {
+  if (!raw || typeof raw !== "object") return null
+  const g = raw as Record<string, unknown>
+  const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [])
+  return {
+    channels: strs(g.channels),
+    shared: g.shared === true,
+    missingVideo: g.missingVideo === true,
+    missingChannels: strs(g.missingChannels),
+  }
+}
+

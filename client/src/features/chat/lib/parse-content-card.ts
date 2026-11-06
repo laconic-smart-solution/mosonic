@@ -18,6 +18,8 @@ export type ContentCardSnapshot = {
   saved: boolean
   /** User's reason from reject_content (or the reject dialog), when known. */
   rejectReason: string | null
+  /** Set when a generate-more / re-run node fails (credits refunded). */
+  failReason: string | null
   /** Channel ids from get_content / content detail (e.g. tiktok, instagram). */
   lanes: string[]
   /** Per-node previews used for channel switcher. */
@@ -30,6 +32,7 @@ const SHOW_ACTIONS = new Set([
   "pipeline_result",
   "generate_more_started",
   "content_rerun_started",
+  "content_rerun_failed",
   "content_approved",
   "content_rejected",
   "publish_started",
@@ -108,6 +111,14 @@ export function parseContentCard(result: string): ContentCardSnapshot | null {
       saved: obj.saved === true,
       rejectReason:
         typeof obj.rejectReason === "string" && obj.rejectReason.trim() ? obj.rejectReason.trim() : null,
+      failReason:
+        typeof obj.failReason === "string" && obj.failReason.trim()
+          ? obj.failReason.trim()
+          : typeof obj.message === "string" &&
+              obj.action === "content_rerun_failed" &&
+              obj.message.trim()
+            ? obj.message.trim()
+            : null,
       lanes: parseLanes(obj.lanes),
       nodes: parseNodes(obj.nodes),
     }

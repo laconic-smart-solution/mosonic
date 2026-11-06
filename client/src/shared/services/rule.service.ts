@@ -44,7 +44,17 @@ export type RulesPageableResponse<T = unknown> = {
   meta: RulesPageableMeta
 }
 
+export type CreateBlankRuleResponse = {
+  ruleId: string
+  name: string
+}
+
 export const ruleService = {
+  /** Instant "Untitled brand" shell — no LLM extraction. */
+  createBlank: async (): Promise<CreateBlankRuleResponse> => {
+    const response = await apiClient.post("/rules")
+    return response.data
+  },
   extract: async (payload: ExtractRulePayload): Promise<ExtractRuleResponse> => {
     const response = await apiClient.post("/rules/extract", payload)
     return response.data
@@ -66,5 +76,9 @@ export const ruleService = {
   putRule: async (ruleId: string, body: RuleReplacePayload): Promise<RuleEntity> => {
     const response = await apiClient.put(`/rules/${ruleId}`, body)
     return response.data as RuleEntity
+  },
+  /** Soft-delete (archive). */
+  deleteRule: async (ruleId: string): Promise<void> => {
+    await apiClient.delete(`/rules/${ruleId}`)
   },
 }

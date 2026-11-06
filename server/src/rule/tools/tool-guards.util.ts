@@ -561,7 +561,7 @@ export function ambiguousChoiceObservation(reply: string): string {
 }
 
 /** Tools a confirmed "set up, then start the post" plan may run together in one turn. */
-export const PLAN_CHAIN_TOOLS: ReadonlySet<string> = new Set(['apply_default_workflow', 'start_generation']);
+export const PLAN_CHAIN_TOOLS: ReadonlySet<string> = new Set(['apply_default_workflow', 'add_workflow_node', 'set_workflow_channels', 'start_generation']);
 /** ask_user option id the plan-confirm card uses for "Start post". */
 export const PLAN_CONFIRM_OPTION_ID = 'start_post';
 

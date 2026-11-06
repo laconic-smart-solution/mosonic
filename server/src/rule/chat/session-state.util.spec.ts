@@ -209,7 +209,34 @@ describe('reduceObservation', () => {
     expect(s.recent.at(-1)?.text).toBe('run cancelled');
   });
 
-  it('a start_post chip adds the plan chain, dropped once its last tool ran', () => {
+  it('yes on a willChange plan card enqueues add_workflow_node + start_generation', () => {
+    let s = reduceObservation(emptyState(), {
+      name: 'ask_user',
+      result: JSON.stringify({
+        action: 'ask_user',
+        question: 'Apply these workflow changes?',
+        options: [
+          { id: 'yes', label: 'Yes' },
+          { id: 'change', label: 'Change' },
+        ],
+        plan: {
+          youAskedFor: ['4 images on facebook'],
+          willChange: ['Add 4 image steps so one run produces 4 images (each step = 1 image)'],
+          notPossible: [],
+        },
+      }),
+    });
+    const ask = s.pending.find((p) => p.kind === 'ask') as { willChangeTools?: string[] };
+    expect(ask.willChangeTools).toEqual(['add_workflow_node', 'start_generation']);
+    const r = reduceUserMessage(s, 'User choice: yes (Yes)');
+    expect(r.resolution.chain).not.toBeNull();
+    expect([...r.resolution.chain!]).toEqual(['add_workflow_node', 'start_generation']);
+    const chain = r.state.pending.find((p) => p.kind === 'chain') as { tools: string[]; source?: string };
+    expect(chain.tools).toEqual(['add_workflow_node', 'start_generation']);
+    expect(chain.source).toBe('plan');
+  });
+
+    it('a start_post chip adds the plan chain, dropped once its last tool ran', () => {
     let s = reduceObservation(emptyState(), {
       name: 'ask_user',
       result: JSON.stringify({ ok: true, action: 'ask_user', question: 'Plan ok?', options: [{ id: 'start_post', label: 'Start' }, { id: 'change', label: 'Change' }] }),

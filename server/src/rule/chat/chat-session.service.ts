@@ -77,7 +77,9 @@ import { createListWorkflowsTool } from '../tools/list-workflows.tool';
 import { buildIntentText, pendingFlowTools, selectTurnTools } from './chat-tool-gating.util';
 import { previewFromRecord, showContentPayload } from '../tools/content-scope.util';
 import { TEXT_ONLY_REQUEST, attachedImageAssetIds, buildCapabilitySummary, latestRequestText, normalizeLanguage } from '../capability.util';
+import { buildRegistrySummary } from '../capability-registry';
 import { toImageAsset } from '../../orchestration/brand-image-assets.util';
+import { BLANK_BRAND_BLOCKED_TOOLS, BLANK_BRAND_PROMPT, isBlankBrand } from './blank-brand.util';
 import { buildGreetingResult, isBareGreeting, sanitizeReply } from './onboarding-greeting.util';
 import { isMultiStepRequest } from './multi-step.util';
 import { createGenerateWorkflowTool } from '../tools/generate-workflow.tool';
@@ -119,6 +121,7 @@ import { WorkflowService } from '../../workflow/workflow.service';
 import { OrchestrationService } from '../../orchestration/orchestration.service';
 import { extractAiMessageText } from '../tools/ai-message-text.util';
 import {
+  CONTINUE_INSTRUCTION_PREFIX,
   runToolCallingLoop,
   type ToolCallingLoopResult,
 } from '../tools/tool-calling-loop';
@@ -193,6 +196,13 @@ import { PostService } from '../../post/post.service';
 import { RedNoteService } from '../../rednote/rednote.service';
 import { UploadService } from '../../upload/upload.service';
 import { latestDraftText, renderLiveState, type LiveFacts } from './live-facts.util';
+import { buildWorkflowGraphSnapshot } from './workflow-graph-snapshot.util';
+import { falseImpossibilityAskBlock } from './false-impossibility.util';
+import {
+  goalContinueInstruction,
+  shouldForceContinueOnGoal,
+  verifyGoalAcceptance,
+} from './goal-verify.util';
 import type { ChatSessionState } from './session-state.types';
 import {
   pendingConnectChannels,
@@ -536,6 +546,10 @@ export class ChatSessionService {
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
     const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
+    const workflowNodes: Array<{ type?: unknown; lane?: unknown }> | null =
+      'workflowNodes' in context && Array.isArray((context as { workflowNodes?: unknown }).workflowNodes)
+        ? ((context as { workflowNodes: Array<{ type?: unknown; lane?: unknown }> }).workflowNodes)
+        : null;
     const latestContentId = facts?.latestPost?.contentId;
 
     const useReasoning =
@@ -585,7 +599,79 @@ export class ChatSessionService {
         mutationLimit: CHAT_MUTATIONS_PER_TURN,
         maxIterations: CHAT_ITERATIONS_PER_ROUND,
         maxContinueRounds: CHAT_CONTINUE_ROUNDS,
+        evaluateCompletion: ({ steps, ran }) => {
+          const observations = steps
+            .filter((s): s is Extract<typeof s, { type: 'observation' }> => s.type === 'observation')
+            .map((s) => ({ name: s.name, result: s.result }));
+          const toolNames = [
+            ...new Set([
+              ...ran,
+              ...observations.map((o) => o.name),
+            ]),
+          ];
+          // Yes -> willChange: this turn accepted a capability / start_post plan; those tools must run.
+          const planTools = confirmedChain ? [...confirmedChain] : [];
+          const missingPlan = planTools.filter((t) => !toolNames.includes(t));
+          const started = observations.some(
+            (o) =>
+              o.name === 'start_generation' &&
+              /"action"\s*:\s*"pipeline_started"/.test(o.result),
+          );
+          if (missingPlan.length > 0 && !started) {
+            return {
+              forceContinue: true as const,
+              instruction:
+                `${CONTINUE_INSTRUCTION_PREFIX} User accepted the capability plan. Do not ask them to wait. Run these tools now in order: ${missingPlan.join(', ')}. Then start_generation (with acceptGaps true if gaps remain).`,
+              unmet: missingPlan,
+            };
+          }
+          const verified = verifyGoalAcceptance({
+            goalKind: turnState.goal?.kind,
+            acceptance: turnState.goal?.acceptance,
+            userText: content,
+            toolNamesThisTurn: toolNames,
+            observations,
+            facts: facts
+              ? {
+                  hasDraft: !!facts.latestPost,
+                  draftHasImage: !!facts.latestPost?.hasImage,
+                  activeRun: !!facts.activeRun,
+                  uploadChannels: facts.upload?.channels
+                    .filter((c) => c.included)
+                    .map((c) => c.channel),
+                }
+              : undefined,
+          });
+          if (!shouldForceContinueOnGoal(verified)) return null;
+          return {
+            forceContinue: true as const,
+            instruction: goalContinueInstruction(verified.unmet),
+            unmet: verified.unmet,
+          };
+        },
         guardToolCall: (name, args, turnSteps) => {
+          if (name === 'ask_user') {
+            const planArg =
+              args && typeof args === 'object' && args.plan && typeof args.plan === 'object'
+                ? (args.plan as { willChange?: string[]; notPossible?: string[] })
+                : null;
+            const opts = Array.isArray(args?.options)
+              ? (args.options as Array<{ id?: string; label?: string }>)
+              : [];
+            const blocked = falseImpossibilityAskBlock({
+              question: typeof args?.question === 'string' ? args.question : '',
+              options: opts,
+              plan: planArg
+                ? {
+                    willChange: planArg.willChange ?? [],
+                    notPossible: planArg.notPossible ?? [],
+                  }
+                : null,
+              nodes: workflowNodes,
+              userText: content,
+            });
+            if (blocked) return blocked;
+          }
           if (
             CONFIRMATION_REQUIRED_TOOL_NAMES.has(name) &&
             !confirmedNow &&
@@ -964,6 +1050,8 @@ export class ChatSessionService {
     const searchTexts = [...priorSearchTexts];
     const urlTexts = () => [...userTexts, ...searchTexts];
     const rule = await this.ruleService.getRuleById(ruleId, auth);
+    // Welcome "Start a new brand" shell: intake first, no post/intro/generate yet.
+    const blankBrand = isBlankBrand(rule as never);
     const assets = await this.ruleAssetService.listByRule(ruleId, auth);
     const memories = await this.ruleMemoryService.listRecent(ruleId, auth);
 
@@ -1006,8 +1094,14 @@ export class ChatSessionService {
       attachedImages: attachedIds.length,
       baseLanguage,
     });
+    const registry = buildRegistrySummary({
+      nodes: workflow ? (workflow.nodes as never) : null,
+      brandChannels,
+      hasDraft: !!facts.latestPost,
+      activeRun: !!facts.activeRun,
+    });
     const brainPrompt = withReactInstructions(
-      `${buildRuleBrainPrompt(rule, assets, memories)}\n\n${liveState}${sessionBlock ? `\n\n${sessionBlock}` : ''}\n\n${capability}`,
+      `${blankBrand ? `${BLANK_BRAND_PROMPT}\n\n` : ''}${buildRuleBrainPrompt(rule, assets, memories)}\n\n${liveState}${sessionBlock ? `\n\n${sessionBlock}` : ''}\n\n${capability}\n\n${registry}`,
     );
     const brandName = rule.name;
 
@@ -1029,7 +1123,7 @@ export class ChatSessionService {
       createForgetAllTool(ruleId, this.ruleMemoryService, auth),
       createSearchBrandMemoryTool(ruleId, this.ruleMemorySearchService, auth),
       createWebSearchTool(this.llm, (text) => searchTexts.push(text)),
-      createAskUserTool(),
+      createAskUserTool({ blankBrand }),
       createListWorkflowsTool(ruleId, this.workflows, auth, brandName),
       createGenerateWorkflowTool(ruleId, this.workflows, auth, brandName),
       createApplyDefaultWorkflowTool(ruleId, this.workflows, auth, brandName),
@@ -1251,7 +1345,13 @@ export class ChatSessionService {
       );
     }
 
-    if (intentText === undefined) return { brainPrompt, tools, facts, brandChannels };
+    // Blank brand: generation/publish tools are unbound until intake fills it in.
+    if (blankBrand) {
+      for (let i = tools.length - 1; i >= 0; i--) {
+        if (BLANK_BRAND_BLOCKED_TOOLS.has(tools[i].name)) tools.splice(i, 1);
+      }
+    }
+    if (intentText === undefined) return { brainPrompt, tools, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null };
     // State gate + intent groups (~15 tools a turn instead of ~50), plus
     // whatever a pending confirmation / connect flow needs.
     const allowed = selectTurnTools(
@@ -1265,7 +1365,7 @@ export class ChatSessionService {
     );
     const gated = tools.filter((t) => allowed(t.name));
     this.logger.log(`Chat tools this turn: ${gated.length} of ${tools.length}`);
-    return { brainPrompt, tools: gated, facts, brandChannels };
+    return { brainPrompt, tools: gated, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null };
   }
 
   /**
@@ -1285,12 +1385,17 @@ export class ChatSessionService {
       upload: null,
       accounts: null,
       memoryCount,
+      graph: buildWorkflowGraphSnapshot(null),
     };
     if (workflow) {
       facts.workflow = {
         status: String(workflow.workflow.status),
         steps: describeWorkflowSteps(workflow.nodes, workflow.edges ?? []),
       };
+      facts.graph = buildWorkflowGraphSnapshot(
+        workflow.nodes as never,
+        String(workflow.workflow.status),
+      );
       runs = await listPipelinesForWorkflow(this.pipelines, workflow.workflow.workflowId, auth).catch(() => []);
       const active = pickActivePipeline(runs);
       if (active) facts.activeRun = { pipelineId: active.pipelineId, status: String(active.status) };

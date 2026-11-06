@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Plus } from "lucide-react"
+import { LayoutGrid, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -20,8 +20,10 @@ type ChatRuleSelectorProps = {
   canViewMore: boolean
   onSelectRule: (ruleId: string) => void
   onViewMore: () => void
-  /** Starts a new brand profile (the chat onboarding flow creates the Rule). */
+  /** Creates an Untitled brand and enters it. */
   onNewBrand: () => void
+  /** Returns to the Welcome brand list (clears the active brand). */
+  onLeaveBrand?: () => void
 }
 
 function initials(name?: string): string {
@@ -57,6 +59,7 @@ export function ChatRuleSelector({
   onSelectRule,
   onViewMore,
   onNewBrand,
+  onLeaveBrand,
 }: ChatRuleSelectorProps) {
   const { t } = useTranslation("home")
   const { t: tChat } = useTranslation("chat")
@@ -144,7 +147,21 @@ export function ChatRuleSelector({
               </Button>
             </div>
           ) : null}
-          <div className="mt-2 border-t border-border pt-2">
+          <div className="mt-2 space-y-1 border-t border-border pt-2">
+            {onLeaveBrand ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 w-full justify-start rounded-[9px] text-xs font-medium"
+                onClick={() => {
+                  setIsOpen(false)
+                  onLeaveBrand()
+                }}
+              >
+                <LayoutGrid data-icon="inline-start" />
+                {tChat("ruleSelector.allBrands")}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"

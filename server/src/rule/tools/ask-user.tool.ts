@@ -1,5 +1,7 @@
+import { blankBrandAskBlock } from '../chat/blank-brand.util';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { falseImpossibilityAskBlock } from '../chat/false-impossibility.util';
 
 export const ASK_USER_TOOL_NAME = 'ask_user';
 
@@ -42,7 +44,7 @@ const ASK_USER_SCHEMA = z.object({
     ),
   plan: z
     .object({
-      youAskedFor: z.string(),
+      youAskedFor: z.union([z.string(), z.array(z.string())]),
       willChange: z.array(z.string()),
       notPossible: z.array(z.string()),
     })
@@ -55,7 +57,7 @@ export type AskUserObservation = {
   type: 'yes_no' | 'single' | 'multi';
   question: string;
   options: { id: string; label: string; inputType?: 'url' }[];
-  plan?: { youAskedFor: string; willChange: string[]; notPossible: string[] };
+  plan?: { youAskedFor: string | string[]; willChange: string[]; notPossible: string[] };
 };
 
 const URL_OPTION_PATTERN = /\b(url|website|web site|link)\b/i;
@@ -82,7 +84,8 @@ const DEFAULT_YES_NO: AskUserObservation['options'] = [
  * The client renders buttons from the JSON observation; the click is the
  * next user chat message. No I/O.
  */
-export function createAskUserTool() {
+/** `blankBrand`: the bound brand is still empty - block post/intro/generate choices (intake first). */
+export function createAskUserTool(opts: { blankBrand?: boolean } = {}) {
   return tool(
     async ({ type, question, options, plan }): Promise<string> => {
       const resolved =
@@ -94,6 +97,22 @@ export function createAskUserTool() {
 
       if (type !== 'yes_no' && resolved.length < 2) {
         return 'ask_user needs at least two options for single/multi. Ask in plain text instead, or pass options.';
+      }
+
+      const blocked = falseImpossibilityAskBlock({
+        question: question ?? '',
+        options: resolved,
+        plan: plan
+          ? {
+              willChange: plan.willChange ?? [],
+              notPossible: plan.notPossible ?? [],
+            }
+          : null,
+      });
+      if (blocked) return blocked;
+      if (opts.blankBrand) {
+        const blankBlock = blankBrandAskBlock({ question: question ?? '', options: resolved });
+        if (blankBlock) return blankBlock;
       }
 
       const payload: AskUserObservation = {
@@ -108,7 +127,17 @@ export function createAskUserTool() {
             ...(inputType ? { inputType } : {}),
           };
         }),
-        ...(plan ? { plan: { youAskedFor: plan.youAskedFor.trim(), willChange: plan.willChange.filter((x) => x.trim()), notPossible: plan.notPossible.filter((x) => x.trim()) } } : {}),
+        ...(plan
+          ? {
+              plan: {
+                youAskedFor: Array.isArray(plan.youAskedFor)
+                  ? plan.youAskedFor.map((x) => x.trim()).filter(Boolean)
+                  : plan.youAskedFor.trim(),
+                willChange: plan.willChange.filter((x) => x.trim()),
+                notPossible: plan.notPossible.filter((x) => x.trim()),
+              },
+            }
+          : {}),
       };
       return JSON.stringify(payload);
     },

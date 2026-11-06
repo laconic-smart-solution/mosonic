@@ -56,7 +56,10 @@ describe('generationPreviewPrompt', () => {
     expect(out.action).toBe('ask_user');
     expect(out.confirmFor).toBe('start_generation');
     expect(out.options[0].id).toBe(PREVIEW_CONFIRM_OPTION_ID);
-    expect(out.question).toContain('video credits');
+    expect(out.question).toContain('Ready to generate "Launch"?');
+    expect(out.estimate.images).toBe(1);
+    expect(out.estimate.credits).toBeGreaterThanOrEqual(1);
+    expect(out.preview.steps.some((s: { badge?: string }) => s.badge === 'updated')).toBe(true);
   });
 
   it('Start on the card confirms the plan chain; Change does not', () => {
