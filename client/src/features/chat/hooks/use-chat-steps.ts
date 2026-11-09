@@ -59,6 +59,7 @@ export function useChatSteps(
       if (!matches(payload.sessionId)) return
       setIsActive(false)
       setIsFollowUp(false)
+      setLiveSteps([])
       // Covers follow-up turns (no HTTP response) and any step events missed on reconnect.
       invalidateForToolSteps(queryClient, payload.assistantMessage?.steps)
       if (payload.followUp) onFollowUpRef.current?.(payload.sessionId)
@@ -68,6 +69,7 @@ export function useChatSteps(
       if (!matches(payload.sessionId)) return
       setIsActive(false)
       setIsFollowUp(false)
+      setLiveSteps([])
     })
 
     return () => {

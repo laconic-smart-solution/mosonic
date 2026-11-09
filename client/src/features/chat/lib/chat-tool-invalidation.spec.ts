@@ -18,6 +18,17 @@ describe("queryKeysForToolSteps", () => {
     expect(keys).toContainEqual(["pipeline", "estimate"])
   })
 
+  it("maps ingest_website_content to rule, assets, and workflow keys", () => {
+    const keys = queryKeysForToolSteps([
+      { type: "observation", name: "ingest_website_content", result: "{}" },
+    ])
+    expect(keys).toContainEqual(["rule"])
+    expect(keys).toContainEqual(["rules"])
+    expect(keys).toContainEqual(["chat-sessions"])
+    expect(keys).toContainEqual(["rule-assets"])
+    expect(keys).toContainEqual(["workflow"])
+  })
+
   it("dedupes keys across steps and covers persisted tool_call steps", () => {
     const keys = queryKeysForToolSteps([
       { type: "tool_call", name: "start_generation", args: {}, result: "ok" },

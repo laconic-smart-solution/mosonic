@@ -16,9 +16,10 @@ const CHANNELS: QueryKey[] = [["zernio", "accounts"]]
 /** Chat agent tools that change server state -> the client caches they make stale. Read-only tools are absent. */
 const TOOL_QUERY_KEYS: Record<string, QueryKey[]> = {
   create_rule_from_intake: [...RULE, ...ASSETS, ...WORKFLOW],
-  update_rule: RULE,
-  apply_rule_suggestion: RULE,
-  fetch_website_assets: ASSETS,
+  ingest_website_content: [...RULE, ...ASSETS, ...WORKFLOW],
+  update_rule: [...RULE, ...WORKFLOW],
+  apply_rule_suggestion: [...RULE, ...WORKFLOW],
+  fetch_website_assets: [...ASSETS, ...RULE],
   request_asset_upload: ASSETS,
   remember: MEMORY,
   forget: MEMORY,
@@ -32,6 +33,7 @@ const TOOL_QUERY_KEYS: Record<string, QueryKey[]> = {
   apply_default_workflow: WORKFLOW,
   update_node_config: WORKFLOW,
 
+  cancel_pipeline: RUN,
   start_generation: RUN,
   // Synthetic follow-up observation when a chat-started run ends.
   pipeline_result: RUN,

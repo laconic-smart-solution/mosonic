@@ -64,6 +64,7 @@ export default function HomePage() {
   const {
     ruleOptions,
     selectedRuleId,
+    selectedRule,
     selectRule,
     bindRuleToCurrentSession,
     isLoadingRules,
@@ -74,7 +75,6 @@ export default function HomePage() {
     createSession,
   } = useActiveChatSession()
 
-  const selectedRule = ruleOptions.find((r) => r.ruleId === selectedRuleId)
   const showWelcome = !selectedRuleId
 
   async function startUntitledBrand() {
@@ -293,7 +293,7 @@ export default function HomePage() {
         <ChatMessageThread
           messages={threadMessages}
           historicalIds={historicalIds}
-          isLoading={messagesQuery.isLoading}
+          isLoading={messagesQuery.isLoading && threadMessages.length === 0 && !isBusy}
           hasOlder={messagesQuery.hasNextPage}
           isLoadingOlder={messagesQuery.isFetchingNextPage}
           onLoadOlder={() => void messagesQuery.fetchNextPage()}

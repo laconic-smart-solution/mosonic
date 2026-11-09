@@ -4,12 +4,87 @@
  * offers a post, an intro, or generation.
  */
 
-type RuleLike = { name?: unknown; brand?: unknown };
+type RuleLike = {
+  name?: unknown;
+  brand?: unknown;
+  status?: unknown;
+  intake?: unknown;
+};
 
 const UNTITLED = /^\s*(untitled(\s+brand)?|new brand)?\s*$/i;
 
 function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
+}
+
+/**
+ * Explicit readiness lifecycle for a brand profile.
+ */
+export type BrandReadiness =
+  | 'EMPTY'           // Blank shell (Untitled, no brand info)
+  | 'INTAKE_PENDING'  // Waiting for brand information or website URL
+  | 'EXTRACTING'      // Brand extraction is actively running
+  | 'READY'           // Brand is fully populated and ready for workflow/generation
+  | 'FAILED';         // Extraction failed
+
+export type BrandReadinessInfo = {
+  readiness: BrandReadiness;
+  reason?: string;
+  brandName?: string;
+  brandDescription?: string;
+  industry?: string;
+};
+
+/**
+ * Evaluates the brand readiness state from the rule record.
+ * Handles existing populated brands (evaluated as READY) as well as newly created shells.
+ */
+export function getBrandReadiness(
+  rule: RuleLike | null | undefined,
+  assets?: ReadonlyArray<{ type?: unknown }> | null,
+): BrandReadinessInfo {
+  if (!rule) {
+    return { readiness: 'EMPTY', reason: 'No brand profile exists.' };
+  }
+
+  const intake = (rule.intake && typeof rule.intake === 'object' ? rule.intake : {}) as Record<string, unknown>;
+  const statusStr = String(rule.status ?? '').toLowerCase();
+
+  if (statusStr === 'failed' || intake.readiness === 'FAILED') {
+    return {
+      readiness: 'FAILED',
+      reason: str(intake.failureReason) || 'Brand extraction failed. Please retry or provide brand details manually.',
+    };
+  }
+
+  if (statusStr === 'processing' || intake.readiness === 'EXTRACTING') {
+    return {
+      readiness: 'EXTRACTING',
+      reason: 'Brand extraction is currently running in the background.',
+    };
+  }
+
+  if (intake.readiness === 'INTAKE_PENDING') {
+    return {
+      readiness: 'INTAKE_PENDING',
+      reason: 'Awaiting brand URL or business details from user.',
+    };
+  }
+
+  if (isBlankBrand(rule)) {
+    return {
+      readiness: 'EMPTY',
+      reason: 'This brand was just created and has no name, description, or website yet.',
+    };
+  }
+
+  const brand = (rule.brand && typeof rule.brand === 'object' ? rule.brand : {}) as Record<string, unknown>;
+  return {
+    readiness: 'READY',
+    brandName: str(rule.name) || str(brand.brandName) || 'My Brand',
+    brandDescription: str(brand.brandDescription),
+    industry: str(brand.industry),
+  };
 }
 
 /**
@@ -27,7 +102,7 @@ export function isBlankBrand(rule: RuleLike | null | undefined): boolean {
   return true;
 }
 
-/** Logo / site images already pulled in — enough to lift the blank-brand gate. */
+/** Logo / site images already pulled in. */
 export function brandHasIntakeSeed(
   assets: ReadonlyArray<{ type?: unknown }> | null | undefined,
 ): boolean {
@@ -39,15 +114,15 @@ export function brandHasIntakeSeed(
 }
 
 /**
- * Gate for chat: blank shell AND no site/logo assets yet.
- * After "Use it" / fetch_website_assets, assets exist so generation tools return
- * even if name/description have not been patched yet.
+ * Gate for chat: true when the brand is not READY yet.
+ * Generation and workflow setup tools remain blocked until readiness === 'READY'.
  */
 export function shouldGateBlankBrand(
   rule: RuleLike | null | undefined,
   assets?: ReadonlyArray<{ type?: unknown }> | null,
 ): boolean {
-  return isBlankBrand(rule) && !brandHasIntakeSeed(assets);
+  const { readiness } = getBrandReadiness(rule, assets);
+  return readiness !== 'READY';
 }
 
 /** Tools that make or ship content: unbound while the brand is blank. */
@@ -70,12 +145,15 @@ export const BLANK_BRAND_BLOCKED_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 export const BLANK_BRAND_PROMPT = [
-  '## Brand is empty (server check)',
-  'This brand was just created and has no name, description, or website yet - there is nothing to introduce.',
-  'Your first job is intake: ask for the brand name plus a website URL and/or a one or two line description.',
-  'Save answers with update_rule (name, brand.brandName, brand.brandDescription); for a URL use fetch_website_assets.',
-  'After fetch_website_assets succeeds, call update_rule with brandName (from the site) and a short brandDescription, set channels the user named (e.g. facebook), then apply_default_workflow and start_generation if they asked for a post — do not stop at "assets saved".',
-  'Do NOT offer to make a post, introduce the brand, or start generation until the brand has a name and a description or website assets. Generation tools stay unavailable until then.',
+  '## Brand is not ready (server check)',
+  'This brand profile is not ready yet: it needs brand identity and factual context before generation can start.',
+  'Your first priority is brand intake: ask for the brand name, a website URL, and/or a short description.',
+  'When the user provides a website URL:',
+  '1. Call ingest_website_content with the URL to extract brand identity, description, value proposition, and facts.',
+  '2. Call fetch_website_assets to retrieve brand logos and reference imagery (image fetching operates independently and does not block brand extraction).',
+  '3. For specific listing/room promotion posts: verify if room/listing facts (title, rate) were found in the site data. If not, ask the user ONE targeted question for the specific room/rate before generation.',
+  '4. Once brand readiness is READY and workflow is prepared, call start_generation to present the preview card.',
+  'Do NOT offer to start generation or claim the draft is ready until brand readiness is READY.',
 ].join('\n');
 
 const POST_OPTION =

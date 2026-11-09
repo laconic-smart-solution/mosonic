@@ -178,7 +178,6 @@ describe('createFetchWebsiteAssetsTool', () => {
     const result = await chatTool.invoke({ url: 'https://brew-co.coffee' });
 
     expect(seed).toHaveBeenCalledWith('rule-1', 'https://brew-co.coffee');
-    expect(result).toContain('Seeded brand name');
-    expect(result).toContain('do not stop at assets alone');
+    expect(result).toContain('Brand media assets are ready');
   });
 });

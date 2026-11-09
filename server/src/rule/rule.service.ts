@@ -202,6 +202,117 @@ export class RuleService {
     return { ruleId };
   }
 
+  /**
+   * Run extraction into an existing rule and await completion with a bounded timeout.
+   * - If completed within timeout: returns { status: 'COMPLETED', rule }.
+   * - If timeout reached before completion: returns { status: 'EXTRACTING' } (continues in background).
+   * - If extraction fails: marks readiness as FAILED and returns { status: 'FAILED', error }.
+   */
+  async extractIntoRuleAndAwait(
+    ruleId: string,
+    args: RuleExtractRequest,
+    auth: TenancyAuth,
+    timeoutMs = 25000,
+  ): Promise<{
+    status: 'COMPLETED' | 'EXTRACTING' | 'FAILED';
+    rule?: RuleRecord;
+    error?: string;
+  }> {
+    await this.creditService.assertCreditsForNodeType(
+      auth.userId,
+      RULE_GENERATION_NODE_TYPE,
+    );
+    const existing = await this.rules.findById(ruleId, auth);
+    if (!existing) {
+      throw new NotFoundException(`Rule ${ruleId} not found`);
+    }
+
+    const currentIntake =
+      existing.intake && typeof existing.intake === 'object'
+        ? (existing.intake as Record<string, unknown>)
+        : {};
+
+    await this.rules.updateById(
+      ruleId,
+      {
+        status: RuleStatus.Processing,
+        intake: {
+          ...currentIntake,
+          readiness: 'EXTRACTING',
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      auth,
+    );
+
+    let failureError: string | undefined;
+
+    const extractionPromise = this.runExtraction(ruleId, args, auth, {
+      failureStatus: RuleStatus.Failed,
+      rethrow: true,
+    })
+      .then(async () => {
+        const updated = await this.rules.findById(ruleId, auth);
+        if (updated && updated.status === RuleStatus.Failed) {
+          failureError = 'Extraction failed during processing';
+        }
+      })
+      .catch((err) => {
+        failureError = err instanceof Error ? err.message : String(err);
+      });
+
+    const timeoutPromise = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), timeoutMs),
+    );
+
+    const winner = await Promise.race([
+      extractionPromise.then(() => 'done' as const),
+      timeoutPromise,
+    ]);
+
+    if (winner === 'done') {
+      const finalRule = await this.rules.findById(ruleId, auth);
+      if (failureError || !finalRule || finalRule.status === RuleStatus.Failed) {
+        const errorMsg = failureError ?? 'Rule extraction failed';
+        const finalIntake =
+          finalRule?.intake && typeof finalRule.intake === 'object'
+            ? (finalRule.intake as Record<string, unknown>)
+            : {};
+        await this.rules.updateById(
+          ruleId,
+          {
+            status: RuleStatus.Failed,
+            intake: {
+              ...finalIntake,
+              readiness: 'FAILED',
+              failureReason: errorMsg,
+            },
+          },
+          auth,
+        );
+        return { status: 'FAILED', error: errorMsg };
+      }
+
+      const finalIntake =
+        finalRule.intake && typeof finalRule.intake === 'object'
+          ? (finalRule.intake as Record<string, unknown>)
+          : {};
+      await this.rules.updateById(
+        ruleId,
+        {
+          intake: {
+            ...finalIntake,
+            readiness: 'READY',
+          },
+        },
+        auth,
+      );
+      return { status: 'COMPLETED', rule: finalRule };
+    }
+
+    return { status: 'EXTRACTING' };
+  }
+
 
   /**
    * Start extraction from a plain prompt and wait until the rule is active.
@@ -442,6 +553,7 @@ export class RuleService {
     if (!updated) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
+    this.events?.emitToRule(ruleId, 'rule:completed', { ruleId });
     return updated;
   }
 
@@ -474,6 +586,7 @@ export class RuleService {
     if (!updated) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
+    this.events?.emitToRule(ruleId, 'rule:completed', { ruleId });
     return updated;
   }
 
@@ -564,7 +677,7 @@ export class RuleService {
     ruleId: string,
     args: RuleExtractRequest,
     auth: TenancyAuth,
-    opts?: { failureStatus?: RuleStatus },
+    opts?: { failureStatus?: RuleStatus; rethrow?: boolean },
   ): Promise<void> {
     try {
       this.events.emitToRule(ruleId, 'rule:started', { ruleId });
@@ -679,6 +792,9 @@ export class RuleService {
         ruleId,
         message,
       });
+      if (opts?.rethrow) {
+        throw error;
+      }
     }
   }
 

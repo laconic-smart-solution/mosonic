@@ -190,6 +190,24 @@ describe('toPersistableGraph', () => {
     expect(translations).toHaveLength(6);
   });
 
+  it('produces single shared trunk image for multi-channel rule when image targets all channels', () => {
+    const answers = baseAnswers({
+      generateImage: true,
+      imageChannels: RULE_CHANNELS,
+    });
+    const logical = buildWorkflowNodes(answers, RULE_CHANNELS);
+    const graph = toPersistableGraph(logical, RULE_CHANNELS);
+
+    const images = graph.filter(
+      (n) => n.type === WorkflowNodeType.ImageGeneration,
+    );
+    expect(images).toHaveLength(1);
+    expect(images[0].lane).toBeNull();
+
+    const branch = graph.find((n) => n.type === WorkflowNodeType.Branch);
+    expect(images[0].order).toBeLessThan(branch!.order);
+  });
+
   it('Default preset: keyword → intelligence → text → branch → adapt → merge (multi-channel)', () => {
     const answers = baseAnswers({
       useKeywordPlanner: true,
