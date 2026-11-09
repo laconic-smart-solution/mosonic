@@ -2,6 +2,7 @@ import {
   blankBrandAskBlock,
   brandHasIntakeSeed,
   brandNameFromWebsiteUrl,
+  getBrandReadiness,
   isBlankBrand,
   shouldGateBlankBrand,
 } from './blank-brand.util';
@@ -29,21 +30,37 @@ describe('isBlankBrand', () => {
   });
 });
 
-describe('shouldGateBlankBrand', () => {
+describe('getBrandReadiness & shouldGateBlankBrand', () => {
   const blank = {
     name: 'Untitled brand',
     brand: { brandName: 'Untitled', brandDescription: '', brandVoice: '', industry: '' },
   };
 
-  it('gates a bare Untitled shell with no assets', () => {
+  it('evaluates a bare Untitled shell as EMPTY and gates it', () => {
+    expect(getBrandReadiness(blank).readiness).toBe('EMPTY');
     expect(shouldGateBlankBrand(blank, [])).toBe(true);
   });
-  it('lifts the gate once logo/reference assets exist (after Use it)', () => {
-    expect(shouldGateBlankBrand(blank, [{ type: 'logo' }])).toBe(false);
-    expect(shouldGateBlankBrand(blank, [{ type: 'reference_image' }])).toBe(false);
+
+  it('evaluates processing or EXTRACTING status as EXTRACTING and gates it', () => {
+    expect(getBrandReadiness({ ...blank, status: 'processing' }).readiness).toBe('EXTRACTING');
+    expect(getBrandReadiness({ ...blank, intake: { readiness: 'EXTRACTING' } }).readiness).toBe('EXTRACTING');
+    expect(shouldGateBlankBrand({ ...blank, intake: { readiness: 'EXTRACTING' } })).toBe(true);
   });
-  it('still gates when only unrelated asset types exist', () => {
-    expect(shouldGateBlankBrand(blank, [{ type: 'guideline_document' }])).toBe(true);
+
+  it('evaluates failed extraction as FAILED and gates it', () => {
+    const res = getBrandReadiness({ ...blank, status: 'failed', intake: { failureReason: 'Connection timed out' } });
+    expect(res.readiness).toBe('FAILED');
+    expect(res.reason).toBe('Connection timed out');
+    expect(shouldGateBlankBrand({ ...blank, status: 'failed' })).toBe(true);
+  });
+
+  it('evaluates populated brand as READY and lifts gate', () => {
+    const populated = {
+      name: 'Beauty Phoo',
+      brand: { brandName: 'Beauty Phoo', brandDescription: 'Natural herbal cosmetics' },
+    };
+    expect(getBrandReadiness(populated).readiness).toBe('READY');
+    expect(shouldGateBlankBrand(populated)).toBe(false);
   });
 });
 

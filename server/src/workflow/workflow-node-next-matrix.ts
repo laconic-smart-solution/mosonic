@@ -29,6 +29,7 @@ export const WORKFLOW_NEXT_MATRIX = {
     'merge',
   ],
   image_generation: [
+    'branch',
     'image_generation',
     'video_presenter',
     'video_cinematic',

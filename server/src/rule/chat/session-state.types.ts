@@ -9,6 +9,7 @@ export const SESSION_STATE_VERSION = 1;
 /** Derived from Live state every turn; the stored copy is only a debugging snapshot. */
 export type ChatStage =
   | 'no_brand'
+  | 'brand_intake_pending'
   | 'brand_no_workflow'
   | 'workflow_no_post'
   | 'run_active'
@@ -76,6 +77,8 @@ export type GoalAcceptance = {
   imageCount?: number;
   /** After draft is ready, ask before publish. */
   askPublish?: boolean;
+  /** Whether the post requires specific room/listing facts before generation. */
+  requiresListingOffer?: boolean;
   /** Plain-language criteria for UI / verifier. */
   criteria?: string[];
 };

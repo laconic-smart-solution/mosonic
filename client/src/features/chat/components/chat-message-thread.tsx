@@ -112,7 +112,7 @@ export function ChatMessageThread({
     const reportArrived = added.some((m) => m.role === "assistant" && findRunReportId(m.steps))
     // Only follow new output when the user is already at the bottom (or sending themselves).
     if (nearBottomRef.current || isSending) {
-      bottomRef.current?.scrollIntoView({ behavior: prevLastId ? "smooth" : "auto" })
+      bottomRef.current?.scrollIntoView({ behavior: tailChanged && prevLastId ? "smooth" : "auto" })
     } else if (reportArrived) {
       setReadyPill(true)
     }
@@ -140,7 +140,7 @@ export function ChatMessageThread({
     }
   }, [isLoadingOlder, messages])
 
-  if (isLoading) {
+  if (isLoading && messages.length === 0 && !isSending) {
     return (
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-6" aria-busy="true">
         {[0, 1, 2].map((i) => (
@@ -157,6 +157,10 @@ export function ChatMessageThread({
   if (messages.length === 0 && !isSending) {
     return <ChatEmptyState variant="no-messages" />
   }
+
+  const isWaitingForAssistant =
+    isSending &&
+    (messages.length === 0 || messages[messages.length - 1]?.role === "user")
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -186,7 +190,7 @@ export function ChatMessageThread({
           </Fragment>
         )
       })}
-      {isSending ? (
+      {isWaitingForAssistant ? (
         <div className="flex w-full items-start gap-2" aria-busy="true">
           <ChatAssistantAvatar />
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">

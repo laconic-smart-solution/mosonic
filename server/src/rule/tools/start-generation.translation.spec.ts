@@ -48,4 +48,15 @@ describe('start_generation languages (B)', () => {
     );
     expect(base.ok).toBe(true);
   });
+
+  it('rejects with brand_not_ready when brand readiness check fails', async () => {
+    const orchestration = { startPipeline: jest.fn() } as unknown as OrchestrationService;
+    const tool = createStartGenerationTool(ruleId, ws(snapshot()), orchestration, auth, undefined, {
+      checkBrandReady: () => ({ ready: false, reason: 'Brand profile is not ready.' }),
+    });
+    const parsed = JSON.parse((await tool.invoke({ contentPrompt: 'Sale' })) as string);
+    expect(parsed.code).toBe('brand_not_ready');
+    expect(parsed.error).toContain('Brand profile is not ready');
+    expect(orchestration.startPipeline).not.toHaveBeenCalled();
+  });
 });

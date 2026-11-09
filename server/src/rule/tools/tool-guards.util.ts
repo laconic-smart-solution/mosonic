@@ -69,7 +69,6 @@ export const CONFIRMATION_REQUIRED_TOOL_NAMES: ReadonlySet<string> = new Set([
   // Video renders are expensive (HeyGen presenter / cinematic): never start one unconfirmed.
   'generate_presenter_video',
   'generate_cinematic_video',
-  'fetch_website_assets',
   'approve_content',
   'reject_content',
   'publish_now',

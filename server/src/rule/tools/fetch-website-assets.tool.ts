@@ -58,7 +58,7 @@ export function createFetchWebsiteAssetsTool(
       }
 
       if (images.length === 0) {
-        return `No usable images found on ${url}.`;
+        return `No usable images found on ${url}. Brand text ingestion is unaffected.`;
       }
 
       const saved: string[] = [];
@@ -80,7 +80,7 @@ export function createFetchWebsiteAssetsTool(
       }
 
       if (saved.length === 0) {
-        return `Found images on ${url} but none could be saved.`;
+        return `Found images on ${url} but none could be saved. Brand text ingestion is unaffected.`;
       }
 
       let seeded = false;
@@ -93,11 +93,9 @@ export function createFetchWebsiteAssetsTool(
         }
       }
 
-      const next =
-        'Next: if the user asked for a post, call update_rule (channels they named), apply_default_workflow, then start_generation — do not stop at assets alone.';
       return seeded
-        ? `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Seeded brand name from the site and started full brand extraction into this profile. ${next}`
-        : `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. They'll finish processing shortly — call list_brand_assets to check. ${next}`;
+        ? `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Brand media assets are ready.`
+        : `Saved ${saved.length} asset(s) from ${url}: ${saved.join(', ')}. Brand media assets are ready.`;
     },
     {
       name: 'fetch_website_assets',

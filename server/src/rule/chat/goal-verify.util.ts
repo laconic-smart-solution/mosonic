@@ -32,6 +32,8 @@ export type GoalVerifyFacts = {
   /** Max ordered mediaUrls seen on any included upload channel. */
   mediaUrlCount?: number;
   uploadChannels?: string[];
+  brandReady?: boolean;
+  listingFactsPresent?: boolean;
 };
 
 /** Largest mediaUrls length found in get_upload / preview_upload observations. */
@@ -121,6 +123,14 @@ export function verifyGoalAcceptance(input: {
   }
 
   const unmet: string[] = [];
+
+  if (input.facts?.brandReady === false) {
+    unmet.push('Brand profile completed and READY');
+  }
+
+  if (acceptance?.requiresListingOffer && input.facts?.listingFactsPresent === false) {
+    unmet.push('Specific room/listing facts verified');
+  }
   const mediaFromObs = mediaCountFromObservations(obs);
   const mediaCount = Math.max(
     mediaFromObs,

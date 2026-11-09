@@ -111,6 +111,26 @@ describe('verifyGoalAcceptance', () => {
     expect(r.status).toBe('in_progress');
     expect(r.unmet.some((u) => /4 images/i.test(u))).toBe(true);
   });
+  it('flags unreadiness when facts.brandReady is false', () => {
+    const r = verifyGoalAcceptance({
+      goalKind: 'make_post',
+      toolNamesThisTurn: ['get_rule'],
+      observations: [{ name: 'get_rule', result: '{}' }],
+      facts: { brandReady: false },
+    });
+    expect(r.unmet).toContain('Brand profile completed and READY');
+  });
+
+  it('flags missing room/listing facts when requiresListingOffer is true', () => {
+    const r = verifyGoalAcceptance({
+      goalKind: 'make_post',
+      acceptance: { requiresListingOffer: true },
+      toolNamesThisTurn: ['get_rule'],
+      observations: [{ name: 'get_rule', result: '{}' }],
+      facts: { brandReady: true, listingFactsPresent: false },
+    });
+    expect(r.unmet).toContain('Specific room/listing facts verified');
+  });
 });
 
 describe('goalContinueInstruction', () => {

@@ -36,6 +36,12 @@ describe("withPendingUserMessage", () => {
     expect(withPendingUserMessage(messages, pending)).toEqual(messages)
   })
 
+  it("does not duplicate after turn commit when assistant message is already added", () => {
+    const pending = createPendingUserMessage("s1", "Hello")
+    const messages = [msg("user-1", "user", "Hello"), msg("asst-1", "assistant", "Hi back")]
+    expect(withPendingUserMessage(messages, pending)).toEqual(messages)
+  })
+
   it("passes through when nothing is pending", () => {
     const messages = [msg("a")]
     expect(withPendingUserMessage(messages, null)).toBe(messages)

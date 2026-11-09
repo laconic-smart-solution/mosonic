@@ -66,7 +66,7 @@ export function ChatMessageBubble({
   return (
     <div className={cn("flex w-full min-w-0 gap-2", isUser ? "justify-end" : "justify-start")}>
       {!isUser ? <ChatAssistantAvatar /> : null}
-      <div className={cn("flex min-w-0 w-full max-w-[75%] flex-col gap-1.5 overflow-hidden", isUser && "items-end")}>
+      <div className={cn("flex min-w-0 w-full max-w-[75%] flex-col gap-2 overflow-hidden", isUser && "items-end")}>
         {!isUser && message.steps && message.steps.length > 0 && !onlyAskUser ? (
           <ChatStepAccordion
             steps={message.steps}
@@ -75,16 +75,18 @@ export function ChatMessageBubble({
           />
         ) : null}
         {attachments.length > 0 ? <ChatAttachmentThumbs attachments={attachments} /> : null}
-        {shownText ? <div
-          className={cn(
-            "rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
-            isUser
-              ? "rounded-br-md bg-navy-700 dark:bg-teal-400 text-white dark:text-navy-700"
-              : "px-0.5 py-0 text-navy-700 dark:text-[#E8EDF6]",
-          )}
-        >
-          {shownText}
-        </div> : null}
+        {shownText ? (
+          <div
+            className={cn(
+              "whitespace-pre-wrap leading-relaxed",
+              isUser
+                ? "rounded-2xl rounded-br-md bg-navy-700 px-4 py-2.5 text-sm text-white dark:bg-teal-400 dark:text-navy-700"
+                : "rounded-2xl rounded-tl-md border border-canvas-200/90 bg-white px-4 py-3 text-[14.5px] font-normal text-navy-900 shadow-xs dark:border-white/10 dark:bg-[#121A2B] dark:text-[#F3F1EC]",
+            )}
+          >
+            {shownText}
+          </div>
+        ) : null}
         {!isUser ? (
           <ChatConnectActions
             oauth={oauthConnects}

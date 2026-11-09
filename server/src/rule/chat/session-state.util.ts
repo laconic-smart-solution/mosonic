@@ -50,7 +50,7 @@ export const SESSION_STATE_MAX_CHARS = 600;
 export const FOLLOWUP_TOOL_NAME = 'pipeline_result';
 
 const STAGES: ReadonlySet<string> = new Set<ChatStage>([
-  'no_brand', 'brand_no_workflow', 'workflow_no_post', 'run_active', 'post_ready', 'post_published',
+  'no_brand', 'brand_intake_pending', 'brand_no_workflow', 'workflow_no_post', 'run_active', 'post_ready', 'post_published',
 ]);
 const GOAL_KINDS: ReadonlySet<string> = new Set(['make_post', 'publish', 'setup_brand', 'edit_workflow']);
 
@@ -585,8 +585,9 @@ export function reduceFollowUp(prev: ChatSessionState, steps: unknown): ChatSess
   return enforceCaps(s);
 }
 
-export function deriveStage(facts: LiveFacts | null | undefined): ChatStage {
+export function deriveStage(facts: LiveFacts | null | undefined, brandReady?: boolean): ChatStage {
   if (!facts) return 'no_brand';
+  if (brandReady === false) return 'brand_intake_pending';
   if (!facts.workflow) return 'brand_no_workflow';
   if (facts.activeRun) return 'run_active';
   if (facts.latestPost) return latestPostPublished(facts) ? 'post_published' : 'post_ready';
@@ -599,9 +600,9 @@ export function deriveStage(facts: LiveFacts | null | undefined): ChatStage {
  * approvals bound to a post that is no longer the latest; recompute stage.
  * `facts` null = onboarding (no brand yet).
  */
-export function reconcile(prev: ChatSessionState, facts: LiveFacts | null, now = Date.now()): ChatSessionState {
+export function reconcile(prev: ChatSessionState, facts: LiveFacts | null, now = Date.now(), brandReady?: boolean): ChatSessionState {
   const s = clone(prev);
-  s.stage = deriveStage(facts);
+  s.stage = deriveStage(facts, brandReady);
   if (!facts) return enforceCaps(s);
   const connected = connectedChannels(facts);
   s.pending = s.pending.filter((p) => {
