@@ -100,6 +100,19 @@ describe('selectTurnTools (state gate + intent groups + pending flows)', () => {
   it('includes get_active_pipeline with the run tools', () => {
     expect(selectChatTools('is it done yet?', { hasWorkflow: true, hasActiveRun: false }).has('get_active_pipeline')).toBe(true);
   });
+
+  it('blocks generation and workflow setup tools when brandReady is false', () => {
+    const tools = selectChatTools('create a post for Facebook', {
+      hasWorkflow: false,
+      hasActiveRun: false,
+      brandReady: false,
+    });
+    expect(tools.has('start_generation')).toBe(false);
+    expect(tools.has('apply_default_workflow')).toBe(false);
+    expect(tools.has('generate_workflow')).toBe(false);
+    expect(tools.has('ingest_website_content')).toBe(true);
+    expect(tools.has('fetch_website_assets')).toBe(true);
+  });
 });
 
 describe('buildIntentText uses only the tail of a long previous reply', () => {

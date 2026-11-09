@@ -79,6 +79,7 @@ const SUBJECT_RULES = [
   'Keep real products, tools, places, packaging, and brand-recognizable objects literal.',
   'Do not translate the offering into an abstract feeling (progress, mastery, relief) unless the user explicitly asked for metaphor.',
   'Do not replace the product with a unrelated lifestyle tableau.',
+  'When a reference image of a real property, room, place, or physical product is provided, preserve that exact subject and setting. Do not substitute it with an invented alternative room, location, or subject (e.g. if the reference image is a living room, use that living room; never invent a different room like a bedroom).',
   'People in the scene must match the target audience (age range, location cues, clothing, setting).',
   'When Visual identity lists theme colors, put those hex (or clear color names) in Must include — do not invent a different brand palette.',
   'When a logo / brand_mark reference is present, composite it; when design keywords exist, reflect them in Style.',
@@ -289,7 +290,7 @@ function roleInstruction(role: string, label?: string): string {
     case 'brand_mark':
       return 'Composite this logo onto the scene; preserve geometry and clean edges.';
     case 'product':
-      return 'Keep this product as the hero subject; preserve shape, label, and materials.';
+      return 'Keep this subject (product, property, room, interior, or place shown in the reference photo) as the hero subject; preserve its actual layout, furniture, architecture, and materials. Do not invent an alternative room or subject.';
     case 'identity':
       return 'Preserve this person/face likeness exactly; do not redesign identity.';
     case 'style_ref':

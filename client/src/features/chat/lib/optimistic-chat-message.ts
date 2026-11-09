@@ -35,12 +35,13 @@ export function withPendingUserMessage(
   pending: ChatMessage | null,
 ): ChatMessage[] {
   if (!pending) return messages
-  const last = messages[messages.length - 1]
-  if (
-    last?.role === "user" &&
-    last.content === pending.content &&
-    last.sessionId === pending.sessionId
-  ) {
+  const exists = messages.some(
+    (m) =>
+      m.role === "user" &&
+      m.content === pending.content &&
+      m.sessionId === pending.sessionId,
+  )
+  if (exists) {
     return messages
   }
   return [...messages, pending]

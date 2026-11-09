@@ -381,6 +381,29 @@ function toMultiChannelGraph(
     ),
   );
 
+  const imageLogical = findLogical(logical, WorkflowNodeType.ImageGeneration);
+  // Shared trunk image: when image step targets all channels (or multi-channel post with no channel restriction),
+  // emit ONE image node in the trunk before Branch so one image is generated and shared across all channels.
+  // It is only per-lane when the user explicitly targeted a strict subset of channels.
+  const isPerLaneImage =
+    !!imageLogical &&
+    imageLogical.targetChannels.length > 0 &&
+    imageLogical.targetChannels.length < channels.length;
+
+  if (imageLogical && !isPerLaneImage) {
+    const copied = copyFromLogical(imageLogical, {});
+    nodes.push(
+      toGenerated(
+        WorkflowNodeType.ImageGeneration,
+        order++,
+        false,
+        copied.config,
+        copied.userPrompt ?? '',
+        null,
+      ),
+    );
+  }
+
   nodes.push(
     toGenerated(
       WorkflowNodeType.Branch,
@@ -447,20 +470,21 @@ function toMultiChannelGraph(
     }
   }
 
-  const imageLogical = findLogical(logical, WorkflowNodeType.ImageGeneration);
-  for (const ch of imageLogical?.targetChannels ?? []) {
-    if (!channels.includes(ch)) continue;
-    const copied = copyFromLogical(imageLogical, { laneId: ch });
-    nodes.push(
-      toGenerated(
-        WorkflowNodeType.ImageGeneration,
-        order++,
-        false,
-        copied.config,
-        copied.userPrompt ?? '',
-        ch,
-      ),
-    );
+  if (imageLogical && isPerLaneImage) {
+    for (const ch of imageLogical.targetChannels) {
+      if (!channels.includes(ch)) continue;
+      const copied = copyFromLogical(imageLogical, { laneId: ch });
+      nodes.push(
+        toGenerated(
+          WorkflowNodeType.ImageGeneration,
+          order++,
+          false,
+          copied.config,
+          copied.userPrompt ?? '',
+          ch,
+        ),
+      );
+    }
   }
 
   const videoLogical = findVideoLogical(logical);

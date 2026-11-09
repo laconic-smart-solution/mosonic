@@ -41,6 +41,8 @@ export type StartGenerationOptions = {
    * plan / translation card this run depends on).
    */
   previewGate?: { confirmed: boolean; anyConfirmed?: boolean };
+  /** Service-level check: ensure brand is READY before starting generation. */
+  checkBrandReady?: () => { ready: boolean; reason?: string };
 };
 
 export const START_GENERATION_TOOL_NAME = 'start_generation';
@@ -97,6 +99,16 @@ export function createStartGenerationTool(
             'empty_prompt',
             'contentPrompt is required. Ask the user what to generate.',
           );
+        }
+
+        if (options.checkBrandReady) {
+          const check = options.checkBrandReady();
+          if (!check.ready) {
+            return toolError(
+              'brand_not_ready',
+              `Cannot start generation: ${check.reason ?? 'brand profile is not ready. Call ingest_website_content first.'}`,
+            );
+          }
         }
 
         const requestedId = workflowId?.trim();

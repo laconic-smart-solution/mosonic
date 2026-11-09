@@ -57,6 +57,7 @@ import { createRequestAssetUploadTool } from '../tools/request-asset-upload.tool
 import { channelsNamedIn, createCreateRuleFromIntakeTool, intakeFromArgs } from '../tools/create-rule-from-intake.tool';
 import { createUpdateRuleTool } from '../tools/update-rule.tool';
 import { createFetchWebsiteAssetsTool } from '../tools/fetch-website-assets.tool';
+import { createIngestWebsiteContentTool } from '../tools/ingest-website-content.tool';
 import { createRememberTool } from '../tools/remember.tool';
 import { createForgetAllTool, createForgetTool } from '../tools/forget.tool';
 import {
@@ -79,7 +80,7 @@ import { previewFromRecord, showContentPayload } from '../tools/content-scope.ut
 import { TEXT_ONLY_REQUEST, attachedImageAssetIds, buildCapabilitySummary, latestRequestText, normalizeLanguage } from '../capability.util';
 import { buildRegistrySummary } from '../capability-registry';
 import { toImageAsset } from '../../orchestration/brand-image-assets.util';
-import { BLANK_BRAND_BLOCKED_TOOLS, BLANK_BRAND_PROMPT, brandNameFromWebsiteUrl, isBlankBrand, shouldGateBlankBrand } from './blank-brand.util';
+import { BLANK_BRAND_BLOCKED_TOOLS, BLANK_BRAND_PROMPT, brandNameFromWebsiteUrl, getBrandReadiness, isBlankBrand, shouldGateBlankBrand } from './blank-brand.util';
 import { buildGreetingResult, isBareGreeting, sanitizeReply } from './onboarding-greeting.util';
 import { isMultiStepRequest } from './multi-step.util';
 import { createGenerateWorkflowTool } from '../tools/generate-workflow.tool';
@@ -1111,40 +1112,18 @@ export class ChatSessionService {
       createListBrandAssetsTool(ruleId, this.ruleAssetService, auth),
       createRequestAssetUploadTool(),
       createUpdateRuleTool(ruleId, this.ruleService, auth),
+      createIngestWebsiteContentTool(
+        () => ruleId,
+        this.ruleService,
+        auth,
+        urlTexts,
+      ),
       createFetchWebsiteAssetsTool(
         () => ruleId,
         this.websiteAssetHandler,
         this.ruleAssetService,
         auth,
         urlTexts,
-        async (rid, siteUrl) => {
-          const current = await this.ruleService.getRuleById(rid, auth);
-          if (!isBlankBrand(current as never)) return;
-          const name = brandNameFromWebsiteUrl(siteUrl);
-          // Immediate shell rename so Untitled disappears while extraction runs.
-          await this.ruleService.patchRule(
-            rid,
-            {
-              name,
-              brand: {
-                brandName: name,
-                brandDescription: `Brand website: ${siteUrl}`,
-              },
-            },
-            auth,
-          );
-          // Full site extract into THIS rule (same pipeline as create_rule_from_intake).
-          await this.ruleService.requestExtractionIntoRule(
-            rid,
-            {
-              input: `Brand website: ${siteUrl}. Extract the brand profile from this site.`,
-              files: [],
-              urls: [siteUrl],
-              intake: intakeFromArgs(name, channelsNamedIn(urlTexts())),
-            },
-            auth,
-          );
-        },
       ),
       createRememberTool(ruleId, this.ruleMemoryService, auth),
       createForgetTool(this.ruleMemoryService, auth),
@@ -1210,6 +1189,13 @@ export class ChatSessionService {
           // Option B: a first post with no workflow sets up the default one and starts.
           ...(hasWorkflow ? {} : { setupDefaultWorkflow: () => this.workflows.applyDefaultWorkflowStructure(ruleId, auth) }),
           ...(previewGate ? { previewGate } : {}),
+          checkBrandReady: () => {
+            const readinessInfo = getBrandReadiness(rule as never, assets as never);
+            return {
+              ready: readinessInfo.readiness === 'READY',
+              reason: readinessInfo.reason,
+            };
+          },
         },
       ),
     ];
@@ -1388,6 +1374,7 @@ export class ChatSessionService {
         hasWorkflow,
         hasContent: !!facts.latestPost,
         hasActiveRun: !!facts.workflow && !!facts.activeRun,
+        brandReady: !blankBrand,
       },
       keepTools,
     );
@@ -1536,6 +1523,12 @@ export class ChatSessionService {
         },
         urlTexts,
         () => hasPostGoal,
+      ),
+      createIngestWebsiteContentTool(
+        () => currentRuleId,
+        this.ruleService,
+        auth,
+        urlTexts,
       ),
       createFetchWebsiteAssetsTool(
         () => currentRuleId,

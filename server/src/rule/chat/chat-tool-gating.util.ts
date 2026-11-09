@@ -8,14 +8,15 @@
  * the tool names it used, so a chip answer keeps the group it continues.
  */
 import type { StatePending } from './session-state.util';
+import { BLANK_BRAND_BLOCKED_TOOLS } from './blank-brand.util';
 
 export const CORE_TOOLS = ['ask_user', 'get_rule', 'update_rule', 'remember', 'list_workflows'] as const;
 
 const GROUPS: { tools: string[]; when: RegExp; needsWorkflow?: boolean; orActiveRun?: boolean }[] = [
   {
-    tools: ['search_brand_assets', 'list_brand_assets', 'request_asset_upload', 'fetch_website_assets'],
+    tools: ['search_brand_assets', 'list_brand_assets', 'request_asset_upload', 'fetch_website_assets', 'ingest_website_content'],
     // Media for the publish draft comes from these assets; add_upload_media is in the publish group.
-    when: /(asset|logo|photo|image|picture|pic\b|website|https?:\/\/|www\.|\.com|upload|file|\[\[asset|fetch_website_assets|list_brand_assets|search_brand_assets)/i,
+    when: /(asset|logo|photo|image|picture|pic\b|website|https?:\/\/|www\.|\.com|upload|file|\[\[asset|fetch_website_assets|ingest_website_content|list_brand_assets|search_brand_assets)/i,
   },
   {
     tools: ['forget', 'forget_all', 'search_brand_memory'],
@@ -67,7 +68,7 @@ const GROUPS: { tools: string[]; when: RegExp; needsWorkflow?: boolean; orActive
   },
   {
     tools: ['list_channels', 'check_channel_auth', 'start_channel_oauth'],
-    when: /(connect|oauth|account|auth|publish|schedule|channel|login|log in|sign in|list_channels|check_channel|start_channel)/i,
+    when: /(connect|oauth|account|auth|publish|schedule|channel|login|log in|sign in|upload|post|share|list_channels|check_channel|start_channel)/i,
   },
   {
     tools: ['list_posts', 'get_post', 'get_post_analytics'],
@@ -86,7 +87,7 @@ const GROUPS: { tools: string[]; when: RegExp; needsWorkflow?: boolean; orActive
 
 export function selectChatTools(
   intentText: string,
-  state: { hasWorkflow: boolean; hasActiveRun: boolean },
+  state: { hasWorkflow: boolean; hasActiveRun: boolean; brandReady?: boolean },
 ): Set<string> {
   const allowed = new Set<string>(CORE_TOOLS);
   for (const group of GROUPS) {
@@ -99,6 +100,16 @@ export function selectChatTools(
     allowed.add('generate_workflow');
     allowed.add('apply_default_workflow');
   }
+
+  // When brand is not ready, strictly prevent content generation and workflow setup tools
+  if (state.brandReady === false) {
+    for (const blocked of BLANK_BRAND_BLOCKED_TOOLS) {
+      allowed.delete(blocked);
+    }
+    allowed.add('ingest_website_content');
+    allowed.add('fetch_website_assets');
+  }
+
   return allowed;
 }
 
@@ -239,7 +250,7 @@ export function pendingFlowTools(
  */
 export function selectTurnTools(
   intentText: string,
-  state: { hasWorkflow: boolean; hasContent: boolean; hasActiveRun: boolean },
+  state: { hasWorkflow: boolean; hasContent: boolean; hasActiveRun: boolean; brandReady?: boolean },
   keep: ReadonlySet<string> = new Set(),
 ): (name: string) => boolean {
   const byState = selectToolsByState(state);

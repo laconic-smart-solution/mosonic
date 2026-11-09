@@ -44,20 +44,15 @@ export class WorkflowGenerationService {
       ruleChannelIds,
     );
     if (ruleChannelIds.length > 0) {
-      // The Q&A wizard's `generateImage`/`imageChannels` path only ever
-      // resolves to instagram/facebook/linkedin/tiktok (see
-      // `resolveQaNodeChannels`), so it can silently produce zero image
-      // nodes for a rule outside that set or with >1 channel. The default
-      // structure has no wizard behind it to pick channels, so add the
-      // image node directly, targeting the rule's first channel — this
-      // guarantees at least one lane gets an image node regardless of
-      // which channels the rule actually has.
+      // The default structure has no wizard behind it to pick channels, so
+      // add the image node directly targeting all rule channels — this
+      // guarantees a shared image is produced and shared to all lanes.
       logical.push({
         nodeId: randomUUID(),
         type: WorkflowNodeType.ImageGeneration,
         order: logical.length + 1,
         isLocked: false,
-        targetChannels: [ruleChannelIds[0]],
+        targetChannels: [...ruleChannelIds],
         config: {},
         userPrompt: '',
       });

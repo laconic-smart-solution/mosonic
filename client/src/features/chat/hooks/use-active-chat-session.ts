@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { useChatSessionsQuery, useCreateChatSessionMutation } from "@/shared/queries/chat.query"
-import { useRulesPageQuery } from "@/shared/queries/rule.query"
+import { useRuleByIdQuery, useRulesPageQuery } from "@/shared/queries/rule.query"
 import type { RuleListItem } from "@/shared/services/rule.service"
 
 const RULES_PAGE_LIMIT = 8
@@ -29,6 +30,11 @@ export function useActiveChatSession() {
     filter: { status: "active" },
   })
 
+  const activeRuleQuery = useRuleByIdQuery<RuleListItem>(
+    selectedRuleId ?? undefined,
+    Boolean(selectedRuleId),
+  )
+
   useEffect(() => {
     // Wait until page 1 has settled so an empty result can clear stale cards
     // after the last brand is soft-deleted.
@@ -42,6 +48,32 @@ export function useActiveChatSession() {
       return Array.from(map.values())
     })
   }, [rulesPage, rulesPageQuery.data, rulesPageQuery.isFetching])
+
+  // Keep the active rule option in sync immediately whenever rule query refetches.
+  useEffect(() => {
+    if (!activeRuleQuery.data || !selectedRuleId) return
+    const activeItem = activeRuleQuery.data
+    setRuleOptions((prev) => {
+      const idx = prev.findIndex((r) => r.ruleId === selectedRuleId)
+      if (idx === -1) return prev
+      if (prev[idx].name === activeItem.name && prev[idx].status === activeItem.status) return prev
+      const updated = [...prev]
+      updated[idx] = { ...updated[idx], ...activeItem }
+      return updated
+    })
+  }, [activeRuleQuery.data, selectedRuleId])
+
+  const selectedRule = useMemo(() => {
+    if (!selectedRuleId) return undefined
+    const fromOptions = ruleOptions.find((r) => r.ruleId === selectedRuleId)
+    if (activeRuleQuery.data?.name) {
+      return {
+        ...fromOptions,
+        ...activeRuleQuery.data,
+      }
+    }
+    return fromOptions
+  }, [activeRuleQuery.data, ruleOptions, selectedRuleId])
 
   /** Explicit user-driven rule switch — also resets the session. */
   const selectRule = useCallback(
@@ -106,15 +138,20 @@ export function useActiveChatSession() {
     if (defaultSession) setActiveSessionId(defaultSession.sessionId)
   }, [activeSessionId, selectedRuleId, sessions, setActiveSessionId])
 
+  const queryClient = useQueryClient()
   const createSessionMutation = useCreateChatSessionMutation()
 
   const createSession = useCallback(async (): Promise<string | undefined> => {
     const session = await createSessionMutation.mutateAsync({
       ruleId: selectedRuleId ?? undefined,
     })
+    queryClient.setQueryData(["chat-messages", session.sessionId], {
+      pages: [{ messages: [], hasMore: false, nextCursor: null }],
+      pageParams: [null],
+    })
     setActiveSessionId(session.sessionId)
     return session.sessionId
-  }, [createSessionMutation, selectedRuleId, setActiveSessionId])
+  }, [createSessionMutation, queryClient, selectedRuleId, setActiveSessionId])
 
   const handleViewMoreRules = useCallback(() => {
     const meta = rulesPageQuery.data?.meta
@@ -125,6 +162,7 @@ export function useActiveChatSession() {
   return {
     ruleOptions,
     selectedRuleId,
+    selectedRule,
     selectRule,
     bindRuleToCurrentSession,
     isLoadingRules: rulesPageQuery.isLoading && rulesPage === 1,
