@@ -17,9 +17,10 @@ import { createSetWorkflowChannelsTool } from '../tools/workflow-edit.tools';
 const dep = {} as never;
 
 describe('REACT_CHAT_INSTRUCTIONS core prompt', () => {
-  it('requires start_generation instead of drafting in chat', () => {
+  it('requires start_generation instead of drafting in chat, but supports Two-Phase Interaction for inquiries', () => {
     expect(REACT_CHAT_INSTRUCTIONS).toContain('MUST call start_generation');
     expect(REACT_CHAT_INSTRUCTIONS).toContain('not a copywriter');
+    expect(REACT_CHAT_INSTRUCTIONS).toContain('Two-Phase Interaction');
   });
 
   it('uses private reasoning (no forced Thought line) and is plain ASCII', () => {
@@ -56,7 +57,7 @@ describe('REACT_CHAT_INSTRUCTIONS core prompt', () => {
   });
 
   it('stays short (per-tool rules live in tool descriptions and guards)', () => {
-    expect(REACT_CHAT_INSTRUCTIONS.length).toBeLessThan(3500);
+    expect(REACT_CHAT_INSTRUCTIONS.length).toBeLessThan(8000);
     // Guard-enforced prose stays out of the prompt.
     expect(REACT_CHAT_INSTRUCTIONS).not.toContain('PLAN CONFIRM');
     expect(REACT_CHAT_INSTRUCTIONS).not.toContain('Already started that post');

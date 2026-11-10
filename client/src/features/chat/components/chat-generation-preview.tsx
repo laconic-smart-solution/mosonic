@@ -43,7 +43,7 @@ function nodeLabel(step: GenerationPreviewStep, t: (k: string, o?: Record<string
   if (!step.lane) return base
   if (step.type === "adapt") return t("askUser.preview.nodeType.adaptFor", { channel: channelName(step.lane) })
   if (step.type === "image_generation") return t("askUser.preview.nodeType.imageFor", { channel: channelName(step.lane) })
-  return `${base} Â· ${channelName(step.lane)}`
+  return `${base} · ${channelName(step.lane)}`
 }
 
 function nodeBlurb(step: GenerationPreviewStep, t: (k: string, o?: Record<string, unknown>) => string): string {
@@ -70,7 +70,7 @@ function stepBadge(
   return undefined
 }
 
-/** List-price defaults â mirrors server estimate-run-credits.util + billable defaults. */
+/** List-price defaults — mirrors server estimate-run-credits.util + billable defaults. */
 const LIST_PRICE_USD: Record<string, number> = {
   keyword_planner: 0.01,
   intelligence: 0.01,
@@ -143,7 +143,7 @@ function Chip({
   )
   if (readOnly) {
     return (
-      <span className={className} aria-disabled="true" title="View only â not saved yet">
+      <span className={className} aria-disabled="true" title="View only — not saved yet">
         {label}
       </span>
     )
@@ -177,7 +177,7 @@ function ToggleRow({
         <span className="block font-medium">{label}</span>
         {hint ? <span className="block text-[12px] font-normal text-[#718096]">{hint}</span> : null}
         {readOnly ? (
-          <span className="mt-0.5 block text-[11px] font-medium text-[#718096]">View only â not saved yet</span>
+          <span className="mt-0.5 block text-[11px] font-medium text-[#718096]">View only — not saved yet</span>
         ) : null}
       </span>
       <span
@@ -314,7 +314,7 @@ function Badge({ kind }: { kind: "adding" | "updated" }) {
 type DraftMap = Record<string, Record<string, unknown>>
 
 /**
- * Plan / run confirm card â matches Designer mocks (Review this plan).
+ * Plan / run confirm card — matches Designer mocks (Review this plan).
  * Apply persists editable node settings via PUT /workflow/:id/nodes.
  * Display-only controls (image count, mood, mockup type, refs toggles) stay local.
  */
@@ -353,7 +353,7 @@ export function ChatGenerationPreview({
     estimate.credits > 0 ? t("askUser.preview.creditsApprox", { count: estimate.credits }) : t("askUser.preview.footerCreditsWhenStart"),
   ]
     .filter(Boolean)
-    .join(" Â· ")
+    .join(" · ")
 
   const workflowQuery = useQuery({
     queryKey: ["workflow", workflowId, "preview-card"],
@@ -577,7 +577,7 @@ export function ChatGenerationPreview({
           {estimate.credits > 0 ? (
             <>
               {t("askUser.preview.footerImages", { count: estimate.images })}
-              {" Â· "}
+              {" · "}
               {t("askUser.preview.footerCredits", { count: estimate.credits })}
               {estimate.basis === "list_price" ? (
                 <span className="ml-1 opacity-80"> {t("askUser.preview.footerListPrice")}</span>
@@ -720,14 +720,14 @@ function ImageStepConfig({
           <div>
             <div className="mb-1.5 text-xs font-semibold text-[#4A5568]">
               {t("askUser.preview.fields.howManyImages")}{" "}
-              <span className="font-semibold text-[#00A589]">Â· {t("askUser.preview.fields.wasN", { n: wasCount })}</span>
+              <span className="font-semibold text-[#00A589]">· {t("askUser.preview.fields.wasN", { n: wasCount })}</span>
             </div>
             <div
               className="flex w-[120px] items-center justify-between rounded-[9px] border border-dashed border-[#D9D3C7] bg-[#FBF9F6] px-2.5 py-1.5 font-semibold text-[#4A5568] opacity-80"
               aria-disabled="true"
-              title="View only â not saved yet"
+              title="View only — not saved yet"
             >
-              <span className="opacity-40">â</span>
+              <span className="opacity-40">−</span>
               <span>{count}</span>
               <span className="opacity-40">+</span>
             </div>
@@ -779,7 +779,7 @@ function ImageStepConfig({
             <div
               className="grid h-[58px] w-[84px] place-items-center rounded-lg border border-dashed border-[#D9D3C7] bg-[#FBF9F6] text-[12px] text-[#718096] opacity-70"
               aria-disabled="true"
-              title="View only â not saved yet"
+              title="View only — not saved yet"
             >
               {t("askUser.preview.fields.add")}
             </div>
@@ -947,7 +947,7 @@ function KeywordStepConfig({
     { id: "basics", label: t("askUser.preview.tabs.basics") },
     { id: "advanced", label: t("askUser.preview.tabs.advanced") },
   ]
-  const market = String(config._uiMarket ?? "th")
+  const market = String(config._uiMarket ?? config.market ?? "global")
   const keywords = Array.isArray(config._uiKeywords)
     ? (config._uiKeywords as string[])
     : typeof config.customPrompt === "string" && config.customPrompt
@@ -967,7 +967,7 @@ function KeywordStepConfig({
               value={topicValue}
               readOnly
               className="rounded-[9px] border-dashed border-[#D9D3C7] bg-[#FBF9F6] text-[13px] text-[#4A5568]"
-              title="View only â not saved yet"
+              title="View only — not saved yet"
             />
           </div>
           <div>

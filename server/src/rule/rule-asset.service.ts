@@ -64,13 +64,16 @@ export class RuleAssetService {
       fileSize: file.size,
     });
 
-    void this.processAsset(asset.ruleAssetId, type, file).catch((err) => {
+    try {
+      await this.processAsset(asset.ruleAssetId, type, file);
+    } catch (err) {
       this.logger.error(
         `Failed to process rule asset ${asset.ruleAssetId}: ${err instanceof Error ? err.message : String(err)}`,
       );
-    });
+    }
 
-    return asset;
+    const updated = await this.ruleAssets.findById(asset.ruleAssetId, auth);
+    return updated ?? asset;
   }
 
   private async processAsset(
@@ -85,18 +88,45 @@ export class RuleAssetService {
           await this.ruleAssets.updateById(ruleAssetId, { status: 'ready' });
           return;
         }
-        const description = await this.llm.describeImageForExtraction(
-          file.buffer,
-          file.mimetype,
-        );
-        await this.ruleAssets.updateById(ruleAssetId, {
-          aiDescription: description,
-          status: 'ready',
-        });
+        try {
+          const description = await this.llm.describeImageForExtraction(
+            file.buffer,
+            file.mimetype,
+          );
+          await this.ruleAssets.updateById(ruleAssetId, {
+            aiDescription: description,
+            status: 'ready',
+          });
+        } catch (err) {
+          this.logger.warn(`Image description failed for asset ${ruleAssetId}: ${err instanceof Error ? err.message : String(err)}`);
+          await this.ruleAssets.updateById(ruleAssetId, { status: 'ready' });
+        }
         return;
       }
 
-      const text = await extractPdfText(file.buffer);
+      let text = '';
+      const mime = (file.mimetype || '').toLowerCase();
+      const origName = (file.originalname || '').toLowerCase();
+      const isPdf = mime === 'application/pdf' || origName.endsWith('.pdf');
+
+      if (isPdf) {
+        try {
+          text = await extractPdfText(file.buffer);
+        } catch (err) {
+          this.logger.warn(`PDF parse failed for asset ${ruleAssetId}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      if (!text.trim()) {
+        try {
+          const raw = file.buffer.toString('utf-8');
+          // Check if it is mostly printable text
+          if (!/[\x00-\x08\x0E-\x1F]/.test(raw.slice(0, 500))) {
+            text = raw;
+          }
+        } catch {}
+      }
+
       if (!text.trim()) {
         await this.ruleAssets.updateById(ruleAssetId, {
           status: 'failed',
@@ -114,21 +144,30 @@ export class RuleAssetService {
         return;
       }
 
-      const chunkTexts = splitTextIntoChunks(text);
-      const embeddings = await this.llm.embedTexts(chunkTexts);
-      await this.ruleAssets.createChunks(
-        ruleAssetId,
-        chunkTexts.map((chunkText, index) => ({
-          chunkIndex: index,
-          text: chunkText,
-          embedding: embeddings[index],
-        })),
-      );
-      await this.ruleAssets.updateById(ruleAssetId, {
-        extractedText: text.slice(0, RAG_TEXT_LENGTH_THRESHOLD),
-        ragEnabled: true,
-        status: 'ready',
-      });
+      try {
+        const chunkTexts = splitTextIntoChunks(text);
+        const embeddings = await this.llm.embedTexts(chunkTexts);
+        await this.ruleAssets.createChunks(
+          ruleAssetId,
+          chunkTexts.map((chunkText, index) => ({
+            chunkIndex: index,
+            text: chunkText,
+            embedding: embeddings[index],
+          })),
+        );
+        await this.ruleAssets.updateById(ruleAssetId, {
+          extractedText: text.slice(0, RAG_TEXT_LENGTH_THRESHOLD),
+          ragEnabled: true,
+          status: 'ready',
+        });
+      } catch (chunkErr) {
+        this.logger.warn(`RAG chunking/embedding failed for asset ${ruleAssetId}, falling back to flat text: ${chunkErr instanceof Error ? chunkErr.message : String(chunkErr)}`);
+        await this.ruleAssets.updateById(ruleAssetId, {
+          extractedText: text.slice(0, RAG_TEXT_LENGTH_THRESHOLD),
+          ragEnabled: false,
+          status: 'ready',
+        });
+      }
     } catch (err) {
       await this.ruleAssets.updateById(ruleAssetId, {
         status: 'failed',

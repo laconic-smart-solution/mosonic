@@ -10,7 +10,9 @@ jest.mock('./rule-extraction.service', () => ({
   RuleExtractionService: class RuleExtractionService {},
 }));
 jest.mock('../events/events.service', () => ({
-  EventsService: class EventsService {},
+  EventsService: class EventsService {
+    emitToRule = jest.fn();
+  },
 }));
 import { UserRole } from '../users/schemas/user.schema';
 import { RuleService } from './rule.service';
@@ -71,7 +73,7 @@ describe('RuleService updates', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      { emitToRule: jest.fn() } as never,
       creditService as never,
     );
 

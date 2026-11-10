@@ -1706,6 +1706,11 @@ export class OrchestrationService {
       userEdits: (contentDoc.userEdits ?? {}) as ContentUserEdits,
     });
     const ruleChannels = (rule.channels ?? []) as ChannelEntry[];
+    const channels = this.uploadService.buildChannelEntriesFromPipeline(
+      ruleChannels,
+      beforeComplete as never,
+      resolvedOutputs,
+    );
     const { uploadId } = await this.uploadService.createUpload({
       userId,
       contentRef: contentId,
@@ -1713,6 +1718,7 @@ export class OrchestrationService {
       ruleRef: ruleId,
       resolvedOutputs,
       ruleChannels,
+      channels,
     });
 
     this.events.emitToPipeline(pipelineId, 'pipeline:completed', {

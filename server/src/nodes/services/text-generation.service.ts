@@ -110,6 +110,9 @@ function buildSystemPrompt(
     'You are a professional content writer.',
     'Write content strictly following the brand guidelines below.',
     'Never break character or deviate from the brand tone.',
+    'This copy will be published directly to social media on behalf of the brand.',
+    'CRITICAL: NEVER write in the voice of a conversational AI assistant (e.g. "I can help research this...", "As an AI...", "I could not find/verify...", "If you mean...", "Let me know if you would like me to...").',
+    'If the request mentions an unverified, fictional, or ambiguous entity or historical figure, do NOT produce an apology letter, disclaimer card, or meta clarification. Instead, weave the verified cultural, historical, or brand context into an inspiring, celebratory, or creative storytelling post.',
     '',
     formatGenerationTemporalContext(),
     intelligenceBrief

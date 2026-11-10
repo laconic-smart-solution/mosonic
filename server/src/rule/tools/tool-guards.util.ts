@@ -581,7 +581,7 @@ const PROFILE_WORDS = /\b(tone|voice|channels?|audience|name|industry|brand|prof
  * first (plan_first, not_requested, confirm_start, the preview card) step aside.
  */
 const WAIVE_ASKS =
-  /\b(do(n'?t| not) ask( me)?|stop asking|no (more )?questions|without asking|do it (all )?yourself|do (it|everything) for me|just do it|all the way|handle (it|everything)|figure it out|you decide)\b/i;
+  /\b(do(n'?t| not) ask( me)?|stop asking|no (more )?questions|without asking|(do|build|make) it (all )?(yourself|urself)|build (by )?(yourself|urself)|do (it|everything) for me|just do it|all the way|handle (it|everything)|figure it out|(you|u) decide|won'?t give( you| u)? (more |any )?info)\b/i;
 export function waivesQuestions(userText: string): boolean {
   return WAIVE_ASKS.test(userText);
 }
@@ -597,8 +597,9 @@ export const WAIVABLE_CONFIRMATION_TOOLS: ReadonlySet<string> = new Set(['approv
 /** update_rule only when the user's message is about the brand profile; never a silent side change. */
 export function unrequestedProfileChange(
   userText: string,
-  opts: { args?: Record<string, unknown>; waived?: boolean; pendingPostText?: string | null; brandChannels?: readonly string[] } = {},
+  opts: { args?: Record<string, unknown>; waived?: boolean; pendingPostText?: string | null; brandChannels?: readonly string[]; blankBrand?: boolean } = {},
 ): string | null {
+  if (opts.blankBrand) return null;
   if (PROFILE_WORDS.test(userText)) return null;
   // Adding the channel a pending post needs ("...upload on facebook", then "do it yourself")
   // is part of that request, not a side change - when only channels change and the

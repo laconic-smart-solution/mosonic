@@ -31,8 +31,11 @@ export const useGenerateWorkflow = () => {
   return useMutation({
     mutationFn: (payload: GenerateWorkflowPayload) =>
       workflowService.generateWorkflow(payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+    onSuccess: (_data, payload) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
+      if (payload?.ruleId) {
+        void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", payload.ruleId] })
+      }
     },
     meta: { silent: true },
   })
@@ -49,8 +52,8 @@ export const useRegenerateWorkflowByRuleMutation = () => {
       answers: GenerateWorkflowPayload["answers"]
     }) => workflowService.regenerateByRule(ruleId, { answers }),
     onSuccess: (_data, { ruleId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
     meta: { silent: true },
   })
@@ -62,8 +65,8 @@ export const useApplyDefaultWorkflowStructureMutation = () => {
     mutationFn: (ruleId: string) =>
       workflowService.applyDefaultStructure(ruleId),
     onSuccess: (_data, ruleId) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
     meta: { silent: true },
   })
@@ -111,9 +114,9 @@ export const useSaveWorkflowNodesMutation = () => {
     }) => workflowService.saveNodes(workflowId, { name, nodes, edges }),
     onSuccess: (_, { workflowId, ruleId }) => {
       toast.success(i18n.t("workflow:toast.saved"))
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       if (ruleId) void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
-      else void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
     },
     onError: (err) => {
       toastApiError(err, "workflow:toast.saveFailed")
@@ -134,12 +137,11 @@ export const usePatchWorkflowMutation = () => {
     }) => workflowService.patchWorkflow(workflowId, { name }),
     onSuccess: (_data, { workflowId, ruleId }) => {
       toast.success(i18n.t("workflow:toast.nameUpdated"))
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       if (ruleId) {
         void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
-      } else {
-        void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
       }
+      void queryClient.invalidateQueries({ queryKey: ["workflow", workflowId] })
     },
     onError: (err) => {
       toastApiError(err, "workflow:toast.nameUpdateFailed")
@@ -163,7 +165,7 @@ export const useSaveWorkflowNodesByRuleMutation = () => {
     }) => workflowService.saveNodesByRuleId(ruleId, { name, nodes, edges }),
     onSuccess: (_data, { ruleId }) => {
       toast.success(i18n.t("workflow:toast.saved"))
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
     },
     onError: (err) => {
@@ -183,8 +185,8 @@ export const useApplyPipelineToWorkflowMutation = () => {
       pipelineId: string
     }) => workflowService.applyPipelineToWorkflow(ruleId, pipelineId),
     onSuccess: (_data, { ruleId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["workflow"] })
       void queryClient.invalidateQueries({ queryKey: ["workflow", "rule", ruleId] })
-      void queryClient.invalidateQueries({ queryKey: ["workflow", "pageable"] })
     },
     meta: { toastNs: "workflow", toastKey: "usedPipelines.applyFailed", silent: true },
   })

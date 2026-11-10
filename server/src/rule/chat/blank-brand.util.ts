@@ -129,7 +129,6 @@ export function shouldGateBlankBrand(
 export const BLANK_BRAND_BLOCKED_TOOLS: ReadonlySet<string> = new Set([
   'start_generation',
   'preview_generation',
-  'apply_default_workflow',
   'generate_workflow',
   'generate_more_image',
   'generate_more_translation',
@@ -153,6 +152,18 @@ export const BLANK_BRAND_PROMPT = [
   '2. Call fetch_website_assets to retrieve brand logos and reference imagery (image fetching operates independently and does not block brand extraction).',
   '3. For specific listing/room promotion posts: verify if room/listing facts (title, rate) were found in the site data. If not, ask the user ONE targeted question for the specific room/rate before generation.',
   '4. Once brand readiness is READY and workflow is prepared, call start_generation to present the preview card.',
+  'When the user attaches files or images (marketing overview, brand guidelines, product documents, logo) OR mentions attached assets:',
+  '- READ the attached files and images under "## Brand assets & knowledge files". These contain the core knowledge to build the brand.',
+  '- If the brand is new, untitled, or missing details: immediately call update_rule to extract and populate brand name (both name and brand.brandName), industry, description, target audience, and visualIdentity (from logo description).',
+  '- NEVER leave the brand as "Untitled brand" or workflow as "Untitled · Workflow" when attached files or images provide the brand/product identity and name.',
+  '- Call apply_default_workflow in the same turn so the marketing workflow is configured right away.',
+  '- Once the brand profile is updated from the attached files, acknowledge the brand and proceed with their request.',
+  'When the user has NO website or provides details directly in chat (e.g. brand name, industry, topic) or waives details ("u decide", "build by urself"):',
+  '- Immediately call update_rule to save the brand name and industry/description (never leave it blank or fail with excuses).',
+  '- If channels were not mentioned, include default channels (facebook, instagram) on update_rule.',
+  '- Immediately call apply_default_workflow in the same turn so the marketing workflow is set up.',
+  '- Respond warmly with thoughtful marketing context explaining that the brand profile and workflow are set up, and propose 2-3 engaging angles or topics for their first post.',
+  '- NEVER say "The workflow itself is still unconfigured, so content generation can\'t start yet" - configure it with apply_default_workflow in that very turn!',
   'Do NOT offer to start generation or claim the draft is ready until brand readiness is READY.',
 ].join('\n');
 

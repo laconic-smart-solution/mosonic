@@ -54,14 +54,14 @@ export function expandGraphLaneTemplates(
   nodes: GraphNodeSpec[],
   channelIds: string[],
 ): GraphNodeSpec[] {
-  if (!isGraphWorkflow(nodes) || channelIds.length < 2) {
+  if (!isGraphWorkflow(nodes) || channelIds.length < 1) {
     return nodes;
   }
 
   const lanes = [...new Set(channelIds.map((c) => normalizeLaneId(c)))].filter(
     Boolean,
   );
-  if (lanes.length < 2) {
+  if (lanes.length < 1) {
     return nodes;
   }
 
