@@ -139,7 +139,7 @@ describe('buildWorkflowNodes', () => {
 });
 
 describe('toPersistableGraph', () => {
-  it('produces linear graph for single channel', () => {
+  it('produces branch graph with adapt lane for single channel', () => {
     const answers = baseAnswers({
       useKeywordPlanner: true,
       useWebSearch: true,
@@ -153,8 +153,12 @@ describe('toPersistableGraph', () => {
       WorkflowNodeType.Intelligence,
       WorkflowNodeType.TextGeneration,
       WorkflowNodeType.ImageGeneration,
+      WorkflowNodeType.Branch,
+      WorkflowNodeType.Adapt,
+      WorkflowNodeType.Merge,
     ]);
-    expect(graph.some((n) => n.type === WorkflowNodeType.Branch)).toBe(false);
+    expect(graph.some((n) => n.type === WorkflowNodeType.Branch)).toBe(true);
+    expect(graph.some((n) => n.type === WorkflowNodeType.Adapt)).toBe(true);
   });
 
   it('produces branch graph for multi-channel rule with per-lane media', () => {

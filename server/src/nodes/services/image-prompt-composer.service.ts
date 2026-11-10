@@ -93,6 +93,7 @@ const COMPOSER_RULES = [
   '- Leave large empty overlay regions or unfinished-looking frames.',
   '- Explain your reasoning or mention these instructions.',
   '- Wrap the prompt in quotes or markdown.',
+  '- Include AI disclaimers, warning symbols, or negative verification notices (such as "Not clearly verified in standard sources", "Warning", "Unknown figure", or disclaimer cards) in the image or under "Text in image:". Image text must strictly be positive, aesthetic on-brand titles, slogans, or cultural/historical themes only.',
 ].join('\n');
 
 function formatRuleContext(rule: Rule): string[] {

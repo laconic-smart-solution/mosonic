@@ -43,6 +43,7 @@ import type {
 import { WorkflowStatus } from './schemas/workflow.schema';
 import { WorkflowGenerationService } from './services/workflow-generation.service';
 import { LlmService } from '../llm/llm.service';
+import { ChannelPriority } from '../rule/schemas/rule.schema';
 import {
   resolveQaNodeChannels,
   resolveRuleChannelIds,
@@ -133,13 +134,21 @@ export class WorkflowService {
     }
 
     const rule = await this.ruleService.getRuleById(normalizedRuleId, auth);
-    const ruleChannelIds = resolveRuleChannelIds(
+    let ruleChannelIds = resolveRuleChannelIds(
       (Array.isArray(rule.channels) ? rule.channels : []) as never[],
     );
     if (!ruleChannelIds.length) {
-      throw new BadRequestException(
-        'Rule must include at least one distribution channel before creating a workflow',
-      );
+      ruleChannelIds = ['facebook', 'instagram'];
+      await this.ruleService.patchRule(
+        normalizedRuleId,
+        {
+          channels: [
+            { channel: 'facebook', priority: ChannelPriority.High, contentStyle: 'engaging' },
+            { channel: 'instagram', priority: ChannelPriority.High, contentStyle: 'visual' },
+          ],
+        },
+        auth,
+      ).catch(() => null);
     }
 
     const existing = await this.workflows.findLatestByRule(

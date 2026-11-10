@@ -101,13 +101,19 @@ export function buildRuleBrainPrompt(
   if (readyAssets.length > 0) {
     const assetLines = readyAssets.map((a) => {
       const label = a.originalFileName || a.ruleAssetId;
-      const detail =
-        a.aiDescription?.trim() ||
-        (a.extractedText ? a.extractedText.slice(0, 500) : '') ||
-        '(no description available)';
-      return `- [${a.type}] ${label}: ${detail}`;
+      const text = a.extractedText?.trim();
+      const desc = a.aiDescription?.trim();
+      let detail = '';
+      if (text) {
+        detail = text.length > 3000 ? `${text.slice(0, 3000)}... [truncated]` : text;
+      } else if (desc) {
+        detail = desc;
+      } else {
+        detail = '(no description available)';
+      }
+      return `- [${a.type}] ${label} (assetId: ${a.ruleAssetId}): ${detail}`;
     });
-    sections.push(`## Brand assets\n${assetLines.join('\n')}`);
+    sections.push(`## Brand assets & knowledge files\n${assetLines.join('\n')}`);
   }
 
   if (memories.length > 0) {

@@ -1,4 +1,4 @@
-﻿import { planBeforeSetupChange, startAfterSetupChange, unrequestedProfileChange, waivedRecently, waivesQuestions } from './tool-guards.util';
+import { planBeforeSetupChange, startAfterSetupChange, unrequestedProfileChange, waivedRecently, waivesQuestions } from './tool-guards.util';
 import { TOOL_ERROR_NEXT } from './tool-error.util';
 
 const fbArgs = { channels: [{ channel: 'facebook' }] };
@@ -6,6 +6,8 @@ const fbArgs = { channels: [{ channel: 'facebook' }] };
 describe('"do it yourself" Facebook announcement (Beauty Phoo session)', () => {
   it('detects waivers', () => {
     expect(waivesQuestions("don't ask me do it yourself all the way to publish the post, don't ask me anything")).toBe(true);
+    expect(waivesQuestions("build by urself I won't give u info")).toBe(true);
+    expect(waivesQuestions("u decide the brand I want to get started")).toBe(true);
     expect(waivesQuestions('make a website announcement post and upload on facebook')).toBe(false);
     expect(waivedRecently([{ role: 'user', content: 'do it yourself' }, { role: 'assistant', content: 'x' }, { role: 'user', content: 'done' }])).toBe(true);
   });
@@ -23,6 +25,8 @@ describe('"do it yourself" Facebook announcement (Beauty Phoo session)', () => {
     expect(unrequestedProfileChange(userText, { args: fbArgs, waived: true, brandChannels: [] })).toBeNull();
     expect(unrequestedProfileChange(userText, { args: { tone: 'x' }, waived: true })).toMatch(/not_requested/);
     expect(unrequestedProfileChange('go', { args: fbArgs, brandChannels: [], pendingPostText: 'post it on facebook' })).toBeNull();
+    expect(unrequestedProfileChange('Broad IT trends', { args: { brand: { industry: 'IT' } }, blankBrand: true })).toBeNull();
+    expect(unrequestedProfileChange('build by urself I won\'t give u info', { args: { brand: { industry: 'IT' } }, blankBrand: true })).toBeNull();
     expect(planBeforeSetupChange({ name: 'set_workflow_channels', args: {}, userText: 'make a facebook post, do it yourself', confirmed: false, brandChannels: ['instagram'], waived: true })).toBeNull();
   });
 

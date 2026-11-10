@@ -11,14 +11,14 @@ const UPDATE_RULE_SCHEMA = z.object({
   name: z
     .string()
     .optional()
-    .describe('New name for the brand profile, only if the user wants to rename it.'),
+    .describe('Brand profile name (e.g. "myu"). Set this whenever the brand name is provided or updated so the profile title reflects it immediately.'),
   brand: z
     .object({
       brandName: z
         .string()
         .optional()
         .describe(
-          'Only set when the user gave this name, or it is the name on the website they sent. Never invent or swap the brand name.',
+          'Brand name (e.g. "myu"). Set whenever user gives this name or it is on their site. Keep in sync with name. Never invent or swap the brand name.',
         ),
       industry: z.string().optional(),
       brandDescription: z.string().optional(),
@@ -137,9 +137,16 @@ export function createUpdateRuleTool(
           );
         }
       }
+      const bName = brand?.brandName?.trim();
+      const nName = name?.trim();
+      const resolvedName = nName || bName;
       const dto = {
-        ...(name !== undefined ? { name } : {}),
-        ...(brand !== undefined ? { brand } : {}),
+        ...(resolvedName ? { name: resolvedName } : {}),
+        ...(brand !== undefined
+          ? { brand: { ...brand, ...(resolvedName ? { brandName: resolvedName } : {}) } }
+          : resolvedName
+            ? { brand: { brandName: resolvedName } }
+            : {}),
         ...(audience !== undefined ? { audience } : {}),
         ...(campaign !== undefined ? { campaign } : {}),
         ...(channels !== undefined ? { channels } : {}),
@@ -152,7 +159,7 @@ export function createUpdateRuleTool(
     {
       name: 'update_rule',
       description:
-        'Save new or changed details into the brand profile (name, brand, audience, campaign, channels, content guidelines). Call this BEFORE answering whenever the user gives information that is missing from, or different from, what\'s already in the brief. Only when they asked to change the profile; only pass fields that are new or changed and never fill in tone, audience, campaign or guidelines they did not give. For channels, pass the full intended list (supported only; for an unsupported channel change nothing). Channel change ("post only on facebook"): also call set_workflow_channels in the same turn so the workflow lanes match (if unsure the workflow should change, ask_user "Update the workflow to only <channels> too?"). If Live state shows no workflow, call only this and do not mention a workflow. Not for "the image is for <channel>" (update_node_config lane) or putting the current post on another channel (generate_more_adapt).',
+        'Save new or changed details into the brand profile (name, brand, audience, campaign, channels, content guidelines). Call this BEFORE answering whenever the user gives information that is missing from, or different from, what\'s already in the brief. Only when they asked to change the profile; only pass fields that are new or changed and never fill in tone, audience, campaign or guidelines they did not give. For channels, pass the full intended list (supported only; for an unsupported channel change nothing). Channel change ("post only on facebook"): also call set_workflow_channels in the same turn so the workflow lanes match (if unsure the workflow should change, ask_user "Update the workflow to only <channels> too?"). If Live state shows no workflow, also call apply_default_workflow in the same turn so the marketing workflow is set up. Not for "the image is for <channel>" (update_node_config lane) or putting the current post on another channel (generate_more_adapt).',
       schema: UPDATE_RULE_SCHEMA,
     },
   );

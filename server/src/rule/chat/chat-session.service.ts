@@ -546,6 +546,7 @@ export class ChatSessionService {
         );
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
+    const blankBrand = 'blankBrand' in context ? !!context.blankBrand : false;
     const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
     const workflowNodes: Array<{ type?: unknown; lane?: unknown }> | null =
       'workflowNodes' in context && Array.isArray((context as { workflowNodes?: unknown }).workflowNodes)
@@ -683,7 +684,7 @@ export class ChatSessionService {
             return confirmationPromptFor(name, args);
           }
           if (name === 'update_rule') {
-            const notAsked = unrequestedProfileChange(content, { args, waived, pendingPostText, brandChannels });
+            const notAsked = unrequestedProfileChange(content, { args, waived, pendingPostText, brandChannels, blankBrand });
             if (notAsked) return notAsked;
           }
           if (ambiguousReply && MUTATING_TOOL_NAMES.has(name)) {
@@ -845,6 +846,7 @@ export class ChatSessionService {
         );
     const { brainPrompt, tools } = context;
     const facts: LiveFacts | null = 'facts' in context ? context.facts : null;
+    const blankBrand = 'blankBrand' in context ? !!context.blankBrand : false;
     const brandChannels: string[] | undefined = 'brandChannels' in context ? context.brandChannels : undefined;
 
     const useReasoning =
@@ -1365,7 +1367,7 @@ export class ChatSessionService {
         if (BLANK_BRAND_BLOCKED_TOOLS.has(tools[i].name)) tools.splice(i, 1);
       }
     }
-    if (intentText === undefined) return { brainPrompt, tools, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null };
+    if (intentText === undefined) return { brainPrompt, tools, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null, blankBrand };
     // State gate + intent groups (~15 tools a turn instead of ~50), plus
     // whatever a pending confirmation / connect flow needs.
     const allowed = selectTurnTools(
@@ -1380,7 +1382,7 @@ export class ChatSessionService {
     );
     const gated = tools.filter((t) => allowed(t.name));
     this.logger.log(`Chat tools this turn: ${gated.length} of ${tools.length}`);
-    return { brainPrompt, tools: gated, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null };
+    return { brainPrompt, tools: gated, facts, brandChannels, workflowNodes: workflow ? (workflow.nodes as Array<{ type?: unknown; lane?: unknown }>) : null, blankBrand };
   }
 
   /**

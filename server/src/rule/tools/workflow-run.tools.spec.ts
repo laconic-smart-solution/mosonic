@@ -559,6 +559,7 @@ describe('start_generation', () => {
       contentPrompt: 'Black Friday post',
       auth,
       metadata: { source: 'manual' },
+      referenceAssets: [],
     });
   });
 

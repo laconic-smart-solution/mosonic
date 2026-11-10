@@ -144,6 +144,7 @@ export default function HomePage() {
     void queryClient.invalidateQueries({ queryKey: ["contents"] })
     void queryClient.invalidateQueries({ queryKey: ["content"] })
     void queryClient.invalidateQueries({ queryKey: ["posts"] })
+    void queryClient.invalidateQueries({ queryKey: ["workflow"] })
   })
   useInvalidateOnRunTerminal()
   const { step: ruleBuildStep, startTracking: startTrackingRuleBuild } = useRuleBuildProgress()

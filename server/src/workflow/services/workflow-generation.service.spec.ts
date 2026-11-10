@@ -83,13 +83,13 @@ describe('WorkflowGenerationService', () => {
       WorkflowNodeType.KeywordPlanner,
       WorkflowNodeType.Intelligence,
       WorkflowNodeType.TextGeneration,
+      WorkflowNodeType.ImageGeneration,
       WorkflowNodeType.Branch,
       WorkflowNodeType.Adapt,
-      WorkflowNodeType.ImageGeneration,
       WorkflowNodeType.Merge,
     ]);
     const image = out.find((n) => n.type === WorkflowNodeType.ImageGeneration);
-    expect(image?.lane).toBe('instagram');
+    expect(image?.lane).toBeNull();
   });
 
   it('buildDefaultStructure still adds an image node for a rule channel outside the Q&A wizard set', () => {

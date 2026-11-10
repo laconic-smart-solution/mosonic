@@ -56,7 +56,7 @@ export function toolError(
   extra?: Record<string, unknown>,
 ): string {
   const next = TOOL_ERROR_NEXT[code];
-  return JSON.stringify({ ok: false, code, message, ...(next ? { next } : {}), ...extra });
+  return JSON.stringify({ ok: false, code, message, error: message, ...(next ? { next } : {}), ...extra });
 }
 
 export function toolOk(payload: Record<string, unknown>): string {
@@ -119,6 +119,9 @@ export function fromHttpException(err: unknown): string | null {
     }
     if (/not available for Generate More/i.test(message)) {
       return toolError('not_supported', message);
+    }
+    if (/is not connected/i.test(message)) {
+      return toolError('channel_not_connected', message);
     }
     return toolError('bad_request', message);
   }

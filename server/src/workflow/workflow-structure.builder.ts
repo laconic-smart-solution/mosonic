@@ -213,10 +213,7 @@ export function toPersistableGraph(
     return [];
   }
 
-  if (channels.length === 1) {
-    return toLinearGraph(logicalNodes, channels[0]);
-  }
-
+  // Always use branch -> adapt -> merge structure (with 1 adapt lane if single channel)
   return toMultiChannelGraph(logicalNodes, channels);
 }
 
