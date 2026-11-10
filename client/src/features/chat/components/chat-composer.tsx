@@ -24,10 +24,11 @@ type ChatComposerProps = {
   onBootstrapFromFiles?: (files: File[], text: string) => Promise<string>
 }
 
-function inferAssetType(file: File, index: number): RuleAssetType {
+function inferAssetType(file: File, allFiles: File[]): RuleAssetType {
   if (!file.type.startsWith("image/")) return "guideline_document"
-  // First image in a ruleless bootstrap is treated as the logo.
-  return index === 0 ? "logo" : "reference_image"
+  const isNamedLogo = /logo/i.test(file.name)
+  const isFirstImage = allFiles.find((f) => f.type.startsWith("image/")) === file
+  return isNamedLogo || isFirstImage ? "logo" : "reference_image"
 }
 
 export function ChatComposer({
@@ -69,11 +70,11 @@ export function ChatComposer({
       }
       try {
         uploaded = await Promise.all(
-          files.map((file, index) =>
+          files.map((file) =>
             uploadAssetMutation.mutateAsync({
               ruleId: effectiveRuleId as string,
               file,
-              type: inferAssetType(file, index),
+              type: inferAssetType(file, files),
             }),
           ),
         )

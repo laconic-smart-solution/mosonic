@@ -9,7 +9,7 @@ const ASSETS: QueryKey[] = [["rule-assets"]]
 const MEMORY: QueryKey[] = [["rule-memories"]]
 const WORKFLOW: QueryKey[] = [["workflow"], ["pipeline", "estimate"], ["pipeline", "review-estimate"]]
 const CONTENT: QueryKey[] = [["content"], ["contents"]]
-const RUN: QueryKey[] = [["pipeline"], ...CONTENT, ["usage", "summary"], ["usage", "current-plan"], ["usage", "history"]]
+const RUN: QueryKey[] = [["pipeline"], ...CONTENT, ...WORKFLOW, ["usage", "summary"], ["usage", "current-plan"], ["usage", "history"]]
 const PUBLISH: QueryKey[] = [["upload"], ["posts"], ...CONTENT]
 const CHANNELS: QueryKey[] = [["zernio", "accounts"]]
 

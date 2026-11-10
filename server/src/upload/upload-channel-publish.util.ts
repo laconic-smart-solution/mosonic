@@ -25,11 +25,18 @@ export function resolveAutomappedMediaUrl(
   media: ChannelMediaMapping | null,
   outputs: ResolvedContentOutputs,
 ): string | null {
-  if (!media) return null;
   const o = outputs ?? {};
-  const url =
-    media === ChannelMediaMapping.Image
-      ? (o.image ?? '').trim()
-      : (o.video ?? '').trim();
-  return url.length > 0 ? url : null;
+  if (media === ChannelMediaMapping.Video) {
+    return (o.video ?? '').trim() || null;
+  }
+  if (media === ChannelMediaMapping.Image) {
+    return (o.image ?? '').trim() || null;
+  }
+  // When media mapping is not explicitly set (default/null):
+  // Default to image if available, else video if available!
+  const img = (o.image ?? '').trim();
+  if (img) return img;
+  const vid = (o.video ?? '').trim();
+  if (vid) return vid;
+  return null;
 }

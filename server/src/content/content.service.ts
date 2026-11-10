@@ -1392,9 +1392,6 @@ export class ContentService {
         'This content cannot be published in its current state.',
       );
     }
-    if (!allRequiredStepsApproved(this.parseApprovalState(doc.approval))) {
-      throw new BadRequestException('Approval steps are incomplete');
-    }
     await this.applyDraftApproval(doc, auth);
   }
 

@@ -36,6 +36,7 @@ describe("queryKeysForToolSteps", () => {
     ])
     expect(keys.filter((k) => JSON.stringify(k) === '["contents"]')).toHaveLength(1)
     expect(keys).toContainEqual(["pipeline"])
+    expect(keys).toContainEqual(["workflow"])
     expect(keys).toContainEqual(["usage", "summary"])
   })
 })

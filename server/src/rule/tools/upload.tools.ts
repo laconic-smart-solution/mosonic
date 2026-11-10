@@ -35,10 +35,12 @@ async function resolveUploadForContent(
   auth: TenancyAuth,
 ): Promise<{ uploadId: string }> {
   try {
-    return await uploadService.findUploadIdByContentRef(contentId, auth);
+    const approved = await contentService.approveContent(contentId, auth);
+    if (approved?.uploadId) return { uploadId: approved.uploadId };
   } catch {
-    return contentService.approveContent(contentId, auth);
+    // Content is already approved or no pending approval steps
   }
+  return await uploadService.findUploadIdByContentRef(contentId, auth);
 }
 
 function channelIncludeList(
@@ -556,19 +558,45 @@ export function createPreviewUploadTool(
         const include = channels?.length ? channelIncludeList(detail.channels, channels) : undefined;
         const check = validateUploadDetail(detail, include);
         const { rows } = pickChannels(detail, channels);
+        const connectedSet =
+          typeof uploadService.getConnectedChannels === 'function'
+            ? await uploadService.getConnectedChannels(auth.userId).catch(() => null)
+            : null;
+        const issues = [...check.issues];
+        const notConnected: string[] = [];
+        if (connectedSet) {
+          for (const row of rows) {
+            const key = row.channel.trim().toLowerCase();
+            if (!connectedSet.has(key)) {
+              notConnected.push(row.channel);
+              issues.push({
+                channel: row.channel,
+                problem: `${row.channel} is not connected. Call start_channel_oauth to connect it.`,
+              });
+            }
+          }
+        }
         return toolOk({
           action: 'upload_preview',
           uploadId: found.uploadId,
-          ready: check.ok,
-          issues: check.issues,
-          channels: rows.map(channelView),
-          note: 'Channel connections are not checked here; call check_channel_auth before publishing.',
+          ready: check.ok && notConnected.length === 0,
+          issues,
+          channels: rows.map((r) => ({
+            ...channelView(r),
+            connected: connectedSet ? connectedSet.has(r.channel.trim().toLowerCase()) : undefined,
+          })),
+          ...(notConnected.length > 0
+            ? {
+                notConnected,
+                next: `Call start_channel_oauth for ${notConnected[0]} to show the Connect button in chat.`,
+              }
+            : {}),
         });
       }),
     {
       name: 'preview_upload',
       description:
-        'Read-only pre-publish check: shows what each channel will post (caption preview, media, YouTube title) and lists issues that would block publishing. Call before asking the user to confirm publish_now / schedule_publish. Changes nothing.',
+        'Read-only pre-publish check: shows what each channel will post (caption preview, media, YouTube title) and lists issues (or missing account connections) that would block publishing. Changes nothing.',
       schema: z.object({ ...UPLOAD_SCOPE, channels: CHANNELS_SCHEMA }),
     },
   );

@@ -260,7 +260,7 @@ export class UploadService {
         included: true,
         caption,
         mediaUrl,
-        mediaUrls: [],
+        mediaUrls: mediaUrl ? [mediaUrl] : [],
         youtubeTitle: null,
         status: UploadChannelStatus.Pending,
         scheduledAt: null,
@@ -277,13 +277,13 @@ export class UploadService {
   ): UploadChannelEntry {
     const ro = resolvedOutputs ?? {};
     const fallbackCaption = this.fallbackPrimaryCaption(ro);
+    const fallbackMedia = (ro.image ?? ro.video ?? '').trim() || null;
     return {
       channel,
       included: true,
       caption: fallbackCaption,
-      // Do not copy flattened resolved media — it may belong to another lane.
-      mediaUrl: null,
-      mediaUrls: [],
+      mediaUrl: fallbackMedia,
+      mediaUrls: fallbackMedia ? [fallbackMedia] : [],
       youtubeTitle: null,
       status: UploadChannelStatus.Pending,
       scheduledAt: null,
@@ -338,6 +338,20 @@ export class UploadService {
       ...withUploadChannels(upload, channels),
       status: recomputeUploadJobStatus(channels),
     });
+  }
+
+  async getConnectedChannels(userId: string): Promise<Set<string>> {
+    const [connected, rnStatus] = await Promise.all([
+      this.mcpService.getConnectedAccounts(userId).catch(() => ({ accounts: [] })),
+      this.redNoteService.getAccountStatus(userId).catch(() => ({ connected: false })),
+    ]);
+    const set = new Set<string>(
+      (connected?.accounts ?? [])
+        .map((a) => a.channel?.trim().toLowerCase())
+        .filter((c): c is string => Boolean(c)),
+    );
+    if (rnStatus?.connected) set.add(REDNOTE_CHANNEL);
+    return set;
   }
 
   /**
@@ -1347,10 +1361,14 @@ export class UploadService {
 
   private resolveRowMediaForPublish(
     row: UploadChannelEntry,
-    _ro: ResolvedContentOutputs,
+    ro: ResolvedContentOutputs,
   ): string[] {
     const key = row.channel.trim().toLowerCase();
-    const urls = this.rowAllMedia(row);
+    let urls = this.rowAllMedia(row);
+    if (urls.length === 0) {
+      const roMedia = (ro?.image ?? ro?.video ?? '').trim();
+      if (roMedia) urls = [roMedia];
+    }
     if (key === 'rednote' || key === 'youtube') {
       const videos = urls.filter((u) => this.isVideoMediaUrl(u));
       return videos.length > 0 ? [videos[0]] : [];

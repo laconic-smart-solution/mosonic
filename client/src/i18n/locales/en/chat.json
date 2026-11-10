@@ -170,6 +170,8 @@
     "titleUpdatingImage": "Updating image…",
     "titleUpdatingCaption": "Updating caption…",
     "titleUpdateFailed": "Update failed",
+    "captionLabel": "Caption",
+    "noCaption": "No caption yet",
     "openContent": "Open content",
     "working": "Generating this extra output…",
     "workingImage": "Updating the image…",
@@ -376,7 +378,7 @@
     "sectionDoing": "Doing",
     "planEmpty": "No workflow changes needed for this request.",
     "summaryWorking": "Working · {{done}} of {{total}} steps",
-    "summaryWaiting": "Waiting for your choice · {{done}} of {{total}}",
+    "summaryWaiting": "Waiting for your choice",
     "summaryDone": "Done · {{done}} of {{total}} steps",
     "summaryFailed": "Stopped · {{done}} of {{total}} steps"
   },

@@ -52,13 +52,31 @@ export function useActiveChatSession() {
   // Keep the active rule option in sync immediately whenever rule query refetches.
   useEffect(() => {
     if (!activeRuleQuery.data || !selectedRuleId) return
-    const activeItem = activeRuleQuery.data
+    const activeItem = activeRuleQuery.data as RuleListItem & { brand?: { brandName?: string } }
+    const brandName = activeItem.brand?.brandName?.trim()
+    const resolvedName =
+      activeItem.name && activeItem.name !== "Untitled brand"
+        ? activeItem.name
+        : brandName || activeItem.name || "Untitled brand"
+
     setRuleOptions((prev) => {
       const idx = prev.findIndex((r) => r.ruleId === selectedRuleId)
-      if (idx === -1) return prev
-      if (prev[idx].name === activeItem.name && prev[idx].status === activeItem.status) return prev
+      if (idx === -1) {
+        return [
+          {
+            ruleId: selectedRuleId,
+            name: resolvedName,
+            status: activeItem.status || "active",
+            tones: activeItem.tones || [],
+            channels: activeItem.channels || [],
+            updatedAt: activeItem.updatedAt || new Date().toISOString(),
+          },
+          ...prev,
+        ]
+      }
+      if (prev[idx].name === resolvedName && prev[idx].status === activeItem.status) return prev
       const updated = [...prev]
-      updated[idx] = { ...updated[idx], ...activeItem }
+      updated[idx] = { ...updated[idx], ...activeItem, name: resolvedName }
       return updated
     })
   }, [activeRuleQuery.data, selectedRuleId])
@@ -66,10 +84,19 @@ export function useActiveChatSession() {
   const selectedRule = useMemo(() => {
     if (!selectedRuleId) return undefined
     const fromOptions = ruleOptions.find((r) => r.ruleId === selectedRuleId)
-    if (activeRuleQuery.data?.name) {
+    const activeData = activeRuleQuery.data as
+      | (RuleListItem & { brand?: { brandName?: string } })
+      | undefined
+    const brandName = activeData?.brand?.brandName?.trim()
+    const resolvedName =
+      (activeData?.name && activeData.name !== "Untitled brand" ? activeData.name : undefined) ??
+      (brandName && brandName !== "Untitled brand" ? brandName : undefined) ??
+      fromOptions?.name
+    if (activeData) {
       return {
         ...fromOptions,
-        ...activeRuleQuery.data,
+        ...activeData,
+        name: resolvedName ?? activeData.name ?? fromOptions?.name ?? "",
       }
     }
     return fromOptions

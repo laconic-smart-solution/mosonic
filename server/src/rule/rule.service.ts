@@ -376,7 +376,15 @@ export class RuleService {
     if (!rule) {
       throw new NotFoundException(`Rule ${ruleId} not found`);
     }
-    return { ...rule, campaign: this.sanitizeCampaignRecord(rule.campaign) };
+    const brandObj = rule.brand && typeof rule.brand === 'object' ? (rule.brand as Record<string, unknown>) : {};
+    const bName = typeof brandObj.brandName === 'string' ? brandObj.brandName.trim() : '';
+    const rName = typeof rule.name === 'string' ? rule.name.trim() : '';
+    const effectiveName = rName && rName !== 'Untitled brand' ? rName : (bName || rName || 'Untitled brand');
+    return {
+      ...rule,
+      name: effectiveName,
+      campaign: this.sanitizeCampaignRecord(rule.campaign),
+    };
   }
 
   /**
@@ -477,10 +485,16 @@ export class RuleService {
       unknown
     > & { seoGuidelines?: Record<string, unknown> };
 
-    if (dto.name !== undefined) data.name = dto.name;
-    if (dto.brand !== undefined) {
-      const incomingVi = (dto.brand as { visualIdentity?: Record<string, unknown> })
-        .visualIdentity;
+    const incomingName = dto.name?.trim();
+    const incomingBrandName = dto.brand?.brandName?.trim();
+    const effectiveName = incomingName || incomingBrandName;
+
+    if (effectiveName) {
+      data.name = effectiveName;
+    }
+    if (dto.brand !== undefined || effectiveName) {
+      const incomingVi = (dto.brand as { visualIdentity?: Record<string, unknown> } | undefined)
+        ?.visualIdentity;
       const prevVi =
         brand.visualIdentity && typeof brand.visualIdentity === 'object'
           ? (brand.visualIdentity as Record<string, unknown>)
@@ -491,7 +505,8 @@ export class RuleService {
           : undefined;
       data.brand = {
         ...brand,
-        ...dto.brand,
+        ...(dto.brand ?? {}),
+        ...(effectiveName ? { brandName: effectiveName } : {}),
         ...(incomingVi !== undefined
           ? mergedVi
             ? { visualIdentity: mergedVi }
@@ -659,9 +674,22 @@ export class RuleService {
             : typeof updatedAtRaw === 'string'
               ? updatedAtRaw
               : new Date().toISOString();
+        const brandObj =
+          row.brand && typeof row.brand === 'object'
+            ? (row.brand as Record<string, unknown>)
+            : {};
+        const bName =
+          typeof brandObj.brandName === 'string'
+            ? brandObj.brandName.trim()
+            : '';
+        const rName = typeof row.name === 'string' ? row.name.trim() : '';
+        const resolvedName =
+          rName && rName !== 'Untitled brand'
+            ? rName
+            : bName || rName || 'Untitled brand';
         return {
           ruleId: typeof row.ruleId === 'string' ? row.ruleId : '',
-          name: typeof row.name === 'string' ? row.name : '',
+          name: resolvedName,
           status: row.status ?? RuleStatus.Processing,
           tones: Array.isArray(row.brand?.brandTone) ? row.brand.brandTone : [],
           channels,
