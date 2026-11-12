@@ -65,7 +65,7 @@ const START_GENERATION_SCHEMA = z.object({
   contentPrompt: z
     .string()
     .describe(
-      'The prompt or user instruction for what to generate. Pass the COMPLETE, VERBATIM user prompt, including any requested layout, template, bullet points, emojis, examples, or section structures. Do NOT summarize or condense away user formatting.',
+      'The specific post topic, premise, or creative instructions to generate. Include any requested layout, template, bullet points, or structure. DO NOT call this tool when the user has no idea what to post or is brainstorming - propose 2-3 angles in chat first. Never pass conversational fluff like "I have no idea where to start".',
     ),
   workflowId: z
     .string()
@@ -98,6 +98,14 @@ export function createStartGenerationTool(
           return toolError(
             'empty_prompt',
             'contentPrompt is required. Ask the user what to generate.',
+          );
+        }
+
+        const vagueTopicPattern = /^(i (have|got) no idea|i don'?t know (what|where)|help me (think|brainstorm|with an idea)|what (should|can) i post|suggest (me )?(some )?ideas?|not sure where to start|i have no clue)\b/i;
+        if (vagueTopicPattern.test(prompt)) {
+          return toolError(
+            'vague_topic',
+            'Cannot start generation: The topic is vague or indicates the user has no idea what to post. Do NOT call start_generation yet. Brainstorm and propose 2-3 specific post angles or concepts to the user in chat based on their brand profile.',
           );
         }
 
@@ -288,7 +296,7 @@ export function createStartGenerationTool(
     {
       name: START_GENERATION_TOOL_NAME,
       description:
-        'REQUIRED whenever the user wants generated content (a post, caption, image, video, campaign piece): starts the saved workflow pipeline. Never write the content yourself. Put their full prompt, template, or bullet list in contentPrompt verbatim and call this in the same turn - do not summarize or strip user formatting - do not ask_user again, unless their reply points at a choice you offered ("the second one") that does not clearly match one option; then ask_user which one. For research or exploratory inquiries (e.g. "i want to know about X", "who was X from Y"), first answer and discuss facts in chat, offer options, and call start_generation only after the angle/topic is confirmed. ' +
+        'Starts the saved workflow pipeline to generate post content and imagery. Never write the finished post or generate images manually in chat. Precondition: Call this tool ONLY when there is an agreed, specific post topic or premise. If the user says they have no idea what to post, asks for ideas, or is exploring directions, DO NOT call start_generation yet - brainstorm and suggest 2-3 specific angles based on their brand profile in chat first. When the topic is agreed, pass the clean synthesized topic or their structured outline in contentPrompt and call this in the same turn - do not summarize or strip user formatting - do not ask_user again, unless their reply points at a choice you offered ("the second one") that does not clearly match one option; then ask_user which one. For research or exploratory inquiries (e.g. "i want to know about X", "who was X from Y"), first answer and discuss facts in chat, offer options, and call start_generation only after the angle/topic is confirmed. ' +
           'Clear intent with no topic ("let\'s announce my brand", "make a post", or "do"/"yes" right after you offered ONE post): write a short topic from the brief (saved style, brand channels, season) yourself; ask_user with 3 short topic options only when nothing fits. Name only the brand\'s own channels; never add a channel or saved style the user did not ask for. ' +
           '"Use this photo for my post": say in contentPrompt to use the attached reference image; if reference images are needed and none are attached, say so first. "No image" / "text only" (any language) while the workflow has an Image step: do not call this; ask_user "Remove the image step, then make the post" / "Keep images". ' +
           'Other languages ("also in Thai"): pass languages; on no_translation_step follow its next hint. ' +
