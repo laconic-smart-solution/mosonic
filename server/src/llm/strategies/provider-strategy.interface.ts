@@ -1,4 +1,5 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { Runnable } from '@langchain/core/runnables';
 import type OpenAI from 'openai';
 import type { LlmProvider } from '../../nodes/workflow-node-llm.enums';
 
@@ -79,7 +80,7 @@ export interface AiProviderStrategy {
   createStructuredChatModel<T>(
     schema: unknown,
     options?: StructuredChatModelOptions,
-  ): unknown;
+  ): Runnable<any, T>;
 
   generateImageBase64?(
     params: ImageGenerateParams,

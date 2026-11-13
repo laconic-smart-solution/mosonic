@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { Runnable } from '@langchain/core/runnables';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { GoogleGenAI } from '@google/genai';
 import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
@@ -140,7 +141,7 @@ export class GeminiProviderStrategy implements AiProviderStrategy {
   createStructuredChatModel<T>(
     schema: unknown,
     options?: StructuredChatModelOptions,
-  ): unknown {
+  ): Runnable<any, T> {
     const plainModel = this.createChatModel({
       mode: 'plain',
       model: options?.model,

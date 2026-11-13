@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { ChatOpenAI } from '@langchain/openai';
+import type { Runnable } from '@langchain/core/runnables';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import OpenAI from 'openai';
 import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
 import { coerceOpenAiImageMime } from '../../nodes/openai-image-mime.util';
@@ -23,6 +24,8 @@ import type {
 } from './provider-strategy.interface';
 
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o';
+export const DEFAULT_OPENAI_REASONING_MODEL = 'gpt-6-luna';
+export const DEFAULT_OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
 
 function isNonChatOpenAiModel(model: string): boolean {
   const m = model.trim().toLowerCase();
@@ -109,7 +112,7 @@ export class OpenAiProviderStrategy implements AiProviderStrategy {
   createStructuredChatModel<T>(
     schema: unknown,
     options?: StructuredChatModelOptions,
-  ): unknown {
+  ): Runnable<any, T> {
     const plainModel = this.createChatModel({
       mode: 'plain',
       model: options?.model,
@@ -343,6 +346,49 @@ export class OpenAiProviderStrategy implements AiProviderStrategy {
     } catch (error) {
       throw new Error(`OpenAI web search failed: ${this.formatError(error)}`);
     }
+  }
+
+  getReasoningModelId(): string {
+    return (
+      this.config.get<string>('OPENAI_REASONING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_REASONING_MODEL
+    );
+  }
+
+  createReasoningChatModel(options?: {
+    effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+    maxTokens?: number;
+  }): BaseChatModel {
+    const apiKey = this.requireApiKey();
+    const model = this.getReasoningModelId();
+    return new ChatOpenAI({
+      apiKey,
+      model,
+      useResponsesApi: true,
+      reasoning: { effort: options?.effort ?? 'low' },
+      ...(options?.maxTokens !== undefined
+        ? { maxTokens: options.maxTokens }
+        : {}),
+    });
+  }
+
+  async embedTexts(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    const apiKey = this.requireApiKey();
+    const model =
+      this.config.get<string>('OPENAI_EMBEDDING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_EMBEDDING_MODEL;
+    const embeddings = new OpenAIEmbeddings({ apiKey, model });
+    return embeddings.embedDocuments(texts);
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const apiKey = this.requireApiKey();
+    const model =
+      this.config.get<string>('OPENAI_EMBEDDING_MODEL')?.trim() ||
+      DEFAULT_OPENAI_EMBEDDING_MODEL;
+    const embeddings = new OpenAIEmbeddings({ apiKey, model });
+    return embeddings.embedQuery(text);
   }
 
   private formatError(error: unknown): string {

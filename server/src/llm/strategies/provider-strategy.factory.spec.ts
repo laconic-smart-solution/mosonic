@@ -1,6 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
+import { AnthropicProviderStrategy } from './anthropic-provider.strategy';
 import { GeminiProviderStrategy } from './gemini-provider.strategy';
+import { GroqProviderStrategy } from './groq-provider.strategy';
+import { OllamaProviderStrategy } from './ollama-provider.strategy';
 import { OpenAiProviderStrategy } from './openai-provider.strategy';
 import { ProviderStrategyFactory } from './provider-strategy.factory';
 
@@ -11,6 +14,8 @@ describe('ProviderStrategyFactory', () => {
         LLM_PROVIDER: 'openai',
         OPENAI_API_KEY: 'sk-test',
         GOOGLE_API_KEY: 'AIza-test',
+        ANTHROPIC_API_KEY: 'ant-test',
+        GROQ_API_KEY: 'gsk-test',
       };
       return map[key];
     }),
@@ -37,6 +42,17 @@ describe('ProviderStrategyFactory', () => {
     expect(txStrategy).toBeInstanceOf(GeminiProviderStrategy);
   });
 
+  it('returns AnthropicProviderStrategy, GroqProviderStrategy, and OllamaProviderStrategy', () => {
+    const anthropic = factory.requireStrategy('anthropic', 'chat');
+    expect(anthropic).toBeInstanceOf(AnthropicProviderStrategy);
+
+    const groq = factory.requireStrategy('groq', 'chat');
+    expect(groq).toBeInstanceOf(GroqProviderStrategy);
+
+    const ollama = factory.requireStrategy('ollama', 'chat');
+    expect(ollama).toBeInstanceOf(OllamaProviderStrategy);
+  });
+
   it('rejects unsupported capability on Gemini (video_generation)', () => {
     expect(() =>
       factory.requireStrategy('google', 'video_generation'),
@@ -59,5 +75,16 @@ describe('ProviderStrategyFactory', () => {
     expect(factory.getDefaultModel('google', 'transcription')).toBe(
       'gemini-2.5-flash',
     );
+
+    expect(factory.getDefaultModel('anthropic', 'chat')).toBe(
+      'claude-3-5-sonnet-latest',
+    );
+    expect(factory.getDefaultModel('groq', 'chat')).toBe(
+      'llama-3.3-70b-versatile',
+    );
+    expect(factory.getDefaultModel('groq', 'transcription')).toBe(
+      'whisper-large-v3-turbo',
+    );
+    expect(factory.getDefaultModel('ollama', 'chat')).toBe('llama3.1');
   });
 });
