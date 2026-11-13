@@ -459,6 +459,69 @@ export function defaultModelForProvider(
   return p === "google" ? "gemini-2.5-flash" : (DEFAULT_MODEL_BY_CANVAS_TYPE[canvasType] ?? "gpt-4o")
 }
 
+export interface NodeModelBadgeInfo {
+  provider: string
+  model: string
+  label: string
+}
+
+export function resolveNodeModelInfo(
+  wfNode?: WorkflowNode | null,
+  layer?: Record<string, unknown> | null,
+): NodeModelBadgeInfo | null {
+  if (!wfNode) return null
+
+  const { type, config } = wfNode
+
+  if (type === "subtitle") {
+    return { provider: "local", model: "srt_vtt", label: "Local · SRT/VTT" }
+  }
+  if (type === "video_presenter") {
+    return { provider: "heygen", model: "heygen_video_1", label: "HeyGen · Photo Avatar" }
+  }
+  if (type === "video_cinematic") {
+    return { provider: "heygen", model: "seedance_2", label: "HeyGen · Cinematic" }
+  }
+  if (type === "video_generation") {
+    const mode =
+      config?.mode === "cinematic_avatar" || config?.mode === "heygen_video"
+        ? "seedance_2"
+        : "heygen_video_1"
+    const label = mode === "seedance_2" ? "HeyGen · Cinematic" : "HeyGen · Photo Avatar"
+    return { provider: "heygen", model: mode, label }
+  }
+
+  const rawProvider =
+    (typeof layer?.provider === "string" && layer.provider.trim()) ||
+    (typeof config?.provider === "string" && config.provider.trim()) ||
+    "openai"
+  const provider = rawProvider.toLowerCase()
+
+  const canvasType = backendTypeToCanvas(type, config)
+  const explicitModel =
+    (typeof layer?.providerModel === "string" && layer.providerModel.trim()) ||
+    (typeof layer?.model === "string" && layer.model.trim()) ||
+    (typeof config?.model === "string" && config.model.trim()) ||
+    undefined
+
+  const model = explicitModel || defaultModelForProvider(canvasType, provider)
+
+  const providerPrefix =
+    provider === "google"
+      ? "Gemini"
+      : provider === "openai"
+        ? "GPT"
+        : provider === "anthropic"
+          ? "Claude"
+          : provider.charAt(0).toUpperCase() + provider.slice(1)
+
+  return {
+    provider,
+    model,
+    label: `${providerPrefix} · ${model}`,
+  }
+}
+
 export function defaultConfigForNewCanvasNode(wfType: string): Record<string, unknown> {
   const model = DEFAULT_MODEL_BY_CANVAS_TYPE[wfType] ?? "gpt-4o"
   switch (wfType) {
