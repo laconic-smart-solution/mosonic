@@ -676,4 +676,80 @@ describe('GraphMaterializationService', () => {
       ),
     ).toBe(true);
   });
+
+  it('materializes updated workflow channels from adapt nodes when rule channels are stale', () => {
+    const staleRule = {
+      channels: [
+        { channel: 'instagram', priority: 'high', contentStyle: 'visual' },
+        { channel: 'facebook', priority: 'medium', contentStyle: 'story' },
+      ],
+    } as never;
+
+    const nodes = [
+      {
+        nodeId: 'text',
+        type: WorkflowNodeType.TextGeneration,
+        order: 1,
+        isLocked: false,
+        config: {},
+      },
+      {
+        nodeId: 'branch',
+        type: WorkflowNodeType.Branch,
+        order: 2,
+        isLocked: false,
+        config: {
+          mode: 'wizard_channels',
+          channels: ['facebook', 'instagram'],
+        },
+      },
+      {
+        nodeId: 'adapt_fb',
+        type: WorkflowNodeType.Adapt,
+        order: 3,
+        lane: 'facebook',
+        isLocked: false,
+        config: { laneId: 'facebook', channel: 'facebook' },
+      },
+      {
+        nodeId: 'adapt_tt',
+        type: WorkflowNodeType.Adapt,
+        order: 4,
+        lane: 'tiktok',
+        isLocked: false,
+        config: { laneId: 'tiktok', channel: 'tiktok' },
+      },
+      {
+        nodeId: 'img_tt',
+        type: WorkflowNodeType.ImageGeneration,
+        order: 5,
+        lane: 'tiktok',
+        isLocked: false,
+        config: { laneId: 'tiktok', channel: 'tiktok' },
+      },
+      {
+        nodeId: 'merge',
+        type: WorkflowNodeType.Merge,
+        order: 6,
+        isLocked: false,
+        config: {},
+      },
+    ];
+    const edges = [
+      { from: 'text', to: 'branch' },
+      { from: 'branch', to: 'adapt_fb' },
+      { from: 'branch', to: 'adapt_tt' },
+      { from: 'adapt_fb', to: 'merge' },
+      { from: 'adapt_tt', to: 'img_tt' },
+      { from: 'img_tt', to: 'merge' },
+    ];
+    const out = service.materialize(nodes, edges, staleRule, 1);
+    expect(out.lanes.sort()).toEqual(['facebook', 'tiktok']);
+    expect(out.nodes.some((n) => n.lane === 'instagram')).toBe(false);
+    expect(
+      out.nodes.some(
+        (n) => n.lane === 'tiktok' && n.type === WorkflowNodeType.ImageGeneration,
+      ),
+    ).toBe(true);
+  });
 });

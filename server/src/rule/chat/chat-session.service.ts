@@ -1220,7 +1220,7 @@ export class ChatSessionService {
         createReorderWorkflowNodesTool(ruleId, this.workflows, auth, brandName),
         createRemoveWorkflowNodeTool(ruleId, this.workflows, auth, brandName),
         createAddWorkflowNodeTool(ruleId, this.workflows, auth, brandName),
-        createSetWorkflowChannelsTool(ruleId, this.workflows, auth, brandName),
+        createSetWorkflowChannelsTool(ruleId, this.workflows, auth, brandName, this.ruleService),
         createListPipelinesTool(ruleId, this.workflows, this.pipelines, auth),
         createGetActivePipelineTool(
           ruleId,

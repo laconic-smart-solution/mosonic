@@ -33,21 +33,23 @@ export function workflowNodeLabel(type: string): string {
 }
 
 const LEGACY_NAME = /^workflow for rule\s/i;
+const UNTITLED_PATTERN = /^untitled(\s+(brand|workflow))?$/i;
 
-/** Brand name wins; a legacy "Workflow for rule <id>" name is never shown. */
+/** Brand name wins; a legacy "Workflow for rule <id>" or "Untitled" name is never shown. */
 export function cardWorkflowName(
   brandName: string | null | undefined,
   storedName: string | null | undefined,
 ): string {
-  if ((brandName ?? '').trim()) return workflowDisplayName(brandName);
+  const brand = (brandName ?? '').trim();
+  if (brand && !UNTITLED_PATTERN.test(brand)) return workflowDisplayName(brand);
   const stored = (storedName ?? '').trim();
-  return stored && !LEGACY_NAME.test(stored) ? stored : 'Workflow';
+  return stored && !LEGACY_NAME.test(stored) && !UNTITLED_PATTERN.test(stored) ? stored : 'Workflow';
 }
 
-/** Card title: "<brand> · Workflow" - never an internal id. */
+/** Card title: "<brand> · Workflow" - never an internal id or "Untitled · Workflow". */
 export function workflowDisplayName(brandName: string | null | undefined): string {
   const brand = (brandName ?? '').trim();
-  return brand ? `${brand} · Workflow` : 'Workflow';
+  return brand && !UNTITLED_PATTERN.test(brand) ? `${brand} · Workflow` : 'Workflow';
 }
 
 export type WorkflowNodeSummary = {

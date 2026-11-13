@@ -205,8 +205,16 @@ export class GraphMaterializationService {
         !subgraphIds.has(n.nodeId),
     );
 
+    const subgraphTemplates = templateNodes.filter((n) =>
+      subgraphIds.has(n.nodeId),
+    );
+
     const branchConfig = branchNode.config as BranchConfig;
-    const abTargets = this.resolveAbTargets(branchConfig, rule.channels ?? []);
+    const abTargets = this.resolveAbTargets(
+      branchConfig,
+      rule.channels ?? [],
+      subgraphTemplates,
+    );
     const channels = abTargets.map((t) => t.channel);
     if (channels.length < 1) {
       throw new BadRequestException(
@@ -219,9 +227,6 @@ export class GraphMaterializationService {
       );
     }
 
-    const subgraphTemplates = templateNodes.filter((n) =>
-      subgraphIds.has(n.nodeId),
-    );
     const adaptTemplateCount = subgraphTemplates.filter(
       (n) => n.type === WorkflowNodeType.Adapt,
     ).length;
@@ -264,7 +269,7 @@ export class GraphMaterializationService {
           template.type === WorkflowNodeType.Adapt ||
           template.type === WorkflowNodeType.ImageGeneration
         ) {
-          config.channel = channel.channel;
+          config.channel = normalizeLaneId(channel.channel);
         }
         if (template.type === WorkflowNodeType.Adapt) {
           config.contentStyle = channel.contentStyle;
@@ -424,6 +429,7 @@ export class GraphMaterializationService {
   private resolveAbTargets(
     branchConfig: BranchConfig,
     ruleChannels: ChannelEntry[],
+    subgraphTemplates: WorkflowNodeTemplate[] = [],
   ): AbVariantTarget[] {
     if (branchConfig.mode === 'ab_test' && branchConfig.variants?.length) {
       return branchConfig.variants.map((v) => {
@@ -439,14 +445,39 @@ export class GraphMaterializationService {
         return { channel, variantId: v.id };
       });
     }
-    const channels = this.resolveChannels(branchConfig, ruleChannels);
+    const channels = this.resolveChannels(
+      branchConfig,
+      ruleChannels,
+      subgraphTemplates,
+    );
     return channels.map((channel) => ({ channel, variantId: 'control' }));
   }
 
   private resolveChannels(
     branchConfig: BranchConfig,
     ruleChannels: ChannelEntry[],
+    subgraphTemplates: WorkflowNodeTemplate[] = [],
   ): ChannelEntry[] {
+    const adaptLanes = [
+      ...new Set(
+        subgraphTemplates
+          .filter((t) => t.type === WorkflowNodeType.Adapt)
+          .map((t) => {
+            const cfg = t.config as
+              | { laneId?: string; channel?: string }
+              | undefined;
+            const raw =
+              cfg?.laneId ?? cfg?.channel ?? (t as { lane?: string }).lane;
+            return typeof raw === 'string' && raw.trim()
+              ? normalizeLaneId(raw.trim())
+              : '';
+          })
+          .filter(Boolean),
+      ),
+    ];
+    if (adaptLanes.length > 0) {
+      return channelIdsToChannelEntries(adaptLanes, ruleChannels);
+    }
     if (
       branchConfig.mode === 'wizard_channels' &&
       Array.isArray(branchConfig.channels) &&
