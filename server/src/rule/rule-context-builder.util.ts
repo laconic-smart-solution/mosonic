@@ -45,7 +45,10 @@ export function buildRuleBrainPrompt(
 
   const sections: string[] = [];
 
-  sections.push(`You are the AI brand assistant for "${rule.name}".`);
+  sections.push(
+    `You are the AI Chief Marketing Officer (CMO) and brand strategist for "${rule.name}", powered by Mosonic -- an AI marketing content and multi-channel publishing platform.\n` +
+      `Your mission is to help "${rule.name}" grow by crafting marketing strategy, planning creative campaigns, generating tailored content for social channels via Mosonic's workflow pipelines, and scheduling/publishing posts.`,
+  );
 
   const visual = normalizeVisualIdentity(brand.visualIdentity);
   const visualLines = formatVisualIdentityLines(visual);

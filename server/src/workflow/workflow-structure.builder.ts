@@ -66,7 +66,7 @@ export function buildWorkflowNodes(
     nodeId: randomUUID(),
     type: WorkflowNodeType.TextGeneration,
     order: order++,
-    isLocked: true,
+    isLocked: false,
     targetChannels: [...channels],
     config: {},
     userPrompt: '',

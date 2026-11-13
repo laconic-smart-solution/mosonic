@@ -76,11 +76,12 @@ export function findWorkflowCards(
 }
 
 const LEGACY_NAME = /^workflow for rule\s/i
+const UNTITLED_PATTERN = /^untitled(\s+(brand|workflow))?$/i
 
-/** Never show an internal id: brand name first, then a stored name that isn't the legacy id form. */
+/** Never show an internal id or "Untitled · Workflow": brand name first, then fallback. */
 export function workflowCardTitle(snapshot: Pick<WorkflowCardSnapshot, "name" | "brandName">, fallback: string): string {
   const brand = snapshot.brandName?.trim()
-  if (brand) return `${brand} · ${fallback}`
+  if (brand && !UNTITLED_PATTERN.test(brand)) return `${brand} · ${fallback}`
   const name = snapshot.name.trim()
-  return name && !LEGACY_NAME.test(name) ? name : fallback
+  return name && !LEGACY_NAME.test(name) && !UNTITLED_PATTERN.test(name) ? name : fallback
 }
