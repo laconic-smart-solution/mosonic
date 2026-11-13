@@ -17,6 +17,7 @@ import {
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 
 type NormalizedTranslationConfig = {
   provider?: LlmProvider;
@@ -35,12 +36,13 @@ function normalizeTranslationConfig(
     typeof c.sourceLanguage === 'string' && c.sourceLanguage.trim()
       ? c.sourceLanguage.trim()
       : 'auto';
+  const provider =
+    c.provider && Object.values(LlmProvider).includes(c.provider)
+      ? c.provider
+      : undefined;
   return {
-    provider:
-      c.provider && Object.values(LlmProvider).includes(c.provider)
-        ? c.provider
-        : undefined,
-    model: typeof c.model === 'string' ? c.model : 'gpt-4o',
+    provider,
+    model: resolveNodeModel(c.model, provider, 'chat'),
     sourceLanguage: rawSource,
     targetLanguage:
       typeof c.targetLanguage === 'string' ? c.targetLanguage : 'th',

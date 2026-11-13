@@ -10,6 +10,7 @@ import type {
   NodeExecutionResult,
   TranscriptionInput,
 } from '../types/node-execution.types';
+import { resolveNodeModel } from '../provider-default-model.util';
 
 /** Whisper / audio transcription — uses audio APIs, not chat completions. */
 const MAX_WHISPER_FILE_BYTES = 25 * 1024 * 1024;
@@ -32,12 +33,13 @@ function normalizeTranscriptionConfig(
       : NodeMediaSourceType.Audio;
   const sourceUrl = typeof c.sourceUrl === 'string' ? c.sourceUrl : '';
   const languageRaw = typeof c.language === 'string' ? c.language.trim() : '';
+  const provider =
+    c.provider && Object.values(LlmProvider).includes(c.provider)
+      ? c.provider
+      : undefined;
   return {
-    provider:
-      c.provider && Object.values(LlmProvider).includes(c.provider)
-        ? c.provider
-        : undefined,
-    model: typeof c.model === 'string' ? c.model : 'whisper-1',
+    provider,
+    model: resolveNodeModel(c.model, provider, 'transcription'),
     sourceType,
     sourceUrl,
     language:

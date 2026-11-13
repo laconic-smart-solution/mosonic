@@ -263,6 +263,37 @@ describe('parseWorkflowNodeConfig', () => {
       'Find competitor reels in skincare',
     );
   });
+
+  it('preserves Google Gemini image model and aspect ratio without forcing OpenAI model', () => {
+    const r = parseWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
+      provider: 'google',
+      model: 'imagen-3.0-generate-002',
+      aspectRatio: '9:16',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.provider).toBe('google');
+    expect(r.data.model).toBe('imagen-3.0-generate-002');
+    expect(r.data.aspectRatio).toBe('9:16');
+  });
+
+  it('defaults chat and transcription node models to Gemini when provider=google', () => {
+    const textRes = parseWorkflowNodeConfig(WorkflowNodeType.TextGeneration, {
+      provider: 'google',
+    });
+    expect(textRes.ok).toBe(true);
+    if (textRes.ok) {
+      expect(textRes.data.model).toBe('gemini-2.5-flash');
+    }
+
+    const txRes = parseWorkflowNodeConfig(WorkflowNodeType.Transcription, {
+      provider: 'google',
+    });
+    expect(txRes.ok).toBe(true);
+    if (txRes.ok) {
+      expect(txRes.data.model).toBe('gemini-2.5-flash');
+    }
+  });
 });
 
 describe('rejectedVideoPatchKeys', () => {

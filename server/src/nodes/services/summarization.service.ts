@@ -19,6 +19,7 @@ import {
   extractUsageFromStreamChunk,
 } from '../langchain-usage.util';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 
 type SummaryFormat = 'paragraph' | 'bullets' | 'tldr';
 
@@ -45,12 +46,14 @@ function normalizeSummarizationConfig(
         ? 'tldr'
         : 'paragraph';
 
+  const provider =
+    c.provider && Object.values(LlmProvider).includes(c.provider)
+      ? c.provider
+      : undefined;
+
   return {
-    provider:
-      c.provider && Object.values(LlmProvider).includes(c.provider)
-        ? c.provider
-        : undefined,
-    model: typeof c.model === 'string' ? c.model : 'gpt-4o',
+    provider,
+    model: resolveNodeModel(c.model, provider, 'chat'),
     summaryLength:
       c.summaryLength === NodeSummaryLength.Short ||
       c.summaryLength === NodeSummaryLength.Long

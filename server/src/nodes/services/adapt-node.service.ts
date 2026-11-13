@@ -19,6 +19,7 @@ import type {
   PreviousOutputs,
 } from '../types/node-execution.types';
 import { extractUsageFromAiMessage } from '../langchain-usage.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 import { parseMarkdownToSections } from '../../content/content-markdown-compiler.util';
 
 type AdaptConfig = {
@@ -65,7 +66,7 @@ export class AdaptNodeService {
 
     const model = this.llm.getChatModelForPlainText({
       provider: config.provider,
-      model: typeof config.model === 'string' ? config.model : 'gpt-4o',
+      model: resolveNodeModel(config.model, config.provider, 'chat'),
     });
 
     const system = [

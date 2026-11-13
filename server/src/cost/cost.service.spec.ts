@@ -110,6 +110,39 @@ describe('CostService', () => {
         ),
       ).toBeCloseTo(12, 5);
     });
+
+    it('computes Google Gemini LLM, image, and transcription costs', () => {
+      const llmCost = service.calculateCost(
+        dto({
+          entryType: 'openai_llm',
+          provider: 'google',
+          providerModel: 'gemini-2.5-flash',
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+        }),
+      );
+      expect(llmCost).toBeCloseTo(0.15 + 0.6, 5);
+
+      const imageCost = service.calculateCost(
+        dto({
+          entryType: 'openai_image',
+          provider: 'google',
+          providerModel: 'gemini-2.5-flash-image',
+          imageCount: 2,
+        }),
+      );
+      expect(imageCost).toBeCloseTo(0.039 * 2, 5);
+
+      const audioCost = service.calculateCost(
+        dto({
+          entryType: 'openai_llm',
+          provider: 'google',
+          providerModel: 'gemini-2.5-flash',
+          audioDurationSeconds: 120,
+        }),
+      );
+      expect(audioCost).toBeCloseTo(2 * 0.003, 6);
+    });
   });
 
   describe('currentBillingPeriod', () => {

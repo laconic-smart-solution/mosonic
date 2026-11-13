@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatAnthropic } from '@langchain/anthropic';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import OpenAI from 'openai';
@@ -12,20 +10,18 @@ import {
   LlmProvider,
   WorkflowNodeType,
 } from '../nodes/workflow-node-llm.enums';
-import { coerceOpenAiImageMime } from '../nodes/openai-image-mime.util';
 import {
   allowedOpenAiImageSizesForModel,
-  coerceOpenAiImageSize,
   isValidOpenAiImageSizeForModel,
   OPENAI_IMAGE_GENERATION_MODEL,
 } from '../nodes/openai-image-size.util';
-import { mirrorFileServiceArtifactToPublicUploadsUrl } from '../upload/file-service-local-mirror.util';
 import { resolveAbsoluteMediaUrlFromConfig } from '../upload/resolve-absolute-media-url.util';
+import type { LlmCapability } from './strategies/provider-strategy.interface';
+import { ProviderStrategyFactory } from './strategies/provider-strategy.factory';
+import { DEFAULT_OPENAI_MODEL } from './strategies/openai-provider.strategy';
 
-const DEFAULT_OPENAI_MODEL = 'gpt-4o';
 const DEFAULT_OPENAI_REASONING_MODEL = 'gpt-6-luna';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-3-5-sonnet-latest';
-const DEFAULT_GOOGLE_MODEL = 'gemini-1.5-pro';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
 const DEFAULT_FILE_SERVICE_UPLOAD_PATH = '/upload';
@@ -45,14 +41,10 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'gpt-6-astra': 1_050_000,
   'claude-3-5-sonnet-latest': 200_000,
   'gemini-1.5-pro': 2_000_000,
+  'gemini-2.0-flash': 1_048_576,
+  'gemini-2.5-flash': 1_048_576,
+  'gemini-2.5-pro': 1_048_576,
 };
-
-type LlmCapability =
-  | 'chat'
-  | 'image_generation'
-  | 'video_generation'
-  | 'transcription'
-  | 'vision_describe';
 
 type ProviderCapabilities = Record<LlmProvider, Record<LlmCapability, boolean>>;
 
@@ -73,10 +65,10 @@ const PROVIDER_CAPABILITIES: ProviderCapabilities = {
   },
   [LlmProvider.Google]: {
     chat: true,
-    image_generation: false,
+    image_generation: true,
     video_generation: false,
-    transcription: false,
-    vision_describe: false,
+    transcription: true,
+    vision_describe: true,
   },
   [LlmProvider.Groq]: {
     chat: true,
@@ -97,25 +89,18 @@ const PROVIDER_CAPABILITIES: ProviderCapabilities = {
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
+  private readonly strategyFactory: ProviderStrategyFactory;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    strategyFactory?: ProviderStrategyFactory,
+  ) {
+    this.strategyFactory =
+      strategyFactory ?? new ProviderStrategyFactory(this.config);
+  }
 
   private resolveProvider(requested?: string): LlmProvider {
-    const normalized = requested?.trim().toLowerCase();
-    if (
-      normalized &&
-      (Object.values(LlmProvider) as string[]).includes(normalized)
-    ) {
-      return normalized as LlmProvider;
-    }
-    const fromEnv = this.config
-      .get<string>('LLM_PROVIDER')
-      ?.trim()
-      .toLowerCase();
-    if (fromEnv && (Object.values(LlmProvider) as string[]).includes(fromEnv)) {
-      return fromEnv as LlmProvider;
-    }
-    return LlmProvider.OpenAI;
+    return this.strategyFactory.resolveProvider(requested);
   }
 
   private requireApiKeyForProvider(provider: LlmProvider): string {
@@ -137,6 +122,13 @@ export class LlmService {
       );
     }
     return apiKey;
+  }
+
+  getDefaultModelForCapability(
+    provider: string | undefined,
+    capability: LlmCapability,
+  ): string {
+    return this.strategyFactory.getDefaultModel(provider, capability);
   }
 
   getProviderCapabilities(provider?: string): Record<LlmCapability, boolean> {
@@ -172,7 +164,6 @@ export class LlmService {
       [WorkflowNodeType.VideoCinematic]: 'video_generation',
       [WorkflowNodeType.VideoGeneration]: 'video_generation',
       [WorkflowNodeType.Transcription]: 'transcription',
-      // Subtitle is a local string transform: no provider capability required.
       [WorkflowNodeType.Adapt]: 'chat',
       [WorkflowNodeType.Intelligence]: 'chat',
     };
@@ -180,7 +171,11 @@ export class LlmService {
     if (capability) {
       this.assertProviderCapability(provider, capability);
     }
-    if (type === WorkflowNodeType.ImageGeneration && config) {
+    if (
+      type === WorkflowNodeType.ImageGeneration &&
+      config &&
+      provider === LlmProvider.OpenAI
+    ) {
       const rec = config as Record<string, unknown>;
       const model = OPENAI_IMAGE_GENERATION_MODEL;
       const sizeRaw =
@@ -204,53 +199,43 @@ export class LlmService {
   }
 
   /**
-   * Returns a configured OpenAI chat model. Throws if OPENAI_API_KEY is not set
-   * (callers that need the model should handle or propagate). Does not call the API.
-   *
-   * Model resolution: `options.model` (e.g. workflow node `config.model`) →
-   * `OPENAI_MODEL` env → built-in default.
+   * Returns a JSON-oriented chat model via ProviderStrategyFactory (OpenAI / Gemini)
+   * or legacy chat providers (Anthropic / Groq / Ollama).
    */
   getChatModel(options?: {
     provider?: string;
     model?: string;
-    /** Default 0.3. Use ~0.55 for workflow planning for more varied JSON plans. */
     temperature?: number;
   }): BaseChatModel {
     const provider = this.resolveProvider(options?.provider);
     this.assertProviderCapability(provider, 'chat');
+
+    const strategy = this.strategyFactory.getStrategy(provider);
+    if (strategy) {
+      return strategy.createChatModel({
+        mode: 'json',
+        model: options?.model,
+        temperature: options?.temperature,
+      });
+    }
+
     const temperature =
       typeof options?.temperature === 'number' ? options.temperature : 0.3;
 
-    if (provider === LlmProvider.OpenAI) {
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const model =
-        this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL;
-      return new ChatOpenAI({
-        apiKey,
-        model,
-        temperature,
-        modelKwargs: {
-          response_format: { type: 'json_object' },
-        },
-      });
-    }
     if (provider === LlmProvider.Anthropic) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
+        options?.model?.trim() ||
         this.config.get<string>('ANTHROPIC_MODEL')?.trim() ||
         DEFAULT_ANTHROPIC_MODEL;
       return new ChatAnthropic({ apiKey, model, temperature });
     }
-    if (provider === LlmProvider.Google) {
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const model =
-        this.config.get<string>('GOOGLE_MODEL')?.trim() || DEFAULT_GOOGLE_MODEL;
-      return new ChatGoogleGenerativeAI({ apiKey, model, temperature });
-    }
     if (provider === LlmProvider.Groq) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
-        this.config.get<string>('GROQ_MODEL')?.trim() || DEFAULT_GROQ_MODEL;
+        options?.model?.trim() ||
+        this.config.get<string>('GROQ_MODEL')?.trim() ||
+        DEFAULT_GROQ_MODEL;
       return new ChatOpenAI({
         apiKey,
         model,
@@ -260,7 +245,9 @@ export class LlmService {
     }
 
     const model =
-      this.config.get<string>('OLLAMA_MODEL')?.trim() || DEFAULT_OLLAMA_MODEL;
+      options?.model?.trim() ||
+      this.config.get<string>('OLLAMA_MODEL')?.trim() ||
+      DEFAULT_OLLAMA_MODEL;
     return new ChatOllama({
       model,
       temperature,
@@ -270,7 +257,7 @@ export class LlmService {
   }
 
   /**
-   * Chat model without JSON mode — for preprocessing steps that must return plain text.
+   * Chat model without JSON mode — for copy generation and plain text tasks.
    */
   getChatModelForPlainText(options?: {
     provider?: string;
@@ -280,24 +267,26 @@ export class LlmService {
   }): BaseChatModel {
     const provider = this.resolveProvider(options?.provider);
     this.assertProviderCapability(provider, 'chat');
+
+    const strategy = this.strategyFactory.getStrategy(provider);
+    if (strategy) {
+      return strategy.createChatModel({
+        mode: 'plain',
+        model: options?.model,
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens,
+      });
+    }
+
     const temperature =
       typeof options?.temperature === 'number' ? options.temperature : 0.2;
     const maxTokens =
       typeof options?.maxTokens === 'number' ? options.maxTokens : undefined;
-    if (provider === LlmProvider.OpenAI) {
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const model =
-        this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL;
-      return new ChatOpenAI({
-        apiKey,
-        model,
-        temperature,
-        ...(maxTokens !== undefined ? { maxTokens } : {}),
-      });
-    }
+
     if (provider === LlmProvider.Anthropic) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
+        options?.model?.trim() ||
         this.config.get<string>('ANTHROPIC_MODEL')?.trim() ||
         DEFAULT_ANTHROPIC_MODEL;
       return new ChatAnthropic({
@@ -307,21 +296,12 @@ export class LlmService {
         ...(maxTokens !== undefined ? { maxTokens } : {}),
       });
     }
-    if (provider === LlmProvider.Google) {
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const model =
-        this.config.get<string>('GOOGLE_MODEL')?.trim() || DEFAULT_GOOGLE_MODEL;
-      return new ChatGoogleGenerativeAI({
-        apiKey,
-        model,
-        temperature,
-        ...(maxTokens !== undefined ? { maxOutputTokens: maxTokens } : {}),
-      });
-    }
     if (provider === LlmProvider.Groq) {
       const apiKey = this.requireApiKeyForProvider(provider);
       const model =
-        this.config.get<string>('GROQ_MODEL')?.trim() || DEFAULT_GROQ_MODEL;
+        options?.model?.trim() ||
+        this.config.get<string>('GROQ_MODEL')?.trim() ||
+        DEFAULT_GROQ_MODEL;
       return new ChatOpenAI({
         apiKey,
         model,
@@ -331,7 +311,9 @@ export class LlmService {
       });
     }
     const model =
-      this.config.get<string>('OLLAMA_MODEL')?.trim() || DEFAULT_OLLAMA_MODEL;
+      options?.model?.trim() ||
+      this.config.get<string>('OLLAMA_MODEL')?.trim() ||
+      DEFAULT_OLLAMA_MODEL;
     return new ChatOllama({
       model,
       temperature,
@@ -340,10 +322,8 @@ export class LlmService {
     });
   }
 
-  /** Default chat Completions model id (`OPENAI_MODEL`). */
   /**
    * Returns a chat model wrapped with structured output validation (Zod schema or JSON schema).
-   * Supports OpenAI native strict JSON Schema, Anthropic function calling, and Google Gemini responseSchema.
    */
   getChatModelForStructuredOutput<T>(
     schema: unknown,
@@ -355,25 +335,22 @@ export class LlmService {
       strict?: boolean;
     },
   ) {
-    const plainModel = this.getChatModelForPlainText(options);
     const provider = this.resolveProvider(options?.provider);
+    this.assertProviderCapability(provider, 'chat');
 
-    if (provider === LlmProvider.OpenAI) {
-      try {
-        return (plainModel as any).withStructuredOutput(schema, {
-          method: 'jsonSchema',
-          strict: options?.strict ?? true,
-        });
-      } catch {
-        return (plainModel as any).withStructuredOutput(schema);
-      }
+    const strategy = this.strategyFactory.getStrategy(provider);
+    if (strategy) {
+      return strategy.createStructuredChatModel<T>(schema, options);
     }
 
+    const plainModel = this.getChatModelForPlainText(options);
     return (plainModel as any).withStructuredOutput(schema);
   }
 
   getPlainTextModelId(): string {
-    return this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL;
+    return (
+      this.config.get<string>('OPENAI_MODEL')?.trim() || DEFAULT_OPENAI_MODEL
+    );
   }
 
   /** The OpenAI reasoning model id currently configured (for context-limit lookups etc). */
@@ -385,10 +362,7 @@ export class LlmService {
   }
 
   /**
-   * OpenAI reasoning model for the chat operator (default gpt-6-luna).
-   * Omit temperature (rejected on reasoning models). Use the Responses API so
-   * function tools work with reasoning.effort; Chat Completions rejects that
-   * combo on gpt-6-luna. Default effort is low (cheap thinking + tools).
+   * OpenAI reasoning model for the chat operator (always OpenAI / ChatGPT).
    */
   getReasoningChatModel(options?: {
     effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
@@ -401,16 +375,12 @@ export class LlmService {
       model,
       useResponsesApi: true,
       reasoning: { effort: options?.effort ?? 'low' },
-      ...(options?.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
+      ...(options?.maxTokens !== undefined
+        ? { maxTokens: options.maxTokens }
+        : {}),
     });
   }
 
-  /**
-   * Describe image content for rule extraction preprocessing (vision models).
-   * Visual understanding is the primary task — what the image actually
-   * shows — with any visible text transcribed as a secondary detail, not
-   * the other way around.
-   */
   async describeImageForExtraction(
     buffer: Buffer,
     mimeType: string,
@@ -418,43 +388,21 @@ export class LlmService {
   ): Promise<string> {
     const provider = this.resolveProvider(options?.provider);
     this.assertProviderCapability(provider, 'vision_describe');
-    const model = this.getChatModelForPlainText({
-      provider,
-      model: options?.model,
-    });
-    const b64 = buffer.toString('base64');
-    const dataUrl = `data:${mimeType};base64,${b64}`;
-    const res = await model.invoke([
-      new SystemMessage(
-        'Look at the image and describe what it actually shows, for use as marketing/brand strategy context: subject matter, setting or scene, people or products, composition, color palette, lighting, and overall visual style or mood. Note any branding or product-presentation cues. After the visual description, separately transcribe any visible text verbatim, labeled as such. Output plain text only, no JSON.',
-      ),
-      new HumanMessage({
-        content: [
-          {
-            type: 'text',
-            text: 'Describe what this image shows and its visual style in detail, then list any readable text separately.',
-          },
-          {
-            type: 'image_url',
-            image_url: { url: dataUrl },
-          },
-        ],
-      }),
-    ]);
-    const text =
-      typeof res.content === 'string'
-        ? res.content
-        : Array.isArray(res.content)
-          ? res.content
-              .map((c) => (typeof c === 'string' ? c : JSON.stringify(c)))
-              .join('\n')
-          : String(res.content);
-    return text.trim();
+    const strategy = this.strategyFactory.getStrategy(provider);
+    if (strategy?.describeImageForExtraction) {
+      return strategy.describeImageForExtraction({
+        buffer,
+        mimeType,
+        model: options?.model,
+      });
+    }
+    throw new Error(
+      `Provider "${provider}" does not support vision describe`,
+    );
   }
 
   /**
-   * Embed a batch of texts for RAG storage/search (OpenAI only, matching the
-   * `faq/` service's embedding approach — JSONB float-array storage, no pgvector).
+   * Embed a batch of texts for RAG storage/search (OpenAI only).
    */
   async embedTexts(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
@@ -484,175 +432,45 @@ export class LlmService {
     return embeddings.embedQuery(text);
   }
 
-  /**
-   * OpenAI image generation (non-streaming). Always uses `gpt-image-2`.
-   * Returns base64 payload (`response_format: b64_json`) for downstream storage.
-   */
   async generateImageBase64(params: {
     provider?: string;
     model: string;
     prompt: string;
     size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+    aspectRatio?: string;
     quality: 'standard' | 'hd';
     style: 'natural' | 'vivid';
   }): Promise<{ base64: string; mimeType: string }> {
-    try {
-      const provider = this.resolveProvider(params.provider);
-      this.assertProviderCapability(provider, 'image_generation');
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const client = new OpenAI({ apiKey });
-      const model = OPENAI_IMAGE_GENERATION_MODEL;
-
-      const body: OpenAI.Images.ImageGenerateParamsNonStreaming = {
-        model,
-        prompt: params.prompt,
-        size: coerceOpenAiImageSize(String(params.size), model),
-        n: 1,
-        response_format: 'b64_json',
-      };
-
-      const callWithCompat = async (
-        req: OpenAI.Images.ImageGenerateParamsNonStreaming,
-      ): Promise<OpenAI.Images.ImagesResponse> => {
-        try {
-          return await client.images.generate(req);
-        } catch (error: unknown) {
-          const msg = this.formatError(error);
-          // Some gateways / older endpoints reject `response_format`.
-          if (msg.includes("Unknown parameter: 'response_format'")) {
-            const without = { ...req };
-            delete (without as { response_format?: unknown }).response_format;
-            return await client.images.generate(without);
-          }
-          throw error;
-        }
-      };
-
-      const response = await callWithCompat(body);
-
-      const row = response.data?.[0];
-      const base64 = row?.b64_json;
-      if (base64) {
-        return { base64, mimeType: 'image/png' };
-      }
-
-      const url = row?.url;
-      if (typeof url === 'string' && url.trim()) {
-        const res = await fetch(url.trim(), {
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (!res.ok) {
-          throw new Error(
-            `Image generation returned URL but download failed (${res.status})`,
-          );
-        }
-        const mimeType =
-          res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
-        const buf = Buffer.from(await res.arrayBuffer());
-        return { base64: buf.toString('base64'), mimeType };
-      }
-
-      throw new Error('Image generation returned no base64 payload');
-    } catch (error) {
-      this.logger.error(
-        `OpenAI image generation failed: ${this.formatError(error)}`,
+    const strategy = this.strategyFactory.requireStrategy(
+      params.provider,
+      'image_generation',
+    );
+    if (!strategy.generateImageBase64) {
+      throw new Error(
+        `Provider "${strategy.provider}" does not implement image generation`,
       );
-      throw error;
     }
+    return strategy.generateImageBase64(params);
   }
 
-  /**
-   * gpt-image-2 edit (text + reference images → image). Returns base64 PNG.
-   */
   async editImageBase64(params: {
     provider?: string;
+    model?: string;
     prompt: string;
-    /** Local file paths or Blob-like uploads; OpenAI SDK accepts File/Blob. */
     images: Array<{ buffer: Buffer; fileName: string; mimeType: string }>;
     size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+    aspectRatio?: string;
   }): Promise<{ base64: string; mimeType: string }> {
-    try {
-      const provider = this.resolveProvider(params.provider);
-      this.assertProviderCapability(provider, 'image_generation');
-      const apiKey = this.requireApiKeyForProvider(provider);
-      const client = new OpenAI({ apiKey });
-      const model = OPENAI_IMAGE_GENERATION_MODEL;
-
-      if (!params.images.length) {
-        throw new Error('editImageBase64 requires at least one reference image');
-      }
-
-      const files = params.images.map((img) => {
-        const bytes = Buffer.isBuffer(img.buffer)
-          ? img.buffer
-          : Buffer.from(img.buffer);
-        const { mimeType, ext } = coerceOpenAiImageMime({
-          buffer: bytes,
-          declaredMime: img.mimeType,
-          fileName: img.fileName,
-        });
-        const baseName = img.fileName.replace(/\.[a-z0-9]+$/i, '') || 'image';
-        return new File([Uint8Array.from(bytes)], `${baseName}.${ext}`, {
-          type: mimeType,
-        });
-      });
-
-      const body: OpenAI.Images.ImageEditParamsNonStreaming = {
-        model,
-        prompt: params.prompt,
-        image: files.length === 1 ? files[0] : files,
-        size: coerceOpenAiImageSize(String(params.size), model) as
-          | '1024x1024'
-          | '1024x1536'
-          | '1536x1024'
-          | 'auto',
-        n: 1,
-        response_format: 'b64_json',
-      };
-
-      let response: OpenAI.Images.ImagesResponse;
-      try {
-        response = await client.images.edit(body);
-      } catch (error: unknown) {
-        const msg = this.formatError(error);
-        if (msg.includes("Unknown parameter: 'response_format'")) {
-          const without = { ...body };
-          delete (without as { response_format?: unknown }).response_format;
-          response = await client.images.edit(without);
-        } else {
-          throw error;
-        }
-      }
-
-      const row = response.data?.[0];
-      const base64 = row?.b64_json;
-      if (base64) {
-        return { base64, mimeType: 'image/png' };
-      }
-
-      const url = row?.url;
-      if (typeof url === 'string' && url.trim()) {
-        const res = await fetch(url.trim(), {
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (!res.ok) {
-          throw new Error(
-            `Image edit returned URL but download failed (${res.status})`,
-          );
-        }
-        const mimeType =
-          res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
-        const buf = Buffer.from(await res.arrayBuffer());
-        return { base64: buf.toString('base64'), mimeType };
-      }
-
-      throw new Error('Image edit returned no base64 payload');
-    } catch (error) {
-      this.logger.error(
-        `OpenAI image edit failed: ${this.formatError(error)}`,
+    const strategy = this.strategyFactory.requireStrategy(
+      params.provider,
+      'image_generation',
+    );
+    if (!strategy.editImageBase64) {
+      throw new Error(
+        `Provider "${strategy.provider}" does not implement image editing`,
       );
-      throw error;
     }
+    return strategy.editImageBase64(params);
   }
 
   async uploadImageBase64(params: {
@@ -698,8 +516,6 @@ export class LlmService {
       }
 
       return {
-        // The file service can answer with an origin-less `4001/api/file/v1/file?...`;
-        // store a fetchable absolute URL instead (I-10).
         fileUrl:
           resolveAbsoluteMediaUrlFromConfig(data.fileUrl, this.config) ||
           data.fileUrl,
@@ -715,9 +531,6 @@ export class LlmService {
     }
   }
 
-  /**
-   * Whisper transcription from in-memory media bytes.
-   */
   async transcribeMedia(params: {
     provider?: string;
     fileBuffer: Buffer;
@@ -729,32 +542,35 @@ export class LlmService {
   }): Promise<string> {
     const provider = this.resolveProvider(params.provider);
     this.assertProviderCapability(provider, 'transcription');
-    const apiKey = this.requireApiKeyForProvider(provider);
-    const client =
-      provider === LlmProvider.Groq
-        ? new OpenAI({
-            apiKey,
-            baseURL: 'https://api.groq.com/openai/v1',
-          })
-        : new OpenAI({ apiKey });
-    const bytes = Uint8Array.from(params.fileBuffer);
-    const file = new File([bytes], params.fileName, {
-      type: params.mimeType,
-    });
-    const response = await client.audio.transcriptions.create({
-      model:
-        provider === LlmProvider.Groq ? 'whisper-large-v3-turbo' : 'whisper-1',
-      file,
-      language: params.language?.trim() || undefined,
-      prompt: params.prompt?.trim() || undefined,
-      response_format: 'text',
-    });
-    return typeof response === 'string' ? response : String(response);
+
+    const strategy = this.strategyFactory.getStrategy(provider);
+    if (strategy?.transcribeMedia) {
+      return strategy.transcribeMedia(params);
+    }
+
+    if (provider === LlmProvider.Groq) {
+      const apiKey = this.requireApiKeyForProvider(provider);
+      const client = new OpenAI({
+        apiKey,
+        baseURL: 'https://api.groq.com/openai/v1',
+      });
+      const bytes = Uint8Array.from(params.fileBuffer);
+      const file = new File([bytes], params.fileName, {
+        type: params.mimeType,
+      });
+      const response = await client.audio.transcriptions.create({
+        model: 'whisper-large-v3-turbo',
+        file,
+        language: params.language?.trim() || undefined,
+        prompt: params.prompt?.trim() || undefined,
+        response_format: 'text',
+      });
+      return typeof response === 'string' ? response : String(response);
+    }
+
+    throw new Error(`Provider "${provider}" does not support transcription`);
   }
 
-  /**
-   * OpenAI Responses API with built-in web_search for intelligence nodes.
-   */
   async runWebSearchBrief(params: {
     prompt: string;
     model?: string;
@@ -763,41 +579,19 @@ export class LlmService {
     text: string;
     usage?: { inputTokens: number; outputTokens: number };
   }> {
-    const provider = this.resolveProvider(params.provider);
-    this.assertProviderCapability(provider, 'chat');
-    if (provider !== LlmProvider.OpenAI) {
+    const strategy = this.strategyFactory.requireStrategy(
+      params.provider,
+      'chat',
+    );
+    if (!strategy.runWebSearchBrief) {
       throw new Error(
-        'Web search intelligence requires OpenAI (Responses API web_search tool)',
+        `Web search intelligence is not implemented for provider "${strategy.provider}"`,
       );
     }
-    const apiKey = this.requireApiKeyForProvider(provider);
-    const client = new OpenAI({ apiKey });
-    const model =
-      params.model?.trim() ||
-      this.config.get<string>('OPENAI_MODEL')?.trim() ||
-      DEFAULT_OPENAI_MODEL;
-
-    try {
-      const response = await client.responses.create({
-        model,
-        tools: [{ type: 'web_search' }],
-        input: params.prompt,
-      });
-
-      const text = (response.output_text ?? '').trim();
-      const usage = response.usage;
-      return {
-        text,
-        usage: usage
-          ? {
-              inputTokens: usage.input_tokens ?? 0,
-              outputTokens: usage.output_tokens ?? 0,
-            }
-          : undefined,
-      };
-    } catch (error) {
-      throw new Error(`OpenAI web search failed: ${this.formatError(error)}`);
-    }
+    return strategy.runWebSearchBrief({
+      prompt: params.prompt,
+      model: params.model,
+    });
   }
 
   private formatError(error: unknown): string {

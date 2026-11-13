@@ -27,6 +27,7 @@ import {
   coerceOpenAiImageSize,
   OPENAI_IMAGE_GENERATION_MODEL,
 } from '../openai-image-size.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 
 import type {
   ImageGenerationInput,
@@ -53,6 +54,7 @@ type NormalizedImageConfig = {
   provider?: LlmProvider;
   model: string;
   size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+  aspectRatio?: string;
   quality: 'standard' | 'hd';
   style: 'natural' | 'vivid';
   template: NodeImageTemplate;
@@ -71,7 +73,7 @@ export function normalizeImageGenerationConfig(
       ? c.provider
       : undefined;
 
-  const model = OPENAI_IMAGE_GENERATION_MODEL;
+  const model = resolveNodeModel(c.model, provider, 'image');
 
   const aspect =
     typeof c.aspectRatio === 'string' && c.aspectRatio.trim()
@@ -84,14 +86,14 @@ export function normalizeImageGenerationConfig(
   let sizeRaw: string;
 
   if (aspect) {
-    sizeRaw = aspectRatioToOpenAiImageSize(aspect, model);
+    sizeRaw = aspectRatioToOpenAiImageSize(aspect, OPENAI_IMAGE_GENERATION_MODEL);
   } else if (explicitSize) {
     sizeRaw = explicitSize;
   } else {
-    sizeRaw = aspectRatioToOpenAiImageSize('1:1', model);
+    sizeRaw = aspectRatioToOpenAiImageSize('1:1', OPENAI_IMAGE_GENERATION_MODEL);
   }
 
-  const size = coerceOpenAiImageSize(sizeRaw, model);
+  const size = coerceOpenAiImageSize(sizeRaw, OPENAI_IMAGE_GENERATION_MODEL);
 
   const quality =
     c.quality === NodeImageQuality.Hd ? ('hd' as const) : ('standard' as const);
@@ -126,6 +128,7 @@ export function normalizeImageGenerationConfig(
     provider,
     model,
     size,
+    aspectRatio: aspect,
     quality,
     style,
     template,
@@ -365,8 +368,10 @@ export class ImageGenerationService {
       args.assets.length > 0
         ? await this.editWithReferences({
             provider: normalized.provider,
+            model: normalized.model,
             prompt: args.prompt,
             size: normalized.size,
+            aspectRatio: normalized.aspectRatio,
             assets: args.assets,
             requireAll: args.requireReferences === true,
           })
@@ -375,6 +380,7 @@ export class ImageGenerationService {
             model: normalized.model,
             prompt: args.prompt,
             size: normalized.size,
+            aspectRatio: normalized.aspectRatio,
             quality: normalized.quality,
             style: normalized.style,
           });
@@ -393,8 +399,10 @@ export class ImageGenerationService {
 
   private async editWithReferences(args: {
     provider?: LlmProvider;
+    model?: string;
     prompt: string;
     size: NonNullable<OpenAI.Images.ImageGenerateParams['size']>;
+    aspectRatio?: string;
     assets: SourcePackAsset[];
     requireAll?: boolean;
   }): Promise<{ base64: string; mimeType: string }> {
@@ -422,9 +430,10 @@ export class ImageGenerationService {
       );
       return this.llm.generateImageBase64({
         provider: args.provider,
-        model: OPENAI_IMAGE_GENERATION_MODEL,
+        model: args.model ?? resolveNodeModel(undefined, args.provider, 'image'),
         prompt: args.prompt,
         size: args.size,
+        aspectRatio: args.aspectRatio,
         quality: 'standard',
         style: 'natural',
       });
@@ -432,9 +441,11 @@ export class ImageGenerationService {
 
     return this.llm.editImageBase64({
       provider: args.provider,
+      model: args.model,
       prompt: args.prompt,
       images,
       size: args.size,
+      aspectRatio: args.aspectRatio,
     });
   }
 
