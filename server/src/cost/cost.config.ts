@@ -18,6 +18,25 @@ export const OPENAI_LLM_PRICING: Record<
   'gpt-4.1-mini': { inputPerMToken: 0.4, outputPerMToken: 1.6 },
 };
 
+/** Google Gemini chat pricing: USD per 1M tokens. */
+export const GOOGLE_LLM_PRICING: Record<
+  string,
+  { inputPerMToken: number; outputPerMToken: number }
+> = {
+  'gemini-2.5-flash': { inputPerMToken: 0.15, outputPerMToken: 0.6 },
+  'gemini-2.5-pro': { inputPerMToken: 1.25, outputPerMToken: 10.0 },
+  'gemini-2.0-flash': { inputPerMToken: 0.1, outputPerMToken: 0.4 },
+  'gemini-1.5-pro': { inputPerMToken: 1.25, outputPerMToken: 5.0 },
+};
+
+/** Google Gemini / Imagen per-image USD rates. */
+export const GOOGLE_IMAGE_PRICING: Record<string, number> = {
+  'gemini-2.5-flash-image': 0.039,
+  'gemini-2.0-flash-exp-image-generation': 0.039,
+  'imagen-3.0-generate-002': 0.03,
+  google_image_default: 0.039,
+};
+
 /**
  * USD per image. Key: `${model}_${size}_${quality}` for DALL·E;
  * gpt-image-2 uses simplified keys (OpenAI pricing varies — conservative defaults).
@@ -113,6 +132,9 @@ export const ZERNIO_ACCOUNT_MONTHLY_USD = 6.0;
 
 /** OpenAI Whisper — USD per minute (approximate public pricing). */
 export const OPENAI_WHISPER_USD_PER_MINUTE = 0.006;
+
+/** Google Gemini multimodal audio transcription — USD per minute estimate. */
+export const GOOGLE_AUDIO_USD_PER_MINUTE = 0.003;
 
 /** Credit display rounding — minimum 1 credit per operation. */
 export const displayCredits = (precise: number): number =>

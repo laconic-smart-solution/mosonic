@@ -138,7 +138,9 @@
   "fields": {
     "shared": {
       "on": "On",
-      "off": "Off"
+      "off": "Off",
+      "provider": "AI Provider",
+      "model": "Model"
     },
     "text": {
       "outputFormat": {

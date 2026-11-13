@@ -24,6 +24,7 @@ import {
   isVideoNodeType,
   videoModeForNode,
 } from './video-node-type.util';
+import { resolveNodeModel } from './provider-default-model.util';
 
 export {
   allowedOpenAiImageSizesForModel,
@@ -105,6 +106,10 @@ const imageConfigSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
+    const provider = data.provider ?? LlmProvider.OpenAI;
+    if (provider !== LlmProvider.OpenAI) {
+      return;
+    }
     const model = OPENAI_IMAGE_GENERATION_MODEL;
     if (typeof data.size === 'string' && data.size.trim()) {
       const s = data.size.trim();
@@ -493,6 +498,16 @@ function mergeWithDefaults(
   const out: Record<string, unknown> = { ...base, ...parsed };
 
   if (type === WorkflowNodeType.ImageGeneration) {
+    if (out.provider === LlmProvider.Google) {
+      out.model = resolveNodeModel(parsed.model, LlmProvider.Google, 'image');
+      if (
+        typeof parsed.aspectRatio === 'string' &&
+        parsed.aspectRatio.trim()
+      ) {
+        out.aspectRatio = parsed.aspectRatio.trim();
+      }
+      return out;
+    }
     const model = OPENAI_IMAGE_GENERATION_MODEL;
     out.model = model;
     const hadAspectInParsed =
@@ -517,6 +532,17 @@ function mergeWithDefaults(
       out.size = aspectRatioToOpenAiImageSize(fallbackAr, model);
     }
     out.size = coerceOpenAiImageSize(String(out.size), model);
+  } else if (type === WorkflowNodeType.Transcription) {
+    out.model = resolveNodeModel(parsed.model, out.provider, 'transcription');
+  } else if (
+    type === WorkflowNodeType.KeywordPlanner ||
+    type === WorkflowNodeType.TextGeneration ||
+    type === WorkflowNodeType.Translation ||
+    type === WorkflowNodeType.Summarization ||
+    type === WorkflowNodeType.Adapt ||
+    type === WorkflowNodeType.Intelligence
+  ) {
+    out.model = resolveNodeModel(parsed.model, out.provider, 'chat');
   }
 
   return out;
@@ -637,10 +663,20 @@ export function parseWorkflowNodeConfig(
   }
 
   if (type === WorkflowNodeType.ImageGeneration) {
-    const model = OPENAI_IMAGE_GENERATION_MODEL;
-    picked.model = model;
-    if (typeof picked.size === 'string' && picked.size.trim()) {
-      picked.size = coerceOpenAiImageSize(picked.size.trim(), model);
+    const isGoogle =
+      String(picked.provider ?? '').trim().toLowerCase() === LlmProvider.Google;
+    if (isGoogle) {
+      picked.model = resolveNodeModel(
+        picked.model,
+        LlmProvider.Google,
+        'image',
+      );
+    } else {
+      const model = OPENAI_IMAGE_GENERATION_MODEL;
+      picked.model = model;
+      if (typeof picked.size === 'string' && picked.size.trim()) {
+        picked.size = coerceOpenAiImageSize(picked.size.trim(), model);
+      }
     }
   }
 

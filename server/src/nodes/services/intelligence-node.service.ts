@@ -13,6 +13,7 @@ import {
   appendAnalyticsContextToPrompt,
   buildIntelligenceSearchPrompt,
 } from './intelligence-search.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 
 @Injectable()
 export class IntelligenceNodeService {
@@ -57,8 +58,11 @@ export class IntelligenceNodeService {
           ? null
           : undefined;
 
-    const model =
-      typeof input.config?.model === 'string' ? input.config.model : 'gpt-4o';
+    const model = resolveNodeModel(
+      input.config?.model,
+      input.config?.provider,
+      'chat',
+    );
 
     if (searchType === 'custom' && !customPrompt?.trim()) {
       throw new UnprocessableEntityException(

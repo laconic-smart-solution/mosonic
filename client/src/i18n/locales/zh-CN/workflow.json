@@ -138,7 +138,9 @@
   "fields": {
     "shared": {
       "on": "开",
-      "off": "关"
+      "off": "关",
+      "provider": "AI 提供商",
+      "model": "模型"
     },
     "text": {
       "outputFormat": {

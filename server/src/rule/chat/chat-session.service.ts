@@ -20,6 +20,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools';
 import type { TenancyAuth } from '../../auth/tenancy.types';
 import { EventsService } from '../../events/events.service';
 import { LlmService } from '../../llm/llm.service';
+import { LlmProvider } from '../../nodes/workflow-node-llm.enums';
 import {
   CHAT_MESSAGE_REPOSITORY,
   CHAT_SESSION_REPOSITORY,
@@ -558,7 +559,7 @@ export class ChatSessionService {
       this.config.get<string>('CHAT_USE_REASONING_MODEL') === 'true';
     const model = useReasoning
       ? this.llm.getReasoningChatModel()
-      : this.llm.getChatModelForPlainText();
+      : this.llm.getChatModelForPlainText({ provider: LlmProvider.OpenAI });
 
     const dryRun = this.config.get<string>('CHAT_EVAL_DRY_RUN') === 'true' || !!opts.evalDryRun;
 
@@ -853,7 +854,7 @@ export class ChatSessionService {
       this.config.get<string>('CHAT_USE_REASONING_MODEL') === 'true';
     const model = useReasoning
       ? this.llm.getReasoningChatModel()
-      : this.llm.getChatModelForPlainText();
+      : this.llm.getChatModelForPlainText({ provider: LlmProvider.OpenAI });
 
     const toolCallId = `pipeline-result-${pipelineId}`;
     const resultText = JSON.stringify(observation);

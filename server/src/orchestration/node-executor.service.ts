@@ -15,6 +15,7 @@ import {
   WorkflowNodeType,
   type WorkflowNodeConfig,
 } from '../nodes/schemas/workflow-node.schema';
+import { resolveNodeModel } from '../nodes/provider-default-model.util';
 import { ImageGenerationService } from '../nodes/services/image-generation.service';
 import { KeywordPlannerService } from '../nodes/services/keyword-planner.service';
 import { AdaptNodeService } from '../nodes/services/adapt-node.service';
@@ -408,10 +409,7 @@ export class NodeExecutor {
       case WorkflowNodeType.Translation:
       case WorkflowNodeType.Summarization:
       case WorkflowNodeType.Intelligence: {
-        const model =
-          typeof cfg.model === 'string' && cfg.model.trim()
-            ? cfg.model.trim()
-            : 'gpt-4o';
+        const model = resolveNodeModel(cfg.model, provider, 'chat');
         return {
           ...base,
           providerModel: model,
@@ -450,10 +448,7 @@ export class NodeExecutor {
         };
       }
       case WorkflowNodeType.Transcription: {
-        const model =
-          typeof cfg.model === 'string' && cfg.model.trim()
-            ? cfg.model.trim()
-            : 'whisper-1';
+        const model = resolveNodeModel(cfg.model, provider, 'transcription');
         return {
           ...base,
           providerModel: model,
@@ -462,10 +457,7 @@ export class NodeExecutor {
         };
       }
       case WorkflowNodeType.Adapt: {
-        const model =
-          typeof cfg.model === 'string' && cfg.model.trim()
-            ? cfg.model.trim()
-            : 'gpt-4o';
+        const model = resolveNodeModel(cfg.model, provider, 'chat');
         return {
           ...base,
           providerModel: model,

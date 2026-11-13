@@ -24,6 +24,7 @@ import {
 } from '../langchain-usage.util';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 import { sanitizeGeneratedPostText } from './generated-text-guardrails.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 import type {
   NodeExecutionInput,
   NodeExecutionResult,
@@ -45,12 +46,13 @@ function normalizeTextGenerationConfig(
   config: WorkflowNodeConfig | undefined,
 ): NormalizedTextConfig {
   const c = config ?? {};
+  const provider =
+    c.provider && Object.values(LlmProvider).includes(c.provider)
+      ? c.provider
+      : undefined;
   return {
-    provider:
-      c.provider && Object.values(LlmProvider).includes(c.provider)
-        ? c.provider
-        : undefined,
-    model: typeof c.model === 'string' ? c.model : 'gpt-4o',
+    provider,
+    model: resolveNodeModel(c.model, provider, 'chat'),
     temperature: typeof c.temperature === 'number' ? c.temperature : 0.7,
     maxTokens: typeof c.maxTokens === 'number' ? c.maxTokens : 500,
     outputFormat:
