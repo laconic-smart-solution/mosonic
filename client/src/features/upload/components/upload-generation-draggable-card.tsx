@@ -17,6 +17,7 @@ import {
   type CardRunState,
 } from "@/features/content/components/content-detail/content-detail-review-ui"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
+import { resolveNodeModelInfo } from "@/features/workflow/data/workflow-model"
 import { cn } from "@/lib/utils"
 
 import {
@@ -89,6 +90,11 @@ export function UploadGenerationDraggableCard(props: Props) {
   const layer = useMemo(
     () => mergeNodeOutputLayers(nodeOutputs, nodeUserEdits, nodeId),
     [nodeOutputs, nodeUserEdits, nodeId]
+  )
+
+  const modelInfo = useMemo(
+    () => resolveNodeModelInfo(wfNode, layer),
+    [wfNode, layer]
   )
 
   const editedOutputsForCard = useMemo((): Partial<
@@ -228,9 +234,29 @@ export function UploadGenerationDraggableCard(props: Props) {
             <p className="text-xs font-semibold text-foreground">{title}</p>
             <CreditUsageBadge credits={creditsUsed} />
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            Step {wfNode.order}
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span>Step {wfNode.order}</span>
+            {modelInfo ? (
+              <>
+                <span className="text-border/90">•</span>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium tracking-tight",
+                    modelInfo.provider === "google"
+                      ? "border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                      : modelInfo.provider === "openai"
+                        ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : modelInfo.provider === "heygen"
+                          ? "border border-purple-500/25 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                          : "border border-border/60 bg-muted/60 text-muted-foreground"
+                  )}
+                  title={`Generated using ${modelInfo.model} (${modelInfo.provider})`}
+                >
+                  {modelInfo.label}
+                </span>
+              </>
+            ) : null}
+          </div>
         </div>
         <Button
           type="button"

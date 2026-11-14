@@ -138,7 +138,9 @@
   "fields": {
     "shared": {
       "on": "เปิด",
-      "off": "ปิด"
+      "off": "ปิด",
+      "provider": "ผู้ให้บริการ AI",
+      "model": "โมเดล"
     },
     "text": {
       "outputFormat": {

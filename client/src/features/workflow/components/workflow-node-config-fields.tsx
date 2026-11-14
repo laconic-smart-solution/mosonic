@@ -17,8 +17,25 @@ import {
   isVideoCanvasType,
   VIDEO_CINEMATIC_UI_ENABLED,
 } from "@/features/workflow/lib/video-generation-ui"
+import {
+  defaultModelForProvider,
+  modelsForProviderAndCanvasType,
+  normalizeWorkflowAiProvider,
+  WORKFLOW_AI_PROVIDERS,
+} from "@/features/workflow/data/workflow-model"
 import i18n from "@/i18n"
 import { cn } from "@/lib/utils"
+
+const AI_MODEL_CANVAS_TYPES = new Set([
+  "keywords",
+  "text",
+  "image",
+  "translation",
+  "transcription",
+  "summarization",
+  "adapt",
+  "intelligence",
+])
 
 const fo = (key: string) => i18n.t(`workflow:fields.options.${key}`)
 const fl = (node: string, field: string) =>
@@ -430,13 +447,18 @@ function buildWorkflowNodeFieldDefs(): Record<string, ConfigField[]> {
       visibleWhen: { key: "searchType", value: "custom" },
     },
   ],
+  keywords: [],
+  adapt: [],
   branch: [],
   }
 }
 
 /** True when the node type exposes editable fields in the configuration dialog. */
 export function nodeHasConfigurableSettings(canvasType: string): boolean {
-  return (getWorkflowNodeFieldDefs()[canvasType] ?? []).length > 0
+  return (
+    AI_MODEL_CANVAS_TYPES.has(canvasType) ||
+    (getWorkflowNodeFieldDefs()[canvasType] ?? []).length > 0
+  )
 }
 
 /** Locale-aware field definitions; refreshed when language changes via getWorkflowNodeFieldDefs(). */
@@ -613,12 +635,40 @@ export function WorkflowNodeConfigFields({
   nodeId,
   persistPresenterToServer = true,
 }: WorkflowNodeConfigFieldsProps) {
-  const { i18n: i18nInstance } = useTranslation("workflow")
+  const { i18n: i18nInstance, t } = useTranslation("workflow")
   const fieldDefs = useMemo(
     () => getWorkflowNodeFieldDefs(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh labels on locale change
     [i18nInstance.language],
   )
+
+  const supportsProviderSelection = AI_MODEL_CANVAS_TYPES.has(canvasType)
+  const activeProvider = normalizeWorkflowAiProvider(config.provider)
+  const providerField: ConfigField | undefined = supportsProviderSelection
+    ? {
+        key: "provider",
+        label: t("fields.shared.provider", { defaultValue: "AI Provider" }),
+        control: "buttons",
+        options: WORKFLOW_AI_PROVIDERS.map((p) => ({
+          label: p.label,
+          value: p.value,
+        })),
+        defaultValue: "openai",
+      }
+    : undefined
+  const modelOptions = supportsProviderSelection
+    ? modelsForProviderAndCanvasType(activeProvider, canvasType)
+    : []
+  const modelField: ConfigField | undefined =
+    supportsProviderSelection && modelOptions.length > 0
+      ? {
+          key: "model",
+          label: t("fields.shared.model", { defaultValue: "Model" }),
+          control: "select",
+          options: modelOptions,
+          defaultValue: modelOptions[0].value,
+        }
+      : undefined
 
   const mode =
     isVideoCanvasType(canvasType) ? effectiveVideoMode(config, canvasType) : ""
@@ -629,13 +679,25 @@ export function WorkflowNodeConfigFields({
     canvasType === "video" && VIDEO_CINEMATIC_UI_ENABLED
       ? visibleFields.find((field) => field.key === "mode")
       : undefined
-  const configFields = visibleFields.filter((field) => field.key !== "mode")
+  const configFields = visibleFields
+    .filter((field) => field.key !== "mode")
+    .filter(
+      (field) =>
+        !(canvasType === "image" && activeProvider === "google" && field.key === "quality"),
+    )
 
   function patchConfig(patch: Record<string, unknown>) {
     onChange({ ...config, ...patch })
   }
 
   function updateConfig(key: string, value: string) {
+    if (key === "provider" && supportsProviderSelection) {
+      patchConfig({
+        provider: value,
+        model: defaultModelForProvider(canvasType, value),
+      })
+      return
+    }
     patchConfig({ [key]: value })
   }
 
@@ -650,6 +712,26 @@ export function WorkflowNodeConfigFields({
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
+      {providerField
+        ? renderConfigField(
+            providerField,
+            { ...config, provider: activeProvider },
+            compact,
+            triggerClass,
+            setConfigValue,
+            updateConfig,
+          )
+        : null}
+      {modelField
+        ? renderConfigField(
+            modelField,
+            config,
+            compact,
+            triggerClass,
+            setConfigValue,
+            updateConfig,
+          )
+        : null}
       {modeField
         ? renderConfigField(
             modeField,

@@ -11,6 +11,7 @@ import { normalizeLaneId } from '../../workflow/workflow-graph.util';
 import { assertValidWorkflowNodeOrder } from '../../workflow/workflow-node-order.util';
 import { WorkflowStatus } from '../../workflow/schemas/workflow.schema';
 import type { WorkflowService } from '../../workflow/workflow.service';
+import type { RuleService } from '../rule.service';
 import { runTool, toolError } from './tool-error.util';
 import { showWorkflowPayload, workflowNodeLabel } from './workflow-tool.util';
 
@@ -432,6 +433,7 @@ export function createSetWorkflowChannelsTool(
   workflowService: WorkflowService,
   auth: TenancyAuth,
   brandName?: string,
+  ruleService?: RuleService,
 ) {
   return tool(
     async ({ channels }) =>
@@ -473,9 +475,27 @@ export function createSetWorkflowChannelsTool(
         const mergeIndex = kept.findIndex((n) => n.type === WorkflowNodeType.Merge);
         const next = [...kept];
         next.splice(mergeIndex, 0, ...added);
+        const branchIndex = next.findIndex((n) => n.type === WorkflowNodeType.Branch);
+        if (branchIndex !== -1) {
+          next[branchIndex] = {
+            ...next[branchIndex],
+            config: {
+              ...(next[branchIndex].config ?? {}),
+              channels: wanted,
+            },
+          };
+        }
         const removedLanes = present.filter((l) => !wanted.includes(l));
         if (removedLanes.length === 0 && missing.length === 0) {
           return toolError('no_change', `The workflow already uses exactly: ${wanted.join(', ')}.`);
+        }
+        if (ruleService) {
+          const ruleEntries = wanted.map((ch) => ({
+            channel: ch,
+            priority: 'medium',
+            contentStyle: 'platform-native',
+          }));
+          await ruleService.patchRule(ruleId, { channels: ruleEntries as never }, auth).catch(() => null);
         }
         return saveEdited(ruleId, workflowService, auth, loaded.snapshot, renumber(next), brandName, {
           channels: wanted,

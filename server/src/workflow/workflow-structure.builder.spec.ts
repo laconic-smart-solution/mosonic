@@ -32,12 +32,12 @@ function baseAnswers(
 }
 
 describe('buildWorkflowNodes', () => {
-  it('always emits locked text_generation first when no web search', () => {
+  it('always emits text_generation first when no web search', () => {
     const nodes = buildWorkflowNodes(baseAnswers(), ['instagram']);
     expect(nodes).toHaveLength(1);
     expect(nodes[0]).toMatchObject({
       type: WorkflowNodeType.TextGeneration,
-      isLocked: true,
+      isLocked: false,
       targetChannels: ['instagram'],
     });
   });

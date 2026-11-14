@@ -357,15 +357,179 @@ export const DEFAULT_MODEL_BY_CANVAS_TYPE: Record<string, string> = {
   translation: "gpt-4o",
   transcription: "whisper-1",
   summarization: "gpt-4o",
+  adapt: "gpt-4o",
+  intelligence: "gpt-4o",
+}
+
+export type WorkflowAiProvider = "openai" | "google"
+
+export const WORKFLOW_AI_PROVIDERS: Array<{ label: string; value: WorkflowAiProvider }> = [
+  { label: "GPT (OpenAI)", value: "openai" },
+  { label: "Gemini (Google)", value: "google" },
+]
+
+export const MODELS_BY_PROVIDER_AND_CANVAS_TYPE: Record<
+  WorkflowAiProvider,
+  Record<string, Array<{ label: string; value: string }>>
+> = {
+  openai: {
+    keywords: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o mini", value: "gpt-4o-mini" },
+      { label: "GPT-4.1", value: "gpt-4.1" },
+    ],
+    text: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o mini", value: "gpt-4o-mini" },
+      { label: "GPT-4.1", value: "gpt-4.1" },
+    ],
+    image: [{ label: "GPT Image 2", value: OPENAI_IMAGE_GENERATION_MODEL }],
+    translation: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o mini", value: "gpt-4o-mini" },
+    ],
+    transcription: [{ label: "Whisper-1", value: "whisper-1" }],
+    summarization: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o mini", value: "gpt-4o-mini" },
+    ],
+    adapt: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o mini", value: "gpt-4o-mini" },
+    ],
+    intelligence: [
+      { label: "GPT-4o (Web Search)", value: "gpt-4o" },
+      { label: "GPT-4.1 (Web Search)", value: "gpt-4.1" },
+    ],
+  },
+  google: {
+    keywords: [
+      { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
+    ],
+    text: [
+      { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
+    ],
+    image: [
+      { label: "Gemini 2.5 Flash Image", value: "gemini-2.5-flash-image" },
+      { label: "Imagen 3", value: "imagen-3.0-generate-002" },
+    ],
+    translation: [
+      { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
+    ],
+    transcription: [
+      { label: "Gemini 2.5 Flash Audio", value: "gemini-2.5-flash" },
+    ],
+    summarization: [
+      { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
+    ],
+    adapt: [
+      { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
+    ],
+    intelligence: [
+      { label: "Gemini 2.5 Flash (Google Search)", value: "gemini-2.5-flash" },
+      { label: "Gemini 2.5 Pro (Google Search)", value: "gemini-2.5-pro" },
+    ],
+  },
+}
+
+export function normalizeWorkflowAiProvider(raw: unknown): WorkflowAiProvider {
+  return String(raw ?? "").trim().toLowerCase() === "google" ? "google" : "openai"
+}
+
+export function modelsForProviderAndCanvasType(
+  provider: unknown,
+  canvasType: string,
+): Array<{ label: string; value: string }> {
+  const p = normalizeWorkflowAiProvider(provider)
+  return MODELS_BY_PROVIDER_AND_CANVAS_TYPE[p][canvasType] ?? []
+}
+
+export function defaultModelForProvider(
+  canvasType: string,
+  provider: unknown,
+): string {
+  const p = normalizeWorkflowAiProvider(provider)
+  const list = MODELS_BY_PROVIDER_AND_CANVAS_TYPE[p][canvasType]
+  if (list && list.length > 0) return list[0].value
+  return p === "google" ? "gemini-2.5-flash" : (DEFAULT_MODEL_BY_CANVAS_TYPE[canvasType] ?? "gpt-4o")
+}
+
+export interface NodeModelBadgeInfo {
+  provider: string
+  model: string
+  label: string
+}
+
+export function resolveNodeModelInfo(
+  wfNode?: WorkflowNode | null,
+  layer?: Record<string, unknown> | null,
+): NodeModelBadgeInfo | null {
+  if (!wfNode) return null
+
+  const { type, config } = wfNode
+
+  if (type === "subtitle") {
+    return { provider: "local", model: "srt_vtt", label: "Local · SRT/VTT" }
+  }
+  if (type === "video_presenter") {
+    return { provider: "heygen", model: "heygen_video_1", label: "HeyGen · Photo Avatar" }
+  }
+  if (type === "video_cinematic") {
+    return { provider: "heygen", model: "seedance_2", label: "HeyGen · Cinematic" }
+  }
+  if (type === "video_generation") {
+    const mode =
+      config?.mode === "cinematic_avatar" || config?.mode === "heygen_video"
+        ? "seedance_2"
+        : "heygen_video_1"
+    const label = mode === "seedance_2" ? "HeyGen · Cinematic" : "HeyGen · Photo Avatar"
+    return { provider: "heygen", model: mode, label }
+  }
+
+  const rawProvider =
+    (typeof layer?.provider === "string" && layer.provider.trim()) ||
+    (typeof config?.provider === "string" && config.provider.trim()) ||
+    "openai"
+  const provider = rawProvider.toLowerCase()
+
+  const canvasType = backendTypeToCanvas(type, config)
+  const explicitModel =
+    (typeof layer?.providerModel === "string" && layer.providerModel.trim()) ||
+    (typeof layer?.model === "string" && layer.model.trim()) ||
+    (typeof config?.model === "string" && config.model.trim()) ||
+    undefined
+
+  const model = explicitModel || defaultModelForProvider(canvasType, provider)
+
+  const providerPrefix =
+    provider === "google"
+      ? "Gemini"
+      : provider === "openai"
+        ? "GPT"
+        : provider === "anthropic"
+          ? "Claude"
+          : provider.charAt(0).toUpperCase() + provider.slice(1)
+
+  return {
+    provider,
+    model,
+    label: `${providerPrefix} · ${model}`,
+  }
 }
 
 export function defaultConfigForNewCanvasNode(wfType: string): Record<string, unknown> {
   const model = DEFAULT_MODEL_BY_CANVAS_TYPE[wfType] ?? "gpt-4o"
   switch (wfType) {
     case "keywords":
-      return { model, temperature: 0.3, maxTokens: 800 }
+      return { provider: "openai", model, temperature: 0.3, maxTokens: 800 }
     case "text":
       return {
+        provider: "openai",
         model,
         outputFormat: "paragraph",
         tone: "professional",
@@ -373,6 +537,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "image":
       return {
+        provider: "openai",
         model,
         template: "auto",
         designStyle: "auto",
@@ -402,6 +567,7 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "translation":
       return {
+        provider: "openai",
         model,
         sourceLanguage: "auto",
         targetLanguage: "th",
@@ -410,12 +576,13 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "transcription":
       // sourceUrl (audio/video URL) is required at run unless an upstream video feeds it.
-      return { model, language: "auto", sourceType: "audio" }
+      return { provider: "openai", model, language: "auto", sourceType: "audio" }
     case "subtitle":
       // Local SRT/VTT transform of transcription text - no AI model.
       return { format: "srt", maxCharsPerLine: 42, burnIn: false }
     case "summarization":
       return {
+        provider: "openai",
         model,
         summaryLength: "medium",
         outputFormat: "paragraph",
@@ -423,8 +590,10 @@ export function defaultConfigForNewCanvasNode(wfType: string): Record<string, un
       }
     case "branch":
       return { mode: "rule_channels" }
+    case "merge":
+      return {}
     default:
-      return { model }
+      return { provider: "openai", model }
   }
 }
 

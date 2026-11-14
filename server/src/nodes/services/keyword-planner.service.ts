@@ -7,6 +7,7 @@ import {
   type WorkflowNodeConfig,
 } from '../schemas/workflow-node.schema';
 import { extractUsageFromAiMessage } from '../langchain-usage.util';
+import { resolveNodeModel } from '../provider-default-model.util';
 import { formatGenerationTemporalContext } from './generation-temporal-context.util';
 import type {
   NodeExecutionInput,
@@ -23,19 +24,25 @@ function normalizeKeywordPlannerConfig(
   config: WorkflowNodeConfig | undefined,
 ): NormalizedKeywordPlannerConfig {
   const c = config ?? {};
+  const provider =
+    c.provider && Object.values(LlmProvider).includes(c.provider)
+      ? c.provider
+      : undefined;
   return {
-    provider:
-      c.provider && Object.values(LlmProvider).includes(c.provider)
-        ? c.provider
-        : undefined,
-    model: typeof c.model === 'string' ? c.model : 'gpt-4o',
+    provider,
+    model: resolveNodeModel(c.model, provider, 'chat'),
     temperature: typeof c.temperature === 'number' ? c.temperature : 0.3,
   };
 }
 
 function safeJsonParse(text: string): unknown {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(cleaned) as unknown;
   } catch {
     return null;
   }

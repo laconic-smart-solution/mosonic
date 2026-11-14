@@ -95,6 +95,33 @@ describe('LlmService', () => {
     ).not.toThrow();
   });
 
+  it('allows google provider for image generation and transcription', () => {
+    expect(() =>
+      service.validateWorkflowNodeConfig(WorkflowNodeType.ImageGeneration, {
+        provider: LlmProvider.Google,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      service.validateWorkflowNodeConfig(WorkflowNodeType.Transcription, {
+        provider: LlmProvider.Google,
+      }),
+    ).not.toThrow();
+  });
+
+  it('forwards explicit model option for google and openai chat models', () => {
+    const googleChat = service.getChatModelForPlainText({
+      provider: LlmProvider.Google,
+      model: 'gemini-2.5-pro',
+    }) as unknown as { model?: string };
+    expect(googleChat.model).toBe('gemini-2.5-pro');
+
+    const openaiChat = service.getChatModelForPlainText({
+      provider: LlmProvider.OpenAI,
+      model: 'gpt-4.1',
+    }) as unknown as { model?: string };
+    expect(openaiChat.model).toBe('gpt-4.1');
+  });
+
   it('rejects non-openai provider for video generation', () => {
     expect(() =>
       service.validateWorkflowNodeConfig(WorkflowNodeType.VideoGeneration, {

@@ -179,11 +179,14 @@ export function blankBrandAskBlock(args: {
   options: ReadonlyArray<{ id: string; label: string }>;
   confirmFor?: string;
 }): string | null {
+  const q = String(args.question ?? '').toLowerCase();
   const offersPost =
     args.confirmFor === 'start_generation' ||
+    /(language|post|intro|first|format|topic|channel|caption|copy|design)/i.test(q) ||
+    POST_OPTION.test(q) ||
     args.options.some((o) => POST_OPTION.test(o.id) || POST_OPTION.test(o.label));
   if (!offersPost) return null;
-  return 'brand_empty: this brand has no name, description, or website yet, so there is nothing to post about. Do not offer posts, intros, or generation. Ask for the brand name and a website URL or a short description first (ask_user options like "Paste my website" (inputType url) / "Describe my brand", or plain text).';
+  return 'brand_empty: this brand has no name, description, or website yet, so there is nothing to post about. Do not offer posts, intros, or generation. If the user provided brand details or attached brand assets/overview files, call update_rule to establish the brand profile (name, brandName, description, audience) and apply_default_workflow in the same turn first. Otherwise ask for the brand name and website URL or a short description.';
 }
 
 /**

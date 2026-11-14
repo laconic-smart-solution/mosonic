@@ -13,6 +13,9 @@ import {
 } from '../repositories/tokens';
 import { UsersService } from '../users/users.service';
 import {
+  GOOGLE_AUDIO_USD_PER_MINUTE,
+  GOOGLE_IMAGE_PRICING,
+  GOOGLE_LLM_PRICING,
   OPENAI_IMAGE_PRICING,
   OPENAI_LLM_PRICING,
   OPENAI_VIDEO_PRICING,
@@ -91,13 +94,21 @@ export class CostService {
   calculateCost(dto: RecordCostDto): number {
     switch (dto.entryType) {
       case 'openai_llm': {
-        if (dto.providerModel === 'whisper-1') {
+        if (
+          dto.providerModel === 'whisper-1' ||
+          typeof dto.audioDurationSeconds === 'number'
+        ) {
           const seconds = dto.audioDurationSeconds ?? 60;
           const minutes = Math.max(seconds / 60, 1 / 60);
-          return minutes * OPENAI_WHISPER_USD_PER_MINUTE;
+          const ratePerMin =
+            dto.provider === 'google'
+              ? GOOGLE_AUDIO_USD_PER_MINUTE
+              : OPENAI_WHISPER_USD_PER_MINUTE;
+          return minutes * ratePerMin;
         }
         const p = dto.providerModel
-          ? OPENAI_LLM_PRICING[dto.providerModel]
+          ? (OPENAI_LLM_PRICING[dto.providerModel] ??
+            GOOGLE_LLM_PRICING[dto.providerModel])
           : undefined;
         if (!p) {
           return 0;
@@ -109,6 +120,17 @@ export class CostService {
       }
 
       case 'openai_image': {
+        const modelId = dto.providerModel ?? '';
+        if (
+          dto.provider === 'google' ||
+          modelId.includes('gemini') ||
+          modelId.startsWith('imagen-')
+        ) {
+          const googleRate =
+            GOOGLE_IMAGE_PRICING[modelId] ??
+            GOOGLE_IMAGE_PRICING.google_image_default;
+          return googleRate * (dto.imageCount ?? 1);
+        }
         const key = `${dto.providerModel}_${dto.imageSize}_${dto.imageQuality}`;
         let perImage = OPENAI_IMAGE_PRICING[key];
         if (perImage == null && dto.providerModel?.startsWith('gpt-image')) {

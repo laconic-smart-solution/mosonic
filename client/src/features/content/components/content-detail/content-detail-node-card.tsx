@@ -14,6 +14,7 @@ import {
 } from "@/features/content/data/content-review-helpers"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/shared/types/workflow.type"
+import { resolveNodeModelInfo } from "@/features/workflow/data/workflow-model"
 import { PreviewImageWithOverlay, MediaVideoBlock, type CardRunState } from "./content-detail-review-ui"
 import { StructuredSectionEditor } from "./structured-section-editor"
 import type { ContentSectionItem } from "@/shared/types/content.type"
@@ -67,6 +68,8 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
     sections,
     onSectionsChange,
   } = props
+
+  const modelInfo = resolveNodeModelInfo(props.wfNode)
 
   const interactionsLocked =
     globalRerunning ||
@@ -238,6 +241,23 @@ export function ContentDetailNodeCard(props: ContentDetailNodeCardProps) {
             <RefreshCw className="mr-1.5 size-3" />
             Re-run node
           </Button>
+          {modelInfo ? (
+            <span
+              className={cn(
+                "inline-flex items-center rounded px-2 py-0.5 font-mono text-[10px] font-medium tracking-tight",
+                modelInfo.provider === "google"
+                  ? "border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : modelInfo.provider === "openai"
+                    ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : modelInfo.provider === "heygen"
+                      ? "border border-purple-500/25 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                      : "border border-border/60 bg-muted/60 text-muted-foreground"
+              )}
+              title={`Generated using ${modelInfo.model} (${modelInfo.provider})`}
+            >
+              {modelInfo.label}
+            </span>
+          ) : null}
           <div className="ml-auto flex flex-wrap gap-2">
             {isTextLike ? (
               <Button
